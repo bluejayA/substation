@@ -1,0 +1,90 @@
+{
+  "app": {
+    "version": "1.0.0-dev",
+    "enableAutoUpdate": false,
+    "enableTelemetry": false,
+    "configVersion": 1,
+    "defaultProfile": "development",
+    "enableExperimentalFeatures": true
+  },
+  "openstack": {
+    "defaultRegion": "RegionOne",
+    "timeout": 60.0,
+    "retryCount": 1,
+    "retryDelay": 0.5,
+    "enableCaching": false,
+    "cacheTimeout": 60.0,
+    "enableCompression": false,
+    "apiVersion": {
+      "compute": "2.1",
+      "network": "2.0",
+      "volume": "3.0",
+      "identity": "3.0",
+      "image": "2.0"
+    },
+    "endpoints": {
+      "identity": "http://localhost:5000/v3",
+      "compute": "http://localhost:8774/v2.1",
+      "network": "http://localhost:9696/v2.0",
+      "volume": "http://localhost:8776/v3",
+      "image": "http://localhost:9292/v2"
+    },
+    "enableInsecure": true
+  },
+  "ui": {
+    "theme": "development",
+    "colorScheme": "dark",
+    "refreshInterval": 2.0,
+    "autoRefresh": true,
+    "pageSize": 20,
+    "enableAnimations": true,
+    "enableNotifications": true,
+    "defaultView": "dashboard",
+    "keybindings": {
+      "quit": "CTRL-C",
+      "refresh": "r",
+      "search": "/",
+      "help": "?",
+      "dashboard": "1",
+      "servers": "2",
+      "networks": "3",
+      "volumes": "4",
+      "topology": "5",
+      "debug": "D"
+    },
+    "enableMouse": true
+  },
+  "performance": {
+    "maxCacheSize": 100,
+    "maxMemoryUsage": 134217728,
+    "targetFPS": 30.0,
+    "enableVirtualScrolling": true,
+    "prefetchSize": 5,
+    "enableLazyLoading": true,
+    "renderOptimizations": false,
+    "memoryWarningThreshold": 0.9,
+    "enableBackgroundProcessing": false
+  },
+  "security": {
+    "enableEncryption": false,
+    "tokenRefreshThreshold": 600.0,
+    "enableCertificateValidation": false,
+    "enableSecureMemory": false,
+    "sessionTimeout": 7200.0,
+    "enableAuditLogging": false,
+    "maxSessionDuration": 86400.0,
+    "enableMFA": false,
+    "allowedTLSVersions": ["1.2", "1.3"]
+  },
+  "logging": {
+    "level": "debug",
+    "enableFileLogging": true,
+    "logDirectory": "dev-logs",
+    "maxLogSize": 5242880,
+    "maxLogFiles": 3,
+    "enableConsoleLogging": true,
+    "enableRemoteLogging": false,
+    "remoteLogEndpoint": "",
+    "enableStructuredLogging": true
+  }
+}

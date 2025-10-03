@@ -1,0 +1,9 @@
+markdown-exec
+mkdocs
+mkdocs-charts-plugin
+mkdocs-glightbox
+mkdocs-material
+mkdocs-material-adr
+mkdocs-mermaid2-plugin
+mkdocs-swagger-ui-tag
+reno

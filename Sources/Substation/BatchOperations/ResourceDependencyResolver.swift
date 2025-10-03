@@ -1,0 +1,753 @@
+import Foundation
+import OSClient
+
+// MARK: - Resource Dependency Resolver
+
+/// Resolves resource dependencies and determines optimal execution order for batch operations
+actor ResourceDependencyResolver {
+
+    // MARK: - Dependency Graph Types
+
+    public enum ResourceType: String, CaseIterable, Sendable {
+        case network
+        case subnet
+        case port
+        case router
+        case server
+        case volume
+        case floatingIP
+        case securityGroup
+        case keyPair
+        case image
+        case flavor
+
+        /// Resources that must exist before this resource can be created
+        public var dependencies: [ResourceType] {
+            switch self {
+            case .network:
+                return []
+            case .subnet:
+                return [.network]
+            case .port:
+                return [.network, .subnet]
+            case .router:
+                return [.network] // External network for gateway
+            case .server:
+                return [.image, .flavor, .network, .keyPair] // Basic dependencies
+            case .volume:
+                return []
+            case .floatingIP:
+                return [.network] // External network
+            case .securityGroup:
+                return []
+            case .keyPair:
+                return []
+            case .image:
+                return []
+            case .flavor:
+                return []
+            }
+        }
+
+        /// Resources that depend on this resource (reverse dependencies)
+        public var dependents: [ResourceType] {
+            return ResourceType.allCases.filter { type in
+                type.dependencies.contains(self)
+            }
+        }
+
+        /// Safe deletion order priority (lower number = delete first)
+        public var deletionPriority: Int {
+            switch self {
+            case .server:
+                return 1 // Delete servers first
+            case .volume:
+                return 2 // Then volumes (may be attached to servers)
+            case .port:
+                return 3 // Then ports
+            case .floatingIP:
+                return 4 // Then floating IPs
+            case .router:
+                return 5 // Then routers
+            case .subnet:
+                return 6 // Then subnets
+            case .network:
+                return 7 // Then networks
+            case .securityGroup:
+                return 8 // Security groups can be deleted late
+            case .keyPair, .image, .flavor:
+                return 9 // System resources last
+            }
+        }
+    }
+
+    public struct DependencyNode: Sendable, Hashable {
+        public let id: String
+        public let type: ResourceType
+        public let name: String?
+        public let dependencies: Set<String> // IDs of resources this depends on
+        public let metadata: [String: String]
+
+        public init(
+            id: String,
+            type: ResourceType,
+            name: String? = nil,
+            dependencies: Set<String> = [],
+            metadata: [String: String] = [:]
+        ) {
+            self.id = id
+            self.type = type
+            self.name = name
+            self.dependencies = dependencies
+            self.metadata = metadata
+        }
+    }
+
+    public struct ExecutionPlan: Sendable {
+        public let operationID: String
+        public let phases: [ExecutionPhase]
+        public let totalOperations: Int
+        public let estimatedDuration: TimeInterval
+        public let warnings: [String]
+
+        public init(
+            operationID: String,
+            phases: [ExecutionPhase],
+            totalOperations: Int,
+            estimatedDuration: TimeInterval,
+            warnings: [String] = []
+        ) {
+            self.operationID = operationID
+            self.phases = phases
+            self.totalOperations = totalOperations
+            self.estimatedDuration = estimatedDuration
+            self.warnings = warnings
+        }
+    }
+
+    public struct ExecutionPhase: Sendable {
+        public let phaseNumber: Int
+        public let operations: [PlannedOperation]
+        public let canRunInParallel: Bool
+        public let description: String
+        public let estimatedDuration: TimeInterval
+
+        public init(
+            phaseNumber: Int,
+            operations: [PlannedOperation],
+            canRunInParallel: Bool,
+            description: String,
+            estimatedDuration: TimeInterval
+        ) {
+            self.phaseNumber = phaseNumber
+            self.operations = operations
+            self.canRunInParallel = canRunInParallel
+            self.description = description
+            self.estimatedDuration = estimatedDuration
+        }
+    }
+
+    public struct PlannedOperation: Sendable, Hashable {
+        public let id: String
+        public let type: ResourceType
+        public let action: OperationAction
+        public let resourceIdentifier: String
+        public let dependencies: Set<String>
+        public let estimatedDuration: TimeInterval
+        public let metadata: [String: String]
+
+        public init(
+            id: String,
+            type: ResourceType,
+            action: OperationAction,
+            resourceIdentifier: String,
+            dependencies: Set<String> = [],
+            estimatedDuration: TimeInterval,
+            metadata: [String: String] = [:]
+        ) {
+            self.id = id
+            self.type = type
+            self.action = action
+            self.resourceIdentifier = resourceIdentifier
+            self.dependencies = dependencies
+            self.estimatedDuration = estimatedDuration
+            self.metadata = metadata
+        }
+    }
+
+    public enum OperationAction: String, Sendable, CaseIterable {
+        case create
+        case delete
+        case update
+        case attach
+        case detach
+
+        public var estimatedDurationSeconds: TimeInterval {
+            switch self {
+            case .create:
+                return 30.0 // Most creates take ~30 seconds
+            case .delete:
+                return 15.0 // Deletes are faster
+            case .update:
+                return 20.0 // Updates are moderate
+            case .attach:
+                return 25.0 // Attachments take time
+            case .detach:
+                return 10.0 // Detachments are fast
+            }
+        }
+    }
+
+    // MARK: - Properties
+
+    private var dependencyGraph: [String: DependencyNode] = [:]
+    private var maxConcurrency: Int = 10
+
+    // MARK: - Initialization
+
+    public init(maxConcurrency: Int = 10) {
+        self.maxConcurrency = maxConcurrency
+    }
+
+    // MARK: - Main Interface
+
+    /// Creates an execution plan for a batch operation
+    public func createExecutionPlan(for operation: BatchOperationType) async throws -> ExecutionPlan {
+        let operationID = UUID().uuidString
+        var warnings: [String] = []
+
+        Logger.shared.logInfo("ResourceDependencyResolver - Creating execution plan for: \(operation.description)")
+
+        // Clear previous state
+        dependencyGraph.removeAll()
+
+        // Build dependency graph based on operation type
+        let operations = try await buildOperationsFromBatchType(operation)
+
+        // Create dependency nodes
+        for op in operations {
+            let node = DependencyNode(
+                id: op.id,
+                type: op.type,
+                name: op.resourceIdentifier,
+                dependencies: op.dependencies,
+                metadata: op.metadata
+            )
+            dependencyGraph[op.id] = node
+        }
+
+        // Validate dependencies
+        let validationResult = await validateDependencies()
+        if !validationResult.isValid {
+            throw BatchOperationError.dependencyValidationFailed(validationResult.errors.joined(separator: "; "))
+        }
+        warnings.append(contentsOf: validationResult.warnings)
+
+        // Create execution phases
+        let phases = await createExecutionPhases(from: operations)
+
+        // Calculate total duration and operation count
+        let totalOperations = operations.count
+        let estimatedDuration = phases.reduce(0) { total, phase in
+            total + (phase.canRunInParallel ? phase.estimatedDuration : phase.operations.reduce(0) { $0 + $1.estimatedDuration })
+        }
+
+        let plan = ExecutionPlan(
+            operationID: operationID,
+            phases: phases,
+            totalOperations: totalOperations,
+            estimatedDuration: estimatedDuration,
+            warnings: warnings
+        )
+
+        Logger.shared.logInfo("ResourceDependencyResolver - Execution plan created: \(phases.count) phases, \(totalOperations) operations, ~\(Int(estimatedDuration/60)) minutes")
+
+        return plan
+    }
+
+    /// Validates that all dependencies can be satisfied
+    public func validateDependencies() async -> (isValid: Bool, errors: [String], warnings: [String]) {
+        var errors: [String] = []
+        var warnings: [String] = []
+
+        // Check for circular dependencies
+        let circularDeps = await detectCircularDependencies()
+        if !circularDeps.isEmpty {
+            errors.append("Circular dependencies detected: \(circularDeps.joined(separator: ", "))")
+        }
+
+        // Check for missing dependencies
+        for (nodeId, node) in dependencyGraph {
+            for depId in node.dependencies {
+                if dependencyGraph[depId] == nil {
+                    errors.append("Node \(nodeId) depends on missing resource \(depId)")
+                }
+            }
+        }
+
+        // Check for potential conflicts
+        let conflicts = await detectPotentialConflicts()
+        warnings.append(contentsOf: conflicts)
+
+        return (isValid: errors.isEmpty, errors: errors, warnings: warnings)
+    }
+
+    // MARK: - Private Implementation
+
+    private func buildOperationsFromBatchType(_ batchType: BatchOperationType) async throws -> [PlannedOperation] {
+        var operations: [PlannedOperation] = []
+
+        switch batchType {
+        case .serverBulkCreate(let configs):
+            operations = await buildServerCreateOperations(configs)
+
+        case .serverBulkDelete(let serverIDs):
+            operations = await buildServerDeleteOperations(serverIDs)
+
+        case .networkTopologyDeploy(let topology):
+            operations = await buildNetworkTopologyOperations(topology)
+
+        case .volumeBulkCreate(let configs):
+            operations = await buildVolumeCreateOperations(configs)
+
+        case .volumeBulkDelete(let volumeIDs):
+            operations = await buildVolumeDeleteOperations(volumeIDs)
+
+        case .volumeBulkAttach(let attachments):
+            operations = await buildVolumeAttachOperations(attachments)
+
+        case .volumeBulkDetach(let detachments):
+            operations = await buildVolumeDetachOperations(detachments)
+
+        case .floatingIPBulkCreate(let configs):
+            operations = await buildFloatingIPCreateOperations(configs)
+
+        case .floatingIPBulkAssign(let assignments):
+            operations = await buildFloatingIPAssignOperations(assignments)
+
+        case .securityGroupBulkCreate(let configs):
+            operations = await buildSecurityGroupCreateOperations(configs)
+
+        case .networkInterfaceBulkAttach(let interfaces):
+            operations = await buildNetworkInterfaceAttachOperations(interfaces)
+
+        case .resourceCleanup(let criteria):
+            operations = await buildResourceCleanupOperations(criteria)
+        }
+
+        return operations
+    }
+
+    private func buildServerCreateOperations(_ configs: [ServerCreateConfig]) async -> [PlannedOperation] {
+        return configs.enumerated().map { (index, config) in
+            PlannedOperation(
+                id: "server-create-\(index)",
+                type: .server,
+                action: .create,
+                resourceIdentifier: config.name,
+                dependencies: Set(config.networkIDs.map { "network-\($0)" }),
+                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
+                metadata: [
+                    "imageID": config.imageID,
+                    "flavorID": config.flavorID,
+                    "keyPair": config.keyPairName ?? ""
+                ]
+            )
+        }
+    }
+
+    private func buildServerDeleteOperations(_ serverIDs: [String]) async -> [PlannedOperation] {
+        return serverIDs.enumerated().map { (index, serverID) in
+            PlannedOperation(
+                id: "server-delete-\(index)",
+                type: .server,
+                action: .delete,
+                resourceIdentifier: serverID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildNetworkTopologyOperations(_ topology: NetworkTopologyDeployment) async -> [PlannedOperation] {
+        var operations: [PlannedOperation] = []
+
+        // 1. Create network first
+        let networkOp = PlannedOperation(
+            id: "network-\(topology.network.name)",
+            type: .network,
+            action: .create,
+            resourceIdentifier: topology.network.name,
+            dependencies: [],
+            estimatedDuration: OperationAction.create.estimatedDurationSeconds,
+            metadata: ["external": String(topology.network.external)]
+        )
+        operations.append(networkOp)
+
+        // 2. Create subnets (depend on network)
+        for (index, subnet) in topology.subnets.enumerated() {
+            let subnetOp = PlannedOperation(
+                id: "subnet-\(subnet.name)-\(index)",
+                type: .subnet,
+                action: .create,
+                resourceIdentifier: subnet.name,
+                dependencies: Set([networkOp.id]),
+                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
+                metadata: ["cidr": subnet.cidr]
+            )
+            operations.append(subnetOp)
+        }
+
+        // 3. Create router (if specified)
+        if let router = topology.router {
+            let routerOp = PlannedOperation(
+                id: "router-\(router.name)",
+                type: .router,
+                action: .create,
+                resourceIdentifier: router.name,
+                dependencies: Set([networkOp.id]),
+                estimatedDuration: OperationAction.create.estimatedDurationSeconds * 1.5, // Routers take slightly longer
+                metadata: ["external_gateway": router.externalGatewayNetworkID ?? ""]
+            )
+            operations.append(routerOp)
+        }
+
+        // 4. Create ports (depend on network and subnets)
+        let subnetDeps = Set(topology.subnets.enumerated().map { "subnet-\($0.element.name)-\($0.offset)" })
+        for (index, port) in topology.ports.enumerated() {
+            let portOp = PlannedOperation(
+                id: "port-\(port.name)-\(index)",
+                type: .port,
+                action: .create,
+                resourceIdentifier: port.name,
+                dependencies: Set([networkOp.id]).union(subnetDeps),
+                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
+                metadata: ["subnet": port.subnetID ?? ""]
+            )
+            operations.append(portOp)
+        }
+
+        return operations
+    }
+
+    private func buildVolumeCreateOperations(_ configs: [VolumeCreateConfig]) async -> [PlannedOperation] {
+        return configs.enumerated().map { (index, config) in
+            PlannedOperation(
+                id: "volume-create-\(index)",
+                type: .volume,
+                action: .create,
+                resourceIdentifier: config.name,
+                dependencies: [],
+                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
+                metadata: [
+                    "size": String(config.size),
+                    "type": config.volumeType ?? "default"
+                ]
+            )
+        }
+    }
+
+    private func buildVolumeDeleteOperations(_ volumeIDs: [String]) async -> [PlannedOperation] {
+        return volumeIDs.enumerated().map { (index, volumeID) in
+            PlannedOperation(
+                id: "volume-delete-\(index)",
+                type: .volume,
+                action: .delete,
+                resourceIdentifier: volumeID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildVolumeAttachOperations(_ attachments: [VolumeAttachmentOperation]) async -> [PlannedOperation] {
+        return attachments.enumerated().map { (index, attachment) in
+            PlannedOperation(
+                id: "volume-attach-\(index)",
+                type: .volume,
+                action: .attach,
+                resourceIdentifier: attachment.volumeID,
+                dependencies: Set(["server-\(attachment.serverID)"]),
+                estimatedDuration: OperationAction.attach.estimatedDurationSeconds,
+                metadata: [
+                    "serverID": attachment.serverID,
+                    "device": attachment.device ?? ""
+                ]
+            )
+        }
+    }
+
+    private func buildVolumeDetachOperations(_ detachments: [VolumeDetachmentOperation]) async -> [PlannedOperation] {
+        return detachments.enumerated().map { (index, detachment) in
+            PlannedOperation(
+                id: "volume-detach-\(index)",
+                type: .volume,
+                action: .detach,
+                resourceIdentifier: detachment.volumeID,
+                dependencies: [],
+                estimatedDuration: OperationAction.detach.estimatedDurationSeconds,
+                metadata: ["serverID": detachment.serverID]
+            )
+        }
+    }
+
+    private func buildFloatingIPCreateOperations(_ configs: [FloatingIPCreateConfig]) async -> [PlannedOperation] {
+        return configs.enumerated().map { (index, config) in
+            PlannedOperation(
+                id: "floatingip-create-\(index)",
+                type: .floatingIP,
+                action: .create,
+                resourceIdentifier: "floating-ip-\(index)",
+                dependencies: Set(["network-\(config.networkID)"]),
+                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
+                metadata: ["networkID": config.networkID]
+            )
+        }
+    }
+
+    private func buildFloatingIPAssignOperations(_ assignments: [FloatingIPAssignment]) async -> [PlannedOperation] {
+        return assignments.enumerated().map { (index, assignment) in
+            PlannedOperation(
+                id: "floatingip-assign-\(index)",
+                type: .floatingIP,
+                action: .attach,
+                resourceIdentifier: assignment.floatingIPID,
+                dependencies: Set(["server-\(assignment.serverID)"]),
+                estimatedDuration: OperationAction.attach.estimatedDurationSeconds,
+                metadata: [
+                    "serverID": assignment.serverID,
+                    "portID": assignment.portID ?? ""
+                ]
+            )
+        }
+    }
+
+    private func buildSecurityGroupCreateOperations(_ configs: [SecurityGroupCreateConfig]) async -> [PlannedOperation] {
+        return configs.enumerated().map { (index, config) in
+            PlannedOperation(
+                id: "securitygroup-create-\(index)",
+                type: .securityGroup,
+                action: .create,
+                resourceIdentifier: config.name,
+                dependencies: [],
+                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
+                metadata: [
+                    "rulesCount": String(config.rules.count),
+                    "description": config.description
+                ]
+            )
+        }
+    }
+
+    private func buildNetworkInterfaceAttachOperations(_ interfaces: [NetworkInterfaceOperation]) async -> [PlannedOperation] {
+        return interfaces.enumerated().map { (index, interface) in
+            PlannedOperation(
+                id: "interface-attach-\(index)",
+                type: .port,
+                action: .attach,
+                resourceIdentifier: interface.portID ?? "port-\(index)",
+                dependencies: Set([
+                    "server-\(interface.serverID)",
+                    "network-\(interface.networkID)"
+                ]),
+                estimatedDuration: OperationAction.attach.estimatedDurationSeconds,
+                metadata: [
+                    "serverID": interface.serverID,
+                    "networkID": interface.networkID
+                ]
+            )
+        }
+    }
+
+    private func buildResourceCleanupOperations(_ criteria: ResourceCleanupCriteria) async -> [PlannedOperation] {
+        var operations: [PlannedOperation] = []
+        var operationIndex = 0
+
+        // Build cleanup operations in safe deletion order (high priority first)
+        let resourceTypes = ResourceType.allCases.sorted { $0.deletionPriority < $1.deletionPriority }
+
+        for resourceType in resourceTypes {
+            switch resourceType {
+            case .server where criteria.includeServers:
+                // Add server cleanup operations
+                let serverOps = (1...5).map { i in
+                    PlannedOperation(
+                        id: "cleanup-server-\(operationIndex + i)",
+                        type: .server,
+                        action: .delete,
+                        resourceIdentifier: "cleanup-server-\(i)",
+                        dependencies: [],
+                        estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+                    )
+                }
+                operations.append(contentsOf: serverOps)
+                operationIndex += serverOps.count
+
+            case .volume where criteria.includeVolumes:
+                // Add volume cleanup operations
+                let volumeOps = (1...3).map { i in
+                    PlannedOperation(
+                        id: "cleanup-volume-\(operationIndex + i)",
+                        type: .volume,
+                        action: .delete,
+                        resourceIdentifier: "cleanup-volume-\(i)",
+                        dependencies: [],
+                        estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+                    )
+                }
+                operations.append(contentsOf: volumeOps)
+                operationIndex += volumeOps.count
+
+            case .network where criteria.includeNetworks:
+                // Add network cleanup operations
+                let networkOps = (1...2).map { i in
+                    PlannedOperation(
+                        id: "cleanup-network-\(operationIndex + i)",
+                        type: .network,
+                        action: .delete,
+                        resourceIdentifier: "cleanup-network-\(i)",
+                        dependencies: [],
+                        estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+                    )
+                }
+                operations.append(contentsOf: networkOps)
+                operationIndex += networkOps.count
+
+            default:
+                // Skip resource types not selected for cleanup
+                continue
+            }
+        }
+
+        return operations
+    }
+
+    private func createExecutionPhases(from operations: [PlannedOperation]) async -> [ExecutionPhase] {
+        var phases: [ExecutionPhase] = []
+        var remainingOps = Set(operations)
+        var completedOps = Set<String>()
+        var phaseNumber = 1
+
+        while !remainingOps.isEmpty {
+            // Find operations that have all dependencies satisfied
+            let readyOps = remainingOps.filter { op in
+                op.dependencies.isSubset(of: completedOps)
+            }
+
+            guard !readyOps.isEmpty else {
+                Logger.shared.logError("ResourceDependencyResolver - Dependency deadlock detected with \(remainingOps.count) remaining operations")
+                break
+            }
+
+            // Group operations by type for parallel execution
+            let groupedOps = Dictionary(grouping: readyOps) { $0.type }
+
+            // Determine if operations can run in parallel
+            let canRunInParallel = readyOps.count > 1 && readyOps.allSatisfy { op in
+                // Create operations can usually run in parallel
+                // Delete operations need careful ordering
+                op.action == .create || op.action == .attach
+            }
+
+            // Calculate phase duration
+            let phaseDuration = canRunInParallel ?
+                readyOps.map(\.estimatedDuration).max() ?? 0 :
+                readyOps.reduce(0) { $0 + $1.estimatedDuration }
+
+            // Create description
+            let typeGroups = groupedOps.keys.map { type in
+                "\(groupedOps[type]?.count ?? 0) \(type.rawValue)s"
+            }.joined(separator: ", ")
+
+            let phase = ExecutionPhase(
+                phaseNumber: phaseNumber,
+                operations: Array(readyOps),
+                canRunInParallel: canRunInParallel,
+                description: "Phase \(phaseNumber): \(typeGroups)",
+                estimatedDuration: phaseDuration
+            )
+
+            phases.append(phase)
+
+            // Mark operations as completed and remove from remaining
+            for op in readyOps {
+                completedOps.insert(op.id)
+                remainingOps.remove(op)
+            }
+
+            phaseNumber += 1
+        }
+
+        return phases
+    }
+
+    private func detectCircularDependencies() async -> [String] {
+        var visited: Set<String> = []
+        var recursionStack: Set<String> = []
+        var circularDeps: [String] = []
+
+        for nodeId in dependencyGraph.keys {
+            if !visited.contains(nodeId) {
+                await detectCircularDependenciesHelper(
+                    nodeId: nodeId,
+                    visited: &visited,
+                    recursionStack: &recursionStack,
+                    circularDeps: &circularDeps
+                )
+            }
+        }
+
+        return circularDeps
+    }
+
+    private func detectCircularDependenciesHelper(
+        nodeId: String,
+        visited: inout Set<String>,
+        recursionStack: inout Set<String>,
+        circularDeps: inout [String]
+    ) async {
+        visited.insert(nodeId)
+        recursionStack.insert(nodeId)
+
+        if let node = dependencyGraph[nodeId] {
+            for depId in node.dependencies {
+                if !visited.contains(depId) {
+                    await detectCircularDependenciesHelper(
+                        nodeId: depId,
+                        visited: &visited,
+                        recursionStack: &recursionStack,
+                        circularDeps: &circularDeps
+                    )
+                } else if recursionStack.contains(depId) {
+                    circularDeps.append("\(nodeId) -> \(depId)")
+                }
+            }
+        }
+
+        recursionStack.remove(nodeId)
+    }
+
+    private func detectPotentialConflicts() async -> [String] {
+        var warnings: [String] = []
+
+        // Check for resource name conflicts
+        let nameGroups = Dictionary(grouping: dependencyGraph.values) { $0.name ?? "unnamed" }
+        for (name, nodes) in nameGroups {
+            if nodes.count > 1 && name != "unnamed" {
+                warnings.append("Multiple resources with name '\(name)': \(nodes.map(\.type.rawValue).joined(separator: ", "))")
+            }
+        }
+
+        // Check for high-concurrency scenarios that might stress the system
+        let createOps = dependencyGraph.values.filter { node in
+            // Assume operations with no dependencies are creates
+            node.dependencies.isEmpty && node.type != .flavor && node.type != .image
+        }
+
+        if createOps.count > maxConcurrency * 2 {
+            warnings.append("High concurrency operation (\(createOps.count) creates) may stress the OpenStack cluster")
+        }
+
+        return warnings
+    }
+}

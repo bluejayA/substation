@@ -1,0 +1,124 @@
+site_name: Substation - OpenStack Terminal UI
+site_description: Enterprise-grade terminal user interface for OpenStack cloud infrastructure management
+site_author: Kevin Carter
+site_url: https://github.com/cloudnull/substation
+repo_name: substation
+repo_url: https://github.com/cloudnull/substation
+edit_uri: edit/main/docs/
+
+theme:
+  logo: assets/substation-logo-icon-fav.png
+  favicon: assets/substation-logo-icon-fav.png
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    logo: material/cloud
+    repo: fontawesome/brands/github
+
+plugins:
+  - search:
+      separator: '[\s\-\.]+'
+  - mermaid2:
+      version: 10.6.1
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - footnotes
+  - def_list
+  - attr_list
+  - md_in_html
+  - meta
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/cloudnull
+
+nav:
+  - Home:
+    - index.md
+    - Features: features.md
+    - Security: security.md
+    - FAQ: faq.md
+
+  - Getting Started:
+    - getting-started/index.md
+
+  - Architecture:
+    - architecture/index.md
+
+  - User Guide:
+    - user-guide/index.md
+
+  - Developer Guide:
+    - developers/index.md
+    - developers/formbuilder-guide.md
+    - developers/formselector-guide.md
+    - developers/formtextfield-guide.md
+
+  - OpenStack Integration:
+    - openstack/index.md
+
+  - API Reference:
+    - api/index.md
+
+  - Performance:
+    - performance/index.md
+
+  - Troubleshooting:
+    - troubleshooting/index.md

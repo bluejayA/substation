@@ -1,0 +1,102 @@
+# Enhanced OpenStack clouds.yaml configuration file
+# Demonstrates all advanced features of the enhanced parser
+# Place this file at ~/.config/openstack/clouds.yaml
+
+clouds:
+  # Example cloud with environment variable substitution
+  production:
+    auth:
+      auth_url: ${OS_AUTH_URL}
+      username: ${OS_USERNAME}
+      password: ${OS_PASSWORD}
+      project_name: ${OS_PROJECT_NAME:-production}
+      user_domain_name: ${OS_USER_DOMAIN_NAME:-Default}
+      project_domain_name: ${OS_PROJECT_DOMAIN_NAME:-Default}
+    region_name: ${OS_REGION_NAME:-RegionOne}
+    interface: public
+    identity_api_version: "3"
+
+  # Example with quoted strings and escape sequences
+  development:
+    auth:
+      auth_url: "https://keystone.dev.example.com:5000/v3"
+      username: "dev_user"
+      password: "dev_password_with_\"quotes\""  # Escaped quotes
+      project_name: "Development Project"       # Spaces in quotes
+      user_domain_name: 'Default'              # Single quotes
+      project_domain_name: 'Default'
+    region_name: us-west-1
+    interface: public
+    identity_api_version: "3"
+
+  # Application credentials example
+  ci_pipeline:
+    auth:
+      auth_url: https://identity.ci.example.com/v3
+      application_credential_id: ${CI_APP_CRED_ID}
+      application_credential_secret: ${CI_APP_CRED_SECRET}
+    region_name: ci-region
+    interface: internal
+    identity_api_version: "3"
+
+  # Advanced environment variable features
+  staging:
+    auth:
+      auth_url: https://identity.staging.example.com/v3
+      # Use environment variable with default fallback
+      username: ${STAGING_USER:-staging_admin}
+      # Require environment variable or fail
+      password: ${STAGING_PASS:?Staging password must be set}
+      # Use alternate value if variable is set
+      project_name: ${STAGING_PROJECT:+staging_env_project}
+      user_domain_name: Default
+      project_domain_name: Default
+    region_name: staging-west
+    interface: public
+    identity_api_version: "3"
+
+  # Example with complex string escapes
+  testing:
+    auth:
+      auth_url: "https://identity.test.example.com/v3"
+      username: "test\\user"          # Escaped backslash
+      password: "pass\nwith\nnewlines" # Escaped newlines
+      project_name: "test\tproject"   # Escaped tab
+      user_domain_name: Default
+      project_domain_name: Default
+    region_name: test-region
+    interface: public
+    identity_api_version: "3"
+
+  # Multi-region cloud example
+  multi_region:
+    auth:
+      auth_url: https://identity.multi.example.com/v3
+      application_credential_id: multi_cred_123
+      application_credential_secret: multi_secret_456
+    # Default to first region, can be overridden
+    region_name: ${PREFERRED_REGION:-east-1}
+    interface: public
+    identity_api_version: "3"
+
+  # Rackspace-style configuration with mixed auth
+  rackspace_prod:
+    auth:
+      auth_url: https://identity.api.rackspacecloud.com/v2.0
+      username: ${RACK_USERNAME}
+      password: ${RACK_API_KEY}
+      project_name: ${RACK_TENANT:-123456}
+      user_domain_name: Default
+      project_domain_name: Default
+    region_name: ${RACK_REGION:-DFW}
+    interface: public
+    identity_api_version: "3"
+
+# Example of how you might set environment variables:
+# export OS_AUTH_URL="https://identity.prod.example.com:5000/v3"
+# export OS_USERNAME="prod_admin"
+# export OS_PASSWORD="super_secure_password"
+# export OS_PROJECT_NAME="production"
+# export CI_APP_CRED_ID="abc123def456"
+# export CI_APP_CRED_SECRET="very-secure-app-credential-secret"
+# export STAGING_PASS="staging_password"

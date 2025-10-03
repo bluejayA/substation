@@ -1,0 +1,83 @@
+{
+  "app": {
+    "version": "1.0.0",
+    "enableAutoUpdate": true,
+    "enableTelemetry": true,
+    "configVersion": 1,
+    "defaultProfile": "production",
+    "enableExperimentalFeatures": false
+  },
+  "openstack": {
+    "defaultRegion": "",
+    "timeout": 30.0,
+    "retryCount": 3,
+    "retryDelay": 1.0,
+    "enableCaching": true,
+    "cacheTimeout": 300.0,
+    "enableCompression": true,
+    "apiVersion": {
+      "compute": "2.1",
+      "network": "2.0",
+      "volume": "3.0",
+      "identity": "3.0",
+      "image": "2.0"
+    },
+    "endpoints": {},
+    "enableInsecure": false
+  },
+  "ui": {
+    "theme": "production",
+    "colorScheme": "auto",
+    "refreshInterval": 5.0,
+    "autoRefresh": true,
+    "pageSize": 50,
+    "enableAnimations": true,
+    "enableNotifications": true,
+    "defaultView": "dashboard",
+    "keybindings": {
+      "quit": "CTRL-C",
+      "refresh": "r",
+      "search": "/",
+      "help": "?",
+      "dashboard": "1",
+      "servers": "2",
+      "networks": "3",
+      "volumes": "4",
+      "topology": "5"
+    },
+    "enableMouse": false
+  },
+  "performance": {
+    "maxCacheSize": 1000,
+    "maxMemoryUsage": 536870912,
+    "targetFPS": 60.0,
+    "enableVirtualScrolling": true,
+    "prefetchSize": 20,
+    "enableLazyLoading": true,
+    "renderOptimizations": true,
+    "memoryWarningThreshold": 0.8,
+    "enableBackgroundProcessing": true
+  },
+  "security": {
+    "enableEncryption": true,
+    "tokenRefreshThreshold": 300.0,
+    "enableCertificateValidation": true,
+    "enableSecureMemory": true,
+    "sessionTimeout": 3600.0,
+    "enableAuditLogging": true,
+    "maxSessionDuration": 28800.0,
+    "enableMFA": false,
+    "allowedTLSVersions": ["1.2", "1.3"]
+  },
+  "logging": {
+    "level": "info",
+    "enableFileLogging": true,
+    "logDirectory": "logs",
+    "maxLogSize": 10485760,
+    "maxLogFiles": 5,
+    "enableConsoleLogging": false,
+    "enableRemoteLogging": false,
+    "remoteLogEndpoint": "",
+    "enableStructuredLogging": true
+  }
+}

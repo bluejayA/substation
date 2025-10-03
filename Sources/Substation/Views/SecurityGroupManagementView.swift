@@ -1,0 +1,1420 @@
+import Foundation
+import OSClient
+import SwiftTUI
+
+struct SecurityGroupViews {
+    // Helper functions for SecurityGroupRule compatibility
+    private static func formatPortRange(_ rule: SecurityGroupRule) -> String {
+        if let min = rule.portRangeMin, let max = rule.portRangeMax {
+            return min == max ? "\(min)" : "\(min)-\(max)"
+        } else if let min = rule.portRangeMin {
+            return "\(min)"
+        } else if let max = rule.portRangeMax {
+            return "\(max)"
+        }
+        return "ALL"
+    }
+
+    private static func formatRemoteDescription(_ rule: SecurityGroupRule) -> String {
+        if let remoteIp = rule.remoteIpPrefix {
+            return remoteIp
+        } else if let remoteGroup = rule.remoteGroupId {
+            return "sg-\(String(remoteGroup.prefix(8)))"
+        }
+        return "0.0.0.0/0"
+    }
+
+    // Layout Constants
+    private static let titleOffset: Int32 = 2
+    private static let contentIndent: Int32 = 2
+    private static let fieldIndent: Int32 = 2
+    private static let itemIndent: Int32 = 2
+    private static let clearAreaOffset: Int32 = -1
+    private static let rowSpacing: Int32 = 1
+    private static let sectionSpacing: Int32 = 2
+    private static let componentTopPadding: Int32 = 2
+    private static let componentSpacing: Int32 = 0
+    private static let headerBottomPadding: Int32 = 2
+    private static let pendingChangesTopPadding: Int32 = 1
+
+    // Text Constants
+    private static let manageSecurityGroupsTitle = "Manage Security Groups"
+    private static let serverLabel = "Server: "
+    private static let unknownServerName = "Unknown"
+    private static let loadingMessage = "Loading security groups..."
+    private static let errorPrefix = "Error: "
+    private static let noGroupsAvailableMessage = "No security groups available"
+    private static let securityGroupsListTitle = "Security Groups:"
+    private static let pendingChangesPrefix = "Pending: "
+    private static let pendingChangesAddPrefix = "+"
+    private static let pendingChangesRemovePrefix = "-"
+    private static let pendingChangesSuffix = " changes"
+
+    // Status Indicators
+    private static let statusPendingAdd = "[+]"
+    private static let statusPendingRemove = "[-]"
+    private static let statusAttached = "[*]"
+    private static let statusNotAttached = "[ ]"
+
+    // Dimensions
+    private static let loadingComponentHeight: Int32 = 6
+    private static let errorComponentHeight: Int32 = 6
+    private static let emptyComponentHeight: Int32 = 6
+    private static let contentHeightOffset: Int32 = 8
+    private static let visibleItemsOffset: Int32 = 2
+
+    // MARK: - Security Groups List View
+
+    @MainActor
+    static func drawDetailedSecurityGroupList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                             width: Int32, height: Int32, cachedSecurityGroups: [SecurityGroup],
+                                             searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
+
+        // Defensive bounds checking to prevent crashes on small terminals
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        // Main Security Groups List
+        let surface = SwiftTUI.surface(from: screen)
+        var components: [any Component] = []
+
+        // Title
+        let titleText = searchQuery.map { "Security Groups (filtered: \($0))" } ?? "Security Groups"
+        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
+
+        // Header
+        components.append(Text("  NAME                            RULES     DESCRIPTION").muted()
+            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
+
+        // Content - get filtered groups and create list components
+        let filteredGroups = FilterUtils.filterSecurityGroups(cachedSecurityGroups, query: searchQuery)
+
+        if filteredGroups.isEmpty {
+            components.append(Text("No security groups found").info()
+                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
+        } else {
+            // Calculate visible range for simple viewport
+            let maxVisibleItems = max(1, Int(height) - 10) // Reserve space for header and footer
+            let startIndex = max(0, min(scrollOffset, filteredGroups.count - maxVisibleItems))
+            let endIndex = min(filteredGroups.count, startIndex + maxVisibleItems)
+
+            for i in startIndex..<endIndex {
+                let securityGroup = filteredGroups[i]
+                let isSelected = i == selectedIndex
+                let groupComponent = createSecurityGroupListItemComponent(securityGroup: securityGroup, isSelected: isSelected, width: width)
+                components.append(groupComponent)
+            }
+
+            // Scroll indicator if needed
+            if filteredGroups.count > maxVisibleItems {
+                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(filteredGroups.count)]"
+                components.append(Text(scrollText).info()
+                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
+            }
+        }
+
+        // Render unified security groups list
+        let securityGroupListComponent = VStack(spacing: 0, children: components)
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        await SwiftTUI.render(securityGroupListComponent, on: surface, in: bounds)
+    }
+
+    // MARK: - Component Creation Functions
+
+    private static func createSecurityGroupListItemComponent(securityGroup: SecurityGroup, isSelected: Bool, width: Int32) -> any Component {
+        // Security group name with formatting (30 chars to match header)
+        let groupName = String((securityGroup.name ?? "Unknown").prefix(30)).padding(toLength: 30, withPad: " ", startingAt: 0)
+
+        // Rules count with formatting (9 chars to match header)
+        let ruleCount = securityGroup.securityGroupRules?.count ?? 0
+        let rulesDisplay = String("\(ruleCount) rule\(ruleCount == 1 ? "" : "s")".prefix(9)).padding(toLength: 9, withPad: " ", startingAt: 0)
+
+        // Description with remaining space
+        let remainingWidth = max(0, Int(width) - 45)
+        let descDisplay = remainingWidth > 5 ? String((securityGroup.description ?? "No description").prefix(remainingWidth)) : ""
+
+        let rowStyle: TextStyle = isSelected ? .accent : .secondary
+
+        return HStack(spacing: 0, children: [
+            Text(" \(groupName)").styled(rowStyle),
+            Text(" \(rulesDisplay)").styled(rowStyle),
+            Text(" \(descDisplay)").styled(rowStyle)
+        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
+    }
+
+    private static func createSecurityGroupRuleItemComponent(rule: SecurityGroupRule, ruleIndex: Int,
+                                                           selectedIndices: Set<Int>, currentRuleIndex: Int) -> any Component {
+        let isSelected = selectedIndices.contains(ruleIndex)
+        let isCurrentRow = ruleIndex == currentRuleIndex
+
+        let prefix = isCurrentRow ? "> " : "  "
+        let checkbox = isSelected ? "[X] " : "[ ] "
+        let dirDisplay = String(rule.direction.prefix(6)).padding(toLength: 6, withPad: " ", startingAt: 0)
+        let protocolDisplay = String((rule.protocolEnum?.rawValue ?? "any").prefix(7)).padding(toLength: 7, withPad: " ", startingAt: 0)
+        let portDisplay = String(formatPortRange(rule).prefix(15)).padding(toLength: 15, withPad: " ", startingAt: 0)
+
+        let directionStyle: TextStyle = rule.direction == "ingress" ? .success : .error
+        let checkboxStyle: TextStyle = isSelected ? .success : .secondary
+        let prefixStyle: TextStyle = isCurrentRow ? .warning : .secondary
+
+        return HStack(spacing: 0, children: [
+            Text(prefix).styled(prefixStyle),
+            Text(checkbox).styled(checkboxStyle),
+            Text(dirDisplay).styled(directionStyle),
+            Text(" \(protocolDisplay) \(portDisplay) \(formatRemoteDescription(rule))").secondary()
+        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
+    }
+
+    // MARK: - Security Group Detail View
+
+    // Detail View Layout Constants
+    private static let securityGroupDetailTopPadding: Int32 = 2
+    private static let securityGroupDetailBottomPadding: Int32 = 2
+    private static let securityGroupDetailLeadingPadding: Int32 = 0
+    private static let securityGroupDetailTrailingPadding: Int32 = 0
+    private static let securityGroupDetailBasicInfoSpacing: Int32 = 0
+    private static let securityGroupDetailRulesSpacing: Int32 = 0
+    private static let securityGroupDetailSectionSpacing: Int32 = 1
+    private static let securityGroupDetailMinScreenWidth: Int32 = 40
+    private static let securityGroupDetailMinScreenHeight: Int32 = 15
+    private static let securityGroupDetailBoundsMinWidth: Int32 = 1
+    private static let securityGroupDetailBoundsMinHeight: Int32 = 1
+    private static let securityGroupDetailComponentSpacing: Int32 = 0
+    private static let securityGroupDetailReservedSpace: Int32 = 10
+    private static let securityGroupDetailRuleScrollThreshold = 8
+
+    // Detail View EdgeInsets (Pre-calculated for Performance - Gold Standard)
+    private static let securityGroupDetailTitleEdgeInsets = EdgeInsets(top: securityGroupDetailTitleTopPadding, leading: securityGroupDetailTitleLeadingPadding, bottom: securityGroupDetailTitleBottomPadding, trailing: securityGroupDetailTitleTrailingPadding)
+    private static let securityGroupDetailSectionEdgeInsets = EdgeInsets(top: securityGroupDetailSectionTopPadding, leading: securityGroupDetailSectionLeadingPadding, bottom: securityGroupDetailSectionBottomPadding, trailing: securityGroupDetailSectionTrailingPadding)
+
+    // Detail View Text Constants
+    private static let securityGroupDetailTitle = "Security Group Details"
+    private static let securityGroupDetailBasicInfoTitle = "Basic Information"
+    private static let securityGroupDetailIngressRulesTitle = "Ingress Rules"
+    private static let securityGroupDetailEgressRulesTitle = "Egress Rules"
+    private static let securityGroupDetailRulesSummaryTitle = "Rules Summary"
+    private static let securityGroupDetailNameLabel = "Name"
+    private static let securityGroupDetailIdLabel = "ID"
+    private static let securityGroupDetailDescriptionLabel = "Description"
+    private static let securityGroupDetailNoDescription = "No description"
+    private static let securityGroupDetailNoRules = "No rules defined"
+    private static let securityGroupDetailNoIngressRules = "No ingress rules"
+    private static let securityGroupDetailNoEgressRules = "No egress rules"
+    private static let securityGroupDetailRulesTableHeader = "PROTO   PORTS           ETHERTYPE  REMOTE"
+    private static let securityGroupDetailRulesTableSeparator = String(repeating: "-", count: 50)
+    private static let securityGroupDetailScreenTooSmallText = "Screen too small"
+    private static let securityGroupDetailRuleSelectedPrefix = "> "
+    private static let securityGroupDetailRuleUnselectedPrefix = "  "
+    private static let securityGroupDetailMoreRulesText = "... and %d more rules"
+    private static let securityGroupDetailScrollIndicatorText = "[%d-%d/%d] - Scroll: UP/DOWN"
+    private static let securityGroupDetailIngressCountText = "Ingress: %d rules"
+    private static let securityGroupDetailEgressCountText = "Egress: %d rules"
+    private static let securityGroupDetailRuleDetailsTitle = "Rule Details"
+    private static let securityGroupDetailRemoteGroupsTitle = "Remote Security Groups"
+    private static let securityGroupDetailPortRangesTitle = "Port Ranges"
+    private static let securityGroupDetailProtocolsTitle = "Protocols Used"
+    private static let securityGroupDetailProjectIdLabel = "Project ID"
+    private static let securityGroupDetailCreatedAtLabel = "Created"
+    private static let securityGroupDetailUpdatedAtLabel = "Updated"
+    private static let securityGroupDetailRuleIdLabel = "Rule ID"
+    private static let securityGroupDetailDirectionLabel = "Direction"
+    private static let securityGroupDetailProtocolLabel = "Protocol"
+    private static let securityGroupDetailEthertypeLabel = "EtherType"
+    private static let securityGroupDetailPortRangeLabel = "Port Range"
+    private static let securityGroupDetailRemoteIpLabel = "Remote IP"
+    private static let securityGroupDetailRemoteGroupLabel = "Remote Group"
+    private static let securityGroupDetailNoRemoteGroups = "No remote security groups referenced"
+    private static let securityGroupDetailTruncationSuffix = "..."
+    private static let securityGroupDetailTotalRulesText = "Total rules: %d"
+    private static let securityGroupDetailUniqueProtocolsText = "Protocols: %@"
+    private static let securityGroupDetailUniquePortsText = "Port ranges: %@"
+    private static let securityGroupDetailInfoFieldIndent = "  "
+    private static let securityGroupDetailFieldValueSeparator = ": "
+    private static let securityGroupDetailRuleDetailMaxLength = 50
+    private static let securityGroupDetailTitleTopPadding: Int32 = 0
+    private static let securityGroupDetailTitleLeadingPadding: Int32 = 0
+    private static let securityGroupDetailTitleBottomPadding: Int32 = 2
+    private static let securityGroupDetailTitleTrailingPadding: Int32 = 0
+    private static let securityGroupDetailSectionTopPadding: Int32 = 0
+    private static let securityGroupDetailSectionLeadingPadding: Int32 = 4
+    private static let securityGroupDetailSectionBottomPadding: Int32 = 1
+    private static let securityGroupDetailSectionTrailingPadding: Int32 = 0
+    private static let securityGroupDetailHelpText = "Press ESC to return to security group list"
+
+    @MainActor
+    static func drawSecurityGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                       width: Int32, height: Int32, securityGroup: SecurityGroup,
+                                       selectedRuleIndex: Int? = nil) async {
+
+        // Create surface for optimal performance
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Defensive bounds checking to prevent crashes on small terminals
+        guard width > securityGroupDetailMinScreenWidth && height > securityGroupDetailMinScreenHeight else {
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow),
+                                   width: max(securityGroupDetailBoundsMinWidth, width),
+                                   height: max(securityGroupDetailBoundsMinHeight, height))
+            await SwiftTUI.render(Text(securityGroupDetailScreenTooSmallText).error(), on: surface, in: errorBounds)
+            return
+        }
+
+        // Analyze security group for rich metadata display
+        let securityGroupAnalysis = analyzeSecurityGroup(securityGroup: securityGroup)
+        _ = securityGroup.securityGroupRules?.count ?? 0
+
+        // Determine layout strategy
+        let availableHeight = max(1, height - securityGroupDetailReservedSpace)
+        let needsScrolling = needsScrollableLayout(securityGroup: securityGroup, analysis: securityGroupAnalysis, availableHeight: availableHeight)
+
+        if needsScrolling {
+            await drawScrollableSecurityGroupDetail(screen: screen, startRow: startRow, startCol: startCol,
+                                                  width: width, height: height, securityGroup: securityGroup,
+                                                  analysis: securityGroupAnalysis, selectedRuleIndex: selectedRuleIndex)
+        } else {
+            await drawCompactSecurityGroupDetail(screen: screen, startRow: startRow, startCol: startCol,
+                                               width: width, height: height, securityGroup: securityGroup,
+                                               analysis: securityGroupAnalysis, selectedRuleIndex: selectedRuleIndex)
+        }
+    }
+
+    // MARK: - Security Group Analysis (Rich Metadata)
+
+    struct SecurityGroupAnalysis {
+        let ingressRules: [SecurityGroupRule]
+        let egressRules: [SecurityGroupRule]
+        let uniqueProtocols: Set<String>
+        let uniquePorts: Set<String>
+        let remoteGroups: Set<String>
+        let remoteIPs: Set<String>
+        let ethertypes: Set<String>
+    }
+
+    private static func analyzeSecurityGroup(securityGroup: SecurityGroup) -> SecurityGroupAnalysis {
+        let ingressRules = securityGroup.securityGroupRules?.filter { $0.direction == "ingress" } ?? []
+        let egressRules = securityGroup.securityGroupRules?.filter { $0.direction == "egress" } ?? []
+
+        var uniqueProtocols = Set<String>()
+        var uniquePorts = Set<String>()
+        var remoteGroups = Set<String>()
+        var remoteIPs = Set<String>()
+        var ethertypes = Set<String>()
+
+        for rule in securityGroup.securityGroupRules ?? [] {
+            if let protocolValue = rule.protocolEnum?.rawValue {
+                uniqueProtocols.insert(protocolValue.uppercased())
+            } else {
+                uniqueProtocols.insert("ANY")
+            }
+
+            let portRange = formatPortRange(rule)
+            if !portRange.isEmpty && portRange != "ALL" {
+                uniquePorts.insert(formatPortRange(rule))
+            }
+
+            ethertypes.insert(rule.ethertype ?? "IPv4")
+
+            // Analyze remote description for groups and IPs
+            let remoteDesc = formatRemoteDescription(rule).lowercased()
+            if remoteDesc.contains("group") {
+                remoteGroups.insert(formatRemoteDescription(rule))
+            } else if remoteDesc.contains(".") || remoteDesc.contains(":") {
+                remoteIPs.insert(formatRemoteDescription(rule))
+            }
+        }
+
+        return SecurityGroupAnalysis(
+            ingressRules: ingressRules,
+            egressRules: egressRules,
+            uniqueProtocols: uniqueProtocols,
+            uniquePorts: uniquePorts,
+            remoteGroups: remoteGroups,
+            remoteIPs: remoteIPs,
+            ethertypes: ethertypes
+        )
+    }
+
+    private static func needsScrollableLayout(securityGroup: SecurityGroup, analysis: SecurityGroupAnalysis, availableHeight: Int32) -> Bool {
+        // Estimate component count for layout decision
+        var estimatedComponents = 12 // Base components (title, basic info, rules summary)
+
+        // Add rule sections
+        estimatedComponents += analysis.ingressRules.count + 3 // rules + headers
+        estimatedComponents += analysis.egressRules.count + 3 // rules + headers
+
+        // Add metadata sections
+        if !analysis.remoteGroups.isEmpty { estimatedComponents += analysis.remoteGroups.count + 1 }
+        if !analysis.uniqueProtocols.isEmpty { estimatedComponents += 2 }
+        if !analysis.uniquePorts.isEmpty { estimatedComponents += 2 }
+
+        return estimatedComponents > Int(availableHeight)
+    }
+
+    // MARK: - Enhanced Security Group Detail Layouts
+
+    @MainActor
+    private static func drawScrollableSecurityGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                                        width: Int32, height: Int32, securityGroup: SecurityGroup,
+                                                        analysis: SecurityGroupAnalysis, selectedRuleIndex: Int?) async {
+
+        let surface = SwiftTUI.surface(from: screen)
+        var allComponents: [any Component] = []
+
+        // Title Section (Gold Standard)
+        let titleText = securityGroupDetailTitle + securityGroupDetailFieldValueSeparator + (securityGroup.name ?? "Unknown")
+        allComponents.append(Text(titleText).accent().bold()
+            .padding(securityGroupDetailTitleEdgeInsets))
+
+        // Basic Information Section
+        allComponents.append(Text(securityGroupDetailBasicInfoTitle).primary().bold())
+        allComponents.append(contentsOf: createSecurityGroupBasicInfoComponents(securityGroup: securityGroup))
+        allComponents.append(Text("").muted()) // Blank line for spacing
+
+        // Rules Summary Section
+        allComponents.append(Text(securityGroupDetailRulesSummaryTitle).primary().bold())
+        allComponents.append(contentsOf: createRulesSummaryComponents(analysis: analysis))
+        allComponents.append(Text("").secondary()) // Blank line for spacing
+
+        // Protocols and Ports Section
+        if !analysis.uniqueProtocols.isEmpty || !analysis.uniquePorts.isEmpty {
+            allComponents.append(Text(securityGroupDetailProtocolsTitle).primary().bold())
+            allComponents.append(contentsOf: createProtocolsAndPortsComponents(analysis: analysis))
+            allComponents.append(Text("").secondary()) // Blank line for spacing
+        }
+
+        // Remote Groups Section
+        if !analysis.remoteGroups.isEmpty {
+            allComponents.append(Text(securityGroupDetailRemoteGroupsTitle).primary().bold())
+            allComponents.append(contentsOf: createRemoteGroupsComponents(analysis: analysis))
+            allComponents.append(Text("").secondary()) // Blank line for spacing
+        }
+
+        // Detailed Rules Section
+        allComponents.append(Text(securityGroupDetailRuleDetailsTitle).primary().bold())
+        allComponents.append(contentsOf: createDetailedRuleComponents(analysis: analysis, selectedRuleIndex: selectedRuleIndex))
+
+        // Help text
+        allComponents.append(Text(securityGroupDetailHelpText).info())
+
+        // Apply scrolling and render visible components
+        let maxVisibleComponents = max(1, Int(height) - Int(securityGroupDetailReservedSpace))
+        let startIndex = 0 // For now, always start from beginning
+        let endIndex = min(allComponents.count, startIndex + maxVisibleComponents)
+        let visibleComponents = Array(allComponents[startIndex..<endIndex])
+
+        // Render the scrollable security group detail view using gold standard pattern
+        let securityGroupDetailComponent = VStack(spacing: securityGroupDetailComponentSpacing, children: visibleComponents)
+            .padding(securityGroupDetailSectionEdgeInsets)
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        await SwiftTUI.render(securityGroupDetailComponent, on: surface, in: bounds)
+
+        // Add scroll indicator if needed
+        if allComponents.count > maxVisibleComponents {
+            let scrollText = String(format: securityGroupDetailScrollIndicatorText, startIndex + 1, endIndex, allComponents.count)
+            let scrollBounds = Rect(x: startCol, y: startRow + height - 1, width: width, height: 1)
+            await SwiftTUI.render(Text(scrollText).info(), on: surface, in: scrollBounds)
+        }
+    }
+
+    @MainActor
+    private static func drawCompactSecurityGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                                     width: Int32, height: Int32, securityGroup: SecurityGroup,
+                                                     analysis: SecurityGroupAnalysis, selectedRuleIndex: Int?) async {
+
+        let surface = SwiftTUI.surface(from: screen)
+        var components: [any Component] = []
+
+        // Title Section (Gold Standard)
+        let titleText = securityGroupDetailTitle + securityGroupDetailFieldValueSeparator + (securityGroup.name ?? "Unknown")
+        components.append(Text(titleText).accent().bold()
+            .padding(securityGroupDetailTitleEdgeInsets))
+
+        // Basic Information Section
+        components.append(Text(securityGroupDetailBasicInfoTitle).primary().bold())
+        components.append(contentsOf: createSecurityGroupBasicInfoComponents(securityGroup: securityGroup))
+        components.append(Text("").secondary()) // Blank line for spacing
+
+        // Rules Summary Section
+        components.append(Text(securityGroupDetailRulesSummaryTitle).primary().bold())
+        components.append(contentsOf: createRulesSummaryComponents(analysis: analysis))
+        components.append(Text("").secondary()) // Blank line for spacing
+
+        // Most important information for compact view
+        if !analysis.uniqueProtocols.isEmpty {
+            components.append(Text(securityGroupDetailProtocolsTitle).primary().bold())
+            components.append(contentsOf: createProtocolsAndPortsComponents(analysis: analysis))
+            components.append(Text("").secondary()) // Blank line for spacing
+        }
+
+        // Simple rule display for compact view
+        if securityGroup.securityGroupRules?.isEmpty ?? true {
+            components.append(Text(securityGroupDetailNoRules).warning())
+        } else {
+            let rulesToShow = min(securityGroup.securityGroupRules?.count ?? 0, 5) // Show max 5 rules in compact view
+            let visibleRules = Array((securityGroup.securityGroupRules ?? []).prefix(rulesToShow))
+            components.append(contentsOf: createSimpleRuleComponents(rules: visibleRules, selectedRuleIndex: selectedRuleIndex))
+
+            if (securityGroup.securityGroupRules?.count ?? 0) > rulesToShow {
+                let remainingCount = (securityGroup.securityGroupRules?.count ?? 0) - rulesToShow
+                let moreText = "... and \(remainingCount) more rules"
+                components.append(Text(moreText).warning())
+            }
+        }
+
+        // Help text
+        components.append(Text(securityGroupDetailHelpText).muted())
+
+        // Render compact layout using gold standard pattern
+        let securityGroupDetailComponent = VStack(spacing: securityGroupDetailComponentSpacing, children: components)
+            .padding(securityGroupDetailSectionEdgeInsets)
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        await SwiftTUI.render(securityGroupDetailComponent, on: surface, in: bounds)
+    }
+
+    // MARK: - Enhanced Component Creation Functions
+
+    private static func createSecurityGroupBasicInfoComponents(securityGroup: SecurityGroup) -> [any Component] {
+        var components: [any Component] = []
+
+        let nameText = securityGroupDetailInfoFieldIndent + securityGroupDetailNameLabel + securityGroupDetailFieldValueSeparator + (securityGroup.name ?? "Unknown")
+        components.append(Text(nameText).primary())
+
+        let idText = securityGroupDetailInfoFieldIndent + securityGroupDetailIdLabel + securityGroupDetailFieldValueSeparator + securityGroup.id
+        components.append(Text(idText).secondary())
+
+        let description = securityGroup.description?.isEmpty == false ? securityGroup.description! : securityGroupDetailNoDescription
+        let descriptionText = securityGroupDetailInfoFieldIndent + securityGroupDetailDescriptionLabel + securityGroupDetailFieldValueSeparator + description
+        components.append(Text(descriptionText).secondary())
+
+        return components
+    }
+
+    private static func createRulesSummaryComponents(analysis: SecurityGroupAnalysis) -> [any Component] {
+        var components: [any Component] = []
+
+        let totalText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailTotalRulesText, analysis.ingressRules.count + analysis.egressRules.count)
+        components.append(Text(totalText).primary())
+
+        let ingressText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailIngressCountText, analysis.ingressRules.count)
+        components.append(Text(ingressText).success())
+
+        let egressText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailEgressCountText, analysis.egressRules.count)
+        components.append(Text(egressText).error())
+
+        return components
+    }
+
+    private static func createProtocolsAndPortsComponents(analysis: SecurityGroupAnalysis) -> [any Component] {
+        var components: [any Component] = []
+
+        if !analysis.uniqueProtocols.isEmpty {
+            let protocolsList = Array(analysis.uniqueProtocols).sorted().joined(separator: ", ")
+            let protocolsText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailUniqueProtocolsText, protocolsList)
+            components.append(Text(protocolsText).secondary())
+        }
+
+        if !analysis.uniquePorts.isEmpty {
+            let portsList = Array(analysis.uniquePorts).sorted().joined(separator: ", ")
+            let truncatedPorts = portsList.count > securityGroupDetailRuleDetailMaxLength ?
+                String(portsList.prefix(securityGroupDetailRuleDetailMaxLength - 3)) + securityGroupDetailTruncationSuffix : portsList
+            let portsText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailUniquePortsText, truncatedPorts)
+            components.append(Text(portsText).secondary())
+        }
+
+        return components
+    }
+
+    private static func createRemoteGroupsComponents(analysis: SecurityGroupAnalysis) -> [any Component] {
+        var components: [any Component] = []
+
+        for remoteGroup in analysis.remoteGroups.sorted() {
+            let truncatedGroup = remoteGroup.count > securityGroupDetailRuleDetailMaxLength ?
+                String(remoteGroup.prefix(securityGroupDetailRuleDetailMaxLength - 3)) + securityGroupDetailTruncationSuffix : remoteGroup
+            let groupText = securityGroupDetailInfoFieldIndent + truncatedGroup
+            components.append(Text(groupText).accent())
+        }
+
+        return components
+    }
+
+    private static func createDetailedRuleComponents(analysis: SecurityGroupAnalysis, selectedRuleIndex: Int?) -> [any Component] {
+        var components: [any Component] = []
+
+        let allRules = analysis.ingressRules + analysis.egressRules
+
+        for (index, rule) in allRules.enumerated() {
+            // Create detailed rule display
+            let directionIcon = rule.direction == "ingress" ? "IN" : "OUT"
+            let directionText = securityGroupDetailInfoFieldIndent + directionIcon + " " + rule.direction.capitalized
+            let directionStyle: TextStyle = rule.direction == "ingress" ? .success : .error
+            components.append(Text(directionText).styled(directionStyle))
+
+            let protocolText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailProtocolLabel + securityGroupDetailFieldValueSeparator + (rule.protocolEnum?.rawValue.uppercased() ?? "ANY")
+            components.append(Text(protocolText).secondary())
+
+            let portRange = formatPortRange(rule)
+            if !portRange.isEmpty && portRange != "ALL" {
+                let portText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailPortRangeLabel + securityGroupDetailFieldValueSeparator + portRange
+                components.append(Text(portText).secondary())
+            }
+
+            let ethertypeText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailEthertypeLabel + securityGroupDetailFieldValueSeparator + (rule.ethertype ?? "IPv4")
+            components.append(Text(ethertypeText).secondary())
+
+            let remoteText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailRemoteIpLabel + securityGroupDetailFieldValueSeparator + formatRemoteDescription(rule)
+            let truncatedRemote = remoteText.count > securityGroupDetailRuleDetailMaxLength ?
+                String(remoteText.prefix(securityGroupDetailRuleDetailMaxLength - 3)) + securityGroupDetailTruncationSuffix : remoteText
+            components.append(Text(truncatedRemote).secondary())
+
+            // Add separator between rules
+            if index < allRules.count - 1 {
+                components.append(Text("").secondary())
+            }
+        }
+
+        return components
+    }
+
+    private static func createSimpleRuleComponents(rules: [SecurityGroupRule], selectedRuleIndex: Int?) -> [any Component] {
+        var components: [any Component] = []
+
+        for (index, rule) in rules.enumerated() {
+            let isRuleSelected = selectedRuleIndex == index
+            let directionIcon = rule.direction == "ingress" ? "IN" : "OUT"
+            let protocolValue = rule.protocolEnum?.rawValue.uppercased() ?? "ANY"
+            let portRange = formatPortRange(rule)
+            let port = portRange == "ALL" ? "ALL" : portRange
+
+            let ruleText = securityGroupDetailInfoFieldIndent + directionIcon + " " + protocolValue + " " + port + " -> " + formatRemoteDescription(rule)
+            let ruleStyle: TextStyle = isRuleSelected ? .primary : .secondary
+            components.append(Text(ruleText).styled(ruleStyle))
+        }
+
+        return components
+    }
+
+    // MARK: - Security Group Create View
+
+    // Layout Constants
+    private static let sgCreateComponentTopPadding: Int32 = 1
+    private static let sgCreateStatusMessageTopPadding: Int32 = 2
+    private static let sgCreateStatusMessageLeadingPadding: Int32 = 2
+    private static let sgCreateValidationErrorLeadingPadding: Int32 = 2
+    private static let sgCreateLoadingErrorBoundsHeight: Int32 = 6
+    private static let sgCreateFieldActiveSpacing = "                      "
+
+    // Text Constants
+    private static let sgCreateFormTitle = "Create Security Group"
+    private static let sgCreateCreatingText = "Creating security group..."
+    private static let sgCreateErrorPrefix = "Error: "
+    private static let sgCreateRequiredFieldSuffix = ": *"
+    private static let sgCreateOptionalFieldSuffix = " (optional)"
+
+    // Field Display Constants
+    private static let sgCreateValidationErrorsTitle = "Validation Errors:"
+    private static let sgCreateValidationErrorPrefix = "- "
+    private static let sgCreateEditPromptText = "Press SPACE to edit..."
+
+    // Field Label Constants
+    private static let sgCreateNameFieldLabel = "Security Group Name"
+    private static let sgCreateDescriptionFieldLabel = "Description"
+
+    // Placeholder Constants
+    private static let sgCreateNamePlaceholder = "[Enter security group name]"
+    private static let sgCreateDescriptionPlaceholder = "[Optional description]"
+
+    // UI Component Constants
+    private static let sgCreateSelectedIndicator = "> "
+    private static let sgCreateUnselectedIndicator = "  "
+    private static let sgCreateComponentSpacing: Int32 = 0
+
+    @MainActor
+    static func drawSecurityGroupCreateForm(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                           width: Int32, height: Int32, form: SecurityGroupCreateForm,
+                                           formState: FormBuilderState) async {
+
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Build form fields with FormBuilder state
+        let fields = form.buildFields(
+            selectedFieldId: formState.getCurrentFieldId(),
+            activeFieldId: formState.getActiveFieldId(),
+            formState: formState
+        )
+
+        // Create FormBuilder
+        let formBuilder = FormBuilder(
+            title: Self.sgCreateFormTitle,
+            fields: fields,
+            selectedFieldId: formState.getCurrentFieldId(),
+            validationErrors: form.validateForm().errors,
+            showValidationErrors: formState.showValidationErrors
+        )
+
+        // Render the form
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+    }
+
+
+    // MARK: - Security Group Rule Create View
+
+    // Layout Constants
+    private static let sgRuleCreateComponentTopPadding: Int32 = 1
+    private static let sgRuleCreateStatusMessageTopPadding: Int32 = 2
+    private static let sgRuleCreateStatusMessageLeadingPadding: Int32 = 2
+    private static let sgRuleCreateValidationErrorLeadingPadding: Int32 = 2
+    private static let sgRuleCreateLoadingErrorBoundsHeight: Int32 = 6
+    private static let sgRuleCreateFieldActiveSpacing = "                      "
+
+    // Text Constants
+    private static let sgRuleCreateFormTitle = "Create Security Group Rule"
+    private static let sgRuleCreateCreatingText = "Creating rule..."
+    private static let sgRuleCreateErrorPrefix = "Error: "
+    private static let sgRuleCreateRequiredFieldSuffix = ": *"
+    private static let sgRuleCreateOptionalFieldSuffix = " (optional)"
+
+    // Field Display Constants
+    private static let sgRuleCreateValidationErrorsTitle = "Validation Errors:"
+    private static let sgRuleCreateValidationErrorPrefix = "- "
+    private static let sgRuleCreateEditPromptText = "Press SPACE to edit..."
+    private static let sgRuleCreateTogglePromptText = "Press SPACE to change"
+    private static let sgRuleCreateSelectPromptText = "Press SPACE to select"
+
+    // Field Label Constants
+    private static let sgRuleCreateDirectionFieldLabel = "Direction"
+    private static let sgRuleCreateProtocolFieldLabel = "Protocol"
+    private static let sgRuleCreatePortTypeFieldLabel = "Port Type"
+    private static let sgRuleCreatePortRangeMinFieldLabel = "Port Range Min"
+    private static let sgRuleCreatePortRangeMaxFieldLabel = "Port Range Max"
+    private static let sgRuleCreateEthertypeFieldLabel = "Ether Type"
+    private static let sgRuleCreateRemoteTypeFieldLabel = "Remote Type"
+    private static let sgRuleCreateRemoteValueFieldLabel = "Remote Value"
+
+    // Placeholder Constants
+    private static let sgRuleCreatePortRangeMinPlaceholder = "[Enter minimum port]"
+    private static let sgRuleCreatePortRangeMaxPlaceholder = "[Enter maximum port]"
+    private static let sgRuleCreateRemoteValuePlaceholder = "[Enter CIDR block]"
+    private static let sgRuleCreateNoSecurityGroupsText = "No security groups available"
+
+    // UI Component Constants
+    private static let sgRuleCreateSelectedIndicator = "> "
+    private static let sgRuleCreateUnselectedIndicator = "  "
+    private static let sgRuleCreateComponentSpacing: Int32 = 0
+
+    @MainActor
+    static func drawSecurityGroupRuleCreateForm(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                               width: Int32, height: Int32, form: SecurityGroupRuleCreateForm,
+                                               cachedSecurityGroups: [SecurityGroup] = [],
+                                               errorMessage: String? = nil) async {
+
+        // Check if we're in security group selection mode
+        if form.securityGroupSelectionMode {
+            let surface = SwiftTUI.surface(from: screen)
+            let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+
+            // Create FormSelector for multi-select security group selection
+            let columns = [
+                FormSelectorColumn<SecurityGroup>(
+                    header: "Name",
+                    width: 40,
+                    getValue: { $0.name ?? "Unknown" }
+                )
+            ]
+
+            let tab = FormSelectorTab<SecurityGroup>(
+                title: "Security Groups",
+                columns: columns
+            )
+
+            let selector = FormSelector<SecurityGroup>(
+                label: "Select Remote Security Groups",
+                tabs: [tab],
+                selectedTabIndex: 0,
+                items: form.remoteSecurityGroups,
+                selectedItemIds: form.selectedRemoteSecurityGroups,
+                highlightedIndex: form.selectedRemoteSecurityGroupIndex,
+                multiSelect: true,
+                scrollOffset: 0,
+                searchQuery: nil,
+                maxHeight: Int(height),
+                isActive: true
+            )
+
+            await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+            return
+        }
+
+        // Main Security Group Rule Create Form
+        let surface = SwiftTUI.surface(from: screen)
+        var components: [any Component] = [
+            Text(Self.sgRuleCreateFormTitle).emphasis().bold()
+        ]
+
+        // Error message display
+        if let errorMessage = errorMessage {
+            components.append(Text("\(Self.sgRuleCreateErrorPrefix)\(errorMessage)").error().bold()
+                .padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)))
+        }
+
+        // Build all form fields as components
+        let visibleFields = getSGRuleCreateVisibleFields(for: form)
+
+        for (index, field) in visibleFields.enumerated() {
+            let isFirstField = index == 0
+            let fieldComponent = createSGRuleCreateFieldComponent(field: field, form: form, width: width, isFirstField: isFirstField)
+            components.append(fieldComponent)
+        }
+
+        // Show validation errors if any
+        let validation = form.validateForm()
+        if !validation.isValid {
+            components.append(Text(Self.sgRuleCreateValidationErrorsTitle).error().bold()
+                .padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)))
+
+            for error in validation.errors {
+                components.append(Text("\(Self.sgRuleCreateValidationErrorPrefix)\(error)").error()
+                    .padding(EdgeInsets(top: 0, leading: Self.sgRuleCreateValidationErrorLeadingPadding, bottom: 0, trailing: 0)))
+            }
+        }
+
+        // Render the entire form following ServerCreateView pattern
+        let formComponent = VStack(spacing: Self.sgRuleCreateComponentSpacing, children: components)
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(formComponent, on: surface, in: bounds)
+    }
+
+    // MARK: - Component Creation
+
+    private static func getSGRuleCreateVisibleFields(for form: SecurityGroupRuleCreateForm) -> [SecurityGroupRuleCreateField] {
+        return form.getVisibleFields()
+    }
+
+    private static func createSGRuleCreateFieldComponent(field: SecurityGroupRuleCreateField, form: SecurityGroupRuleCreateForm, width: Int32, isFirstField: Bool) -> any Component {
+        let isSelected = form.currentField == field
+
+        switch field {
+        case .direction:
+            return createSGRuleCreateDirectionField(form: form, isSelected: isSelected, isFirstField: isFirstField)
+        case .protocol:
+            return createSGRuleCreateProtocolField(form: form, isSelected: isSelected, isFirstField: isFirstField)
+        case .portType:
+            return createSGRuleCreatePortTypeField(form: form, isSelected: isSelected, isFirstField: isFirstField)
+        case .portRangeMin:
+            return createSGRuleCreatePortRangeMinField(form: form, isSelected: isSelected, width: width, isFirstField: isFirstField)
+        case .portRangeMax:
+            return createSGRuleCreatePortRangeMaxField(form: form, isSelected: isSelected, width: width, isFirstField: isFirstField)
+        case .ethertype:
+            return createSGRuleCreateEthertypeField(form: form, isSelected: isSelected, isFirstField: isFirstField)
+        case .remoteType:
+            return createSGRuleCreateRemoteTypeField(form: form, isSelected: isSelected, isFirstField: isFirstField)
+        case .remoteValue:
+            return createSGRuleCreateRemoteValueField(form: form, isSelected: isSelected, width: width, isFirstField: isFirstField)
+        }
+    }
+
+    // MARK: - Field Creation Functions
+
+    private static func createSGRuleCreateDirectionField(form: SecurityGroupRuleCreateForm, isSelected: Bool, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreateDirectionFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText = isSelected ? "\(form.direction.rawValue.capitalized) (\(Self.sgRuleCreateTogglePromptText))" : form.direction.rawValue.capitalized
+        let fieldStyle: TextStyle = isSelected ? .warning : .secondary
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(displayText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    private static func createSGRuleCreateProtocolField(form: SecurityGroupRuleCreateForm, isSelected: Bool, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreateProtocolFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText = isSelected ? "\(form.ruleProtocol.rawValue.uppercased()) (\(Self.sgRuleCreateTogglePromptText))" : form.ruleProtocol.rawValue.uppercased()
+        let fieldStyle: TextStyle = isSelected ? .warning : .secondary
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(displayText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    private static func createSGRuleCreatePortTypeField(form: SecurityGroupRuleCreateForm, isSelected: Bool, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreatePortTypeFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText = isSelected ? "\(form.portType.displayName) (\(Self.sgRuleCreateTogglePromptText))" : form.portType.displayName
+        let fieldStyle: TextStyle = isSelected ? .warning : .secondary
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(displayText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    private static func createSGRuleCreatePortRangeMinField(form: SecurityGroupRuleCreateForm, isSelected: Bool, width: Int32, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreatePortRangeMinFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText: String
+        if form.fieldEditMode && isSelected {
+            displayText = form.portRangeMin.isEmpty ? Self.sgRuleCreateEditPromptText : form.portRangeMin + Self.sgRuleCreateFieldActiveSpacing
+        } else {
+            displayText = form.portRangeMin.isEmpty ? Self.sgRuleCreatePortRangeMinPlaceholder : form.portRangeMin
+        }
+
+        let fieldStyle: TextStyle = isSelected ? (form.fieldEditMode ? .primary : .warning) : .secondary
+        let truncatedText = String(displayText.prefix(Int(width) - 10))
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(truncatedText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    private static func createSGRuleCreatePortRangeMaxField(form: SecurityGroupRuleCreateForm, isSelected: Bool, width: Int32, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreatePortRangeMaxFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText: String
+        if form.fieldEditMode && isSelected {
+            displayText = form.portRangeMax.isEmpty ? Self.sgRuleCreateEditPromptText : form.portRangeMax + Self.sgRuleCreateFieldActiveSpacing
+        } else {
+            displayText = form.portRangeMax.isEmpty ? Self.sgRuleCreatePortRangeMaxPlaceholder : form.portRangeMax
+        }
+
+        let fieldStyle: TextStyle = isSelected ? (form.fieldEditMode ? .primary : .warning) : .secondary
+        let truncatedText = String(displayText.prefix(Int(width) - 10))
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(truncatedText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    private static func createSGRuleCreateEthertypeField(form: SecurityGroupRuleCreateForm, isSelected: Bool, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreateEthertypeFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText = isSelected ? "\(form.ethertype.rawValue) (\(Self.sgRuleCreateTogglePromptText))" : form.ethertype.rawValue
+        let fieldStyle: TextStyle = isSelected ? .warning : .secondary
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(displayText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    private static func createSGRuleCreateRemoteTypeField(form: SecurityGroupRuleCreateForm, isSelected: Bool, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreateRemoteTypeFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText = isSelected ? "\(form.remoteType.displayName) (\(Self.sgRuleCreateTogglePromptText))" : form.remoteType.displayName
+        let fieldStyle: TextStyle = isSelected ? .warning : .secondary
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(displayText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    private static func createSGRuleCreateRemoteValueField(form: SecurityGroupRuleCreateForm, isSelected: Bool, width: Int32, isFirstField: Bool) -> any Component {
+        let fieldLabel = "\(Self.sgRuleCreateRemoteValueFieldLabel)\(Self.sgRuleCreateRequiredFieldSuffix)"
+        let indicator = isSelected ? Self.sgRuleCreateSelectedIndicator : Self.sgRuleCreateUnselectedIndicator
+
+        let displayText: String
+        let fieldStyle: TextStyle
+
+        if form.remoteType == .cidr {
+            if form.fieldEditMode && isSelected {
+                displayText = form.remoteValue.isEmpty ? Self.sgRuleCreateEditPromptText : form.remoteValue + Self.sgRuleCreateFieldActiveSpacing
+            } else {
+                displayText = form.remoteValue.isEmpty ? Self.sgRuleCreateRemoteValuePlaceholder : form.remoteValue
+            }
+            fieldStyle = isSelected ? (form.fieldEditMode ? .primary : .warning) : .secondary
+        } else if form.remoteType == .securityGroup {
+            if let selectedGroup = form.getSelectedRemoteSecurityGroup() {
+                displayText = isSelected && !form.remoteSecurityGroups.isEmpty ? "\(selectedGroup.name ?? "Unknown") (\(Self.sgRuleCreateSelectPromptText))" : (selectedGroup.name ?? "Unknown")
+                fieldStyle = isSelected ? .warning : .secondary
+            } else {
+                displayText = Self.sgRuleCreateNoSecurityGroupsText
+                fieldStyle = .error
+            }
+        } else {
+            displayText = ""
+            fieldStyle = .secondary
+        }
+
+        let truncatedText = String(displayText.prefix(Int(width) - 10))
+
+        let labelComponent: any Component = isFirstField ?
+            Text(fieldLabel).accent().bold().padding(EdgeInsets(top: Self.sgRuleCreateComponentTopPadding, leading: 0, bottom: 0, trailing: 0)) :
+            Text(fieldLabel).accent().bold()
+
+        return VStack(spacing: 0, children: [
+            labelComponent,
+            Text("\(indicator)\(truncatedText)").styled(fieldStyle)
+                .padding(EdgeInsets(top: 0, leading: 4, bottom: Self.sgRuleCreateComponentTopPadding, trailing: 0))
+        ])
+    }
+
+    // MARK: - Security Group Rules Management View
+
+    @MainActor
+    static func drawSecurityGroupRulesManagement(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                                width: Int32, height: Int32, securityGroup: SecurityGroup,
+                                                selectedRuleIndices: Set<Int>, currentRuleIndex: Int) async {
+
+        // Defensive bounds checking to prevent crashes on small terminals
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        // Main Security Group Rules Management
+        let surface = SwiftTUI.surface(from: screen)
+        var components: [any Component] = []
+
+        // Title
+        components.append(Text("Manage Rules - \(securityGroup.name ?? "Unknown")").emphasis().bold())
+
+        // Instructions
+        components.append(Text("SPACE: toggle selection | A: add rule | DEL: delete selected | ESC: back").info()
+            .padding(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)))
+
+        if securityGroup.securityGroupRules?.isEmpty ?? true {
+            components.append(Text("No rules defined. Press 'A' to add a rule.").info()
+                .padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0)))
+        } else {
+            // Rules table header
+            components.append(Text("    DIR    PROTO   PORTS           REMOTE").accent().bold())
+            components.append(Text(String(repeating: "-", count: 46)).border())
+
+            // Display rules using SwiftTUI
+            let availableHeight = max(1, Int(height) - 10) // Reserve space for header and footer
+            let maxRulesToShow = min(securityGroup.securityGroupRules?.count ?? 0, availableHeight)
+
+            for i in 0..<maxRulesToShow {
+                let rule = (securityGroup.securityGroupRules ?? [])[i]
+                let ruleComponent = createSecurityGroupRuleItemComponent(rule: rule, ruleIndex: i,
+                                                                        selectedIndices: selectedRuleIndices,
+                                                                        currentRuleIndex: currentRuleIndex)
+                components.append(ruleComponent)
+            }
+
+            if (securityGroup.securityGroupRules?.count ?? 0) > maxRulesToShow {
+                components.append(Text("... and \((securityGroup.securityGroupRules?.count ?? 0) - maxRulesToShow) more rules").info())
+            }
+
+            // Selection summary
+            if !selectedRuleIndices.isEmpty {
+                let summaryText = "Selected: \(selectedRuleIndices.count) rule\(selectedRuleIndices.count == 1 ? "" : "s")"
+                components.append(Text(summaryText).warning()
+                    .padding(EdgeInsets(top: 2, leading: 0, bottom: 0, trailing: 0)))
+            }
+        }
+
+        // Render unified rules management
+        let rulesManagementComponent = VStack(spacing: 0, children: components)
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(rulesManagementComponent, on: surface, in: bounds)
+    }
+
+    @MainActor
+    static func drawServerSecurityGroupManagement(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                                 width: Int32, height: Int32, form: SecurityGroupManagementForm) async {
+
+        // Defensive bounds checking to prevent crashes on small terminals
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        // Main Server Security Group Management
+        let surface = SwiftTUI.surface(from: screen)
+        var components: [any Component] = []
+
+        // Title
+        components.append(Text(Self.manageSecurityGroupsTitle).emphasis().bold())
+
+        // Server information
+        if let server = form.selectedServer {
+            let serverText = "\(Self.serverLabel)\(server.name ?? Self.unknownServerName)"
+            components.append(Text(serverText).primary()
+                .padding(EdgeInsets(top: Self.componentTopPadding, leading: 0, bottom: 0, trailing: 0)))
+        }
+
+        // Status messages (loading, error, or content)
+        if form.isLoading {
+            components.append(Text(Self.loadingMessage).info()
+                .padding(EdgeInsets(top: Self.componentTopPadding, leading: Self.fieldIndent, bottom: 0, trailing: 0)))
+        } else if let errorMessage = form.errorMessage {
+            components.append(Text("\(Self.errorPrefix)\(errorMessage)").error()
+                .padding(EdgeInsets(top: Self.componentTopPadding, leading: Self.fieldIndent, bottom: 0, trailing: 0)))
+        } else {
+            let managementGroups = form.getManagementGroups()
+            let contentHeight = height - Self.contentHeightOffset
+
+            if managementGroups.isEmpty {
+                components.append(Text(Self.noGroupsAvailableMessage).info()
+                    .padding(EdgeInsets(top: Self.componentTopPadding, leading: Self.fieldIndent, bottom: 0, trailing: 0)))
+            } else {
+                // Security groups list
+                let listComponents = createSecurityGroupsListComponents(form: form, managementGroups: managementGroups, contentHeight: contentHeight)
+                components.append(contentsOf: listComponents)
+
+                // Pending changes summary
+                if form.hasPendingChanges() {
+                    let pendingChangesComponent = createPendingChangesComponent(form: form)
+                    components.append(pendingChangesComponent)
+                }
+            }
+        }
+
+        // Render unified component structure
+        let managementComponent = VStack(spacing: Self.componentSpacing, children: components)
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(managementComponent, on: surface, in: bounds)
+    }
+
+    // MARK: - Component Creation Functions for Security Group Management
+
+    private static func createSecurityGroupsListComponents(form: SecurityGroupManagementForm, managementGroups: [SecurityGroup], contentHeight: Int32) -> [any Component] {
+        var components: [any Component] = []
+
+        // List title
+        components.append(Text(Self.securityGroupsListTitle).emphasis().bold()
+            .padding(EdgeInsets(top: Self.componentTopPadding, leading: 0, bottom: 0, trailing: 0)))
+
+        // Calculate visible items
+        let maxItemsToShow = min(Int(contentHeight - Self.visibleItemsOffset), managementGroups.count)
+        let startIndex = max(0, min(form.selectedSecurityGroupIndex - maxItemsToShow + 1, managementGroups.count - maxItemsToShow))
+
+        // Create item components
+        for i in 0..<maxItemsToShow {
+            let groupIndex = startIndex + i
+            if groupIndex >= managementGroups.count { break }
+
+            let group = managementGroups[groupIndex]
+            let itemComponent = createSecurityGroupItemComponent(group: group, groupIndex: groupIndex, form: form)
+            components.append(itemComponent)
+        }
+
+        return components
+    }
+
+    private static func createSecurityGroupItemComponent(group: SecurityGroup, groupIndex: Int, form: SecurityGroupManagementForm) -> any Component {
+        let isSelected = groupIndex == form.selectedSecurityGroupIndex
+
+        // Determine status indicator
+        let statusIndicator = getStatusIndicator(for: group, form: form)
+
+        let itemStyle: TextStyle = isSelected ? .accent : .secondary
+        return Text("\(statusIndicator) \(group.name ?? "Unknown")").styled(itemStyle)
+            .padding(EdgeInsets(top: 0, leading: Self.itemIndent, bottom: 0, trailing: 0))
+    }
+
+    private static func getStatusIndicator(for group: SecurityGroup, form: SecurityGroupManagementForm) -> String {
+        let isAttached = form.serverSecurityGroups.contains { $0.id == group.id }
+        let isPendingAdd = form.pendingAdditions.contains(group.id)
+        let isPendingRemove = form.pendingRemovals.contains(group.id)
+
+        if isPendingAdd {
+            return Self.statusPendingAdd
+        } else if isPendingRemove {
+            return Self.statusPendingRemove
+        } else if isAttached {
+            return Self.statusAttached
+        } else {
+            return Self.statusNotAttached
+        }
+    }
+
+    private static func createPendingChangesComponent(form: SecurityGroupManagementForm) -> any Component {
+        var changeText = Self.pendingChangesPrefix
+        if !form.pendingAdditions.isEmpty {
+            changeText += "\(Self.pendingChangesAddPrefix)\(form.pendingAdditions.count) "
+        }
+        if !form.pendingRemovals.isEmpty {
+            changeText += "\(Self.pendingChangesRemovePrefix)\(form.pendingRemovals.count) "
+        }
+        changeText += Self.pendingChangesSuffix
+
+        return Text(changeText).warning()
+            .padding(EdgeInsets(top: Self.pendingChangesTopPadding, leading: 0, bottom: 0, trailing: 0))
+    }
+
+    // MARK: - Security Group Rule Management
+
+    // Layout Constants
+    private static let sgRuleMgmtComponentTopPadding: Int32 = 1
+    private static let sgRuleMgmtStatusMessageTopPadding: Int32 = 2
+    private static let sgRuleMgmtStatusMessageLeadingPadding: Int32 = 2
+    private static let sgRuleMgmtValidationErrorLeadingPadding: Int32 = 2
+    private static let sgRuleMgmtLoadingErrorBoundsHeight: Int32 = 6
+    private static let sgRuleMgmtFieldActiveSpacing = "                      "
+
+    // Text Constants
+    private static let sgRuleMgmtListTitle = "Security Group Rules"
+    private static let sgRuleMgmtCreateTitle = "Create Security Group Rule"
+    private static let sgRuleMgmtEditTitle = "Edit Security Group Rule"
+    private static let sgRuleMgmtCreatingText = "Creating rule..."
+    private static let sgRuleMgmtErrorPrefix = "Error: "
+    private static let sgRuleMgmtRequiredFieldSuffix = ": *"
+    private static let sgRuleMgmtOptionalFieldSuffix = " (optional)"
+
+    // Field Display Constants
+    private static let sgRuleMgmtValidationErrorsTitle = "Validation Errors:"
+    private static let sgRuleMgmtValidationErrorPrefix = "- "
+    private static let sgRuleMgmtEditPromptText = "Press SPACE to edit..."
+    private static let sgRuleMgmtTableHeader = "DIR    PROTO   PORTS           REMOTE"
+    private static let sgRuleMgmtTableSeparator = String(repeating: "-", count: 42)
+
+    // Help Text Constants
+    private static let sgRuleMgmtListHelpText = "UP/DOWN: navigate | SPACE: edit rule | A: add rule | DEL: delete | ESC: back"
+    private static let sgRuleMgmtCreateHelpText = "UP/DOWN: navigate fields | SPACE: edit/select | ENTER: create | ESC: cancel"
+    private static let sgRuleMgmtEditHelpText = "UP/DOWN: navigate fields | SPACE: edit/select | ENTER: save | ESC: cancel"
+
+    // UI Component Constants
+    private static let sgRuleMgmtSelectedIndicator = "> "
+    private static let sgRuleMgmtUnselectedIndicator = "  "
+    private static let sgRuleMgmtComponentSpacing: Int32 = 0
+
+    @MainActor
+    static func drawSecurityGroupRuleManagement(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                               width: Int32, height: Int32, form: SecurityGroupRuleManagementForm,
+                                               cachedSecurityGroups: [SecurityGroup] = []) async {
+
+        // Defensive bounds checking to prevent crashes on small terminals
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        // Main Security Group Rule Management
+        let surface = SwiftTUI.surface(from: screen)
+        var components: [any Component] = []
+
+        // Title based on current mode
+        let titleText = getSGRuleMgmtTitle(for: form)
+        components.append(Text(titleText).emphasis().bold())
+
+        // Content based on current mode
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+
+        if form.shouldShowRulesList() {
+            // Render FormSelector for rule list
+            let selector = createSGRuleMgmtListComponents(form: form, width: width, height: height)
+            surface.clear(rect: bounds)
+            await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        } else if form.shouldShowCreateForm() || form.shouldShowEditForm() {
+            // Check if a selector field is active
+            if let currentField = form.ruleCreateFormState.getCurrentField(),
+               case .selector(let selectorField) = currentField,
+               selectorField.isActive {
+                // Render full-screen FormSelector overlay
+                if let selectorComponent = FormSelectorRenderer.renderSelector(
+                    label: selectorField.label,
+                    items: selectorField.items,
+                    selectedItemId: selectorField.selectedItemId,
+                    highlightedIndex: selectorField.highlightedIndex,
+                    scrollOffset: selectorField.scrollOffset,
+                    searchQuery: selectorField.searchQuery,
+                    columns: selectorField.columns,
+                    maxHeight: Int(height)
+                ) {
+                    surface.clear(rect: bounds)
+                    await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+                }
+            } else {
+                // Render create/edit form with FormBuilder
+                let titleText = getSGRuleMgmtTitle(for: form)
+
+                // Build form fields
+                let fields = form.ruleCreateForm.buildFields(
+                    selectedFieldId: form.ruleCreateFormState.getCurrentFieldId(),
+                    activeFieldId: form.ruleCreateFormState.getActiveFieldId(),
+                    formState: form.ruleCreateFormState
+                )
+
+                // Create FormBuilder
+                let formBuilder = FormBuilder(
+                    title: titleText,
+                    fields: fields,
+                    selectedFieldId: form.ruleCreateFormState.getCurrentFieldId(),
+                    validationErrors: form.ruleCreateForm.validateForm().errors,
+                    showValidationErrors: form.ruleCreateFormState.showValidationErrors
+                )
+
+                // Render the form
+                surface.clear(rect: bounds)
+                await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+            }
+        }
+    }
+
+    // MARK: - Component Creation Functions
+
+    private static func getSGRuleMgmtTitle(for form: SecurityGroupRuleManagementForm) -> String {
+        if form.shouldShowCreateForm() {
+            return "\(Self.sgRuleMgmtCreateTitle) - \(form.securityGroup.name ?? "Unknown")"
+        } else if form.shouldShowEditForm() {
+            return "\(Self.sgRuleMgmtEditTitle) - \(form.securityGroup.name ?? "Unknown")"
+        } else {
+            return "\(Self.sgRuleMgmtListTitle) (\(form.securityGroup.securityGroupRules?.count ?? 0)) - \(form.securityGroup.name ?? "Unknown")"
+        }
+    }
+
+    private static func getSGRuleMgmtHelpText(for form: SecurityGroupRuleManagementForm) -> String {
+        if form.shouldShowCreateForm() {
+            return Self.sgRuleMgmtCreateHelpText
+        } else if form.shouldShowEditForm() {
+            return Self.sgRuleMgmtEditHelpText
+        } else {
+            return Self.sgRuleMgmtListHelpText
+        }
+    }
+
+    private static func createSGRuleMgmtListComponents(form: SecurityGroupRuleManagementForm, width: Int32, height: Int32) -> FormSelector<SecurityGroupRule> {
+        // Create FormSelector columns
+        let dirColumn = FormSelectorColumn<SecurityGroupRule>(
+            header: "DIR",
+            width: 8
+        ) { rule in
+            rule.direction.uppercased()
+        }
+
+        let protocolColumn = FormSelectorColumn<SecurityGroupRule>(
+            header: "PROTOCOL",
+            width: 10
+        ) { rule in
+            rule.protocolEnum?.rawValue.uppercased() ?? "ANY"
+        }
+
+        let portsColumn = FormSelectorColumn<SecurityGroupRule>(
+            header: "PORTS",
+            width: 15
+        ) { rule in
+            formatPortRange(rule)
+        }
+
+        let ethertypeColumn = FormSelectorColumn<SecurityGroupRule>(
+            header: "ETHERTYPE",
+            width: 10
+        ) { rule in
+            rule.ethertype ?? "IPv4"
+        }
+
+        let remoteColumn = FormSelectorColumn<SecurityGroupRule>(
+            header: "REMOTE",
+            width: 25
+        ) { rule in
+            formatRemoteDescription(rule)
+        }
+
+        let columns = [dirColumn, protocolColumn, portsColumn, ethertypeColumn, remoteColumn]
+
+        let tab = FormSelectorTab<SecurityGroupRule>(
+            title: "Security Group Rules",
+            columns: columns
+        )
+
+        let rules = form.securityGroup.securityGroupRules ?? []
+
+        return FormSelector<SecurityGroupRule>(
+            label: "Security Group Rules (\(rules.count))",
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: rules,
+            selectedItemIds: form.selectedRuleIds,
+            highlightedIndex: form.highlightedRuleIndex,
+            multiSelect: false,
+            scrollOffset: form.ruleScrollOffset,
+            searchQuery: form.ruleSearchQuery,
+            maxHeight: Int(height),
+            isActive: true
+        )
+    }
+
+    private static func createSGRuleMgmtFormComponents(form: SecurityGroupRuleManagementForm, cachedSecurityGroups: [SecurityGroup], width: Int32) -> [any Component] {
+        var components: [any Component] = []
+
+        // Since we're following gold standard, we integrate the rule create/edit form directly here
+        // Build all form fields as components using the rule create form
+        let ruleForm = form.ruleCreateForm
+        let visibleFields = getSGRuleCreateVisibleFields(for: ruleForm)
+
+        for (index, field) in visibleFields.enumerated() {
+            let isFirstField = index == 0
+            let fieldComponent = createSGRuleCreateFieldComponent(field: field, form: ruleForm, width: width, isFirstField: isFirstField)
+            components.append(fieldComponent)
+        }
+
+        // Show validation errors if any
+        let validation = ruleForm.validateForm()
+        if !validation.isValid {
+            components.append(Text(Self.sgRuleCreateValidationErrorsTitle).error().bold()
+                .padding(EdgeInsets(top: Self.sgRuleMgmtComponentTopPadding, leading: 0, bottom: 0, trailing: 0)))
+
+            for error in validation.errors {
+                components.append(Text("\(Self.sgRuleCreateValidationErrorPrefix)\(error)").error()
+                    .padding(EdgeInsets(top: 0, leading: Self.sgRuleCreateValidationErrorLeadingPadding, bottom: 0, trailing: 0)))
+            }
+        }
+
+        return components
+    }
+
+}

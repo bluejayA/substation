@@ -1,0 +1,83 @@
+#
+name: Create binary release
+
+permissions: write-all
+
+# Configures this workflow to run every time a change is pushed to the branch called `release`.
+on:
+  release:
+    types:
+      - published
+  pull_request:
+    paths:
+      - ".github/workflows/binary-build.yml"
+      - Sources/**
+  workflow_dispatch:
+
+# Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
+jobs:
+  build:
+    name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - macos-15-intel
+        swift:
+          - "6.1"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y binutils libncurses-dev libssl-dev libcurl4-openssl-dev
+        if: matrix.os == 'ubuntu-latest'
+      - name: Install Swift ${{ matrix.swift }} and build on macos
+        if: matrix.os == 'macos-latest' || matrix.os == 'macos-15-intel'
+        run: |
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
+          ~/.swiftly/bin/swiftly init --assume-yes --skip-install --quiet-shell-followup && \
+          hash -r && \
+          ~/.swiftly/bin/swiftly install ${{ matrix.swift }} && \
+          ~/.swiftly/bin/swiftly use ${{ matrix.swift }} && \
+          ~/.swiftly/bin/swift --version && \
+          ~/.swiftly/bin/swift package resolve && \
+          ~/.swiftly/bin/swift build -c release --static-swift-stdlib && \
+          export BUILD_DIR="$(~/.swiftly/bin/swift build --package-path .build -c release --show-bin-path)" && \
+          echo "BIN_PATH=${BUILD_DIR}" >> $GITHUB_ENV
+      - name: Install Swift ${{ matrix.swift }} and build on ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz && \
+          tar zxf swiftly-$(uname -m).tar.gz && \
+          ./swiftly init --assume-yes --skip-install --quiet-shell-followup &&
+          hash -r && \
+          ~/.local/share/swiftly/bin/swiftly install ${{ matrix.swift }} && \
+          ~/.local/share/swiftly/bin/swiftly use ${{ matrix.swift }} && \
+          ~/.local/share/swiftly/bin/swift --version && \
+          ~/.local/share/swiftly/bin/swift package resolve && \
+          ~/.local/share/swiftly/bin/swift build -c release --static-swift-stdlib && \
+          export BUILD_DIR="$(~/.local/share/swiftly/bin/swift build --package-path .build -c release --show-bin-path)" && \
+          echo "BIN_PATH=${BUILD_DIR}" >> $GITHUB_ENV
+      - name: Set architecture
+        run: echo "ARCH=$(uname -sm | sed -e 's@ @-@g' -e 's@/@-@g')" >> $GITHUB_ENV
+      - name: Binary rename
+        run: sudo cp ${{ env.BIN_PATH }}/substation ${{ env.BIN_PATH }}/substation-${{ env.ARCH }}
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: ${{ env.BIN_PATH }}/substation-${{ env.ARCH }}
+          fail_on_unmatched_files: true
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: substation-${{ env.ARCH }}
+          path: ${{ env.BIN_PATH }}/
