@@ -43,7 +43,7 @@ jobs:
     needs: build
 
     # ensure we only run on commits to the main branch
-    if: github.ref == 'refs/heads/main'
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
 
     runs-on: ubuntu-latest
 
