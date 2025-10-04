@@ -418,11 +418,22 @@ struct Substation {
         let configManager = CloudConfigManager()
         do {
             Logger.shared.logDebug("Listing available clouds")
-            let clouds = try await configManager.listAvailableClouds(path: configPath)
+            let cloudsConfig = try await configManager.loadCloudsConfig(path: configPath)
+            let clouds = Array(cloudsConfig.clouds.keys).sorted()
             Logger.shared.logInfo("Found \(clouds.count) clouds in configuration")
+
+            // Display validation warnings first, if any
+            if !cloudsConfig.validationWarnings.isEmpty {
+                print("Configuration Warnings:")
+                for (cloudName, warning) in cloudsConfig.validationWarnings.sorted(by: { $0.key < $1.key }) {
+                    print("  \(cloudName): \(warning) [SKIPPED]")
+                }
+                print("")
+            }
+
             if clouds.isEmpty {
-                Logger.shared.logWarning("No clouds found in configuration")
-                print("No clouds found in configuration.")
+                Logger.shared.logWarning("No valid clouds found in configuration")
+                print("No valid clouds found in configuration.")
                 return
             }
 

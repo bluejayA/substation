@@ -269,6 +269,7 @@ public actor EnhancedYAMLParser {
         }
 
         var clouds: [String: CloudConfig] = [:]
+        var validationWarnings: [String: String] = [:]
         let lines = yamlString.components(separatedBy: .newlines)
 
         var currentCloud: String?
@@ -315,11 +316,17 @@ public actor EnhancedYAMLParser {
             if indent == 2 && trimmedLine.hasSuffix(":") && state.canTransitionToNewCloud {
                 // Save previous cloud if exists
                 if let cloudName = currentCloud {
-                    clouds[cloudName] = try await createCloudConfig(
-                        from: currentConfig,
-                        auth: currentAuth,
-                        regions: currentRegions
-                    )
+                    do {
+                        clouds[cloudName] = try await createCloudConfig(
+                            from: currentConfig,
+                            auth: currentAuth,
+                            regions: currentRegions
+                        )
+                    } catch CloudConfigError.missingRequiredField(let field) {
+                        // Skip this cloud configuration if it's missing required fields
+                        // Add a validation warning so users can see what went wrong
+                        validationWarnings[cloudName] = "Missing required field: \(field)"
+                    }
                 }
 
                 // Start new cloud
@@ -418,14 +425,20 @@ public actor EnhancedYAMLParser {
 
         // Save the last cloud
         if let cloudName = currentCloud {
-            clouds[cloudName] = try await createCloudConfig(
-                from: currentConfig,
-                auth: currentAuth,
-                regions: currentRegions
-            )
+            do {
+                clouds[cloudName] = try await createCloudConfig(
+                    from: currentConfig,
+                    auth: currentAuth,
+                    regions: currentRegions
+                )
+            } catch CloudConfigError.missingRequiredField(let field) {
+                // Skip this cloud configuration if it's missing required fields
+                // Add a validation warning so users can see what went wrong
+                validationWarnings[cloudName] = "Missing required field: \(field)"
+            }
         }
 
-        return CloudsConfig(clouds: clouds)
+        return CloudsConfig(clouds: clouds, validationWarnings: validationWarnings)
     }
 
     private func parseKeyValue(_ line: String) async -> (String, String) {

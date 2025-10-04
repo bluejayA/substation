@@ -447,6 +447,58 @@ final class EnhancedCloudConfigTests: XCTestCase {
         }
     }
 
+    // MARK: - Error Handling Tests
+
+    func testSkipCloudWithMissingRequiredField() async throws {
+        let yamlContent = """
+        clouds:
+          valid-cloud:
+            auth:
+              auth_url: https://identity.example.com/v3
+              username: testuser
+              password: testpass
+              project_name: testproject
+            region_name: RegionOne
+          invalid-cloud:
+            auth:
+              username: testuser
+              password: testpass
+              project_name: testproject
+            region_name: RegionTwo
+          another-valid-cloud:
+            auth:
+              auth_url: https://identity2.example.com/v3
+              application_credential_id: abc123
+              application_credential_secret: secret456
+              project_name: myproject
+            region_name: RegionThree
+        """
+
+        let parser = EnhancedYAMLParser()
+        let data = yamlContent.data(using: .utf8)!
+        let config = try await parser.parse(data)
+
+        // Verify that only valid clouds were loaded
+        XCTAssertEqual(config.clouds.count, 2)
+        XCTAssertNotNil(config.clouds["valid-cloud"])
+        XCTAssertNotNil(config.clouds["another-valid-cloud"])
+        XCTAssertNil(config.clouds["invalid-cloud"])
+
+        // Verify that validation warnings were recorded for invalid cloud
+        XCTAssertEqual(config.validationWarnings.count, 1)
+        XCTAssertNotNil(config.validationWarnings["invalid-cloud"])
+        XCTAssertTrue(config.validationWarnings["invalid-cloud"]?.contains("auth_url") ?? false)
+
+        // Verify the valid clouds have correct data
+        let validCloud = config.clouds["valid-cloud"]!
+        XCTAssertEqual(validCloud.auth.auth_url, "https://identity.example.com/v3")
+        XCTAssertEqual(validCloud.auth.username, "testuser")
+
+        let anotherValidCloud = config.clouds["another-valid-cloud"]!
+        XCTAssertEqual(anotherValidCloud.auth.auth_url, "https://identity2.example.com/v3")
+        XCTAssertEqual(anotherValidCloud.auth.application_credential_id, "abc123")
+    }
+
     // MARK: - Performance Tests
 
     func testParsingPerformance() async throws {
