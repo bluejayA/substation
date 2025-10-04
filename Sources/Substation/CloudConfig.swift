@@ -57,9 +57,26 @@ public enum RegionConfig: Codable, Sendable {
 
 public struct CloudsConfig: Codable, Sendable {
     public let clouds: [String: CloudConfig]
+    public let validationWarnings: [String: String]
 
-    public init(clouds: [String: CloudConfig]) {
+    public init(clouds: [String: CloudConfig], validationWarnings: [String: String] = [:]) {
         self.clouds = clouds
+        self.validationWarnings = validationWarnings
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case clouds
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        clouds = try container.decode([String: CloudConfig].self, forKey: .clouds)
+        validationWarnings = [:]
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(clouds, forKey: .clouds)
     }
 }
 
