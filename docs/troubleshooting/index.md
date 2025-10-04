@@ -720,9 +720,9 @@ sudo pacman -S ncurses
 
 ### Community Resources
 
+- **GitHub Releases**: [github.com/cloudnull/substation/releases](https://github.com/cloudnull/substation/releases)
 - **GitHub Issues**: [github.com/cloudnull/substation/issues](https://github.com/cloudnull/substation/issues)
 - **Documentation**: [substation.cloud](https://substation.cloud)
-- **Discord**: [discord.gg/substation](https://discord.gg/substation)
 - **Stack Overflow**: Tag `substation-tui`
 
 ### Diagnostic Commands

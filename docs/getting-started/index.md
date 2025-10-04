@@ -45,11 +45,12 @@ docker run --volume ~/.config/openstack:/root/.config/openstack \
 
 Pre-built binaries are available for macOS and Linux:
 
-#### macOS Installation
+#### `macOS` Installation
 
 ```bash
-# Download the latest release
-curl -L https://github.com/cloudnull/substation/releases/latest/download/substation-macos -o substation
+# Be sure to be using the latest tagged release
+# https://github.com/cloudnull/substation/releases/latest
+curl -L "https://github.com/cloudnull/substation/releases/latest/download/substation-$(uname -s)-$(uname -m)" -o substation
 
 # Make executable
 chmod +x substation
@@ -68,8 +69,9 @@ substation --version
 sudo apt-get update
 sudo apt-get install -y libncurses6
 
-# Download the latest release
-curl -L https://github.com/cloudnull/substation/releases/latest/download/substation-linux -o substation
+# Be sure to be using the latest tagged release
+# https://github.com/cloudnull/substation/releases/latest
+curl -L "https://github.com/cloudnull/substation/releases/latest/download/substation-$(uname -s)-$(uname -m)" -o substation
 
 # Make executable
 chmod +x substation

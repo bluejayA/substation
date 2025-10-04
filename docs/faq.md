@@ -34,24 +34,6 @@ Yes, Substation is open-source software licensed under the MIT License. You can 
 - **Memory**: Minimum 256MB RAM (512MB recommended)
 - **Network**: Access to OpenStack API endpoints
 
-### How do I install Substation?
-
-The easiest way is to download the pre-built binary:
-
-```bash
-curl -L https://github.com/cloudnull/substation/releases/latest/download/substation -o substation
-chmod +x substation
-sudo mv substation /usr/local/bin/
-```
-
-Or build from source:
-
-```bash
-git clone https://github.com/cloudnull/substation.git
-cd substation
-~/.swiftly/bin/swift build -c release --static-swift-stdlib
-```
-
 ### Where should I put my clouds.yaml file?
 
 Substation looks for clouds.yaml in these locations (in order):
@@ -700,5 +682,4 @@ Report issues on GitHub:
 ### Where can I ask questions?
 
 - **GitHub Discussions**: Community forum
-- **Discord**: Real-time chat
 - **Stack Overflow**: Tag `substation-tui`
