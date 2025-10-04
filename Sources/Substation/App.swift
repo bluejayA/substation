@@ -86,6 +86,10 @@ struct Substation {
         var showHelp = false
         var debugMode = false
 
+        // Track whether values came from CLI (higher precedence than env vars)
+        var cloudNameFromCLI = false
+        var configPathFromCLI = false
+
         Logger.shared.logDebug("Application started with arguments: \(arguments)")
 
         // Simple argument parsing - process all arguments first
@@ -96,6 +100,7 @@ struct Substation {
             case "--cloud", "-c":
                 if i + 1 < arguments.count {
                     cloudName = arguments[i + 1]
+                    cloudNameFromCLI = true
                     i += 1
                 } else {
                     printError("--cloud option requires a cloud name")
@@ -105,6 +110,7 @@ struct Substation {
             case "--config":
                 if i + 1 < arguments.count {
                     configPath = arguments[i + 1]
+                    configPathFromCLI = true
                     i += 1
                 } else {
                     printError("--config option requires a file path")
@@ -120,6 +126,7 @@ struct Substation {
             default:
                 if !arg.hasPrefix("-") && cloudName == nil {
                     cloudName = arg
+                    cloudNameFromCLI = true
                 } else {
                     printError("Unknown option: \(arg)")
                     printUsage()
@@ -127,6 +134,17 @@ struct Substation {
                 }
             }
             i += 1
+        }
+
+        // Apply environment variables if not overridden by CLI arguments
+        if !cloudNameFromCLI, let osCloud = ProcessInfo.processInfo.environment["OS_CLOUD"] {
+            cloudName = osCloud
+            Logger.shared.logDebug("Using cloud from OS_CLOUD environment variable: \(osCloud)")
+        }
+
+        if !configPathFromCLI, let osConfigFile = ProcessInfo.processInfo.environment["OS_CLIENT_CONFIG_FILE"] {
+            configPath = osConfigFile
+            Logger.shared.logDebug("Using config file from OS_CLIENT_CONFIG_FILE environment variable: \(osConfigFile)")
         }
 
         // Configure logger immediately after parsing arguments
@@ -514,6 +532,10 @@ struct Substation {
           --list-clouds          List available clouds in configuration
           --wiretap               Enable debug mode and log to ~/substation.log
           -h, --help             Show this help message
+
+        Environment Variables:
+          OS_CLOUD               Cloud name to use (overridden by --cloud or positional argument)
+          OS_CLIENT_CONFIG_FILE  Path to clouds.yaml file (overridden by --config)
 
         Configuration:
           Substation uses the standard OpenStack clouds.yaml configuration file.
