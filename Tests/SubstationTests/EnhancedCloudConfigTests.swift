@@ -499,6 +499,132 @@ final class EnhancedCloudConfigTests: XCTestCase {
         XCTAssertEqual(anotherValidCloud.auth.application_credential_id, "abc123")
     }
 
+    // MARK: - Region Auto-Detection Tests
+    //
+    // These tests verify that clouds.yaml configurations without region_name
+    // are parsed correctly, allowing the application to auto-detect regions
+    // from the service catalog at runtime.
+
+    func testRegionAutoDetectionWithNoRegion() async throws {
+        let yamlContent = """
+        clouds:
+          cloud-no-region:
+            auth:
+              auth_url: https://identity.example.com/v3
+              username: testuser
+              password: testpass
+              project_name: testproject
+              user_domain_name: Default
+              project_domain_name: Default
+            interface: public
+        """
+
+        let parser = EnhancedYAMLParser()
+        let data = yamlContent.data(using: .utf8)!
+        let config = try await parser.parse(data)
+
+        // Verify cloud was loaded successfully
+        XCTAssertEqual(config.clouds.count, 1)
+        XCTAssertNotNil(config.clouds["cloud-no-region"])
+
+        let cloud = config.clouds["cloud-no-region"]!
+
+        // Verify region_name is nil (allowing auto-detection)
+        XCTAssertNil(cloud.region_name)
+        XCTAssertNil(cloud.primaryRegionName)
+
+        // Verify other fields are properly configured
+        XCTAssertEqual(cloud.auth.auth_url, "https://identity.example.com/v3")
+        XCTAssertEqual(cloud.auth.username, "testuser")
+        XCTAssertEqual(cloud.auth.project_name, "testproject")
+        XCTAssertEqual(cloud.interface, "public")
+    }
+
+    func testRegionAutoDetectionWithEmptyString() async throws {
+        let yamlContent = """
+        clouds:
+          cloud-empty-region:
+            auth:
+              auth_url: https://identity.example.com/v3
+              username: testuser
+              password: testpass
+              project_name: testproject
+              user_domain_name: Default
+              project_domain_name: Default
+            region_name: ""
+            interface: public
+        """
+
+        let parser = EnhancedYAMLParser()
+        let data = yamlContent.data(using: .utf8)!
+        let config = try await parser.parse(data)
+
+        XCTAssertEqual(config.clouds.count, 1)
+        let cloud = config.clouds["cloud-empty-region"]!
+
+        // Empty string should result in nil primaryRegionName
+        XCTAssertNil(cloud.primaryRegionName)
+    }
+
+    func testRegionConfigurationVariations() async throws {
+        let yamlContent = """
+        clouds:
+          cloud-with-single-region:
+            auth:
+              auth_url: https://identity1.example.com/v3
+              username: user1
+              password: pass1
+              project_name: project1
+              user_domain_name: Default
+              project_domain_name: Default
+            region_name: RegionOne
+            interface: public
+          cloud-with-multiple-regions:
+            auth:
+              auth_url: https://identity2.example.com/v3
+              username: user2
+              password: pass2
+              project_name: project2
+              user_domain_name: Default
+              project_domain_name: Default
+            region_name:
+              - RegionOne
+              - RegionTwo
+              - RegionThree
+            interface: public
+          cloud-with-no-region:
+            auth:
+              auth_url: https://identity3.example.com/v3
+              username: user3
+              password: pass3
+              project_name: project3
+              user_domain_name: Default
+              project_domain_name: Default
+            interface: public
+        """
+
+        let parser = EnhancedYAMLParser()
+        let data = yamlContent.data(using: .utf8)!
+        let config = try await parser.parse(data)
+
+        XCTAssertEqual(config.clouds.count, 3)
+
+        // Test single region
+        let singleRegion = config.clouds["cloud-with-single-region"]!
+        XCTAssertEqual(singleRegion.primaryRegionName, "RegionOne")
+        XCTAssertEqual(singleRegion.allRegionNames, ["RegionOne"])
+
+        // Test multiple regions (should use first as primary)
+        let multiRegion = config.clouds["cloud-with-multiple-regions"]!
+        XCTAssertEqual(multiRegion.primaryRegionName, "RegionOne")
+        XCTAssertEqual(multiRegion.allRegionNames, ["RegionOne", "RegionTwo", "RegionThree"])
+
+        // Test no region (should be nil for auto-detection)
+        let noRegion = config.clouds["cloud-with-no-region"]!
+        XCTAssertNil(noRegion.primaryRegionName)
+        XCTAssertEqual(noRegion.allRegionNames, [])
+    }
+
     // MARK: - Performance Tests
 
     func testParsingPerformance() async throws {

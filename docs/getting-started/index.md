@@ -303,35 +303,6 @@ clouds:
     cacert: /path/to/ca.pem   # Custom CA certificate
 ```
 
-### Environment Variables
-
-Alternatively, use environment variables (compatible with OpenStack CLI):
-
-```bash
-# Authentication
-export OS_AUTH_URL=https://openstack.example.com:5000/v3
-export OS_USERNAME=operator
-export OS_PASSWORD=secret
-export OS_PROJECT_NAME=operations
-export OS_PROJECT_DOMAIN_NAME=default
-export OS_USER_DOMAIN_NAME=default
-export OS_REGION_NAME=RegionOne
-
-# Run Substation
-substation
-```
-
-**Application Credential Variables:**
-
-```bash
-export OS_AUTH_URL=https://openstack.example.com:5000/v3
-export OS_APPLICATION_CREDENTIAL_ID=abc123...
-export OS_APPLICATION_CREDENTIAL_SECRET=secret456...
-export OS_REGION_NAME=RegionOne
-
-substation
-```
-
 ### Testing Your Configuration
 
 **Test Connection:**
