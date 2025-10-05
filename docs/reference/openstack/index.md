@@ -17,26 +17,26 @@ Substation is tested and supported with:
 
 ### Core Services (Required)
 
-| Service | Component | API Version | Lines of Code | Status |
-|---------|-----------|-------------|---------------|--------|
-| **Keystone** | Identity | v3 | ~3,500 | Full support |
-| **Nova** | Compute | v2.1 | ~7,000 | Full support |
-| **Neutron** | Networking | v2.0 | ~6,500 | Full support |
+| Service | Component | API Version | Status |
+|---------|-----------|-------------|--------|
+| **Keystone** | Identity | v3 | Full support |
+| **Nova** | Compute | v2.1 | Full support |
+| **Neutron** | Networking | v2.0 | Full support |
 
 ### Extended Services (Optional)
 
-| Service | Component | API Version | Lines of Code | Status |
-|---------|-----------|-------------|---------------|--------|
-| **Cinder** | Block Storage | v3 | ~5,000 | Full support |
-| **Glance** | Image | v2 | ~4,000 | Full support |
-| **Barbican** | Key Manager | v1 | ~2,500 | Full support |
-| **Octavia** | Load Balancer | v2 | ~3,000 | Full support |
-| **Swift** | Object Storage | v1 | ~2,800 | Full support |
-| **Heat** | Orchestration | v1 | Stub | Planned |
+| Service | Component | API Version | Status |
+|---------|-----------|-------------|--------|
+| **Cinder** | Block Storage | v3 | Full support |
+| **Glance** | Image | v2 | Partial support |
+| **Barbican** | Key Manager | v1 | Full support |
+| **Octavia** | Load Balancer | v2 | planned |
+| **Swift** | Object Storage | v1 | planned |
+| **Heat** | Orchestration | v1 | planned |
 
 ### Service Capabilities Detail
 
-#### Nova (Compute Service) - ~7,000 lines
+#### Nova (Compute Service)
 
 **Full Resource Support:**
 
@@ -54,7 +54,7 @@ Substation is tested and supported with:
 - Interface attachment/detachment
 - Server group policies (affinity, anti-affinity)
 
-#### Neutron (Networking Service) - ~6,500 lines
+#### Neutron (Networking Service)
 
 **Full Resource Support:**
 
@@ -73,7 +73,7 @@ Substation is tested and supported with:
 - External network management
 - Subnet allocation pools
 
-#### Cinder (Block Storage Service) - ~5,000 lines
+#### Cinder (Block Storage Service)
 
 **Full Resource Support:**
 
@@ -89,7 +89,7 @@ Substation is tested and supported with:
 - Multi-attach volumes
 - Volume migration
 
-#### Glance (Image Service) - ~4,000 lines
+#### Glance (Image Service)
 
 **Full Resource Support:**
 
@@ -104,7 +104,7 @@ Substation is tested and supported with:
 - Image properties and tags
 - Protected images
 
-#### Barbican (Secrets Management) - ~2,500 lines
+#### Barbican (Secrets Management)
 
 **Full Resource Support:**
 
@@ -118,7 +118,7 @@ Substation is tested and supported with:
 - ACL management
 - Secret metadata
 
-#### Octavia (Load Balancer) - ~3,000 lines
+#### Octavia (Load Balancer)
 
 **Full Resource Support:**
 
@@ -133,7 +133,7 @@ Substation is tested and supported with:
 - Load balancer statistics
 - Amphora management
 
-#### Swift (Object Storage) - ~2,800 lines
+#### Swift (Object Storage)
 
 **Full Resource Support:**
 

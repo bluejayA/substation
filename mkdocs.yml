@@ -1,5 +1,5 @@
-site_name: Substation - OpenStack Terminal UI
-site_description: Enterprise-grade terminal user interface for OpenStack cloud infrastructure management
+site_name: Substation - The Operators Control Room
+site_description: OpenStack terminal user interface for modern cloud infrastructure management
 site_author: Kevin Carter
 site_url: https://github.com/cloudnull/substation
 repo_name: substation
@@ -90,35 +90,47 @@ extra:
       link: https://github.com/cloudnull
 
 nav:
-  - Home:
-    - index.md
-    - Features: features.md
-    - Security: security.md
-    - FAQ: faq.md
+  - Home: index.md
+  - Quick Start: quick-start.md
+  - Getting Started: getting-started/index.md
+  - Installation: installation/index.md
+  - Configuration: configuration/index.md
 
-  - Getting Started:
-    - getting-started/index.md
+  - Guides:
+    - Operators:
+      - Keyboard Shortcuts: guides/operators/keyboard-shortcuts.md
+      - Common Workflows: guides/operators/workflows.md
+
+  - Concepts:
+    - Features: concepts/features.md
+    - Caching System: concepts/caching.md
+    - Search Engine: concepts/search.md
+    - Security: concepts/security.md
 
   - Architecture:
-    - architecture/index.md
-
-  - User Guide:
-    - user-guide/index.md
-
-  - Developer Guide:
-    - developers/index.md
-    - developers/formbuilder-guide.md
-    - developers/formselector-guide.md
-    - developers/formtextfield-guide.md
-
-  - OpenStack Integration:
-    - openstack/index.md
-
-  - API Reference:
-    - api/index.md
+    - Overview: architecture/index.md
+    - System Architecture: architecture/overview.md
+    - Components: architecture/components.md
+    - Technology Stack: architecture/technology-stack.md
 
   - Performance:
-    - performance/index.md
+    - Overview: performance/index.md
+    - Performance Details: performance/overview.md
+    - Benchmarks: performance/benchmarks.md
+    - Tuning: performance/tuning.md
+    - Troubleshooting: performance/troubleshooting.md
 
-  - Troubleshooting:
-    - troubleshooting/index.md
+  - Reference:
+    - API Reference:
+      - Quick Reference: reference/api/index.md
+      - OSClient Library: reference/api/osclient.md
+      - SwiftTUI Framework: reference/api/swifttui.md
+      - Integration Guide: reference/api/integration.md
+    - Developers:
+      - Overview: guides/developers/index.md
+      - FormBuilder Guide: guides/developers/formbuilder-guide.md
+      - FormTextField Guide: guides/developers/formtextfield-guide.md
+      - FormSelector Guide: guides/developers/formselector-guide.md
+    - OpenStack Integration: reference/openstack/index.md
+    - FAQ: reference/faq.md
+    - Troubleshooting: troubleshooting/index.md

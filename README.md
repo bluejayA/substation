@@ -6,7 +6,7 @@
 
 Built with Swift 6.1 and custom SwiftTUI framework, because sometimes you just need to manage your cloud without leaving the terminal - especially at 3 AM when the pagers won't stop screaming.
 
-> "Finally, an OpenStack tool that doesn't make me want to throw my laptop out the window." - Anonymous Cloud Operator, 3:47 AM
+> "Finally, an OpenStack tool that doesn't make me want to throw my laptop out the window." - Anonymous Cloud Operator (me)
 
 ## Why Substation?
 
@@ -58,214 +58,49 @@ Substation is built as a modular Swift package (because monoliths are so 2010):
 
 **Zero external dependencies** - We built it all ourselves. Every. Single. Line.
 
-## Quick Start
+## Quick Start in 1 minute
 
-### Configuration
-
-Create `~/.config/openstack/clouds.yaml` (the same one you've been using for years):
-
-```yaml
-clouds:
-  mycloud:
-    auth:
-      auth_url: https://identity.example.com:5000/v3
-      username: admin
-      password: secretpassword        # Yes, plaintext. Welcome to OpenStack.
-      project_name: admin
-      user_domain_name: Default       # Because domains make everything better
-      project_domain_name: Default    # Twice the domains, twice the fun
-    region_name: RegionOne            # Or whatever creative name your team chose
-```
-
-> **Pro Tip**: Substation respects the same `clouds.yaml` format as the OpenStack CLI. If it works there, it works here.
-
-### Build Requirements
-
-**macOS:**
-- Swift 6.1 or later (we use the bleeding edge features, sorry)
-- Xcode 15+ (optional, for IDE support and pretty colors)
-- OpenStack clouds.yaml configuration (the one you already have)
-- A working OpenStack cluster (the hard part)
-
-**Linux:**
-- Swift 6.1 or later (yes, really - Swift 6 strict concurrency is non-negotiable)
-- ncurses development headers: `sudo apt-get install libncurses-dev`
-- OpenStack clouds.yaml configuration
-- Patience (Linux builds are... character building)
-
-### Installation
-
-#### macOS
-
-While not required, it is recommended to use [swiftly](https://github.com/swiftlang/swiftly) for managing Swift toolchains.
+### Get the container
 
 ```bash
-# Build with Swift 6.1 (use system swift or swiftly)
-swift build -c release
-
-# Run the application
-.build/release/substation
-```
-
-#### Linux-specific Setup
-
-Linux build requires ncurses >=6.4 development headers and Swift 6.1 installation.
-
-```bash
-# Install Swift 6.1 using swiftly (recommended)
-curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
-swiftly install 6.1
-swiftly use 6.1
-
-# Install development headers and tools
-sudo apt update
-sudo apt install binutils build-essential libc6-dev libncurses-dev
-
-# Build via swiftly
-~/.swiftly/bin/swift build -c release
-
-# Run the application
-mv .build/release/substation /usr/local/bin/substation
-```
-
-#### Docker
-
-Running Substation in Docker requires an interactive terminal and access to your OpenStack configuration.
-
-##### Build (Linux)
-
-```bash
-# Build Docker image
-docker build . -t substation:local
-```
-
-##### Run (local build)
-
-```bash
-# Run with clouds.yaml mounted
+# Docker (fastest)
 docker run --volume ~/.config/openstack:/root/.config/openstack \
-           --interactive \
-           --tty \
-           --env TERM \
-           --rm \
-           substation:local
-```
-
-##### Run (pre-built image)
-
-```bash
-docker run --volume ~/.config/openstack:/root/.config/openstack \
-           --interactive \
-           --tty \
-           --env TERM \
-           --rm \
+           --interactive --tty --env TERM --rm \
            ghcr.io/cloudnull/substation/substation:latest
 ```
 
-### Usage
+### Get pre-built binary
 
 ```bash
-# Use default cloud (first one in your clouds.yaml)
-substation
+curl -L "https://github.com/cloudnull/substation/releases/latest/download/substation-$(uname -s)-$(uname -m)" -o substation
 
-# Use specific cloud (when you have trust issues with defaults)
-substation --cloud mycloud
+# Make executable
+chmod +x substation
 
-# List available clouds (forgot what you named them again?)
-substation --list-clouds
-
-# Use the wiretap feature for debugging (see every API call in excruciating detail)
-substation --wiretap
+# Move to your PATH
+sudo mv substation /usr/local/bin/
 ```
 
-> **Wiretap Mode**: When using `--wiretap`, API requests and responses will be logged to `substation.log` in your `${HOME}` directory. Warning: This gets verbose. Very verbose. "Why is this log file 2GB?" verbose. Use it when your OpenStack cluster is misbehaving (so, always).
+## Full guides
 
-### Operator Survival Tips
+- **[Installation Guide](substation.cloud/installation/)** - All installation methods (Docker, binary, source)
+- **[Configuration Guide](substation.cloud/configuration/)** - clouds.yaml setup and authentication
+- **[Quick Start Guide](substation.cloud/quick-start/)** - Get up and running in 5 minutes
+- **[Getting Started](substation.cloud/getting-started/)** - Comprehensive first-time setup
 
-- Press `c` to purge all caches when your data looks stale (happens more often than you'd like)
-- Press `?` for help when you forget what key does what (we've all been there)
-- Press `q` to quit and go back to bed (the monitoring will call you back anyway)
-- The cache TTLs are tuned for typical OpenStack behavior: Servers (2 min), Networks (5 min), Auth tokens (1 hour)
-- If searches are slow, your OpenStack API is probably having a bad day (again)
+## Navigation Quick Reference
 
-## Navigation
+Press `?` anytime for help. Here are the essentials:
 
-All keyboard-driven, because your mouse is for the weak.
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| `d` | Dashboard | `s` | Servers |
+| `n` | Networks | `v` | Volumes |
+| `e` | Security Groups | `i` | Images |
+| `z` | Advanced Search | `c` | Purge cache |
+| `/` | Filter list | `q` | Quit |
 
-### Main Navigation
-
-| Key | View | When You'll Use It |
-|-----|------|--------------------|
-| `d` | Dashboard | First thing, every time |
-| `s` | Servers | "Why is prod down?" |
-| `g` | Server Groups | Advanced placement wizardry |
-| `n` | Networks | "Can you see me now?" |
-| `e` | Security Groups | Firewall archaeology |
-| `v` | Volumes | Where did my data go? |
-| `i` | Images | Finding that one CentOS image |
-| `f` | Flavors | Size matters |
-| `t` | Topology | Pretty network diagrams |
-| `h` | Health Dashboard | Is it us or them? |
-| `u` | Subnets | CIDR math at 3 AM |
-| `p` | Ports | MAC address detective work |
-| `r` | Routers | Routing table archaeology |
-| `l` | Floating IPs | The IPs that float away |
-| `b` | Barbican (Secrets) | Where secrets hide |
-| `o` | Octavia (Load Balancers) | Distributing the pain |
-| `j` | Swift (Object Storage) | Object storage chaos |
-| `z` | Advanced Search | Cross-service grep for your cloud |
-| `c` | (Hidden) | Purge all caches - the panic button |
-
-### List Navigation
-
-| Key | Action | Pro Tip |
-|-----|--------|---------|
-| `↑/↓` | Navigate lists | Or j/k if you're a vim person |
-| `Enter` | View details | See everything about a resource |
-| `/` | Search/filter | Instant local filtering |
-| `?` | Show help | When you forget (again) |
-| `q` | Quit | Until next time |
-
-## Package Structure
-
-```
-substation/
-├── Package.swift              # Swift Package Manager manifest (zero external deps)
-├── Sources/
-│   ├── OSClient/             # OpenStack API client library (the beast)
-│   │   ├── Services/         # OpenStack service clients
-│   │   │   ├── NovaService.swift        # Compute
-│   │   │   ├── NeutronService.swift     # Networking
-│   │   │   ├── CinderService.swift      # Storage
-│   │   │   ├── GlanceService.swift      # Images
-│   │   │   ├── KeystoneService.swift    # Identity
-│   │   │   └── BarbicanService.swift    # Secrets
-│   │   ├── Models/           # Data models and DTOs (JSON hell)
-│   │   ├── Authentication/   # Auth and token management (1hr TTL)
-│   │   └── Cache/            # Caching and optimization (60-80% hit rate)
-│   ├── MemoryKit/            # Multi-level caching system
-│   │   ├── MultiLevelCacheManager.swift   # L1/L2/L3 hierarchy
-│   │   ├── CacheManager.swift             # Main cache engine
-│   │   ├── MemoryManager.swift            # Memory pressure
-│   │   ├── TypedCacheManager.swift        # Type-safe caching
-│   │   └── PerformanceMonitor.swift       # Metrics tracking
-│   ├── SwiftTUI/            # Custom terminal UI framework (NCurses magic)
-│   │   ├── Core/            # Core rendering engine (60fps or bust)
-│   │   ├── Components/      # Reusable UI components (tables, lists, forms)
-│   │   └── Events/          # Input and event handling (keyboard wizardry)
-│   ├── CrossPlatformTimer/  # Cross-platform timer utilities (Darwin vs Glibc)
-│   ├── Substation/          # Main application (where it all comes together)
-│   │   ├── Services/        # Refactored service layer (clean code organization)
-│   │   │   ├── ResourceOperations.swift      # CRUD operations
-│   │   │   ├── ServerActions.swift           # Server-specific actions
-│   │   │   ├── UIHelpers.swift               # UI helper methods
-│   │   │   ├── OperationErrorHandler.swift   # Error handling
-│   │   │   └── ValidationService.swift       # Input validation
-│   │   ├── Views/           # Application-specific views (pretty displays)
-│   │   └── Telemetry/       # Metrics and performance monitoring
-│   └── CNCurses/            # NCurses C bindings (because C is eternal)
-└── Tests/                   # Unit and integration tests (we test things)
-```
+**Full keyboard guide:** [Keyboard Shortcuts & Navigation](substation.cloud/guides/operators/keyboard-shortcuts/)
 
 ### Library Overview
 
@@ -313,12 +148,31 @@ Because fast matters when you're debugging production at 3 AM:
 
 ## Documentation
 
-For when you want to know how the sausage is made:
+### Getting Started
 
-- **[Architecture Guide](docs/architecture/index.md)**: System design, patterns, and all the diagrams
-- **[API Documentation](docs/api/index.md)**: Library and service APIs (use our code in your projects)
-- **[User Guide](docs/user-guide/index.md)**: Interface, navigation, and keyboard wizardry
-- **[Performance Guide](docs/performance/index.md)**: Optimization, benchmarking, and cache tuning
+- **[Quick Start](substation.cloud/quick-start/)** - Get running in 5 minutes
+- **[Installation](substation.cloud/installation/)** - All installation methods
+- **[Configuration](substation.cloud/configuration/)** - clouds.yaml and authentication
+- **[Getting Started](substation.cloud/getting-started/)** - Complete first-time setup
+
+### Operators
+
+- **[Keyboard Shortcuts](substation.cloud/guides/operators/keyboard-shortcuts/)** - Complete navigation reference
+- **[Common Workflows](substation.cloud/guides/operators/workflows/)** - Everyday operations
+- **[Troubleshooting](substation.cloud/guides/operators/troubleshooting/)** - When things go wrong
+
+### Developers
+
+- **[Developer Guide](substation.cloud/guides/developers/)** - Contributing and extending
+- **[API Reference](substation.cloud/reference/api/)** - Using Substation libraries
+- **[FormBuilder Guide](substation.cloud/guides/developers/)** - Building forms
+
+### Deep Dives
+
+- **[Architecture](substation.cloud/architecture/)** - System design and components
+- **[Performance](substation.cloud/performance/)** - Optimization and benchmarking
+- **[Concepts](substation.cloud/concepts/features/)** - Features, caching, search, security
+- **[FAQ](substation.cloud/reference/faq/)** - Frequently asked questions
 
 Full documentation available at [https://substation.cloud](https://substation.cloud)
 
