@@ -25,8 +25,6 @@ Substation provides full CRUD (Create, Read, Update, Delete) operations for all 
 - **Predictive prefetching** for common workflows
 - **Request coalescing** to minimize network overhead
 
-### Features
-
 #### Batch Operations
 
 - Process 100+ resources simultaneously
@@ -312,12 +310,11 @@ Substation includes a comprehensive form building system designed specifically f
 
 **Developer Benefits:**
 
-- Reduce form creation from 500+ lines to ~50 lines of declarative code
 - Eliminate cursor tracking, history management, and validation boilerplate
 - Type-safe resource selection that preserves OSClient types
 - Easy extension for new resource types
 
-See [Developer Documentation](developers/index.md) for implementation guides.
+See [Developer Documentation](../guides/developers/index.md) for implementation guides.
 
 ## Developer Features
 

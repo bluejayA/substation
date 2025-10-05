@@ -1,10 +1,8 @@
-# API Reference
+# OSClient API Reference
 
-Substation provides multiple packages with clean, modular APIs for OpenStack management and terminal UI development. This reference documents all public APIs across the package ecosystem.
+Complete API reference for the OpenStackClient library, service clients, and data models.
 
 ## Package Overview
-
-### OSClient - OpenStack API Library
 
 The OSClient library provides a comprehensive Swift API for interacting with OpenStack services with:
 
@@ -13,84 +11,6 @@ The OSClient library provides a comprehensive Swift API for interacting with Ope
 - **Intelligent caching** for 60-80% API call reduction
 - **Comprehensive error handling** with recovery strategies
 - **Cross-platform compatibility** (macOS and Linux)
-
-### SwiftTUI - Terminal UI Framework
-
-SwiftTUI provides a declarative terminal UI framework with:
-
-- **SwiftUI-like syntax** for familiar development experience
-- **Cross-platform rendering** using NCurses abstraction
-- **High-performance rendering** with 60+ FPS capability
-- **Component-based architecture** for reusability
-- **Event-driven input handling** for responsive UIs
-
-### CrossPlatformTimer - Timer Utilities
-
-CrossPlatformTimer offers unified timer functionality with:
-
-- **Platform abstraction** for consistent behavior
-- **High-precision timing** for smooth animations
-- **Memory-efficient implementation** with automatic cleanup
-- **Actor-safe design** for concurrent environments
-
-## Core Components
-
-```mermaid
-graph TB
-    subgraph "Public API"
-        Client[OpenStackClient]
-        Services[Service Clients]
-        Models[Data Models]
-    end
-
-    subgraph "Infrastructure"
-        Core[ClientCore]
-        Cache[CacheManager]
-        Auth[AuthManager]
-    end
-
-    subgraph "Extensions"
-        DataManagers[Data Managers]
-        Performance[Performance]
-        Telemetry[Telemetry]
-    end
-
-    Client --> Services
-    Services --> Models
-    Client --> Core
-    Core --> Cache
-    Core --> Auth
-    Services --> DataManagers
-    DataManagers --> Performance
-    DataManagers --> Telemetry
-```
-
-## Quick Start
-
-```swift
-import OSClient
-
-// Connect to OpenStack
-let config = OpenStackConfig(
-    authUrl: "https://keystone.example.com:5000/v3"
-)
-
-let credentials = OpenStackCredentials(
-    username: "operator",
-    password: "secret",
-    projectName: "myproject",
-    domainName: "default"
-)
-
-let client = try await OpenStackClient.connect(
-    config: config,
-    credentials: credentials
-)
-
-// Use service clients
-let servers = try await client.nova.servers.list()
-let networks = try await client.neutron.networks.list()
-```
 
 ## OpenStackClient
 
@@ -108,6 +28,28 @@ public actor OpenStackClient {
         enablePerformanceEnhancements: Bool = true
     ) async throws -> OpenStackClient
 }
+```
+
+**Example**:
+
+```swift
+import OSClient
+
+let config = OpenStackConfig(
+    authUrl: "https://keystone.example.com:5000/v3"
+)
+
+let credentials = OpenStackCredentials(
+    username: "operator",
+    password: "secret",
+    projectName: "myproject",
+    domainName: "default"
+)
+
+let client = try await OpenStackClient.connect(
+    config: config,
+    credentials: credentials
+)
 ```
 
 ### Service Access
@@ -149,6 +91,8 @@ public struct OpenStackCredentials {
 ## Service Clients
 
 ### NovaService (Compute)
+
+Compute service for managing servers, flavors, and keypairs.
 
 ```swift
 public actor NovaService {
@@ -201,6 +145,8 @@ public actor ServerManager {
 
 ### NeutronService (Networking)
 
+Networking service for managing networks, subnets, routers, and security groups.
+
 ```swift
 public actor NeutronService {
     public func networks() -> NetworkManager
@@ -239,6 +185,8 @@ public actor NetworkManager {
 ```
 
 ### CinderService (Block Storage)
+
+Block storage service for managing volumes and snapshots.
 
 ```swift
 public actor CinderService {
@@ -402,6 +350,25 @@ public struct CacheStatistics {
 }
 ```
 
+**Example**:
+
+```swift
+// Configure cache for your environment
+await client.cacheManager.configure(
+    maxSize: 100_000_000,  // 100MB
+    defaultTTL: 300,       // 5 minutes
+    resourceTTLs: [
+        .servers: 60,      // 1 minute for servers
+        .networks: 300,    // 5 minutes for networks
+        .images: 3600      // 1 hour for images
+    ]
+)
+
+// Get cache statistics
+let stats = await client.cacheManager.statistics()
+print("Cache hit rate: \(stats.hitRate * 100)%")
+```
+
 ## Error Handling
 
 ### Error Types
@@ -436,9 +403,28 @@ public struct ExponentialBackoffStrategy: ErrorRecoveryStrategy {
 }
 ```
 
+**Example**:
+
+```swift
+do {
+    let server = try await client.nova.servers.create(...)
+} catch OpenStackError.quotaExceeded(let message) {
+    // Handle quota error
+    print("Quota exceeded: \(message)")
+} catch OpenStackError.conflict(let message) {
+    // Handle conflict
+    print("Conflict: \(message)")
+} catch {
+    // Handle other errors
+    print("Error: \(error)")
+}
+```
+
 ## Data Managers
 
 ### ServerDataManager
+
+High-level server operations with related resource management.
 
 ```swift
 public actor ServerDataManager {
@@ -461,6 +447,8 @@ public actor ServerDataManager {
 ```
 
 ### NetworkDataManager
+
+High-level network operations with topology analysis.
 
 ```swift
 public actor NetworkDataManager {
@@ -538,6 +526,17 @@ extension ServerManager {
 }
 ```
 
+**Example**:
+
+```swift
+// Watch for server to become active
+try await client.nova.servers.watchStatus(
+    serverId,
+    until: .active,
+    timeout: 600  // 10 minutes
+)
+```
+
 ### Batch Operations
 
 ```swift
@@ -556,8 +555,9 @@ public protocol BatchOperation {
 
 ### From Python OpenStack SDK
 
+**Python**:
+
 ```python
-# Python
 from openstack import connection
 conn = connection.Connection(
     auth_url="https://keystone.example.com:5000/v3",
@@ -568,8 +568,9 @@ conn = connection.Connection(
 servers = conn.compute.servers()
 ```
 
+**Swift**:
+
 ```swift
-// Swift
 import OSClient
 
 let client = try await OpenStackClient.connect(
@@ -581,278 +582,6 @@ let client = try await OpenStackClient.connect(
     )
 )
 let servers = try await client.nova.servers.list()
-```
-
----
-
-## SwiftTUI Framework API
-
-### Core Components
-
-#### Surface Management
-
-```swift
-import SwiftTUI
-
-// Create rendering surface
-let surface = SwiftTUI.surface(from: screen)
-
-// Get surface dimensions
-let (width, height) = SwiftTUI.getScreenSize()
-let maxY = SwiftTUI.getMaxY(screen)
-let maxX = SwiftTUI.getMaxX(screen)
-```
-
-#### Component Rendering
-
-```swift
-// Basic text rendering
-await SwiftTUI.render(
-    Text("Hello, World!").bold().color(.blue),
-    on: surface,
-    in: Rect(x: 0, y: 0, width: 20, height: 1)
-)
-
-// List component
-let listComponent = List(items: ["Item 1", "Item 2", "Item 3"])
-await SwiftTUI.render(listComponent, on: surface, in: bounds)
-
-// Table component
-let tableComponent = Table(data: serverData, columns: columns)
-await SwiftTUI.render(tableComponent, on: surface, in: bounds)
-```
-
-#### Input Handling
-
-```swift
-// Get user input
-let key = SwiftTUI.getInput(screen)
-
-// Handle special keys
-switch key {
-case Int32(259): // Arrow Up
-    // Handle up arrow
-case Int32(258): // Arrow Down
-    // Handle down arrow
-case 10, 13: // Enter
-    // Handle enter key
-case 27: // Escape
-    // Handle escape key
-default:
-    // Handle other keys
-}
-```
-
-#### Screen Management
-
-```swift
-// Screen operations
-SwiftTUI.clear(screen)
-SwiftTUI.refresh(screen)
-
-// Initialize/cleanup
-let screen = SwiftTUI.initializeScreen()
-SwiftTUI.cleanup(screen)
-```
-
-### UI Components
-
-#### Text Component
-
-```swift
-public struct Text {
-    public init(_ content: String)
-
-    // Styling modifiers
-    public func bold() -> Text
-    public func color(_ color: Color) -> Text
-    public func background(_ color: Color) -> Text
-    public func underline() -> Text
-}
-```
-
-#### List Component
-
-```swift
-public struct List<Item> {
-    public init(items: [Item])
-
-    // Configuration
-    public func selectedIndex(_ index: Int) -> List
-    public func onSelection(_ handler: @escaping (Item) -> Void) -> List
-    public func scrollable(_ enabled: Bool = true) -> List
-}
-```
-
-#### Table Component
-
-```swift
-public struct Table<Data> {
-    public init(data: [Data], columns: [TableColumn])
-
-    // Configuration
-    public func sortable(_ enabled: Bool = true) -> Table
-    public func selectable(_ enabled: Bool = true) -> Table
-    public func headerStyle(_ style: HeaderStyle) -> Table
-}
-```
-
-#### Form Component
-
-```swift
-public struct Form {
-    public init(@FormBuilder content: () -> [FormField])
-
-    // Validation
-    public func validate() -> [ValidationError]
-    public func onSubmit(_ handler: @escaping () -> Void) -> Form
-}
-```
-
----
-
-## CrossPlatformTimer API
-
-### Timer Creation
-
-```swift
-import CrossPlatformTimer
-
-// Create a timer
-let timer = createCompatibleTimer(
-    interval: 1.0,
-    repeats: true
-) {
-    print("Timer fired!")
-}
-
-// One-shot timer
-let oneShot = createCompatibleTimer(
-    interval: 5.0,
-    repeats: false
-) {
-    print("One-time action")
-}
-```
-
-### Timer Management
-
-```swift
-// Platform-specific timer handling
-#if canImport(Darwin)
-// macOS/iOS timer implementation
-let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: repeats, block: action)
-#else
-// Linux timer implementation
-let timer = DispatchSource.makeTimerSource(queue: .main)
-timer.schedule(deadline: .now() + interval, repeating: repeats ? interval : .never)
-timer.setEventHandler(handler: action)
-timer.resume()
-#endif
-```
-
-### High-Performance Timing
-
-```swift
-// For animation timing (60+ FPS)
-let animationTimer = createCompatibleTimer(interval: 1.0/60.0, repeats: true) {
-    // Update animation frame
-    updateFrame()
-}
-
-// For periodic background tasks
-let backgroundTimer = createCompatibleTimer(interval: 30.0, repeats: true) {
-    // Perform background maintenance
-    performMaintenance()
-}
-```
-
----
-
-## Package Integration Examples
-
-### Complete Application Example
-
-```swift
-import OSClient
-import SwiftTUI
-import CrossPlatformTimer
-
-@main
-struct MyOpenStackApp {
-    static func main() async {
-        let screen = SwiftTUI.initializeScreen()
-        defer { SwiftTUI.cleanup(screen) }
-
-        // Initialize OpenStack client
-        let client = try await OpenStackClient.connect(
-            config: OpenStackConfig(authUrl: "https://keystone.example.com:5000/v3"),
-            credentials: OpenStackCredentials(
-                username: "admin",
-                password: "secret",
-                projectName: "admin"
-            )
-        )
-
-        // Create UI surface
-        let surface = SwiftTUI.surface(from: screen)
-        let bounds = Rect(x: 0, y: 0, width: 80, height: 24)
-
-        // Set up refresh timer
-        let refreshTimer = createCompatibleTimer(interval: 5.0, repeats: true) {
-            Task {
-                await updateServerList(client: client, surface: surface, bounds: bounds)
-            }
-        }
-
-        // Main application loop
-        var running = true
-        while running {
-            let key = SwiftTUI.getInput(screen)
-            if key == 113 { // 'q' key
-                running = false
-            }
-        }
-    }
-}
-
-func updateServerList(client: OpenStackClient, surface: Surface, bounds: Rect) async {
-    do {
-        let servers = try await client.nova.servers.list()
-        let serverNames = servers.map { $0.name }
-
-        let listComponent = List(items: serverNames)
-        await SwiftTUI.render(listComponent, on: surface, in: bounds)
-        SwiftTUI.refresh(surface.screen)
-    } catch {
-        let errorText = Text("Error: \(error.localizedDescription)").color(.red)
-        await SwiftTUI.render(errorText, on: surface, in: bounds)
-    }
-}
-```
-
-### Using Individual Packages
-
-```swift
-// OSClient only
-import OSClient
-
-let client = try await OpenStackClient.connect(/* config */)
-let servers = try await client.nova.servers.list()
-
-// SwiftTUI only
-import SwiftTUI
-
-let screen = SwiftTUI.initializeScreen()
-let surface = SwiftTUI.surface(from: screen)
-await SwiftTUI.render(Text("Hello"), on: surface, in: bounds)
-
-// CrossPlatformTimer only
-import CrossPlatformTimer
-
-let timer = createCompatibleTimer(interval: 1.0, repeats: true) {
-    // Timer action
-}
 ```
 
 ## Best Practices
@@ -907,3 +636,11 @@ await client.cacheManager.configure(
     ]
 )
 ```
+
+---
+
+**See Also**:
+
+- [SwiftTUI Framework API](swifttui.md) - Terminal UI framework
+- [Integration Guide](integration.md) - CrossPlatformTimer and integration examples
+- [API Reference Index](index.md) - Quick reference and navigation

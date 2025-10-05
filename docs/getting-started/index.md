@@ -1,6 +1,6 @@
 # Getting Started with Substation
 
-Welcome to Substation! This guide will help you get up and running with the OpenStack Terminal UI quickly and efficiently.
+Welcome to Substation! This guide will help you understand the concepts and get started with the OpenStack Terminal UI.
 
 ## Overview
 
@@ -8,334 +8,53 @@ Substation provides a powerful terminal-based interface for managing OpenStack i
 
 ![Substation Dashboard](../assets/substation-dash.png)
 
-## Prerequisites
+## Installation and Configuration
 
-Before installing Substation, ensure you have:
+Before using Substation, you'll need to install it and configure your OpenStack credentials:
 
-- **Operating System**: macOS 13+ or Linux (Windows users: use WSL2)
-- **Swift**: Version 6.1 or later (strict concurrency required)
-- **Terminal**: Any terminal emulator with ncurses support
-- **OpenStack Access**: Valid credentials for an OpenStack cloud (Queens or later)
-- **Memory**: 200MB+ available (plus 100MB cache for 10K resources)
-- **ncurses**: Required library (usually pre-installed on macOS/Linux)
+- **[Installation Guide](../installation/index.md)** - Install via Docker, pre-built binary, or build from source
+- **[Configuration Guide](../configuration/index.md)** - Set up clouds.yaml with your OpenStack credentials
 
-## Installation
+### Quick Install
 
-### Option 1: Using Docker (Easiest)
-
-The fastest way to get started is using Docker:
+#### Using Docker
 
 ```bash
-# Run with your OpenStack credentials
+# Docker (easiest)
 docker run --volume ~/.config/openstack:/root/.config/openstack \
-           --interactive \
-           --tty \
-           --env TERM \
-           --rm \
+           --interactive --tty --env TERM --rm \
            ghcr.io/cloudnull/substation/substation:latest
 ```
 
-**Notes:**
-
-- Your `clouds.yaml` must exist at `~/.config/openstack/clouds.yaml`
-- The `--env TERM` passes your terminal type for proper rendering
-- The `--rm` flag removes the container after exit (keeps things clean)
-
-### Option 2: Pre-built Binaries
-
-Pre-built binaries are available for macOS and Linux:
-
-#### `macOS` Installation
+#### Using Pre-Built Binary
 
 ```bash
-# Be sure to be using the latest tagged release
-# https://github.com/cloudnull/substation/releases/latest
+# Or download binary
 curl -L "https://github.com/cloudnull/substation/releases/latest/download/substation-$(uname -s)-$(uname -m)" -o substation
-
-# Make executable
 chmod +x substation
-
-# Move to your PATH
 sudo mv substation /usr/local/bin/
-
-# Verify installation
-substation --version
 ```
 
-#### Linux Installation
+### Quick Configuration
 
 ```bash
-# Install ncurses if not present (Ubuntu/Debian)
-sudo apt-get update
-sudo apt-get install -y libncurses6
-
-# Be sure to be using the latest tagged release
-# https://github.com/cloudnull/substation/releases/latest
-curl -L "https://github.com/cloudnull/substation/releases/latest/download/substation-$(uname -s)-$(uname -m)" -o substation
-
-# Make executable
-chmod +x substation
-
-# Move to your PATH
-sudo mv substation /usr/local/bin/
-
-# Verify installation
-substation --version
-```
-
-### Option 3: Building from Source
-
-Building from source gives you the latest features and allows customization.
-
-#### Step 1: Install Swift 6.1
-
-**macOS:**
-
-```bash
-# Using Swiftly (recommended)
-curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
-swiftly install latest
-
-# Verify Swift version
-~/.swiftly/bin/swift --version
-# Should show: Swift version 6.1 or later
-```
-
-**Linux:**
-
-```bash
-# Install dependencies (Ubuntu/Debian)
-sudo apt-get update
-sudo apt-get install -y \
-    binutils \
-    git \
-    gnupg2 \
-    libncurses-dev \
-    build-essential \
-    libc6-dev
-
-# Install Swiftly
-curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
-swiftly install latest
-swiftly use 6.1
-
-# Verify Swift version
-~/.swiftly/bin/swift --version
-```
-
-#### Step 2: Clone and Build
-
-```bash
-# Clone the repository
-git clone https://github.com/cloudnull/substation.git
-cd substation
-
-# Build in release mode (optimized)
-~/.swiftly/bin/swift build -c release
-
-# The binary will be at:
-# .build/release/substation
-
-# Optionally, install to PATH
-sudo cp .build/release/substation /usr/local/bin/
-
-# Verify installation
-substation --version
-```
-
-**Build Options:**
-
-```bash
-# Debug build (includes debug symbols, slower)
-~/.swiftly/bin/swift build
-
-# Clean build (remove all build artifacts)
-~/.swiftly/bin/swift package clean
-
-# Run without installing
-~/.swiftly/bin/swift run substation --cloud mycloud
-```
-
-## Configuration
-
-### Understanding clouds.yaml
-
-Substation uses the same `clouds.yaml` format as the official Python OpenStack CLI. If you already use OpenStack CLI tools, your existing configuration will work.
-
-**Configuration File Locations** (checked in order):
-
-1. `./clouds.yaml` (current directory - highest priority)
-2. `~/.config/openstack/clouds.yaml` (user config - recommended)
-3. `/etc/openstack/clouds.yaml` (system-wide config)
-
-### Basic Configuration
-
-Create `~/.config/openstack/clouds.yaml`:
-
-```bash
-# Create directory if it doesn't exist
 mkdir -p ~/.config/openstack
-
-# Create the file
-touch ~/.config/openstack/clouds.yaml
-
-# Set appropriate permissions (important for security!)
-chmod 600 ~/.config/openstack/clouds.yaml
-```
-
-**Basic Password Authentication:**
-
-```yaml
+cat > ~/.config/openstack/clouds.yaml << 'EOF'
 clouds:
   mycloud:
     auth:
       auth_url: https://keystone.example.com:5000/v3
-      username: your-username
-      password: your-password
-      project_name: your-project
-      project_domain_name: default
-      user_domain_name: default
-    region_name: RegionOne
-```
-
-### Advanced Configuration Options
-
-#### Application Credentials (Recommended)
-
-Application credentials are more secure than passwords and can be scoped to specific projects:
-
-```yaml
-clouds:
-  production:
-    auth:
-      auth_url: https://openstack.example.com:5000/v3
-      application_credential_id: "abc123..."
-      application_credential_secret: "secret456..."
-    region_name: RegionOne
-```
-
-**Creating Application Credentials:**
-
-```bash
-# Using OpenStack CLI
-openstack application credential create substation \
-    --description "Substation TUI access" \
-    --expiration "2026-12-31T23:59:59"
-
-# Save the ID and secret to clouds.yaml
-```
-
-#### Multiple Clouds
-
-Manage multiple OpenStack environments:
-
-```yaml
-clouds:
-  production:
-    auth:
-      auth_url: https://prod.example.com:5000/v3
-      username: prod-operator
-      password: prod-password
-      project_name: production-ops
-      project_domain_name: default
-      user_domain_name: default
-    region_name: RegionOne
-
-  staging:
-    auth:
-      auth_url: https://staging.example.com:5000/v3
-      username: staging-operator
-      password: staging-password
-      project_name: staging-ops
-      project_domain_name: default
-      user_domain_name: default
-    region_name: RegionOne
-
-  development:
-    auth:
-      auth_url: https://dev.example.com:5000/v3
-      application_credential_id: "dev-cred-id"
-      application_credential_secret: "dev-cred-secret"
-    region_name: RegionOne
-```
-
-**Switching Between Clouds:**
-
-```bash
-# Specify cloud at runtime
-substation --cloud production
-substation --cloud staging
-substation --cloud development
-
-# Or use environment variable
-export OS_CLOUD=production
-substation
-```
-
-#### Enhanced Configuration
-
-For advanced users, Substation supports extended configuration options:
-
-```yaml
-clouds:
-  production:
-    auth:
-      auth_url: https://openstack.example.com:5000/v3
       username: operator
       password: secret
       project_name: operations
       project_domain_name: default
       user_domain_name: default
     region_name: RegionOne
-
-    # Performance tuning (optional)
-    cache:
-      enabled: true
-      ttl:
-        servers: 120          # 2 minutes (highly dynamic)
-        networks: 300         # 5 minutes (moderately stable)
-        images: 900           # 15 minutes (rarely change)
-        flavors: 900          # 15 minutes (basically static)
-
-    # API configuration (optional)
-    interface: public         # public, internal, or admin
-    verify: true              # SSL certificate verification
-    cacert: /path/to/ca.pem   # Custom CA certificate
+EOF
+chmod 600 ~/.config/openstack/clouds.yaml
 ```
 
-### Testing Your Configuration
-
-**Test Connection:**
-
-```bash
-# Test with a specific cloud
-substation --cloud mycloud
-
-# Test with environment variables
-export OS_CLOUD=mycloud
-substation
-
-# Enable debug output for troubleshooting
-substation --cloud mycloud --wiretap
-```
-
-**Wiretap Mode** (for debugging):
-
-```bash
-# Enable detailed API logging
-substation --cloud mycloud --wiretap
-
-# Logs written to ~/substation.log
-tail -f ~/substation.log
-```
-
-This shows:
-
-- All HTTP requests and responses
-- Authentication token exchange
-- API endpoint discovery
-- Cache hit/miss statistics
-- Performance metrics
+See the guides above for complete details on all installation methods, authentication options, and configuration settings.
 
 ## First Steps
 
@@ -392,7 +111,7 @@ Press single keys to switch between resource views:
 
 **Navigate Lists:**
 
-```
+```text
 ↑/↓ or j/k    Move selection up/down
 Page Up/Down  Scroll by page
 Home/End      Jump to start/end
@@ -411,7 +130,7 @@ Home/End      Jump to start/end
 
 **Local Search (fast, filters current view):**
 
-```
+```text
 / (slash)     Start local search
 Type query    Results filter as you type
 Esc           Clear search
@@ -419,7 +138,7 @@ Esc           Clear search
 
 **Cross-Service Search (searches all services):**
 
-```
+```text
 z             Open advanced search
 Type query    Searches Nova, Neutron, Cinder, Glance, Keystone, Swift
 Enter         Execute search (< 500ms typical)
@@ -429,7 +148,7 @@ Enter         Execute search (< 500ms typical)
 
 **Manual Refresh:**
 
-```
+```text
 r             Refresh current view (uses cache if available)
 c             Purge ALL caches and force fresh data from API
 ```
@@ -438,7 +157,7 @@ c             Purge ALL caches and force fresh data from API
 
 ### 7. Creating Resources
 
-**Example: Creating a Server**
+#### Example: Creating a Server
 
 1. Press `s` to view servers
 2. Press `n` for "New Server" (or follow on-screen prompts)
@@ -451,7 +170,7 @@ c             Purge ALL caches and force fresh data from API
 4. Press `Enter` to create
 5. Watch real-time status as server builds
 
-**Other Creation Workflows:**
+##### Other Creation Workflows
 
 - **Networks**: Press `n` in network view
 - **Volumes**: Press `n` in volume view
@@ -548,78 +267,57 @@ substation --cloud mycloud
 # Fresh data loaded from OpenStack API (slower, but accurate)
 ```
 
-## Troubleshooting First Connection
+## Troubleshooting
 
-### Authentication Failures
+If you encounter issues, consult the comprehensive troubleshooting guide:
 
-**Symptom:** "Authentication failed" error
+- **[Troubleshooting Guide](../troubleshooting/index.md)** - Solutions to common problems
 
-**Solutions:**
+**Quick Troubleshooting Tips:**
 
-1. Verify `clouds.yaml` syntax:
+**Authentication Failed:**
 
-   ```bash
-   # Check file exists
-   ls -l ~/.config/openstack/clouds.yaml
+- Verify auth_url includes `/v3`
+- Check domain fields are present
+- Test with: `substation --cloud mycloud --wiretap`
 
-   # Validate YAML syntax
-   python3 -c "import yaml; yaml.safe_load(open('~/.config/openstack/clouds.yaml'))"
-   ```
+**Slow Performance:**
 
-2. Test credentials with OpenStack CLI:
+- Most likely your OpenStack API is slow, not Substation
+- Enable wiretap to measure: `substation --cloud mycloud --wiretap`
+- Check logs: `tail -f ~/substation.log | grep "ms)"`
 
-   ```bash
-   openstack --os-cloud mycloud server list
-   ```
+**Stale Data:**
 
-3. Enable wiretap mode to see auth details:
+- Press `c` to purge all caches
+- Press `r` to refresh current view
 
-   ```bash
-   substation --cloud mycloud --wiretap
-   tail -f ~/substation.log
-   ```
-
-### Endpoint Not Found
-
-**Symptom:** "Service endpoint not found" error
-
-**Solutions:**
-
-1. Verify region name matches your OpenStack deployment
-2. Check service catalog:
-
-   ```bash
-   openstack --os-cloud mycloud catalog list
-   ```
-
-3. Ensure required services are available (Keystone, Nova, Neutron)
-
-### Slow Performance
-
-**Symptom:** Everything takes forever to load
-
-**Likely Causes:**
-
-1. **Slow OpenStack API** (most common): Your cloud, not Substation
-   - Enable wiretap to measure actual API response times
-   - Expected: < 2s per API call
-   - If seeing > 5s, your OpenStack cluster needs attention
-
-2. **Network latency**: Check connectivity to OpenStack endpoints
-3. **Large dataset**: 50K+ servers? Enable pagination in config
+For detailed troubleshooting, connection issues, performance debugging, and more, see the **[Troubleshooting Guide](../troubleshooting/index.md)**.
 
 ## Next Steps
 
 Now that you're up and running, explore:
 
-- **[User Guide](../user-guide/index.md)**: Comprehensive usage documentation and all keyboard shortcuts
-- **[OpenStack Integration](../openstack/index.md)**: Understanding which OpenStack services are supported
-- **[Performance](../performance/index.md)**: Tuning cache settings for your environment
-- **[Troubleshooting](../troubleshooting/index.md)**: Solutions to common problems
+- **[Navigation Guide](../guides/operators/keyboard-shortcuts.md)** - Master all keyboard shortcuts
+- **[Common Workflows](../guides/operators/workflows.md)** - Everyday operations and best practices
+- **[OpenStack Integration](../reference/openstack/index.md)** - Which OpenStack services are supported
+- **[Performance](../performance/index.md)** - Tuning cache settings for your environment
+- **[Architecture](../architecture/index.md)** - Understanding how Substation works
+- **[Troubleshooting](../troubleshooting/index.md)** - Solutions to common problems
+
+## Key Concepts
+
+Understanding these concepts will help you use Substation effectively:
+
+- **[Caching](../concepts/caching.md)** - How the multi-level cache reduces API calls by 60-80%
+- **[Search](../concepts/search.md)** - Local search vs. cross-service advanced search
+- **[Security](../concepts/security.md)** - How credentials are protected and encrypted
+- **[Features](../concepts/features.md)** - Complete feature overview
 
 ## Getting Help
 
 - **Built-in Help**: Press `?` at any time for context-aware help
 - **Documentation**: Complete guides in this documentation site
 - **GitHub Issues**: [Report bugs and request features](https://github.com/cloudnull/substation/issues)
+- **FAQ**: [Common questions](../reference/faq.md)
 - **Logs**: Enable `--wiretap` and check `~/substation.log` for debugging

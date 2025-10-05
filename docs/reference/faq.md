@@ -69,13 +69,14 @@ substation --cloud staging
 
 ### How do I search for resources?
 
-![Substation Search](assets/substation-search.png)
+![Substation Search](../assets/substation-search.png)
 
-Press `/` for quick search or `z` for advanced search with filters:
+Substation provides two search methods:
 
-- Quick search: Type to filter visible resources
-- Advanced search: Complex queries across all services
-- Saved searches: Store frequently used filters
+- **Quick search (/)**: Type to filter visible resources instantly
+- **Advanced search (z)**: Complex queries across all services
+
+For detailed information about search capabilities, see the [Search Engine Guide](../concepts/search.md).
 
 ## Performance Questions
 
@@ -111,21 +112,16 @@ GET /servers/detail <- 200 (2134ms) <- OpenStack is slow
 
 ### How does Substation achieve 60-80% API call reduction?
 
-Through a multi-level caching architecture (MemoryKit):
+Through a multi-level caching architecture (MemoryKit). For detailed information about the caching system, see the [Caching System Guide](../concepts/caching.md).
+
+**Quick Overview:**
 
 1. **L1 Cache (Memory)**: < 1ms retrieval, 80% hit rate
 2. **L2 Cache (Larger Memory)**: ~5ms retrieval, 15% hit rate
 3. **L3 Cache (Disk)**: ~20ms retrieval, 3% hit rate
 4. **API Call**: 2+ seconds, 2% miss rate
 
-**Total cache hit rate: 98%** (L1 + L2 + L3 combined)
-
-**Resource-specific TTLs:**
-
-- Authentication: 1 hour (token lifetime)
-- Flavors/Images: 15 minutes (rarely change)
-- Networks: 5 minutes (moderately stable)
-- Servers/Volumes: 2 minutes (highly dynamic)
+See [Performance Tuning](../performance/tuning.md) for cache configuration details.
 
 ### Why is Substation using so much memory?
 
@@ -479,7 +475,7 @@ Substation enforces a **zero-warning build standard** with Swift 6 strict concur
 
 ### What is MemoryKit?
 
-**MemoryKit** is Substation's multi-level caching system (3,126 lines of code).
+**MemoryKit** is Substation's multi-level caching system.
 
 **Components:**
 
@@ -496,33 +492,6 @@ Substation enforces a **zero-warning build standard** with Swift 6 strict concur
 - L3 (Disk): ~20ms, 3% hit rate
 - Automatic eviction at 85% memory threshold
 - Resource-specific TTLs (2 min to 1 hour)
-
-### What is the September 2025 refactoring?
-
-**Problem:** `TUI.swift` was 9,295 lines (unmaintainable monolith).
-
-**Solution:** Service Layer pattern extraction.
-
-**Before (September 2025):**
-
-- `TUI.swift`: 9,295 lines (everything in one file)
-
-**After (September 2025):**
-
-- `TUI.swift`: 2,246 lines (UI coordination only, 75.8% reduction)
-- Service Layer: 4,977 lines split across:
-  - `ResourceOperations.swift`: 2,176 lines (all CRUD operations)
-  - `ServerActions.swift`: 1,570 lines (server-specific actions)
-  - `UIHelpers.swift`: 1,017 lines (UI utilities)
-  - `OperationErrorHandler.swift`: 55 lines (error handling)
-  - `ValidationService.swift`: 159 lines (input validation)
-
-**Benefits:**
-
-- Clear separation of concerns (UI vs business logic)
-- Independent testability
-- Reusable service methods
-- Easier to extend
 
 ### How does actor-based concurrency work in Substation?
 
@@ -565,48 +534,27 @@ public actor OpenStackClientCore {
 
 ### How are credentials stored?
 
-**Substation takes security seriously:**
+Substation implements comprehensive security measures for credential protection. For complete details, see the [Security Guide](../concepts/security.md).
 
-**Credentials (from clouds.yaml):**
+**Quick Summary:**
 
-- Read once at startup
-- Never written to disk by Substation
-- Stored in memory only during execution
+- Credentials from clouds.yaml are read once at startup, never written to disk
+- Tokens are encrypted in memory using platform-specific encryption
+- Tokens are automatically refreshed before expiration
+- All sensitive data is cleared on exit
 
-**Tokens (from Keystone):**
-
-- **Encrypted in memory** using platform-specific encryption:
-  - macOS: AES-256-GCM (CryptoKit)
-  - Linux: XOR encryption (basic, cross-platform)
-- **Never written to disk**
-- **Automatically refreshed** 5 minutes before expiration
-- **Cleared on exit**
-
-**Best Practices:**
+**Best Practice:**
 
 ```bash
 # Secure your clouds.yaml
 chmod 600 ~/.config/openstack/clouds.yaml
-
-# Use application credentials instead of passwords
-openstack application credential create substation
 ```
 
 ### Are tokens logged in wiretap mode?
 
-**No.** Wiretap mode (`--wiretap`) logs:
+**No.** Wiretap mode redacts all sensitive information. For complete security details, see the [Security Guide](../concepts/security.md).
 
-- HTTP methods and URLs
-- Response status codes and timing
-- Cache hit/miss statistics
-
-**Wiretap does NOT log:**
-
-- Authentication tokens (X-Auth-Token header redacted)
-- Passwords
-- Secret payloads (Barbican)
-
-**Safe to use for debugging** without exposing credentials.
+Wiretap logs HTTP methods, URLs, response codes, and timing - but never logs tokens, passwords, or secrets.
 
 ### How do I report a security vulnerability?
 
