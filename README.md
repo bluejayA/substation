@@ -83,10 +83,10 @@ sudo mv substation /usr/local/bin/
 
 ## Full guides
 
-- **[Installation Guide](substation.cloud/installation/)** - All installation methods (Docker, binary, source)
-- **[Configuration Guide](substation.cloud/configuration/)** - clouds.yaml setup and authentication
-- **[Quick Start Guide](substation.cloud/quick-start/)** - Get up and running in 5 minutes
-- **[Getting Started](substation.cloud/getting-started/)** - Comprehensive first-time setup
+- **[Installation Guide](https://substation.cloud/installation/)** - All installation methods (Docker, binary, source)
+- **[Configuration Guide](https://substation.cloud/configuration/)** - clouds.yaml setup and authentication
+- **[Quick Start Guide](https://substation.cloud/quick-start/)** - Get up and running in 5 minutes
+- **[Getting Started](https://substation.cloud/getting-started/)** - Comprehensive first-time setup
 
 ## Navigation Quick Reference
 
@@ -100,7 +100,7 @@ Press `?` anytime for help. Here are the essentials:
 | `z` | Advanced Search | `c` | Purge cache |
 | `/` | Filter list | `q` | Quit |
 
-**Full keyboard guide:** [Keyboard Shortcuts & Navigation](substation.cloud/guides/operators/keyboard-shortcuts/)
+**Full keyboard guide:** [Keyboard Shortcuts & Navigation](https://substation.cloud/guides/operators/keyboard-shortcuts/)
 
 ### Library Overview
 
@@ -150,29 +150,29 @@ Because fast matters when you're debugging production at 3 AM:
 
 ### Getting Started
 
-- **[Quick Start](substation.cloud/quick-start/)** - Get running in 5 minutes
-- **[Installation](substation.cloud/installation/)** - All installation methods
-- **[Configuration](substation.cloud/configuration/)** - clouds.yaml and authentication
-- **[Getting Started](substation.cloud/getting-started/)** - Complete first-time setup
+- **[Quick Start](https://substation.cloud/quick-start/)** - Get running in 5 minutes
+- **[Installation](https://substation.cloud/installation/)** - All installation methods
+- **[Configuration](https://substation.cloud/configuration/)** - clouds.yaml and authentication
+- **[Getting Started](https://substation.cloud/getting-started/)** - Complete first-time setup
 
 ### Operators
 
-- **[Keyboard Shortcuts](substation.cloud/guides/operators/keyboard-shortcuts/)** - Complete navigation reference
-- **[Common Workflows](substation.cloud/guides/operators/workflows/)** - Everyday operations
-- **[Troubleshooting](substation.cloud/guides/operators/troubleshooting/)** - When things go wrong
+- **[Keyboard Shortcuts](https://substation.cloud/guides/operators/keyboard-shortcuts/)** - Complete navigation reference
+- **[Common Workflows](https://substation.cloud/guides/operators/workflows/)** - Everyday operations
+- **[Troubleshooting](https://substation.cloud/guides/troubleshooting/)** - When things go wrong
 
 ### Developers
 
-- **[Developer Guide](substation.cloud/guides/developers/)** - Contributing and extending
-- **[API Reference](substation.cloud/reference/api/)** - Using Substation libraries
-- **[FormBuilder Guide](substation.cloud/guides/developers/)** - Building forms
+- **[Developer Guide](https://substation.cloud/guides/developers/)** - Contributing and extending
+- **[API Reference](https://substation.cloud/reference/api/)** - Using Substation libraries
+- **[FormBuilder Guide](https://substation.cloud/guides/developers/)** - Building forms
 
 ### Deep Dives
 
-- **[Architecture](substation.cloud/architecture/)** - System design and components
-- **[Performance](substation.cloud/performance/)** - Optimization and benchmarking
-- **[Concepts](substation.cloud/concepts/features/)** - Features, caching, search, security
-- **[FAQ](substation.cloud/reference/faq/)** - Frequently asked questions
+- **[Architecture](https://substation.cloud/architecture/)** - System design and components
+- **[Performance](https://substation.cloud/performance/)** - Optimization and benchmarking
+- **[Concepts](https://substation.cloud/concepts/features/)** - Features, caching, search, security
+- **[FAQ](https://substation.cloud/reference/faq/)** - Frequently asked questions
 
 Full documentation available at [https://substation.cloud](https://substation.cloud)
 
