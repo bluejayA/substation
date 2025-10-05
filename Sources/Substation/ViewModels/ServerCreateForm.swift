@@ -66,7 +66,7 @@ struct ServerCreateForm {
 
     // Flavor selection
     var selectedFlavorID: String? = nil
-    var flavorSelectionMode: FlavorSelectionMode = .manual
+    var flavorSelectionMode: FlavorSelectionMode = .workloadBased
     var workloadType: WorkloadType = .balanced
     var flavorRecommendations: [FlavorRecommendation] = []
     var selectedRecommendationIndex: Int = 0
