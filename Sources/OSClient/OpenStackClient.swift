@@ -368,9 +368,8 @@ public final class OpenStackClient: @unchecked Sendable {
     /// The project ID for this client (if available)
     public var projectID: String? {
         get async {
-            // Try to get project ID from token or service catalog
-            // For now, return the project name as a fallback
-            await projectName
+            // Get project ID from the core authentication token
+            await core.projectId
         }
     }
 

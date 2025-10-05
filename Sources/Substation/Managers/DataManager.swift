@@ -761,6 +761,8 @@ class DataManager {
                         Logger.shared.logWarning("Compute quotas unavailable (HTTP 400) - project ID resolution may have failed")
                     case .httpError(403, _):
                         Logger.shared.logDebug("Compute quota access requires admin privileges (HTTP 403)")
+                    case .httpError(404, _):
+                        Logger.shared.logDebug("Compute quota endpoint not found (HTTP 404) - this API may not be available")
                     default:
                         Logger.shared.logError("Failed to fetch compute quotas: \(error)")
                     }
@@ -786,6 +788,8 @@ class DataManager {
                         Logger.shared.logWarning("Network quotas unavailable (HTTP 400)")
                     case .httpError(403, _):
                         Logger.shared.logDebug("Network quota access requires admin privileges (HTTP 403)")
+                    case .httpError(404, _):
+                        Logger.shared.logDebug("Network quota endpoint not found (HTTP 404) - this API may not be available")
                     default:
                         Logger.shared.logError("Failed to fetch network quotas: \(error)")
                     }
@@ -811,6 +815,8 @@ class DataManager {
                         Logger.shared.logWarning("Volume quotas unavailable (HTTP 400)")
                     case .httpError(403, _):
                         Logger.shared.logDebug("Volume quota access requires admin privileges (HTTP 403)")
+                    case .httpError(404, _):
+                        Logger.shared.logDebug("Volume quota endpoint not found (HTTP 404) - this API may not be available")
                     default:
                         Logger.shared.logError("Failed to fetch volume quotas: \(error)")
                     }
