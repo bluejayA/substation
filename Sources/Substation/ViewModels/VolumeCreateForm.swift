@@ -4,6 +4,7 @@ import OSClient
 enum VolumeCreateFieldId: String, CaseIterable {
     case name = "name"
     case size = "size"
+    case maxVolumes = "maxVolumes"
     case sourceType = "sourceType"
     case source = "source"
     case volumeType = "volumeType"
@@ -12,6 +13,7 @@ enum VolumeCreateFieldId: String, CaseIterable {
         switch self {
         case .name: return "Volume Name"
         case .size: return "Volume Size"
+        case .maxVolumes: return "Max Volumes"
         case .sourceType: return "Source Type"
         case .source: return "Source"
         case .volumeType: return "Volume Type"
@@ -49,6 +51,7 @@ struct SourceTypeOption: FormSelectorItem, FormSelectableItem {
 struct VolumeCreateForm {
     var volumeName: String = ""
     var volumeSize: String = ""
+    var maxVolumes: String = "1"
     var sourceType: VolumeSourceType = .blank
 
     // Image selection
@@ -224,6 +227,21 @@ struct VolumeCreateForm {
             ]
         )))
 
+        // Max Volumes (number field)
+        let maxVolumesId = VolumeCreateFieldId.maxVolumes.rawValue
+        fields.append(.number(FormFieldNumber(
+            id: maxVolumesId,
+            label: VolumeCreateFieldId.maxVolumes.title,
+            value: maxVolumes,
+            placeholder: "1",
+            isRequired: true,
+            isVisible: true,
+            isSelected: selectedFieldId == maxVolumesId,
+            isActive: activeFieldId == maxVolumesId,
+            cursorPosition: formState?.getTextFieldCursorPosition(maxVolumesId),
+            validationError: getMaxVolumesValidationError()
+        )))
+
         return fields
     }
 
@@ -253,6 +271,17 @@ struct VolumeCreateForm {
             }
         } else {
             return "Volume size must be a valid number"
+        }
+        return nil
+    }
+
+    private func getMaxVolumesValidationError() -> String? {
+        let trimmed = maxVolumes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "Max volumes is required"
+        }
+        guard let value = Int(trimmed), value >= 1 else {
+            return "Max volumes must be a number >= 1"
         }
         return nil
     }
@@ -307,6 +336,10 @@ struct VolumeCreateForm {
             errors.append(error)
         }
 
+        if let error = getMaxVolumesValidationError() {
+            errors.append(error)
+        }
+
         // Validate source based on source type
         switch sourceType {
         case .blank:
@@ -350,6 +383,11 @@ struct VolumeCreateForm {
         // Update volume size
         if let size = formState.getTextValue(VolumeCreateFieldId.size.rawValue) {
             volumeSize = size
+        }
+
+        // Update max volumes
+        if let max = formState.getTextValue(VolumeCreateFieldId.maxVolumes.rawValue) {
+            maxVolumes = max
         }
 
         // Update source type from source type selector
@@ -399,6 +437,7 @@ struct VolumeCreateForm {
     mutating func reset() {
         volumeName = ""
         volumeSize = ""
+        maxVolumes = "1"
         sourceType = .blank
         selectedImageID = nil
         selectedSnapshotID = nil

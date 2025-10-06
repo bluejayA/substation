@@ -1377,8 +1377,14 @@ final class ResourceOperations {
             return
         }
 
-        let volumeName = volumeCreateForm.volumeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let volumeNameBase = volumeCreateForm.volumeName.trimmingCharacters(in: .whitespacesAndNewlines)
         let volumeSizeString = volumeCreateForm.volumeSize.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Parse and validate maxVolumes
+        guard let maxVolumesCount = Int(volumeCreateForm.maxVolumes.trimmingCharacters(in: .whitespacesAndNewlines)), maxVolumesCount >= 1 else {
+            statusMessage = "Max volumes must be a valid number >= 1"
+            return
+        }
 
         // Convert volume size to integer
         guard let volumeSize = Int(volumeSizeString), volumeSize > 0 else {
@@ -1387,64 +1393,72 @@ final class ResourceOperations {
         }
 
         // Show creation in progress
-        statusMessage = "Creating volume '\(volumeName)'..."
+        statusMessage = maxVolumesCount > 1 ? "Creating \(maxVolumesCount) volumes..." : "Creating volume '\(volumeNameBase)'..."
         await tui.draw(screen: screen) // Refresh UI to show progress message
 
         do {
-            switch volumeCreateForm.sourceType {
-            case .blank:
-                // Use the selected volume type ID from the form
-                let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
+            // Create volumes with indexed names if maxVolumesCount > 1
+            for i in 0..<maxVolumesCount {
+                let volumeName = maxVolumesCount > 1 ? "\(volumeNameBase)-\(i)" : volumeNameBase
 
-                _ = try await client.createBlankVolume(
-                    name: volumeName,
-                    size: volumeSize,
-                    volumeType: volumeTypeId
-                )
+                switch volumeCreateForm.sourceType {
+                case .blank:
+                    // Use the selected volume type ID from the form
+                    let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
 
-            case .image:
-                guard let selectedImageID = volumeCreateForm.selectedImageID,
-                      cachedImages.contains(where: { $0.id == selectedImageID }) else {
-                    statusMessage = "Please select an image to create volume from"
-                    return
+                    _ = try await client.createBlankVolume(
+                        name: volumeName,
+                        size: volumeSize,
+                        volumeType: volumeTypeId
+                    )
+
+                case .image:
+                    guard let selectedImageID = volumeCreateForm.selectedImageID,
+                          cachedImages.contains(where: { $0.id == selectedImageID }) else {
+                        statusMessage = "Please select an image to create volume from"
+                        return
+                    }
+
+                    // Use the selected volume type ID from the form
+                    let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
+
+                    _ = try await client.createVolumeFromImage(
+                        name: volumeName,
+                        size: volumeSize,
+                        imageRef: selectedImageID,
+                        volumeType: volumeTypeId
+                    )
+
+                case .snapshot:
+                    guard let selectedSnapshotID = volumeCreateForm.selectedSnapshotID,
+                          cachedVolumeSnapshots.contains(where: { $0.id == selectedSnapshotID }) else {
+                        statusMessage = "Please select a snapshot to create volume from"
+                        return
+                    }
+
+                    // Use the selected volume type ID from the form
+                    let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
+
+                    _ = try await client.createVolumeFromSnapshot(
+                        name: volumeName,
+                        size: volumeSize,
+                        snapshotId: selectedSnapshotID,
+                        volumeType: volumeTypeId
+                    )
                 }
-
-                // Use the selected volume type ID from the form
-                let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
-
-                _ = try await client.createVolumeFromImage(
-                    name: volumeName,
-                    size: volumeSize,
-                    imageRef: selectedImageID,
-                    volumeType: volumeTypeId
-                )
-
-            case .snapshot:
-                guard let selectedSnapshotID = volumeCreateForm.selectedSnapshotID,
-                      cachedVolumeSnapshots.contains(where: { $0.id == selectedSnapshotID }) else {
-                    statusMessage = "Please select a snapshot to create volume from"
-                    return
-                }
-
-                // Use the selected volume type ID from the form
-                let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
-
-                _ = try await client.createVolumeFromSnapshot(
-                    name: volumeName,
-                    size: volumeSize,
-                    snapshotId: selectedSnapshotID,
-                    volumeType: volumeTypeId
-                )
             }
 
-            statusMessage = "Volume '\(volumeName)' created successfully"
+            let successMessage = maxVolumesCount > 1
+                ? "Created \(maxVolumesCount) volumes with name pattern '\(volumeNameBase)-N'"
+                : "Volume '\(volumeNameBase)' created successfully"
+            statusMessage = successMessage
 
             // Refresh volume cache and return to list
             await dataManager.refreshVolumeData()
             tui.changeView(to: .volumes, resetSelection: false)
 
         } catch let error as OTError {
-            let baseMsg = "Failed to create volume '\(volumeName)'"
+            let baseMsg = "Failed to create volume '\(volumeNameBase)'"
             switch error {
             case .authenticationFailed:
                 statusMessage = "\(baseMsg): Authentication failed - check credentials"
@@ -1472,7 +1486,7 @@ final class ResourceOperations {
                         statusMessage = "\(baseMsg): Invalid URL configuration"
             }
         } catch {
-            statusMessage = "Failed to create volume '\(volumeName)': \(error.localizedDescription)"
+            statusMessage = "Failed to create volume '\(volumeNameBase)': \(error.localizedDescription)"
         }
     }
 
