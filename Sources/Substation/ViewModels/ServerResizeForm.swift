@@ -46,10 +46,18 @@ struct ServerResizeForm {
     }
 
     // Get all available flavors for management (sorted alphabetically by name)
+    // Excludes the current flavor from the list
     func getAvailableFlavors() -> [Flavor] {
-        return availableFlavors.sorted {
+        let sorted = availableFlavors.sorted {
             ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending
         }
+
+        // Filter out current flavor if it exists
+        if let currentFlavorId = currentFlavor?.id {
+            return sorted.filter { $0.id != currentFlavorId }
+        }
+
+        return sorted
     }
 
     // Toggle flavor selection

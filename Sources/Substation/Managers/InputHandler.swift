@@ -652,13 +652,13 @@ class InputHandler {
                 Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageSecurityGroupRules(screen: screen)
             }
-        case Int32(65): // A - Context-sensitive: Attach security group to server OR interfaces to network OR volume to server OR floating IP attach OR toggle auto-refresh interval
+        case Int32(65): // A - Context-sensitive: Attach security group to server OR network to server OR volume to server OR floating IP attach OR toggle auto-refresh interval
             if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("attach_security_group", details: ["selectedIndex": tui.selectedIndex])
                 await handleAttachSecurityGroup(screen: screen)
             } else if tui.currentView == .networks && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("attach_network_interfaces", details: ["selectedIndex": tui.selectedIndex])
-                await handleAttachNetworkInterfaces(screen: screen)
+                Logger.shared.logUserAction("attach_network_to_server", details: ["selectedIndex": tui.selectedIndex])
+                await handleAttachNetworkToServer(screen: screen)
             } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("manage_floating_ip_server_assignment", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageFloatingIPServerAssignment(screen: screen)
@@ -1207,11 +1207,11 @@ class InputHandler {
         }
     }
 
-    private func handleAttachNetworkInterfaces(screen: OpaquePointer?) async {
+    private func handleAttachNetworkToServer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
         if tui.currentView == .networks && !tui.currentView.isDetailView {
-            await tui.actions.manageNetworkInterfaces(screen: screen)
+            await tui.actions.manageNetworkToServers(screen: screen)
         }
     }
 
