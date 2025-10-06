@@ -72,14 +72,15 @@ internal enum SharedResources {
         return formatter
     }
 
-    static func createURLSession(logger: any OpenStackClientLogger) -> URLSession {
+    static func createURLSession(logger: any OpenStackClientLogger) -> (URLSession, EnhancedSecureURLSessionDelegate) {
         let delegate = EnhancedSecureURLSessionDelegate(logger: logger)
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.httpMaximumConnectionsPerHost = 10
-        return URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        return (session, delegate)
     }
 }
 
@@ -509,6 +510,7 @@ public actor OpenStackClientCore {
     private let memoryManager: MemoryManager
     private let tokenManager: CoreTokenManager
     private let urlSession: URLSession
+    private let urlSessionDelegate: EnhancedSecureURLSessionDelegate
     private var serviceCatalog: [String: URL] = [:]
     private var currentProjectId: String?
     private let microversionManager: MicroversionManager
@@ -525,11 +527,14 @@ public actor OpenStackClientCore {
             logger: OpenStackClientLoggerAdapter(clientLogger: logger)
         ))
         self.tokenManager = CoreTokenManager(logger: logger)
-        self.urlSession = SharedResources.createURLSession(logger: logger)
+        let (session, delegate) = SharedResources.createURLSession(logger: logger)
+        self.urlSession = session
+        self.urlSessionDelegate = delegate
         self.microversionManager = MicroversionManager(logger: logger)
 
         // Initialize memory management and monitoring asynchronously
-        Task {
+        Task { [weak self] in
+            guard let self = self else { return }
             await self.initializeMemoryManagement()
             await self.microversionManager.setCore(self)
         }
@@ -644,6 +649,9 @@ public actor OpenStackClientCore {
         let startTime = Date()
 
         do {
+            // Check if task was cancelled before making request
+            try Task.checkCancellation()
+
             let (data, response) = try await urlSession.data(for: request)
             let duration = Date().timeIntervalSince(startTime)
 
@@ -866,6 +874,9 @@ public actor OpenStackClientCore {
             let startTime = Date()
 
             do {
+                // Check if task was cancelled before making request
+                try Task.checkCancellation()
+
                 let (data, response) = try await urlSession.data(for: request)
                 let duration = Date().timeIntervalSince(startTime)
 
@@ -945,6 +956,9 @@ public actor OpenStackClientCore {
             let startTime = Date()
 
             do {
+                // Check if task was cancelled before making request
+                try Task.checkCancellation()
+
                 let (data, response) = try await urlSession.data(for: request)
                 let duration = Date().timeIntervalSince(startTime)
 
@@ -1048,6 +1062,11 @@ public actor OpenStackClientCore {
         get async {
             return await tokenManager.timeUntilExpiration
         }
+    }
+
+    /// Cleanup and invalidate URLSession to prevent dangling references
+    deinit {
+        urlSession.invalidateAndCancel()
     }
 }
 

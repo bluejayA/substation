@@ -1,5 +1,5 @@
 import XCTest
-@testable import substation
+@testable import Substation
 
 final class TUITests: XCTestCase {
     func testFilterLinesMatchesQuery() {
