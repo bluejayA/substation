@@ -604,9 +604,9 @@ public actor EnhancedYAMLParser {
 public actor AuthenticationManager {
 
     public enum DeterminedAuthMethod: Sendable {
-        case password(username: String, password: String, projectName: String, userDomain: String, projectDomain: String)
-        case applicationCredentialById(id: String, secret: String, projectName: String)
-        case applicationCredentialByName(name: String, secret: String, userId: String?, username: String?, userDomain: String?, projectName: String)
+        case password(username: String, password: String, projectName: String?, userDomain: String, projectDomain: String)
+        case applicationCredentialById(id: String, secret: String, projectName: String?)
+        case applicationCredentialByName(name: String, secret: String, userId: String?, username: String?, userDomain: String?, projectName: String?)
         case token(token: String, projectName: String?, projectId: String?)
     }
 
@@ -640,8 +640,8 @@ public actor AuthenticationManager {
         if let id = auth.application_credential_id,
            let secret = auth.application_credential_secret {
             // For application credentials, try to use project_name from config,
-            // but allow fallback to projectNameFallback or empty string as last resort
-            let projectName = auth.project_name ?? projectNameFallback ?? ""
+            // or fall back to projectNameFallback (don't default to empty string)
+            let projectName = auth.project_name ?? projectNameFallback
             return .applicationCredentialById(
                 id: id,
                 secret: secret,
@@ -653,8 +653,8 @@ public actor AuthenticationManager {
         if let name = auth.application_credential_name,
            let secret = auth.application_credential_secret {
             // For application credentials, try to use project_name from config,
-            // but allow fallback to projectNameFallback or empty string as last resort
-            let projectName = auth.project_name ?? projectNameFallback ?? ""
+            // or fall back to projectNameFallback (don't default to empty string)
+            let projectName = auth.project_name ?? projectNameFallback
             return .applicationCredentialByName(
                 name: name,
                 secret: secret,
@@ -669,7 +669,9 @@ public actor AuthenticationManager {
         if let username = auth.username,
            let password = auth.password,
            (auth.passcode != nil || auth.totp != nil) {
-            let projectName = auth.project_name ?? projectNameFallback ?? "default"
+            // Use project_name if available, otherwise fall back to projectNameFallback
+            // Don't default to "default" if project_id is being used instead
+            let projectName = auth.project_name ?? projectNameFallback
             let userDomain = auth.user_domain_name ?? "Default"
             let projectDomain = auth.project_domain_name ?? "Default"
 
@@ -685,7 +687,9 @@ public actor AuthenticationManager {
         // Priority 7: Password authentication with user ID (fallback to regular password auth)
         if let userId = auth.user_id,
            let password = auth.password {
-            let projectName = auth.project_name ?? projectNameFallback ?? "default"
+            // Use project_name if available, otherwise fall back to projectNameFallback
+            // Don't default to "default" if project_id is being used instead
+            let projectName = auth.project_name ?? projectNameFallback
             let userDomain = auth.user_domain_name ?? "Default"
             let projectDomain = auth.project_domain_name ?? "Default"
 
@@ -701,7 +705,9 @@ public actor AuthenticationManager {
         // Priority 8: Standard password authentication
         if let username = auth.username,
            let password = auth.password {
-            let projectName = auth.project_name ?? projectNameFallback ?? "default"
+            // Use project_name if available, otherwise fall back to projectNameFallback
+            // Don't default to "default" if project_id is being used instead
+            let projectName = auth.project_name ?? projectNameFallback
             let userDomain = auth.user_domain_name ?? "Default"
             let projectDomain = auth.project_domain_name ?? "Default"
 

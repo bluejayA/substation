@@ -51,6 +51,8 @@ clouds:
 
 **Important**: Replace the example values with your actual OpenStack credentials.
 
+**Tip**: For production use, consider using `project_id` instead of `project_name` for more explicit project handling. See [ID-based Authentication](#id-based-authentication-recommended) for details.
+
 ### Step 3: Test Connection
 
 ```bash
@@ -98,6 +100,73 @@ clouds:
 
 - `region_name` - Region to use (required if your cloud has multiple regions)
 
+### ID-based Authentication
+
+It is also possible to authenticate using resource IDs instead of names. This is more robust since IDs do not change, while names can be modified by admins.
+
+```yaml
+clouds:
+  mycloud:
+    auth:
+      auth_url: https://keystone.example.com:5000/v3
+      username: operator
+      password: secret123
+      project_id: a1b2c3d4e5f6g7h8i9j0
+      user_domain_id: default
+      project_domain_id: default
+    region_name: RegionOne
+```
+
+**ID-based Parameters:**
+
+- `project_id` - Unique project identifier (preferred over `project_name`)
+- `user_domain_id` - Unique user domain identifier (preferred over `user_domain_name`)
+- `project_domain_id` - Unique project domain identifier (preferred over `project_domain_name`)
+
+**Benefits of Using IDs:**
+
+- **Immutable** - IDs never change; names can be modified by admins
+- **Faster** - No name-to-ID resolution lookups required
+- **Unique** - IDs are globally unique; names can be duplicated across domains
+- **Reliable** - Better for automation and production deployments
+
+**Mixed Configuration (Best Practice):**
+
+You can provide both names and IDs for maximum compatibility. IDs will be preferred when both are present:
+
+```yaml
+clouds:
+  mycloud:
+    auth:
+      auth_url: https://keystone.example.com:5000/v3
+      username: operator
+      password: secret123
+      # IDs (preferred - used first)
+      project_id: a1b2c3d4e5f6g7h8i9j0
+      user_domain_id: default
+      project_domain_id: default
+      # Names (fallback - for documentation)
+      project_name: operations
+      user_domain_name: default
+      project_domain_name: default
+    region_name: RegionOne
+```
+
+**Finding Your Resource IDs:**
+
+Use the OpenStack CLI to discover your resource IDs:
+
+```bash
+# Find your project ID
+openstack project show <project-name> -f value -c id
+
+# Find domain IDs
+openstack domain show <domain-name> -f value -c id
+
+# List all your projects with IDs
+openstack project list --user <username>
+```
+
 ### Application Credentials (Recommended)
 
 Application credentials are more secure than passwords and can be scoped to specific projects:
@@ -112,12 +181,29 @@ clouds:
     region_name: RegionOne
 ```
 
+**With Project Scoping (Optional):**
+
+```yaml
+clouds:
+  production:
+    auth:
+      auth_url: https://openstack.example.com:5000/v3
+      application_credential_id: "abc123..."
+      application_credential_secret: "secret456..."
+      # Optional: explicitly scope to a project
+      project_id: a1b2c3d4e5f6g7h8i9j0  # Preferred
+      # Or use project name
+      project_name: production-ops
+    region_name: RegionOne
+```
+
 **Benefits:**
 
 - No password exposure in config file
 - Can be easily revoked without changing passwords
 - Can be scoped to specific roles/projects
 - Can have expiration dates
+- Supports both `project_id` and `project_name` for scoping
 
 **Creating Application Credentials:**
 
