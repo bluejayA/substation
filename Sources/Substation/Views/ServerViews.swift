@@ -993,186 +993,136 @@ struct ServerViews {
             return
         }
 
+        var components: [any Component] = []
+
         // Title
         let titleText = serverResizeForm.mode == .confirmOrRevert ? "Confirm or Revert Resize" : "Resize Server"
-        let titleComponent = Text(titleText).primary().bold()
-        let titleRect = Rect(x: startCol + 2, y: startRow + 1, width: width - 4, height: 1)
-        await SwiftTUI.render(titleComponent, on: surface, in: titleRect)
+        components.append(
+            Text(titleText).primary().bold()
+                .padding(EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0))
+        )
 
-        // Server name
+        // Server name with current flavor
         if let server = serverResizeForm.selectedServer {
-            let serverText = "Server: \(server.name ?? "Unknown")"
-            let serverComponent = Text(serverText).secondary()
-            let serverRect = Rect(x: startCol + 2, y: startRow + 2, width: width - 4, height: 1)
-            await SwiftTUI.render(serverComponent, on: surface, in: serverRect)
+            let serverName = server.name ?? "Unknown"
+            let serverText: String
+            if let currentFlavor = serverResizeForm.getCurrentFlavor() {
+                let flavorName = currentFlavor.name ?? "Unknown"
+                serverText = "Server: \(serverName) (\(flavorName))"
+            } else {
+                serverText = "Server: \(serverName)"
+            }
+            components.append(
+                Text(serverText).secondary()
+                    .padding(EdgeInsets(top: 0, leading: 0, bottom: 1, trailing: 0))
+            )
         }
 
-        // Check if we're in confirm/revert mode
-        if serverResizeForm.mode == .confirmOrRevert {
-            await drawConfirmRevertMode(surface: surface, startRow: startRow, startCol: startCol, width: width, height: height, serverResizeForm: serverResizeForm)
+        // Mode-specific selector
+        if serverResizeForm.mode == .selectFlavor {
+            // Flavor selection mode - getAvailableFlavors() already excludes current flavor
+            let availableFlavors = serverResizeForm.getAvailableFlavors()
+
+            // Clamp the highlighted index to valid range
+            let safeHighlightedIndex = min(max(0, serverResizeForm.selectedFlavorIndex), max(0, availableFlavors.count - 1))
+
+            // Build selected IDs set (for pending selection)
+            var selectedIds: Set<String> = []
+            if let pendingSelection = serverResizeForm.pendingFlavorSelection {
+                selectedIds.insert(pendingSelection)
+            }
+
+            let selector = FormSelector<Flavor>(
+                label: "Select New Flavor",
+                tabs: [
+                    FormSelectorTab<Flavor>(
+                        title: "FLAVORS",
+                        columns: [
+                            FormSelectorColumn(header: "Flavor Name", width: 20) {
+                                String(($0.name ?? "Unknown").prefix(20))
+                            },
+                            FormSelectorColumn(header: "vCPUs", width: 6) {
+                                String($0.vcpus)
+                            },
+                            FormSelectorColumn(header: "RAM(GB)", width: 8) {
+                                String(format: "%.1f", Double($0.ram) / 1024.0)
+                            },
+                            FormSelectorColumn(header: "Disk(GB)", width: 9) {
+                                String($0.disk)
+                            }
+                        ]
+                    )
+                ],
+                selectedTabIndex: 0,
+                items: availableFlavors,
+                selectedItemIds: selectedIds,
+                highlightedIndex: safeHighlightedIndex,
+                multiSelect: false,
+                scrollOffset: 0,
+                searchQuery: nil,
+                maxWidth: Int(width) - 4,
+                maxHeight: Int(height) - 10,
+                isActive: true
+            )
+            components.append(selector.render())
+
+            // Show pending selection at bottom if exists
+            if let selectedFlavor = serverResizeForm.getSelectedFlavor() {
+                components.append(
+                    Text("Selected: \(selectedFlavor.name ?? "Unknown") (\(selectedFlavor.vcpus) vCPUs, \(String(format: "%.1f", Double(selectedFlavor.ram) / 1024.0))GB RAM)")
+                        .warning()
+                        .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+                )
+            }
         } else {
-            await drawFlavorSelectionMode(surface: surface, startRow: startRow, startCol: startCol, width: width, height: height, serverResizeForm: serverResizeForm)
+            // Confirm/Revert mode
+            components.append(
+                Text("Status: VERIFY_RESIZE - The server has been resized and is awaiting confirmation.")
+                    .warning()
+                    .padding(EdgeInsets(top: 0, leading: 0, bottom: 1, trailing: 0))
+            )
+
+            let actions: [ResizeAction] = [.confirmResize, .revertResize]
+            let selectedActionId = serverResizeForm.selectedAction == .confirmResize ? "confirm" : "revert"
+
+            let selector = FormSelector<ResizeAction>(
+                label: "Select Action",
+                tabs: [
+                    FormSelectorTab<ResizeAction>(
+                        title: "ACTIONS",
+                        columns: [
+                            FormSelectorColumn(header: "Action", width: 20) { $0.name },
+                            FormSelectorColumn(header: "Description", width: 45) { $0.description }
+                        ]
+                    )
+                ],
+                selectedTabIndex: 0,
+                items: actions,
+                selectedItemIds: Set([selectedActionId]),
+                highlightedIndex: serverResizeForm.selectedAction == .confirmResize ? 0 : 1,
+                multiSelect: false,
+                scrollOffset: 0,
+                searchQuery: nil,
+                maxWidth: Int(width) - 4,
+                maxHeight: 8,
+                isActive: true
+            )
+            components.append(selector.render())
         }
 
         // Bottom instructions
-        let bottomInstructionsY = startRow + height - 1
         let instructions = serverResizeForm.mode == .confirmOrRevert ?
             "UP/DOWN:navigate SPACE:toggle ENTER:confirm ESC:back" :
             "UP/DOWN:navigate SPACE:select ENTER:confirm ESC:back"
-        let instructionsComponent = Text(instructions).muted()
-        let instructionsRect = Rect(x: startCol + 2, y: bottomInstructionsY, width: width - 4, height: 1)
-        await SwiftTUI.render(instructionsComponent, on: surface, in: instructionsRect)
-    }
+        components.append(
+            Text(instructions).muted()
+                .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+        )
 
-    private static func drawConfirmRevertMode(surface: any Surface, startRow: Int32, startCol: Int32, width: Int32, height: Int32, serverResizeForm: ServerResizeForm) async {
-        // Status message
-        let statusY = startRow + 4
-        let statusText = "Status: VERIFY_RESIZE - The server has been resized and is awaiting confirmation."
-        let statusComponent = Text(statusText).warning()
-        let statusRect = Rect(x: startCol + 2, y: statusY, width: width - 4, height: 1)
-        await SwiftTUI.render(statusComponent, on: surface, in: statusRect)
-
-        // Header line
-        let headerY = startRow + 6
-        let headerText = "[ ] Action           Description"
-        let headerComponent = Text(headerText).secondary()
-        let headerRect = Rect(x: startCol + 2, y: headerY, width: width - 4, height: 1)
-        await SwiftTUI.render(headerComponent, on: surface, in: headerRect)
-
-        // Separator
-        let separatorY = headerY + 1
-        let separatorText = String(repeating: "-", count: min(Int(width - 4), 85))
-        let separatorComponent = Text(separatorText).muted()
-        let separatorRect = Rect(x: startCol + 2, y: separatorY, width: width - 4, height: 1)
-        await SwiftTUI.render(separatorComponent, on: surface, in: separatorRect)
-
-        // Content area
-        let contentStartY = separatorY + 1
-
-        // Confirm option
-        let confirmSelected = serverResizeForm.selectedAction == .confirmResize
-        let confirmCheckbox = confirmSelected ? "[X]" : "[ ]"
-        let confirmName = "Confirm Resize".padding(toLength: 20, withPad: " ", startingAt: 0)
-        let confirmDesc = "Accept the new server size"
-        let confirmText = "\(confirmCheckbox) \(confirmName) \(confirmDesc)"
-        let confirmComponent = confirmSelected ? Text(confirmText).accent().bold() : Text(confirmText).info()
-        let confirmRect = Rect(x: startCol + 2, y: contentStartY, width: width - 4, height: 1)
-        await SwiftTUI.render(confirmComponent, on: surface, in: confirmRect)
-
-        // Revert option
-        let revertSelected = serverResizeForm.selectedAction == .revertResize
-        let revertCheckbox = revertSelected ? "[X]" : "[ ]"
-        let revertName = "Revert Resize".padding(toLength: 20, withPad: " ", startingAt: 0)
-        let revertDesc = "Return to the original server size"
-        let revertText = "\(revertCheckbox) \(revertName) \(revertDesc)"
-        let revertComponent = revertSelected ? Text(revertText).accent().bold() : Text(revertText).info()
-        let revertRect = Rect(x: startCol + 2, y: contentStartY + 1, width: width - 4, height: 1)
-        await SwiftTUI.render(revertComponent, on: surface, in: revertRect)
-    }
-
-    private static func drawFlavorSelectionMode(surface: any Surface, startRow: Int32, startCol: Int32, width: Int32, height: Int32, serverResizeForm: ServerResizeForm) async {
-        // Instructions
-        let instructionsY = startRow + 4
-        let instructions = "Select a new flavor for the server. Current flavor is marked with [*]"
-        let instructionsComponent = Text(instructions).secondary()
-        let instructionsRect = Rect(x: startCol + 2, y: instructionsY, width: width - 4, height: 1)
-        await SwiftTUI.render(instructionsComponent, on: surface, in: instructionsRect)
-
-        // Header line
-        let headerY = startRow + 6
-        let headerText = "[ ] Flavor Name          vCPUs  RAM(GB)  Disk(GB)"
-        let headerComponent = Text(headerText).secondary()
-        let headerRect = Rect(x: startCol + 2, y: headerY, width: width - 4, height: 1)
-        await SwiftTUI.render(headerComponent, on: surface, in: headerRect)
-
-        // Separator
-        let separatorY = headerY + 1
-        let separatorText = String(repeating: "-", count: min(Int(width - 4), 85))
-        let separatorComponent = Text(separatorText).muted()
-        let separatorRect = Rect(x: startCol + 2, y: separatorY, width: width - 4, height: 1)
-        await SwiftTUI.render(separatorComponent, on: surface, in: separatorRect)
-
-        // Content area
-        let contentStartY = separatorY + 1
-        let contentHeight = Int(height) - Int(contentStartY - startRow) - 4
-
-        let availableFlavors = serverResizeForm.getAvailableFlavors()
-
-        if availableFlavors.isEmpty {
-            let emptyComponent = Text("No flavors available").muted()
-            let emptyRect = Rect(x: startCol + 2, y: contentStartY + 1, width: width - 4, height: 1)
-            await SwiftTUI.render(emptyComponent, on: surface, in: emptyRect)
-            return
-        }
-
-        // Calculate visible range with scrolling
-        let selectedIndex = serverResizeForm.selectedFlavorIndex
-        let scrollOffset = max(0, min(selectedIndex - contentHeight + 1, availableFlavors.count - contentHeight))
-        let visibleCount = min(contentHeight, availableFlavors.count - scrollOffset)
-
-        // Draw flavor list
-        for i in 0..<visibleCount {
-            let flavorIndex = scrollOffset + i
-            guard flavorIndex < availableFlavors.count else { break }
-
-            let flavor = availableFlavors[flavorIndex]
-            let isHighlighted = flavorIndex == selectedIndex
-            let isSelected = serverResizeForm.pendingFlavorSelection == flavor.id
-            let isCurrent = serverResizeForm.isCurrentFlavor(flavor.id)
-
-            let rowY = contentStartY + Int32(i)
-
-            // Format flavor info
-            let checkbox: String
-            if isCurrent {
-                checkbox = "[*]"
-            } else if isSelected {
-                checkbox = "[X]"
-            } else {
-                checkbox = "[ ]"
-            }
-
-            let name = String((flavor.name ?? "Unknown").prefix(20)).padding(toLength: 20, withPad: " ", startingAt: 0)
-            let vcpus = String(flavor.vcpus).padding(toLength: 6, withPad: " ", startingAt: 0)
-            let ram = String(format: "%.1f", Double(flavor.ram) / 1024.0).padding(toLength: 8, withPad: " ", startingAt: 0)
-            let disk = String(flavor.disk).padding(toLength: 9, withPad: " ", startingAt: 0)
-
-            let flavorText = "\(checkbox) \(name) \(vcpus) \(ram) \(disk)"
-
-            // Apply styling
-            let component: Text
-            if isHighlighted {
-                if isSelected || isCurrent {
-                    component = Text(flavorText).accent().bold()
-                } else {
-                    component = Text(flavorText).secondary()
-                }
-            } else if isSelected || isCurrent {
-                component = Text(flavorText).accent()
-            } else {
-                component = Text(flavorText).info()
-            }
-
-            let flavorRect = Rect(x: startCol + 2, y: rowY, width: width - 4, height: 1)
-            await SwiftTUI.render(component, on: surface, in: flavorRect)
-        }
-
-        // Show scroll indicators if needed
-        if scrollOffset > 0 || scrollOffset + visibleCount < availableFlavors.count {
-            let scrollText = "(\(scrollOffset + 1)-\(scrollOffset + visibleCount) of \(availableFlavors.count))"
-            let scrollComponent = Text(scrollText).muted()
-            let scrollRect = Rect(x: startCol + width - Int32(scrollText.count) - 2, y: contentStartY + Int32(contentHeight) - 1, width: Int32(scrollText.count), height: 1)
-            await SwiftTUI.render(scrollComponent, on: surface, in: scrollRect)
-        }
-
-        // Show pending selection at bottom
-        if let selectedFlavor = serverResizeForm.getSelectedFlavor() {
-            let pendingY = startRow + height - 3
-            let pendingText = "Selected: \(selectedFlavor.name ?? "Unknown") (\(selectedFlavor.vcpus) vCPUs, \(String(format: "%.1f", Double(selectedFlavor.ram) / 1024.0))GB RAM)"
-            let pendingComponent = Text(pendingText).warning()
-            let pendingRect = Rect(x: startCol + 2, y: pendingY, width: width - 4, height: 1)
-            await SwiftTUI.render(pendingComponent, on: surface, in: pendingRect)
-        }
+        // Render all components
+        let mainComponent = VStack(spacing: 0, children: components)
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        await SwiftTUI.render(mainComponent, on: surface, in: bounds)
     }
 
     // MARK: - Pagination and Virtual Scrolling Navigation Helpers
