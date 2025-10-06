@@ -72,6 +72,20 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 - Consistent list rendering
 - 80-90% code reduction
 
+### [DetailView Guide](detailview-guide.md)
+
+**What it does**: Renders detailed information screens with section-based layouts and scrollable content.
+
+**When to use it**: Building detail screens for resources (server details, volume details, network details).
+
+**Read this** when you need:
+
+- Detail screens with consistent formatting
+- Section-based information organization
+- Automatic field label and value formatting
+- Scrolling for large content
+- 70-85% code reduction
+
 ### [Testing Guide](testing.md)
 
 **What it does**: Comprehensive guide to running tests, writing tests, and understanding the testing infrastructure.
