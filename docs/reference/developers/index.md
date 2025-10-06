@@ -72,6 +72,20 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 - Consistent list rendering
 - 80-90% code reduction
 
+### [Testing Guide](testing.md)
+
+**What it does**: Comprehensive guide to running tests, writing tests, and understanding the testing infrastructure.
+
+**When to use it**: Before contributing code, after making changes, when adding new features.
+
+**Read this** when you need:
+
+- Run the test suite
+- Write new tests
+- Understand test coverage
+- Debug failing tests
+- Set up CI/CD
+
 ## Quick Start: Create Your First Form in 5 Minutes
 
 **Scenario**: You need a network creation form. Name, MTU, port security. Let's go.
