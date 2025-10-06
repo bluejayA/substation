@@ -201,7 +201,7 @@ tail -f ~/substation.log
 
 ### Package Management: Swift Package Manager
 
-**Zero External Dependencies** (except one):
+**Minimal External Dependencies**:
 
 - Simple, works everywhere
 - No CocoaPods, no Carthage, no NPM-style dependency hell

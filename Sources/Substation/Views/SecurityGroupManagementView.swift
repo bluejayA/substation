@@ -70,80 +70,18 @@ struct SecurityGroupViews {
                                              width: Int32, height: Int32, cachedSecurityGroups: [SecurityGroup],
                                              searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Security Groups List
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let titleText = searchQuery.map { "Security Groups (filtered: \($0))" } ?? "Security Groups"
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text("  NAME                            RULES     DESCRIPTION").muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered groups and create list components
-        let filteredGroups = FilterUtils.filterSecurityGroups(cachedSecurityGroups, query: searchQuery)
-
-        if filteredGroups.isEmpty {
-            components.append(Text("No security groups found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(1, Int(height) - 10) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, filteredGroups.count - maxVisibleItems))
-            let endIndex = min(filteredGroups.count, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let securityGroup = filteredGroups[i]
-                let isSelected = i == selectedIndex
-                let groupComponent = createSecurityGroupListItemComponent(securityGroup: securityGroup, isSelected: isSelected, width: width)
-                components.append(groupComponent)
-            }
-
-            // Scroll indicator if needed
-            if filteredGroups.count > maxVisibleItems {
-                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(filteredGroups.count)]"
-                components.append(Text(scrollText).info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-
-        // Render unified security groups list
-        let securityGroupListComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(securityGroupListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createSecurityGroupListItemComponent(securityGroup: SecurityGroup, isSelected: Bool, width: Int32) -> any Component {
-        // Security group name with formatting (30 chars to match header)
-        let groupName = String((securityGroup.name ?? "Unknown").prefix(30)).padding(toLength: 30, withPad: " ", startingAt: 0)
-
-        // Rules count with formatting (9 chars to match header)
-        let ruleCount = securityGroup.securityGroupRules?.count ?? 0
-        let rulesDisplay = String("\(ruleCount) rule\(ruleCount == 1 ? "" : "s")".prefix(9)).padding(toLength: 9, withPad: " ", startingAt: 0)
-
-        // Description with remaining space
-        let remainingWidth = max(0, Int(width) - 45)
-        let descDisplay = remainingWidth > 5 ? String((securityGroup.description ?? "No description").prefix(remainingWidth)) : ""
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            Text(" \(groupName)").styled(rowStyle),
-            Text(" \(rulesDisplay)").styled(rowStyle),
-            Text(" \(descDisplay)").styled(rowStyle)
-        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
+        let statusListView = createSecurityGroupStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedSecurityGroups,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     private static func createSecurityGroupRuleItemComponent(rule: SecurityGroupRule, ruleIndex: Int,

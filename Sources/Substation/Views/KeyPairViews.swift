@@ -8,93 +8,18 @@ struct KeyPairViews {
                                       width: Int32, height: Int32, cachedKeyPairs: [KeyPair],
                                       searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.keyPairListMinScreenWidth && height > Self.keyPairListMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.keyPairListBoundsMinWidth, width), height: max(Self.keyPairListBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.keyPairListScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Key Pair List
-        var components: [any Component] = []
-
-        // Title - optimized conditional logic for performance
-        let titleText: String
-        if let query = searchQuery {
-            titleText = Self.keyPairListFilteredTitlePrefix + query + Self.keyPairListFilteredTitleSuffix
-        } else {
-            titleText = Self.keyPairListTitle
-        }
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(Self.keyPairListHeader).muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered key pairs and create list components
-        let filteredKeyPairs = FilterUtils.filterKeyPairs(cachedKeyPairs, query: searchQuery)
-        let totalCount = filteredKeyPairs.count
-
-        if totalCount == 0 {
-            components.append(Text(Self.keyPairListNoKeyPairsText).info()
-                .padding(Self.keyPairListNoKeyPairsEdgeInsets))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(Self.keyPairListMinVisibleItems, Int(height) - Self.keyPairListReservedSpaceForHeaderFooter) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, totalCount - maxVisibleItems))
-            let endIndex = min(totalCount, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let keyPair = filteredKeyPairs[i]
-                let isSelected = i == selectedIndex
-                let keyPairComponent = createKeyPairListItemComponent(keyPair: keyPair, isSelected: isSelected)
-                components.append(keyPairComponent)
-            }
-
-            // Scroll indicator if needed - optimized string construction with cached count
-            if totalCount > maxVisibleItems {
-                let displayStart = startIndex + 1
-                let scrollText = Self.keyPairListScrollInfoPrefix + String(displayStart) + Self.keyPairListScrollInfoSeparator + String(endIndex) + Self.keyPairListScrollInfoMiddle + String(totalCount) + Self.keyPairListScrollInfoSuffix
-                components.append(Text(scrollText).info()
-                    .padding(Self.keyPairListScrollInfoEdgeInsets))
-            }
-        }
-
-        // Render unified key pair list
-        let keyPairListComponent = VStack(spacing: Self.keyPairListComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(keyPairListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createKeyPairListItemComponent(keyPair: KeyPair, isSelected: Bool) -> any Component {
-        // Key pair name (truncated to fit)
-        let keyPairName = keyPair.name
-        let truncatedName = String((keyPairName ?? "Unnamed").prefix(Self.keyPairListNamePadLength)).padding(toLength: Self.keyPairListNamePadLength, withPad: Self.keyPairListPadCharacter, startingAt: 0)
-
-        // Fingerprint (truncated to fit)
-        let fingerprintText: String
-        if let fingerprint = keyPair.fingerprint {
-            fingerprintText = fingerprint.count > Self.keyPairListFingerprintMaxLength ? String(fingerprint.suffix(Self.keyPairListFingerprintMaxLength)) : fingerprint
-        } else {
-            fingerprintText = Self.keyPairListUnknownFingerprintText
-        }
-
-        // Pre-calculate spaced text for optimal performance
-        let spacedName = Self.keyPairListItemTextSpacing + truncatedName
-        let spacedFingerprint = Self.keyPairListItemTextSpacing + fingerprintText
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: Self.keyPairListStatusIconActive),
-            Text(spacedName).styled(rowStyle),
-            Text(spacedFingerprint).styled(rowStyle)
-        ]).padding(Self.keyPairListItemEdgeInsets)
+        let statusListView = createKeyPairStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedKeyPairs,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Detail View

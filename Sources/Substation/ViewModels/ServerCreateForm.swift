@@ -16,6 +16,7 @@ enum FlavorSelectionMode: String, CaseIterable {
 /// Field identifiers for ServerCreate FormBuilder
 enum ServerCreateFieldId: String, CaseIterable {
     case name = "name"
+    case maxServers = "maxServers"
     case source = "source"
     case flavor = "flavor"
     case network = "network"
@@ -27,6 +28,8 @@ enum ServerCreateFieldId: String, CaseIterable {
         switch self {
         case .name:
             return "Server Name"
+        case .maxServers:
+            return "Max Servers"
         case .source:
             return "Source"
         case .flavor:
@@ -58,6 +61,7 @@ struct ServerCreateForm {
     // MARK: - Properties
 
     var serverName: String = ""
+    var maxServers: String = "1"
     var bootSource: BootSource = .image
 
     // Source selection (images and volumes)
@@ -285,6 +289,21 @@ struct ServerCreateForm {
             ]
         )))
 
+        // Max Servers (number field)
+        let maxServersId = ServerCreateFieldId.maxServers.rawValue
+        fields.append(.number(FormFieldNumber(
+            id: maxServersId,
+            label: ServerCreateFieldId.maxServers.title,
+            value: maxServers,
+            placeholder: "1",
+            isRequired: true,
+            isVisible: true,
+            isSelected: selectedFieldId == maxServersId,
+            isActive: activeFieldId == maxServersId,
+            cursorPosition: formState?.getTextFieldCursorPosition(maxServersId),
+            validationError: getMaxServersValidationError()
+        )))
+
         return fields
     }
 
@@ -293,6 +312,17 @@ struct ServerCreateForm {
     private func getNameValidationError() -> String? {
         if serverName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return Self.serverNameRequiredError
+        }
+        return nil
+    }
+
+    private func getMaxServersValidationError() -> String? {
+        let trimmed = maxServers.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "Max servers is required"
+        }
+        guard let value = Int(trimmed), value >= 1 else {
+            return "Max servers must be a number >= 1"
         }
         return nil
     }
@@ -361,6 +391,10 @@ struct ServerCreateForm {
             errors.append(error)
         }
 
+        if let error = getMaxServersValidationError() {
+            errors.append(error)
+        }
+
         if let error = getImageValidationError() {
             errors.append(error)
         }
@@ -409,6 +443,11 @@ struct ServerCreateForm {
             serverName = name
         }
 
+        // Update max servers
+        if let max = formState.getTextValue(ServerCreateFieldId.maxServers.rawValue) {
+            maxServers = max
+        }
+
         // Note: bootSource is now toggled directly via toggleBootSource() when TAB is pressed in source selector
         // No need to update from form state
 
@@ -449,6 +488,7 @@ struct ServerCreateForm {
 
     mutating func reset() {
         serverName = ""
+        maxServers = "1"
         bootSource = .image
         selectedImageID = nil
         selectedVolumeID = nil

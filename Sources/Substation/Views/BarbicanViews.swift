@@ -18,141 +18,18 @@ struct BarbicanViews {
         selectedIndex: Int,
         filterCache: ResourceNameCache?
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Filter secrets based on search query
-        let filteredSecrets = searchQuery.isEmpty ? secrets : secrets.filter { secret in
-            (secret.name?.lowercased().contains(searchQuery.lowercased()) ?? false) ||
-            (secret.secretType?.lowercased().contains(searchQuery.lowercased()) ?? false)
-        }
-
-        // Debug logging for navigation issues (using proper logger)
-        Logger.shared.logDebug("BARBICAN DEBUG: totalSecrets=\(secrets.count), filteredSecrets=\(filteredSecrets.count), selectedIndex=\(selectedIndex), scrollOffset=\(scrollOffset)")
-
-        // Create header components
-        var components: [any Component] = []
-
-        // Title
-        components.append(Text("Secrets").emphasis().bold())
-        components.append(Text(""))
-
-        // Search info
-        if !searchQuery.isEmpty {
-            components.append(Text("Search: \(searchQuery) (\(filteredSecrets.count) results)").info())
-            components.append(Text(""))
-        }
-
-        // Header row
-        let nameHeader = String("NAME".prefix(20)).padding(toLength: 20, withPad: " ", startingAt: 0)
-        let typeHeader = String("TYPE".prefix(12)).padding(toLength: 12, withPad: " ", startingAt: 0)
-        let statusHeader = String("STATUS".prefix(10)).padding(toLength: 10, withPad: " ", startingAt: 0)
-        let createdHeader = String("CREATED".prefix(16)).padding(toLength: 16, withPad: " ", startingAt: 0)
-        let expirationHeader = String("EXPIRATION".prefix(16)).padding(toLength: 16, withPad: " ", startingAt: 0)
-
-        let headerRow = HStack(spacing: 0, children: [
-            Text(" \(nameHeader) ").muted().bold(),
-            Text("\(typeHeader) ").muted().bold(),
-            Text("\(statusHeader) ").muted().bold(),
-            Text("\(createdHeader) ").muted().bold(),
-            Text("\(expirationHeader)").muted().bold()
-        ])
-        components.append(headerRow.border())
-
-        // Calculate visible secrets
-        let availableHeight = Int(height) - 10 // Account for header, help, etc.
-        let maxVisibleSecrets = max(0, availableHeight)
-        let startIndex = max(0, min(scrollOffset, max(0, filteredSecrets.count - maxVisibleSecrets)))
-        let endIndex = min(startIndex + maxVisibleSecrets, filteredSecrets.count)
-        let visibleSecrets = Array(filteredSecrets[startIndex..<endIndex])
-
-        // Secret rows
-        for (index, secret) in visibleSecrets.enumerated() {
-            let globalIndex = startIndex + index
-            let isSelected = globalIndex == selectedIndex
-            let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-            // Debug row selection (using proper logger)
-            if isSelected {
-                Logger.shared.logDebug("BARBICAN ROW DEBUG: Rendering selected row globalIndex=\(globalIndex), name=\(secret.name ?? "Unknown")")
-            }
-
-            let name = secret.name ?? "Unknown"
-            let type = secret.secretType ?? "opaque"
-            let status = secret.status ?? "Unknown"
-            let statusStyle: TextStyle = {
-                switch status.lowercased() {
-                case "active": return .success
-                case "error": return .error
-                case "build", "building": return .warning
-                default: return .info
-                }
-            }()
-            let createdText: String
-            if let created = secret.created {
-                let formatter = DateFormatter()
-                formatter.dateStyle = .short
-                formatter.timeStyle = .short
-                createdText = formatter.string(from: created)
-            } else {
-                createdText = "Unknown"
-            }
-
-            let expirationText: String
-            let expirationStyle: TextStyle
-            if let expiration = secret.expiration {
-                let formatter = DateFormatter()
-                formatter.dateStyle = .short
-                formatter.timeStyle = .short
-                expirationText = formatter.string(from: expiration)
-                let isExpired = expiration < Date()
-                expirationStyle = isExpired ? .error : .warning
-            } else {
-                expirationText = "Never"
-                expirationStyle = .success
-            }
-
-            // Add selection indicator for better visibility
-            let indicator = isSelected ? ">" : " "
-            let nameText = String("\(indicator) \(name)".prefix(20)).padding(toLength: 20, withPad: " ", startingAt: 0)
-            let typeText = String(type.prefix(12)).padding(toLength: 12, withPad: " ", startingAt: 0)
-            let statusText = String(status.prefix(10)).padding(toLength: 10, withPad: " ", startingAt: 0)
-            let createdPaddedText = String(createdText.prefix(16)).padding(toLength: 16, withPad: " ", startingAt: 0)
-            let expirationPaddedText = String(expirationText.prefix(16)).padding(toLength: 16, withPad: " ", startingAt: 0)
-
-            let secretRow = HStack(spacing: 0, children: [
-                Text("\(nameText) ").styled(rowStyle),
-                Text("\(typeText) ").styled(isSelected ? rowStyle : .info),
-                Text("\(statusText) ").styled(statusStyle),
-                Text("\(createdPaddedText) ").styled(isSelected ? rowStyle : .info),
-                Text("\(expirationPaddedText)").styled(expirationStyle)
-            ])
-            components.append(secretRow)
-        }
-
-        // Empty state
-        if filteredSecrets.isEmpty {
-            let emptyMessage = searchQuery.isEmpty ? "No secrets found" : "No secrets match search"
-            components.append(Text(""))
-            components.append(Text(emptyMessage).muted())
-        }
-
-        // Status line
-        components.append(Text(""))
-        let statusText = "\(filteredSecrets.count) secret(s) total"
-        components.append(Text(statusText).muted())
-
-        // Scroll indicator
-        if filteredSecrets.count > maxVisibleSecrets {
-            let scrollText = "(\(startIndex + 1)-\(endIndex) of \(filteredSecrets.count)) Use UP/DOWN to scroll"
-            components.append(Text(scrollText).info())
-        }
-
-        // Render the view
-        let secretListView = VStack(spacing: 0, children: components)
-            .padding(EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 2))
-
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(secretListView, on: surface, in: bounds)
+        let statusListView = createBarbicanSecretStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: secrets,
+            searchQuery: searchQuery.isEmpty ? nil : searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Container List View

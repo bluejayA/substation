@@ -13,241 +13,20 @@ struct VolumeViews {
                                       dataManager: DataManager? = nil,
                                      virtualScrollManager: VirtualScrollManager<Volume>? = nil) async {
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Volume List
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let titleText = searchQuery.map { "Volumes (filtered: \($0))" } ?? "Volumes"
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(" ST  NAME                   STATUS       SIZE     ATTACHED TO").muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - enhanced with pagination and virtual scrolling support
-        await renderVolumeList(
-            components: &components,
-            cachedVolumes: cachedVolumes,
+        let statusListView = createVolumeStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedVolumes,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
             selectedIndex: selectedIndex,
-            height: height,
-            width: width,
             dataManager: dataManager,
             virtualScrollManager: virtualScrollManager
         )
-
-        // Render unified volume list
-        let volumeListComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(volumeListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Enhanced Rendering with Pagination Support
-
-    @MainActor
-    private static func renderVolumeList(
-        components: inout [any Component],
-        cachedVolumes: [Volume],
-        searchQuery: String?,
-        scrollOffset: Int,
-        selectedIndex: Int,
-        height: Int32,
-        width: Int32,
-
-        dataManager: DataManager?,
-        virtualScrollManager: VirtualScrollManager<Volume>?
-    ) async {
-        // Determine which rendering approach to use based on available systems
-        if let virtualScrollManager = virtualScrollManager {
-            await renderWithVirtualScrolling(
-                components: &components,
-                virtualScrollManager: virtualScrollManager,
-                selectedIndex: selectedIndex,
-                height: height,
-                width: width
-            )
-        } else if let dataManager = dataManager, dataManager.isPaginationEnabled(for: "volumes") {
-            await renderWithPagination(
-                components: &components,
-                dataManager: dataManager,
-                selectedIndex: selectedIndex,
-                height: height,
-                width: width
-            )
-        } else {
-            // Fallback to traditional rendering
-            await renderTraditional(
-                components: &components,
-                cachedVolumes: cachedVolumes,
-                searchQuery: searchQuery,
-                scrollOffset: scrollOffset,
-                selectedIndex: selectedIndex,
-                height: height,
-                width: width
-            )
-        }
-    }
-
-    @MainActor
-    private static func renderWithVirtualScrolling(
-        components: inout [any Component],
-        virtualScrollManager: VirtualScrollManager<Volume>,
-        selectedIndex: Int,
-        height: Int32,
-        width: Int32
-    ) async {
-        let maxVisibleItems = max(1, Int(height) - 10)
-        let renderableItems = virtualScrollManager.getRenderableItems(
-            startRow: 5, // Volume list start row
-            endRow: 5 + Int32(maxVisibleItems)
-        )
-
-        if renderableItems.isEmpty {
-            components.append(Text("No volumes found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            for (volume, _, index) in renderableItems {
-                let isSelected = index == selectedIndex
-                let volumeComponent = createVolumeListItemComponent(
-                    volume: volume,
-                    isSelected: isSelected,
-                    width: width
-                )
-                components.append(volumeComponent)
-            }
-
-            // Virtual scrolling status
-            let scrollInfo = virtualScrollManager.getScrollInfo()
-            components.append(Text("Virtual: \(scrollInfo)").info()
-                .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-        }
-    }
-
-    @MainActor
-    private static func renderWithPagination(
-        components: inout [any Component],
-        dataManager: DataManager,
-        selectedIndex: Int,
-        height: Int32,
-        width: Int32
-    ) async {
-        let paginatedVolumes: [Volume] = await dataManager.getPaginatedItems(for: "volumes", type: Volume.self)
-
-        if paginatedVolumes.isEmpty {
-            components.append(Text("No volumes found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            let maxVisibleItems = max(1, Int(height) - 10)
-            let endIndex = min(paginatedVolumes.count, maxVisibleItems)
-
-            for i in 0..<endIndex {
-                let volume = paginatedVolumes[i]
-                let isSelected = i == selectedIndex
-                let volumeComponent = createVolumeListItemComponent(
-                    volume: volume,
-                    isSelected: isSelected,
-                    width: width
-                )
-                components.append(volumeComponent)
-            }
-
-            // Pagination status
-            if let paginationStatus = dataManager.getPaginationStatus(for: "volumes") {
-                components.append(Text("Paginated: \(paginationStatus)").info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-    }
-
-    @MainActor
-    private static func renderTraditional(
-        components: inout [any Component],
-        cachedVolumes: [Volume],
-        searchQuery: String?,
-        scrollOffset: Int,
-        selectedIndex: Int,
-        height: Int32,
-        width: Int32
-    ) async {
-        let filteredVolumes = FilterUtils.filterVolumes(cachedVolumes, query: searchQuery)
-
-        if filteredVolumes.isEmpty {
-            components.append(Text("No volumes found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(1, Int(height) - 10) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, filteredVolumes.count - maxVisibleItems))
-            let endIndex = min(filteredVolumes.count, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let volume = filteredVolumes[i]
-                let isSelected = i == selectedIndex
-                let volumeComponent = createVolumeListItemComponent(volume: volume, isSelected: isSelected, width: width)
-                components.append(volumeComponent)
-            }
-
-            // Traditional scroll indicator
-            if filteredVolumes.count > maxVisibleItems {
-                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(filteredVolumes.count)]"
-                components.append(Text(scrollText).info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createVolumeListItemComponent(volume: Volume, isSelected: Bool, width: Int32) -> any Component {
-        // Volume name with formatting (22 chars to match header)
-        let volumeName = String((volume.name ?? "Unnamed").prefix(22)).padding(toLength: 22, withPad: " ", startingAt: 0)
-
-        // Enhanced status with color coding (12 chars to match header)
-        let status = volume.status ?? "Unknown"
-        let statusStyle: TextStyle = {
-            switch status.lowercased() {
-            case "available", "in-use": return .success
-            case "error": return .error
-            case "creating", "attaching", "detaching": return .warning
-            default: return .info
-            }
-        }()
-        let statusText = String(status.prefix(12)).padding(toLength: 12, withPad: " ", startingAt: 0)
-
-        // Size display (8 chars to match header)
-        let sizeText = "\(volume.size ?? 0)GB"
-        let sizeDisplay = String(sizeText.prefix(8)).padding(toLength: 8, withPad: " ", startingAt: 0)
-
-        // Attachment info (remaining space)
-        let remainingWidth = max(0, Int(width) - 50)
-        let attachmentInfo: String
-        if !(volume.attachments?.isEmpty ?? true) {
-            let serverNames = volume.attachments?.compactMap { $0.serverId } ?? []
-            attachmentInfo = serverNames.isEmpty ? "Attached" : String(serverNames.first?.prefix(remainingWidth) ?? "")
-        } else {
-            attachmentInfo = "Not attached"
-        }
-        let attachmentDisplay = remainingWidth > 5 ? String(attachmentInfo.prefix(remainingWidth)) : ""
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: volume.status ?? "unknown"),
-            Text(" \(volumeName)").styled(rowStyle),
-            Text(" \(statusText)").styled(statusStyle),
-            Text(" \(sizeDisplay)").styled(.info),
-            Text(" \(attachmentDisplay)").styled(rowStyle)
-        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
     }
 
     // MARK: - Volume Detail View
@@ -439,7 +218,8 @@ struct VolumeViews {
                                 highlightedIndex: state.highlightedIndex,
                                 scrollOffset: state.scrollOffset,
                                 searchQuery: state.searchQuery,
-                                title: "Select Source Image"
+                                title: "Select Source Image",
+                                description: "Select image to create volume from. SPACE: select, ENTER: confirm"
                             )
                         } else if let snapshots = selectorField.items as? [VolumeSnapshot] {
                             await VolumeSnapshotSelectionView.drawVolumeSnapshotSelection(
@@ -455,7 +235,13 @@ struct VolumeViews {
                                 searchQuery: state.searchQuery,
                                 title: "Select Source Snapshot"
                             )
-                        } else if let volumeTypes = selectorField.items as? [VolumeType] {
+                        }
+                        return
+                    }
+                case VolumeCreateFieldId.volumeType.rawValue:
+                    if let state = formBuilderState.selectorStates[selectorField.id] {
+                        let selectedIds = state.selectedItemId.map { Set([$0]) } ?? []
+                        if let volumeTypes = selectorField.items as? [VolumeType] {
                             await VolumeTypeSelectionView.drawVolumeTypeSelection(
                                 screen: screen,
                                 startRow: startRow,

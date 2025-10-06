@@ -632,7 +632,7 @@ Now that Substation is configured, learn how to use it:
 
 - **[Quick Start Guide](../quick-start.md)** - Get up and running in 1 minute
 - **[Getting Started](../getting-started/index.md)** - Learn the basics
-- **[Navigation Guide](../guides/operators/keyboard-shortcuts.md)** - Master keyboard shortcuts
+- **[Navigation Guide](../reference/operators/keyboard-shortcuts.md)** - Master keyboard shortcuts
 - **[Troubleshooting](../troubleshooting/index.md)** - Solutions to common problems
 
 ## Getting Help

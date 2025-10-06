@@ -100,256 +100,20 @@ struct ServerViews {
                                       cachedFlavors: [Flavor], cachedImages: [Image],
                                      dataManager: DataManager? = nil, virtualScrollManager: VirtualScrollManager<Server>? = nil) async {
 
-        // Defensive bounds checking - prevent crashes on small screens
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Server List (following ServerCreateView gold standard)
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let titleText = searchQuery.map { "Servers (filtered: \($0))" } ?? "Servers"
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(serverListHeader).muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - enhanced with pagination and virtual scrolling support
-        await renderServerList(
-            components: &components,
-            cachedServers: cachedServers,
+        let statusListView = createServerStatusListView(cachedFlavors: cachedFlavors, cachedImages: cachedImages)
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedServers,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
             selectedIndex: selectedIndex,
-            height: height,
-            cachedFlavors: cachedFlavors,
-            cachedImages: cachedImages,
             dataManager: dataManager,
             virtualScrollManager: virtualScrollManager
         )
-
-        // Render unified server list
-        let serverListComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(serverListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Enhanced Rendering with Pagination Support
-
-    @MainActor
-    private static func renderServerList(
-        components: inout [any Component],
-        cachedServers: [Server],
-        searchQuery: String?,
-        scrollOffset: Int,
-        selectedIndex: Int,
-        height: Int32,
-
-        cachedFlavors: [Flavor],
-        cachedImages: [Image],
-        dataManager: DataManager?,
-        virtualScrollManager: VirtualScrollManager<Server>?
-    ) async {
-        // Determine which rendering approach to use based on available systems
-        if let virtualScrollManager = virtualScrollManager {
-            await renderWithVirtualScrolling(
-                components: &components,
-                virtualScrollManager: virtualScrollManager,
-                selectedIndex: selectedIndex,
-                height: height,
-                cachedFlavors: cachedFlavors,
-                cachedImages: cachedImages
-            )
-        } else if let dataManager = dataManager, dataManager.isPaginationEnabled(for: "servers") {
-            await renderWithPagination(
-                components: &components,
-                dataManager: dataManager,
-                selectedIndex: selectedIndex,
-                height: height,
-                cachedFlavors: cachedFlavors,
-                cachedImages: cachedImages
-            )
-        } else {
-            // Fallback to traditional rendering
-            await renderTraditional(
-                components: &components,
-                cachedServers: cachedServers,
-                searchQuery: searchQuery,
-                scrollOffset: scrollOffset,
-                selectedIndex: selectedIndex,
-                height: height,
-                cachedFlavors: cachedFlavors,
-                cachedImages: cachedImages
-            )
-        }
-    }
-
-    @MainActor
-    private static func renderWithVirtualScrolling(
-        components: inout [any Component],
-        virtualScrollManager: VirtualScrollManager<Server>,
-        selectedIndex: Int,
-        height: Int32,
-        cachedFlavors: [Flavor],
-        cachedImages: [Image]
-    ) async {
-        let maxVisibleItems = max(1, Int(height) - 10)
-        let renderableItems = virtualScrollManager.getRenderableItems(
-            startRow: listStartRow,
-            endRow: listStartRow + Int32(maxVisibleItems)
-        )
-
-        if renderableItems.isEmpty {
-            components.append(Text("No servers found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            for (server, _, index) in renderableItems {
-                let isSelected = index == selectedIndex
-                let serverComponent = createServerListItemComponent(
-                    server: server,
-                    isSelected: isSelected,
-                    cachedFlavors: cachedFlavors,
-                    cachedImages: cachedImages
-                )
-                components.append(serverComponent)
-            }
-
-            // Virtual scrolling status
-            let scrollInfo = virtualScrollManager.getScrollInfo()
-            components.append(Text("Virtual: \(scrollInfo)").info()
-                .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-        }
-    }
-
-    @MainActor
-    private static func renderWithPagination(
-        components: inout [any Component],
-        dataManager: DataManager,
-        selectedIndex: Int,
-        height: Int32,
-        cachedFlavors: [Flavor],
-        cachedImages: [Image]
-    ) async {
-        let paginatedServers: [Server] = await dataManager.getPaginatedItems(for: "servers", type: Server.self)
-
-        if paginatedServers.isEmpty {
-            components.append(Text("No servers found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            let maxVisibleItems = max(1, Int(height) - 10)
-            let endIndex = min(paginatedServers.count, maxVisibleItems)
-
-            for i in 0..<endIndex {
-                let server = paginatedServers[i]
-                let isSelected = i == selectedIndex
-                let serverComponent = createServerListItemComponent(
-                    server: server,
-                    isSelected: isSelected,
-                    cachedFlavors: cachedFlavors,
-                    cachedImages: cachedImages
-                )
-                components.append(serverComponent)
-            }
-
-            // Pagination status
-            if let paginationStatus = dataManager.getPaginationStatus(for: "servers") {
-                components.append(Text("Paginated: \(paginationStatus)").info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-    }
-
-    @MainActor
-    private static func renderTraditional(
-        components: inout [any Component],
-        cachedServers: [Server],
-        searchQuery: String?,
-        scrollOffset: Int,
-        selectedIndex: Int,
-        height: Int32,
-
-        cachedFlavors: [Flavor],
-        cachedImages: [Image]
-    ) async {
-        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery)
-
-        if filteredServers.isEmpty {
-            components.append(Text("No servers found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(1, Int(height) - 10) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, filteredServers.count - maxVisibleItems))
-            let endIndex = min(filteredServers.count, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let server = filteredServers[i]
-                let isSelected = i == selectedIndex
-                let serverComponent = createServerListItemComponent(
-                    server: server,
-                    isSelected: isSelected,
-                    cachedFlavors: cachedFlavors,
-                    cachedImages: cachedImages
-                )
-                components.append(serverComponent)
-            }
-
-            // Traditional scroll indicator
-            if filteredServers.count > maxVisibleItems {
-                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(filteredServers.count)]"
-                components.append(Text(scrollText).info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createServerListItemComponent(server: Server, isSelected: Bool,
-                                                     cachedFlavors: [Flavor], cachedImages: [Image]) -> any Component {
-        // Server name
-        let serverName = String((server.name ?? "Unnamed").prefix(serverNameWidth)).padding(toLength: serverNameWidth, withPad: " ", startingAt: 0)
-
-        // Status with color coding
-        let status = server.status?.rawValue ?? "Unknown"
-        let statusStyle: TextStyle = {
-            switch status.lowercased() {
-            case "active": return .success
-            case "error": return .error
-            case "build", "building": return .warning
-            default: return .info
-            }
-        }()
-        let statusText = String(status.prefix(statusWidth)).padding(toLength: statusWidth, withPad: " ", startingAt: 0)
-
-        // IP address
-        let ipAddress = getServerIP(server) ?? "Unknown"
-        let ipText = String(ipAddress.prefix(ipAddressWidth)).padding(toLength: ipAddressWidth, withPad: " ", startingAt: 0)
-
-        // Flavor/Image info
-        let flavorName = resolveFlavorName(from: server.flavor, cachedFlavors: cachedFlavors)
-        let imageName = resolveImageName(from: server.image, cachedImages: cachedImages)
-        let flavorImageInfo = formatFlavorImageInfo(
-            flavorName: flavorName,
-            imageName: imageName,
-            availableWidth: 40 // Conservative width
-        )
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: server.status?.rawValue ?? "unknown"),
-            Text(" \(serverName)").styled(rowStyle),
-            Text(" \(statusText)").styled(statusStyle),
-            Text(" \(ipText)").styled(rowStyle),
-            Text(" \(flavorImageInfo)").styled(.info)
-        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
     }
 
     // MARK: - Detail View
@@ -739,7 +503,7 @@ struct ServerViews {
 
     // MARK: - Helper Functions
 
-    private static func resolveFlavorName(from flavor: Server.FlavorInfo?, cachedFlavors: [Flavor]) -> String {
+    static func resolveFlavorName(from flavor: Server.FlavorInfo?, cachedFlavors: [Flavor]) -> String {
         guard let flavor = flavor else { return "Unknown" }
 
         // First try original_name from the flavor ref (API format)
@@ -765,7 +529,7 @@ struct ServerViews {
         return "Unknown"
     }
 
-    private static func resolveImageName(from image: Server.ImageInfo?, cachedImages: [Image]) -> String {
+    static func resolveImageName(from image: Server.ImageInfo?, cachedImages: [Image]) -> String {
         guard let image = image else { return "Unknown" }
 
         // First try the name from the image ref itself
@@ -788,7 +552,7 @@ struct ServerViews {
         return image.id
     }
 
-    private static func formatFlavorImageInfo(flavorName: String, imageName: String, availableWidth: Int) -> String {
+    static func formatFlavorImageInfo(flavorName: String, imageName: String, availableWidth: Int) -> String {
         let availableSpace = max(availableWidth, minimumFlavorImageSpace)
         let flavorSpace = Int(Double(availableSpace) * flavorImageSplitRatio)
         let imageSpace = availableSpace - flavorSpace - 1 // -1 for separator
@@ -798,7 +562,7 @@ struct ServerViews {
         return "\(truncatedFlavor)/\(truncatedImage)"
     }
 
-    private static func getServerIP(_ server: Server) -> String? {
+    static func getServerIP(_ server: Server) -> String? {
         guard let addresses = server.addresses else { return nil }
         for (_, addressList) in addresses.sorted(by: { $0.key < $1.key }) {
             for address in addressList.sorted(by: { $0.addr < $1.addr }) {

@@ -427,7 +427,7 @@ defer { timer.invalidate() }
 - **[Performance Documentation](../../performance/index.md)** - Benchmarking, tuning, troubleshooting
 - **[Caching Concepts](../../concepts/caching.md)** - Deep dive into caching architecture
 - **[Architecture Overview](../../architecture/index.md)** - Overall system architecture
-- **[Developer Guides](../../guides/developers/index.md)** - Building forms and components
+- **[Developer Guides](../../reference/developers/index.md)** - Building forms and components
 
 ---
 

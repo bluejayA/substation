@@ -589,7 +589,7 @@ For more detailed information:
 
 - **[Architecture Overview](./overview.md)** - High-level design principles
 - **[Technology Stack](./technology-stack.md)** - Core technologies and dependencies
-- **[FormBuilder Guide](../guides/developers/formbuilder-guide.md)** - Developer guide for FormBuilder
+- **[FormBuilder Guide](../reference/developers/formbuilder-guide.md)** - Developer guide for FormBuilder
 - **[Performance](../performance/index.md)** - Performance architecture and benchmarking
 - **[Security](../concepts/security.md)** - Security implementation details
 

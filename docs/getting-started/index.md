@@ -298,8 +298,8 @@ For detailed troubleshooting, connection issues, performance debugging, and more
 
 Now that you're up and running, explore:
 
-- **[Navigation Guide](../guides/operators/keyboard-shortcuts.md)** - Master all keyboard shortcuts
-- **[Common Workflows](../guides/operators/workflows.md)** - Everyday operations and best practices
+- **[Navigation Guide](../reference/operators/keyboard-shortcuts.md)** - Master all keyboard shortcuts
+- **[Common Workflows](../reference/operators/workflows.md)** - Everyday operations and best practices
 - **[OpenStack Integration](../reference/openstack/index.md)** - Which OpenStack services are supported
 - **[Performance](../performance/index.md)** - Tuning cache settings for your environment
 - **[Architecture](../architecture/index.md)** - Understanding how Substation works

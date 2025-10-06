@@ -70,87 +70,18 @@ struct ServerGroupViews {
                                            width: Int32, height: Int32, cachedServerGroups: [ServerGroup],
                                            searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Server Group List
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let titleText = searchQuery.map { "Server Groups (filtered: \($0))" } ?? "Server Groups"
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text("  NAME                           POLICY             MEMBERS  PROJECT").muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered server groups and create list components
-        let filteredGroups = FilterUtils.filterServerGroups(cachedServerGroups, query: searchQuery)
-
-        if filteredGroups.isEmpty {
-            components.append(Text("No server groups found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(1, Int(height) - 10) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, filteredGroups.count - maxVisibleItems))
-            let endIndex = min(filteredGroups.count, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let serverGroup = filteredGroups[i]
-                let isSelected = i == selectedIndex
-                let groupComponent = createServerGroupListItemComponent(serverGroup: serverGroup, isSelected: isSelected, width: width)
-                components.append(groupComponent)
-            }
-
-            // Scroll indicator if needed
-            if filteredGroups.count > maxVisibleItems {
-                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(filteredGroups.count)]"
-                components.append(Text(scrollText).info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-
-        // Render unified server group list
-        let serverGroupListComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(serverGroupListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createServerGroupListItemComponent(serverGroup: ServerGroup, isSelected: Bool, width: Int32) -> any Component {
-        // Server group name with formatting (30 chars to match header)
-        let groupName = String((serverGroup.name ?? unknownText).prefix(groupNameWidth)).padding(toLength: groupNameWidth, withPad: " ", startingAt: 0)
-
-        // Policy display with formatting (18 chars to match header)
-        let policyName = serverGroup.primaryPolicy?.displayName ?? unknownText
-        let policyDisplay = String(policyName.prefix(policyWidth)).padding(toLength: policyWidth, withPad: " ", startingAt: 0)
-        let policyStyle = policyStyleForList(serverGroup.primaryPolicy)
-
-        // Member count with formatting (8 chars to match header)
-        let memberCount = serverGroup.members.count
-        let memberCountText = formatMemberCount(memberCount)
-        let membersDisplay = String(memberCountText.prefix(membersWidth)).padding(toLength: membersWidth, withPad: " ", startingAt: 0)
-
-        // Project ID with remaining space
-        let remainingWidth = max(0, Int(width) - projectDisplayOffset)
-        let projectDisplay = remainingWidth > minimumRemainingWidth ? String((serverGroup.project_id ?? unknownText).prefix(remainingWidth)) : ""
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            Text(" \(groupName)").styled(rowStyle),
-            Text(" \(policyDisplay)").styled(policyStyle),
-            Text(" \(membersDisplay)").styled(rowStyle),
-            Text(" \(projectDisplay)").styled(rowStyle)
-        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
+        let statusListView = createServerGroupStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedServerGroups,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Server Group Detail View

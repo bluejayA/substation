@@ -8,90 +8,18 @@ struct RouterViews {
                                       width: Int32, height: Int32, cachedRouters: [Router],
                                       searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.routerListMinScreenWidth && height > Self.routerListMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.routerListBoundsMinWidth, width), height: max(Self.routerListBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.routerListScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Router List
-        var components: [any Component] = []
-
-        // Title - optimized conditional logic for performance
-        let titleText: String
-        if let query = searchQuery {
-            titleText = Self.routerListFilteredTitlePrefix + query + Self.routerListFilteredTitleSuffix
-        } else {
-            titleText = Self.routerListTitle
-        }
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(Self.routerListHeader).muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered routers and create list components
-        let filteredRouters = FilterUtils.filterRouters(cachedRouters, query: searchQuery)
-        let totalCount = filteredRouters.count
-
-        if totalCount == 0 {
-            components.append(Text(Self.routerListNoRoutersText).info()
-                .padding(Self.routerListNoRoutersEdgeInsets))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(Self.routerListMinVisibleItems, Int(height) - Self.routerListReservedSpaceForHeaderFooter) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, totalCount - maxVisibleItems))
-            let endIndex = min(totalCount, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let router = filteredRouters[i]
-                let isSelected = i == selectedIndex
-                let routerComponent = createRouterListItemComponent(router: router, isSelected: isSelected)
-                components.append(routerComponent)
-            }
-
-            // Scroll indicator if needed - optimized string construction with cached count
-            if totalCount > maxVisibleItems {
-                let displayStart = startIndex + 1
-                let scrollText = Self.routerListScrollInfoPrefix + String(displayStart) + Self.routerListScrollInfoSeparator + String(endIndex) + Self.routerListScrollInfoMiddle + String(totalCount) + Self.routerListScrollInfoSuffix
-                components.append(Text(scrollText).info()
-                    .padding(Self.routerListScrollInfoEdgeInsets))
-            }
-        }
-
-        // Render unified router list
-        let routerListComponent = VStack(spacing: Self.routerListComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(routerListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createRouterListItemComponent(router: Router, isSelected: Bool) -> any Component {
-        // Router name (truncated to fit)
-        let routerName = router.name ?? Self.routerListUnnamedRouterText
-        let truncatedName = String(routerName.prefix(Self.routerListNamePadLength)).padding(toLength: Self.routerListNamePadLength, withPad: Self.routerListPadCharacter, startingAt: 0)
-
-        // Router ID (truncated to fit)
-        let routerId = String(router.id.prefix(Self.routerListIdPadLength)).padding(toLength: Self.routerListIdPadLength, withPad: Self.routerListPadCharacter, startingAt: 0)
-
-        // Pre-calculate spaced text for optimal performance
-        let spacedName = Self.routerListItemTextSpacing + truncatedName
-        let spacedId = Self.routerListItemTextSpacing + routerId
-        let spacedStatus = Self.routerListItemTextSpacing + Self.routerListActiveStatus
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: Self.routerListStatusIconActive),
-            Text(spacedName).styled(rowStyle),
-            Text(spacedId).styled(rowStyle),
-            Text(spacedStatus).success()
-        ]).padding(Self.routerListItemEdgeInsets)
+        let statusListView = createRouterStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedRouters,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Router List View Constants

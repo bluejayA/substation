@@ -11,112 +11,18 @@ struct ImageViews {
                                     width: Int32, height: Int32, cachedImages: [Image],
                                     searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.imageListMinScreenWidth && height > Self.imageListMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.imageListBoundsMinWidth, width), height: max(Self.imageListBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.imageListScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Image List (following gold standard pattern)
-        var components: [any Component] = []
-
-        // Title - optimized conditional logic for performance
-        let titleText: String
-        if let query = searchQuery {
-            titleText = Self.imageListFilteredTitlePrefix + query + Self.imageListFilteredTitleSuffix
-        } else {
-            titleText = Self.imageListTitle
-        }
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(Self.imageListHeader).muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered images and create list components
-        let filteredImages = FilterUtils.filterImages(cachedImages, query: searchQuery)
-        let totalCount = filteredImages.count
-
-        if totalCount == 0 {
-            components.append(Text(Self.imageListNoImagesText).info()
-                .padding(Self.imageListNoImagesEdgeInsets))
-        } else {
-            // Calculate visible range for optimal viewport performance
-            let maxVisibleItems = max(Self.imageListMinVisibleItems, Int(height) - Self.imageListReservedSpace)
-            let startIndex = max(0, min(scrollOffset, totalCount - maxVisibleItems))
-            let endIndex = min(totalCount, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let image = filteredImages[i]
-                let isSelected = i == selectedIndex
-                let imageComponent = Self.createImageListItemComponent(image: image, isSelected: isSelected, width: width)
-                components.append(imageComponent)
-            }
-
-            // Scroll indicator if needed - optimized string concatenation
-            if totalCount > maxVisibleItems {
-                let scrollText = Self.imageListScrollIndicatorPrefix + String(startIndex + 1) + Self.imageListScrollIndicatorSeparator + String(endIndex) + Self.imageListScrollIndicatorMiddle + String(totalCount) + Self.imageListScrollIndicatorSuffix
-                components.append(Text(scrollText).info()
-                    .padding(Self.imageListScrollInfoEdgeInsets))
-            }
-        }
-
-        // Render unified image list (following gold standard pattern)
-        let imageListComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(imageListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions (Gold Standard Pattern)
-
-    private static func createImageListItemComponent(image: Image, isSelected: Bool, width: Int32) -> any Component {
-        // Name with precise length control (28 chars to match gold standard)
-        let imageName = image.name ?? Self.imageListUnnamedImageText
-        let truncatedName = String(imageName.prefix(Self.imageListNamePadLength)).padding(toLength: Self.imageListNamePadLength, withPad: Self.imageListPadCharacter, startingAt: 0)
-
-        // Status with standardized padding (20 chars to match gold standard)
-        let imageStatus = image.status ?? Self.imageListUnknownStatusText
-        let statusText = String(imageStatus.prefix(Self.imageListStatusPadLength)).padding(toLength: Self.imageListStatusPadLength, withPad: Self.imageListPadCharacter, startingAt: 0)
-        let statusStyle: TextStyle = {
-            switch imageStatus.lowercased() {
-            case Self.imageListActiveStatus: return .success
-            case let s where s.contains(Self.imageListErrorStatus): return .error
-            default: return .accent
-            }
-        }()
-
-        // Visibility with standardized padding (12 chars)
-        let imageVisibility = image.visibility ?? Self.imageListUnknownVisibilityText
-        let visibilityText = String(imageVisibility.prefix(Self.imageListVisibilityPadLength)).padding(toLength: Self.imageListVisibilityPadLength, withPad: Self.imageListPadCharacter, startingAt: 0)
-
-        // Size calculation with formatting
-        let sizeText: String
-        if let size = image.size {
-            let sizeGB = Double(size) / Self.imageListSizeConversionFactor
-            sizeText = String(format: Self.imageListSizeFormat, sizeGB)
-        } else {
-            sizeText = Self.imageListUnknownSizeText
-        }
-
-        // Pre-calculate spaced text for optimal performance
-        let spacedName = Self.imageListItemTextSpacing + truncatedName
-        let spacedStatus = Self.imageListItemTextSpacing + statusText
-        let spacedVisibility = Self.imageListItemTextSpacing + visibilityText
-        let spacedSize = Self.imageListItemTextSpacing + sizeText
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: Self.imageListStatusIconActive),
-            Text(spacedName).styled(rowStyle),
-            Text(spacedStatus).styled(statusStyle),
-            Text(spacedVisibility).styled(rowStyle),
-            Text(spacedSize).styled(rowStyle)
-        ]).padding(Self.imageListItemEdgeInsets)
+        let statusListView = createImageStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedImages,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Image Detail View (Gold Standard Pattern)

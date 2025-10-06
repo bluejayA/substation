@@ -12,81 +12,18 @@ struct PortViews {
                                     width: Int32, height: Int32, cachedPorts: [Port],
                                     searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Port List
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let titleText = searchQuery.map { "Ports (filtered: \($0))" } ?? "Ports"
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(" ST  NAME/ID                           NETWORK ID                    STATUS").muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered ports and create list components
-        let filteredPorts = FilterUtils.filterPorts(cachedPorts, query: searchQuery)
-
-        if filteredPorts.isEmpty {
-            components.append(Text("No ports found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(1, Int(height) - 10) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, filteredPorts.count - maxVisibleItems))
-            let endIndex = min(filteredPorts.count, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let port = filteredPorts[i]
-                let isSelected = i == selectedIndex
-                let portComponent = createPortListItemComponent(port: port, isSelected: isSelected, width: width)
-                components.append(portComponent)
-            }
-
-            // Scroll indicator if needed
-            if filteredPorts.count > maxVisibleItems {
-                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(filteredPorts.count)]"
-                components.append(Text(scrollText).info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-
-        // Render unified port list
-        let portListComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(portListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createPortListItemComponent(port: Port, isSelected: Bool, width: Int32) -> any Component {
-        // Port name/ID with formatting (34 chars to match header)
-        let portName = (port.name?.isEmpty == false) ? port.name! : port.id
-        let portDisplay = String(portName.prefix(34)).padding(toLength: 34, withPad: " ", startingAt: 0)
-
-        // Network ID with formatting (29 chars to match header)
-        let networkDisplay = String(port.networkId.prefix(29)).padding(toLength: 29, withPad: " ", startingAt: 0)
-
-        // Enhanced status with color coding
-        let statusText = port.deviceId != nil ? "ACTIVE" : "DOWN"
-        let statusStyle: TextStyle = statusText == "ACTIVE" ? .success : .error
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: port.deviceId != nil ? "active" : "down"),
-            Text(" \(portDisplay)").styled(rowStyle),
-            Text(" \(networkDisplay)").styled(.info),
-            Text(" \(statusText)").styled(statusStyle)
-        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
+        let statusListView = createPortStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedPorts,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Port Detail View

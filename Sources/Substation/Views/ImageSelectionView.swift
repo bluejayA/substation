@@ -2,6 +2,7 @@ import Foundation
 import OSClient
 import SwiftTUI
 
+/// Unified image selection view used by both Server Create and Volume Create forms
 struct ImageSelectionView {
     @MainActor
     static func drawImageSelection(
@@ -15,25 +16,34 @@ struct ImageSelectionView {
         highlightedIndex: Int,
         scrollOffset: Int,
         searchQuery: String?,
-        title: String = "Select Source Image"
+        title: String = "Select Image",
+        description: String? = nil
     ) async {
         let surface = SwiftTUI.surface(from: screen)
 
+        // Sort images alphabetically for consistent display
+        let sortedImages = images.sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
+
         let tabs = [
             FormSelectorTab<Image>(
-                title: "Images",
+                title: "IMAGES",
                 columns: [
-                    FormSelectorColumn(header: "NAME", width: 35) { image in
-                        (image.name ?? "Unknown").padding(toLength: 35, withPad: " ", startingAt: 0)
+                    FormSelectorColumn(header: "NAME", width: 30) { image in
+                        (image.name ?? "Unknown").padding(toLength: 30, withPad: " ", startingAt: 0)
                     },
-                    FormSelectorColumn(header: "STATUS", width: 15) { image in
-                        (image.status ?? "unknown").padding(toLength: 15, withPad: " ", startingAt: 0)
+                    FormSelectorColumn(header: "STATUS", width: 10) { image in
+                        (image.status ?? "unknown").padding(toLength: 10, withPad: " ", startingAt: 0)
                     },
-                    FormSelectorColumn(header: "SIZE", width: 12) { image in
-                        let sizeGB = (image.size ?? 0) / 1_073_741_824
-                        return "\(sizeGB) GB".padding(toLength: 12, withPad: " ", startingAt: 0)
+                    FormSelectorColumn(header: "SIZE", width: 10) { image in
+                        let sizeGB = image.size != nil ? String(format: "%.1fGB", Double(image.size!) / (1024 * 1024 * 1024)) : "unknown"
+                        return sizeGB.padding(toLength: 10, withPad: " ", startingAt: 0)
+                    },
+                    FormSelectorColumn(header: "PUBLIC", width: 8) { image in
+                        let visibility = (image.visibility == "public") ? "Yes" : "No"
+                        return visibility.padding(toLength: 8, withPad: " ", startingAt: 0)
                     }
-                ]
+                ],
+                description: description ?? "Browse and select image. SPACE: select, ENTER: confirm"
             )
         ]
 
@@ -41,7 +51,7 @@ struct ImageSelectionView {
             label: title,
             tabs: tabs,
             selectedTabIndex: 0,
-            items: images,
+            items: sortedImages,
             selectedItemIds: selectedImageIds,
             highlightedIndex: highlightedIndex,
             multiSelect: false,

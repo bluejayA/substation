@@ -96,9 +96,9 @@ let securityGroupSelector = FormSelector<SecurityGroup>(
 ### 3. Multi-Tab Selector
 
 ```swift
-// Example: Select boot source with different tabs for images vs volumes
+// Example: Select source with different tabs for images vs volumes
 let bootSourceSelector = FormSelector<BootSourceItem>(
-    label: "Select Boot Source",
+    label: "Select Source",
     tabs: [
         FormSelectorTab(
             title: "Images",
@@ -306,7 +306,7 @@ SPACE:select ENTER:confirm ESC:cancel
 ### Multi-Tab Mode
 
 ```
-Select Boot Source
+Select Source
 
 Mode: [Images] (TAB to switch)
 Browse and select item. SPACE: select, ENTER: confirm
