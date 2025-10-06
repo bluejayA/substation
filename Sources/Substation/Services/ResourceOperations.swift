@@ -176,6 +176,12 @@ final class ResourceOperations {
             return
         }
 
+        // Parse and validate maxServers
+        guard let maxServersCount = Int(serverCreateForm.maxServers.trimmingCharacters(in: .whitespacesAndNewlines)), maxServersCount >= 1 else {
+            statusMessage = "Max servers must be a valid number >= 1"
+            return
+        }
+
         // Validate boot source requirements
         var selectedBootSourceId: String = ""
         switch serverCreateForm.bootSource {
@@ -208,20 +214,51 @@ final class ResourceOperations {
         let selectedKeyPairName = serverCreateForm.selectedKeyPairName
         let _ = serverCreateForm.selectedServerGroupID // TODO: Server group support not implemented yet
 
-        statusMessage = "Creating server..."
+        // Use the base server name - Nova will append -0, -1, -2, etc. automatically when maxCount > 1
+        let serverName = serverCreateForm.serverName
+
+        statusMessage = maxServersCount > 1 ? "Creating \(maxServersCount) servers..." : "Creating server..."
 
         do {
             let newServer: Server
 
             switch serverCreateForm.bootSource {
             case .image:
-                newServer = try await client.createServer(
-                    name: serverCreateForm.serverName,
+                // Build networks array from selected networks
+                let networks: [NetworkRequest]? = if let networkId = selectedNetworkId {
+                    [NetworkRequest(uuid: networkId, port: nil, fixedIp: nil)]
+                } else {
+                    nil
+                }
+
+                // Build security groups array
+                let securityGroups: [SecurityGroupRef]? = if !serverCreateForm.selectedSecurityGroups.isEmpty {
+                    serverCreateForm.selectedSecurityGroups.map { SecurityGroupRef(name: $0) }
+                } else {
+                    nil
+                }
+
+                // Create the request with minCount and maxCount for bulk operations
+                let request = CreateServerRequest(
+                    name: serverName,
                     imageRef: selectedBootSourceId,
                     flavorRef: selectedFlavor.id,
-                    networkId: selectedNetworkId,
-                    keyName: selectedKeyPairName
+                    metadata: nil,
+                    personality: nil,
+                    securityGroups: securityGroups,
+                    userData: nil,
+                    availabilityZone: nil,
+                    networks: networks,
+                    keyName: selectedKeyPairName,
+                    adminPass: nil,
+                    minCount: maxServersCount,
+                    maxCount: maxServersCount,
+                    returnReservationId: nil,
+                    serverGroup: nil,
+                    blockDeviceMapping: nil
                 )
+                newServer = try await client.createServer(request: request)
+
             case .volume:
                 // Use proper block device mapping for volume boot
                 guard let selectedVolume = cachedVolumes.first(where: { $0.id == selectedBootSourceId }) else {
@@ -240,19 +277,48 @@ final class ResourceOperations {
                     )
                 ]
 
-                newServer = try await client.createServer(
-                    name: serverCreateForm.serverName,
+                // Build networks array from selected networks
+                let networks: [NetworkRequest]? = if let networkId = selectedNetworkId {
+                    [NetworkRequest(uuid: networkId, port: nil, fixedIp: nil)]
+                } else {
+                    nil
+                }
+
+                // Build security groups array
+                let securityGroups: [SecurityGroupRef]? = if !serverCreateForm.selectedSecurityGroups.isEmpty {
+                    serverCreateForm.selectedSecurityGroups.map { SecurityGroupRef(name: $0) }
+                } else {
+                    nil
+                }
+
+                // Create the request with minCount and maxCount for bulk operations
+                let request = CreateServerRequest(
+                    name: serverName,
                     imageRef: nil, // No image when booting from volume
                     flavorRef: selectedFlavor.id,
-                    networkId: selectedNetworkId,
+                    metadata: nil,
+                    personality: nil,
+                    securityGroups: securityGroups,
+                    userData: nil,
+                    availabilityZone: nil,
+                    networks: networks,
                     keyName: selectedKeyPairName,
-                    blockDeviceMappings: blockDeviceMapping
+                    adminPass: nil,
+                    minCount: maxServersCount,
+                    maxCount: maxServersCount,
+                    returnReservationId: nil,
+                    serverGroup: nil,
+                    blockDeviceMapping: blockDeviceMapping
                 )
+                newServer = try await client.createServer(request: request)
             }
 
             // Add to cached servers and refresh
             cachedServers.append(newServer)
-            statusMessage = "Server '\(serverCreateForm.serverName)' created successfully"
+            let successMessage = maxServersCount > 1
+                ? "Started creation of \(maxServersCount) servers with name pattern '\(serverName)-N'"
+                : "Server '\(serverCreateForm.serverName)' created successfully"
+            statusMessage = successMessage
 
             // Return to servers view
             tui.changeView(to: .servers, resetSelection: false)
