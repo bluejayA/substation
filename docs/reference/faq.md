@@ -284,6 +284,35 @@ This clears L1, L2, and L3 caches. Next operations will be slower while cache re
    openstack application credential create substation
    ```
 
+### Should I use project_id or project_name in clouds.yaml?
+
+**Use `project_id` for a more explicit configuration.** IDs don't change while names can be modified by admins:
+
+```yaml
+clouds:
+  mycloud:
+    auth:
+      auth_url: https://keystone.example.com:5000/v3
+      username: operator
+      password: secret
+      project_id: a1b2c3d4e5f6g7h8i9j0  # Preferred
+      user_domain_id: default
+      project_domain_id: default
+```
+
+**Benefits:**
+
+- IDs never change (names can be modified by admins)
+- Faster authentication (no name-to-ID lookups)
+
+**Find your project ID:**
+
+```bash
+openstack project show <project-name> -f value -c id
+```
+
+For more details, see [ID-based Authentication](../configuration/index.md#id-based-authentication-recommended).
+
 ### Why do I get "403 Forbidden" errors?
 
 **Meaning:** You're authenticated, but don't have permission.

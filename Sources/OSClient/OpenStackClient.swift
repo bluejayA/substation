@@ -354,12 +354,12 @@ public final class OpenStackClient: @unchecked Sendable {
     }
 
     /// The configured project name for this client
-    public var projectName: String {
+    public var projectName: String? {
         get async {
             switch await core.clientCredentials {
-            case .password(_, _, let projectName, _, _):
+            case .password(_, _, let projectName, _, _, _, _, _):
                 return projectName
-            case .applicationCredential(_, _, let projectName):
+            case .applicationCredential(_, _, let projectName, _):
                 return projectName
             }
         }
@@ -376,7 +376,7 @@ public final class OpenStackClient: @unchecked Sendable {
     /// The project name for this client (backward compatibility)
     public var project: String {
         get async {
-            await projectName
+            await projectName ?? ""
         }
     }
 

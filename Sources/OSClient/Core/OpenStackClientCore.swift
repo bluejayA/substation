@@ -72,14 +72,15 @@ internal enum SharedResources {
         return formatter
     }
 
-    static func createURLSession(logger: any OpenStackClientLogger) -> URLSession {
+    static func createURLSession(logger: any OpenStackClientLogger) -> (URLSession, EnhancedSecureURLSessionDelegate) {
         let delegate = EnhancedSecureURLSessionDelegate(logger: logger)
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.httpMaximumConnectionsPerHost = 10
-        return URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        return (session, delegate)
     }
 }
 
@@ -111,8 +112,8 @@ public struct OpenStackConfig: Sendable {
 }
 
 public enum OpenStackCredentials: Sendable {
-    case password(username: String, password: String, projectName: String, userDomainName: String = "default", projectDomainName: String = "default")
-    case applicationCredential(id: String, secret: String, projectName: String)
+    case password(username: String, password: String, projectName: String?, projectID: String? = nil, userDomainName: String? = nil, userDomainID: String? = nil, projectDomainName: String? = nil, projectDomainID: String? = nil)
+    case applicationCredential(id: String, secret: String, projectName: String?, projectID: String? = nil)
 }
 
 // MARK: - Retry Policy
@@ -509,6 +510,7 @@ public actor OpenStackClientCore {
     private let memoryManager: MemoryManager
     private let tokenManager: CoreTokenManager
     private let urlSession: URLSession
+    private let urlSessionDelegate: EnhancedSecureURLSessionDelegate
     private var serviceCatalog: [String: URL] = [:]
     private var currentProjectId: String?
     private let microversionManager: MicroversionManager
@@ -525,11 +527,14 @@ public actor OpenStackClientCore {
             logger: OpenStackClientLoggerAdapter(clientLogger: logger)
         ))
         self.tokenManager = CoreTokenManager(logger: logger)
-        self.urlSession = SharedResources.createURLSession(logger: logger)
+        let (session, delegate) = SharedResources.createURLSession(logger: logger)
+        self.urlSession = session
+        self.urlSessionDelegate = delegate
         self.microversionManager = MicroversionManager(logger: logger)
 
         // Initialize memory management and monitoring asynchronously
-        Task {
+        Task { [weak self] in
+            guard let self = self else { return }
             await self.initializeMemoryManagement()
             await self.microversionManager.setCore(self)
         }
@@ -579,27 +584,51 @@ public actor OpenStackClientCore {
 
     private func createAuthenticationData() -> (Identity, AuthScope?) {
         switch credentials {
-        case .password(let username, let password, let projectName, let userDomainName, let projectDomainName):
+        case .password(let username, let password, let projectName, let projectID, let userDomainName, let userDomainID, let projectDomainName, let projectDomainID):
+            // Build user domain - prefer ID over name
+            let userDomain: AuthDomain
+            if let userDomainID = userDomainID {
+                userDomain = AuthDomain(id: userDomainID, name: nil)
+            } else if let userDomainName = userDomainName {
+                userDomain = AuthDomain(name: userDomainName)
+            } else {
+                userDomain = AuthDomain(name: "default")
+            }
+
             let identity = Identity(
                 methods: ["password"],
                 password: AuthPassword(
                     user: AuthUser(
                         name: username,
-                        domain: AuthDomain(name: userDomainName),
+                        domain: userDomain,
                         password: password
                     )
                 ),
                 applicationCredential: nil
             )
-            let scope = AuthScope(
-                project: AuthProject(
-                    name: projectName,
-                    domain: AuthDomain(name: projectDomainName)
-                )
-            )
+
+            // Build project scope - prefer ID over name
+            let scope: AuthScope
+            if let projectID = projectID {
+                scope = AuthScope(project: AuthProject(id: projectID, name: nil, domain: nil))
+            } else if let projectName = projectName {
+                // Build project domain - prefer ID over name
+                let projectDomain: AuthDomain?
+                if let projectDomainID = projectDomainID {
+                    projectDomain = AuthDomain(id: projectDomainID, name: nil)
+                } else if let projectDomainName = projectDomainName {
+                    projectDomain = AuthDomain(name: projectDomainName)
+                } else {
+                    projectDomain = AuthDomain(name: "default")
+                }
+                scope = AuthScope(project: AuthProject(name: projectName, domain: projectDomain))
+            } else {
+                // No project scoping - unscoped token
+                scope = AuthScope(project: nil)
+            }
             return (identity, scope)
 
-        case .applicationCredential(let id, let secret, let projectName):
+        case .applicationCredential(let id, let secret, let projectName, let projectID):
             let identity = Identity(
                 methods: ["application_credential"],
                 password: nil,
@@ -608,13 +637,15 @@ public actor OpenStackClientCore {
                     secret: secret
                 )
             )
-            // For application credentials, only create scope if projectName is provided
-            let scope: AuthScope? = projectName.isEmpty ? nil : AuthScope(
-                project: AuthProject(
-                    name: projectName,
-                    domain: nil
-                )
-            )
+            // For application credentials, create scope if project info is provided
+            let scope: AuthScope?
+            if let projectID = projectID {
+                scope = AuthScope(project: AuthProject(id: projectID, name: nil, domain: nil))
+            } else if let projectName = projectName, !projectName.isEmpty {
+                scope = AuthScope(project: AuthProject(name: projectName, domain: nil))
+            } else {
+                scope = nil
+            }
             return (identity, scope)
         }
     }
@@ -644,6 +675,9 @@ public actor OpenStackClientCore {
         let startTime = Date()
 
         do {
+            // Check if task was cancelled before making request
+            try Task.checkCancellation()
+
             let (data, response) = try await urlSession.data(for: request)
             let duration = Date().timeIntervalSince(startTime)
 
@@ -866,6 +900,9 @@ public actor OpenStackClientCore {
             let startTime = Date()
 
             do {
+                // Check if task was cancelled before making request
+                try Task.checkCancellation()
+
                 let (data, response) = try await urlSession.data(for: request)
                 let duration = Date().timeIntervalSince(startTime)
 
@@ -945,6 +982,9 @@ public actor OpenStackClientCore {
             let startTime = Date()
 
             do {
+                // Check if task was cancelled before making request
+                try Task.checkCancellation()
+
                 let (data, response) = try await urlSession.data(for: request)
                 let duration = Date().timeIntervalSince(startTime)
 
@@ -1049,6 +1089,11 @@ public actor OpenStackClientCore {
             return await tokenManager.timeUntilExpiration
         }
     }
+
+    /// Cleanup and invalidate URLSession to prevent dangling references
+    deinit {
+        urlSession.invalidateAndCancel()
+    }
 }
 
 // MARK: - Response Helpers
@@ -1094,16 +1139,29 @@ private struct AuthUser: Codable {
 }
 
 private struct AuthDomain: Codable {
-    let name: String
+    let id: String?
+    let name: String?
+
+    init(id: String? = nil, name: String? = nil) {
+        self.id = id
+        self.name = name
+    }
 }
 
 private struct AuthScope: Codable {
-    let project: AuthProject
+    let project: AuthProject?
 }
 
 private struct AuthProject: Codable {
-    let name: String
+    let id: String?
+    let name: String?
     let domain: AuthDomain?
+
+    init(id: String? = nil, name: String? = nil, domain: AuthDomain? = nil) {
+        self.id = id
+        self.name = name
+        self.domain = domain
+    }
 }
 
 private struct AuthResponse: Codable {

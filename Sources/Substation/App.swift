@@ -315,38 +315,91 @@ struct Substation {
         case .applicationCredentialById(_, _, let appCredProjectName), .applicationCredentialByName(_, _, _, _, _, let appCredProjectName):
             // For OSClient compatibility, application credentials may still need the project name
             // that the credential was created for. Check if we have a reasonable project name.
-            let hasValidProject = !appCredProjectName.isEmpty && appCredProjectName != "default"
-            if !hasValidProject {
-                Logger.shared.logWarning("Application credential using fallback project name '\(appCredProjectName)' - this may cause authentication issues")
-            } else {
+            if let projName = appCredProjectName, !projName.isEmpty && projName != "default" {
                 Logger.shared.logDebug("Application credential project validation passed")
+            } else if appCredProjectName == nil {
+                Logger.shared.logDebug("Application credential: no project name (may be scoped by project_id)")
+            } else {
+                Logger.shared.logWarning("Application credential using fallback project name '\(appCredProjectName ?? "nil")' - this may cause authentication issues")
             }
             break
         }
 
         switch method {
         case .password(let username, let password, let projectName, let userDomain, let projectDomain):
-            Logger.shared.logInfo("Using password authentication for project: \(projectName)")
-            credentials = .password(username: username, password: password, projectName: projectName, userDomainName: userDomain, projectDomainName: projectDomain)
+            if let projectName = projectName {
+                Logger.shared.logInfo("Using password authentication for project: \(projectName)")
+            } else {
+                Logger.shared.logInfo("Using password authentication (project scoped by ID)")
+            }
+            // Extract ID-based parameters from cloud config if available
+            let projectID = cloudConfig.auth.project_id
+            let userDomainID = cloudConfig.auth.user_domain_id
+            let projectDomainID = cloudConfig.auth.project_domain_id
+
+            // Log which parameters we're using
+            if let projectID = projectID {
+                Logger.shared.logInfo("Using project_id: \(projectID)")
+            }
+            if let userDomainID = userDomainID {
+                Logger.shared.logInfo("Using user_domain_id: \(userDomainID)")
+            }
+            if let projectDomainID = projectDomainID {
+                Logger.shared.logInfo("Using project_domain_id: \(projectDomainID)")
+            }
+
+            credentials = .password(
+                username: username,
+                password: password,
+                projectName: projectName,
+                projectID: projectID,
+                userDomainName: userDomain,
+                userDomainID: userDomainID,
+                projectDomainName: projectDomain,
+                projectDomainID: projectDomainID
+            )
 
         case .applicationCredentialById(let id, let secret, let projectName):
             Logger.shared.logInfo("Using application credential authentication")
             Logger.shared.logInfo("Application credential ID: '\(id)'")
             Logger.shared.logInfo("Application credential secret: '\(secret.prefix(10))...'")
-            if !projectName.isEmpty {
+            if let projectName = projectName, !projectName.isEmpty {
                 Logger.shared.logInfo("Application credential project: '\(projectName)'")
             } else {
                 Logger.shared.logInfo("Application credential: unscoped (no project)")
             }
-            // Don't force a default project name for application credentials
-            credentials = .applicationCredential(id: id, secret: secret, projectName: projectName)
+
+            // Check if project_id is available in cloud config
+            let projectID = cloudConfig.auth.project_id
+            if let projectID = projectID {
+                Logger.shared.logInfo("Using project_id: \(projectID)")
+            }
+
+            credentials = .applicationCredential(
+                id: id,
+                secret: secret,
+                projectName: projectName,
+                projectID: projectID
+            )
 
         case .applicationCredentialByName(let name, let secret, _, _, _, let projectName):
             // Application credential by name requires special handling
             Logger.shared.logInfo("Using application credential by name authentication")
             Logger.shared.logDebug("Application credential name: '\(name)'")
+
+            // Check if project_id is available in cloud config
+            let projectID = cloudConfig.auth.project_id
+            if let projectID = projectID {
+                Logger.shared.logInfo("Using project_id: \(projectID)")
+            }
+
             // For now, use the ID-based approach with the name as ID (this may need OTCredentials enhancement)
-            credentials = .applicationCredential(id: name, secret: secret, projectName: projectName)
+            credentials = .applicationCredential(
+                id: name,
+                secret: secret,
+                projectName: projectName,
+                projectID: projectID
+            )
 
         case .token(_, _, _):
             // Token-based authentication would require extending OTCredentials
@@ -477,7 +530,34 @@ struct Substation {
 
     private static func buildAuthRequest(credentials: OTCredentials) throws -> [String: Any] {
         switch credentials {
-        case .password(let username, let password, let projectName, let userDomain, let projectDomain):
+        case .password(let username, let password, let projectName, let projectID, let userDomain, let userDomainID, let projectDomain, let projectDomainID):
+            // Build user domain
+            let userDomainDict: [String: String]
+            if let userDomainID = userDomainID {
+                userDomainDict = ["id": userDomainID]
+            } else if let userDomain = userDomain {
+                userDomainDict = ["name": userDomain]
+            } else {
+                userDomainDict = ["name": "default"]
+            }
+
+            // Build project scope
+            var projectDict: [String: Any] = [:]
+            if let projectID = projectID {
+                // When using project_id, don't include domain
+                projectDict["id"] = projectID
+            } else if let projectName = projectName {
+                projectDict["name"] = projectName
+                // Include domain only when using project_name
+                if let projectDomainID = projectDomainID {
+                    projectDict["domain"] = ["id": projectDomainID]
+                } else if let projectDomain = projectDomain {
+                    projectDict["domain"] = ["name": projectDomain]
+                } else {
+                    projectDict["domain"] = ["name": "default"]
+                }
+            }
+
             return [
                 "auth": [
                     "identity": [
@@ -486,19 +566,17 @@ struct Substation {
                             "user": [
                                 "name": username,
                                 "password": password,
-                                "domain": ["name": userDomain]
+                                "domain": userDomainDict
                             ]
                         ]
                     ],
                     "scope": [
-                        "project": [
-                            "name": projectName,
-                            "domain": ["name": projectDomain]
-                        ]
+                        "project": projectDict
                     ]
                 ]
             ]
-        case .applicationCredential(let id, let secret, let projectName):
+
+        case .applicationCredential(let id, let secret, let projectName, let projectID):
             var authDict: [String: Any] = [
                 "auth": [
                     "identity": [
@@ -510,7 +588,16 @@ struct Substation {
                     ]
                 ]
             ]
-            if !projectName.isEmpty {
+
+            // Add scope if project info is provided
+            if let projectID = projectID {
+                authDict["auth"] = [
+                    "identity": authDict["auth"]!,
+                    "scope": [
+                        "project": ["id": projectID]
+                    ]
+                ]
+            } else if let projectName = projectName, !projectName.isEmpty {
                 authDict["auth"] = [
                     "identity": authDict["auth"]!,
                     "scope": [
