@@ -8,93 +8,18 @@ struct SubnetViews {
                                       width: Int32, height: Int32, cachedSubnets: [Subnet],
                                       searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.subnetListMinScreenWidth && height > Self.subnetListMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.subnetListBoundsMinWidth, width), height: max(Self.subnetListBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.subnetListScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Subnet List
-        var components: [any Component] = []
-
-        // Title - optimized conditional logic for performance
-        let titleText: String
-        if let query = searchQuery {
-            titleText = Self.subnetListFilteredTitlePrefix + query + Self.subnetListFilteredTitleSuffix
-        } else {
-            titleText = Self.subnetListTitle
-        }
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(Self.subnetListHeader).muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered subnets and create list components
-        let filteredSubnets = FilterUtils.filterSubnets(cachedSubnets, query: searchQuery)
-        let totalCount = filteredSubnets.count
-
-        if totalCount == 0 {
-            components.append(Text(Self.subnetListNoSubnetsText).info()
-                .padding(Self.subnetListNoSubnetsEdgeInsets))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(Self.subnetListMinVisibleItems, Int(height) - Self.subnetListReservedSpaceForHeaderFooter) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, totalCount - maxVisibleItems))
-            let endIndex = min(totalCount, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let subnet = filteredSubnets[i]
-                let isSelected = i == selectedIndex
-                let subnetComponent = createSubnetListItemComponent(subnet: subnet, isSelected: isSelected)
-                components.append(subnetComponent)
-            }
-
-            // Scroll indicator if needed - optimized string construction with cached count
-            if totalCount > maxVisibleItems {
-                let displayStart = startIndex + 1
-                let scrollText = Self.subnetListScrollInfoPrefix + String(displayStart) + Self.subnetListScrollInfoSeparator + String(endIndex) + Self.subnetListScrollInfoMiddle + String(totalCount) + Self.subnetListScrollInfoSuffix
-                components.append(Text(scrollText).info()
-                    .padding(Self.subnetListScrollInfoEdgeInsets))
-            }
-        }
-
-        // Render unified subnet list
-        let subnetListComponent = VStack(spacing: Self.subnetListComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(subnetListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createSubnetListItemComponent(subnet: Subnet, isSelected: Bool) -> any Component {
-        // Subnet name (truncated to fit)
-        let subnetName = subnet.name ?? Self.subnetListUnnamedSubnetText
-        let truncatedName = String(subnetName.prefix(Self.subnetListNamePadLength)).padding(toLength: Self.subnetListNamePadLength, withPad: Self.subnetListPadCharacter, startingAt: 0)
-
-        // Network ID (truncated to fit)
-        let networkId = String(subnet.networkId.prefix(Self.subnetListNetworkIdPadLength)).padding(toLength: Self.subnetListNetworkIdPadLength, withPad: Self.subnetListPadCharacter, startingAt: 0)
-
-        // Subnet ID (truncated to fit)
-        let subnetId = String(subnet.id.prefix(Self.subnetListIdPadLength)).padding(toLength: Self.subnetListIdPadLength, withPad: Self.subnetListPadCharacter, startingAt: 0)
-
-        // Pre-calculate spaced text for optimal performance
-        let spacedName = Self.subnetListItemTextSpacing + truncatedName
-        let spacedNetworkId = Self.subnetListItemTextSpacing + networkId
-        let spacedSubnetId = Self.subnetListItemTextSpacing + subnetId
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: Self.subnetListStatusIconActive),
-            Text(spacedName).styled(rowStyle),
-            Text(spacedNetworkId).styled(.info),
-            Text(spacedSubnetId).styled(.info)
-        ]).padding(Self.subnetListItemEdgeInsets)
+        let statusListView = createSubnetStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedSubnets,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Subnet Detail View (Gold Standard Pattern following RouterDetail)
