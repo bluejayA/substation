@@ -86,84 +86,18 @@ struct FlavorViews {
                                      width: Int32, height: Int32, cachedFlavors: [Flavor],
                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Flavor List
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let titleText = searchQuery.map { "Flavors (filtered: \($0))" } ?? "Flavors"
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(" ST  NAME                           VCPUS   RAM        DISK").muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered flavors and create list components
-        let filteredFlavors = FilterUtils.filterFlavors(cachedFlavors, query: searchQuery)
-
-        if filteredFlavors.isEmpty {
-            components.append(Text("No flavors found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(1, Int(height) - 10) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, filteredFlavors.count - maxVisibleItems))
-            let endIndex = min(filteredFlavors.count, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let flavor = filteredFlavors[i]
-                let isSelected = i == selectedIndex
-                let flavorComponent = createFlavorListItemComponent(flavor: flavor, isSelected: isSelected)
-                components.append(flavorComponent)
-            }
-
-            // Scroll indicator if needed
-            if filteredFlavors.count > maxVisibleItems {
-                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(filteredFlavors.count)]"
-                components.append(Text(scrollText).info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
-        }
-
-        // Render unified flavor list
-        let flavorListComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(flavorListComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Component Creation Functions
-
-    private static func createFlavorListItemComponent(flavor: Flavor, isSelected: Bool) -> any Component {
-        // Flavor name with formatting
-        let flavorName = String((flavor.name ?? "Unknown").prefix(32)).padding(toLength: 32, withPad: " ", startingAt: 0)
-
-        // Resource information
-        let vcpusText = String(flavor.vcpus)
-        let vcpusDisplay = String(vcpusText.prefix(7)).padding(toLength: 7, withPad: " ", startingAt: 0)
-
-        let ramText = "\(flavor.ram)MB"
-        let ramDisplay = String(ramText.prefix(10)).padding(toLength: 10, withPad: " ", startingAt: 0)
-
-        let diskText = "\(flavor.disk)GB"
-        let diskDisplay = String(diskText.prefix(8)).padding(toLength: 8, withPad: " ", startingAt: 0)
-
-        let rowStyle: TextStyle = isSelected ? .accent : .secondary
-
-        return HStack(spacing: 0, children: [
-            StatusIcon(status: "active"),
-            Text(" \(flavorName)").styled(rowStyle),
-            Text(" \(vcpusDisplay)").styled(.info),
-            Text(" \(ramDisplay)").styled(.accent),
-            Text(" \(diskDisplay)").styled(.success)
-        ]).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
+        let statusListView = createFlavorStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedFlavors,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
     // MARK: - Gold Standard Flavor Detail (Enhanced with Rich Metadata)
