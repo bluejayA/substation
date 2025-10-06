@@ -92,90 +92,25 @@ struct FloatingIPViews {
                                           cachedServers: [Server],
                                          cachedPorts: [Port], cachedNetworks: [Network]) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.floatingIPListMinScreenWidth && height > Self.floatingIPListMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.floatingIPListBoundsMinWidth, width), height: max(Self.floatingIPListBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.floatingIPListScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Floating IP List
-        var components: [any Component] = []
-
-        // Title - optimized conditional logic for performance
-        let titleText: String
-        if let query = searchQuery {
-            titleText = Self.floatingIPListFilteredTitlePrefix + query + Self.floatingIPListFilteredTitleSuffix
-        } else {
-            titleText = Self.floatingIPListTitle
-        }
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        // Header
-        components.append(Text(Self.floatingIPListHeader).muted()
-            .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)).border())
-
-        // Content - get filtered floating IPs and create list components
-        let filteredFloatingIPs = FilterUtils.filterFloatingIPs(cachedFloatingIPs, query: searchQuery)
-        let totalCount = filteredFloatingIPs.count
-
-        if totalCount == 0 {
-            components.append(Text(Self.floatingIPListNoFloatingIPsText).info()
-                .padding(Self.floatingIPListNoFloatingIPsEdgeInsets))
-        } else {
-            // Pre-calculate lookup dictionaries once for all items (major performance optimization)
-            let portLookup: [String: Port] = Dictionary(uniqueKeysWithValues: cachedPorts.map { ($0.id, $0) })
-            let serverLookup: [String: Server] = Dictionary(uniqueKeysWithValues: cachedServers.map { ($0.id, $0) })
-            let externalNetworkCache = cachedNetworks.first(where: { $0.external == Self.floatingIPListExternalNetworkFilter })
-
-            // Pre-calculate network display (once for all items)
-            let remainingWidth = max(Self.floatingIPListMinNetworkWidth, Int(width) - Self.floatingIPListNetworkInfoWidth)
-            let networkDisplayText: String
-            if remainingWidth > Self.floatingIPListMinNetworkDisplayWidth {
-                let networkInfo = externalNetworkCache?.name ?? Self.floatingIPListExternalNetworkText
-                networkDisplayText = String(networkInfo.prefix(remainingWidth))
-            } else {
-                networkDisplayText = Self.floatingIPListEmptyNetworkDisplay
-            }
-
-            // Calculate visible range for simple viewport
-            let maxVisibleItems = max(Self.floatingIPListMinVisibleItems, Int(height) - Self.floatingIPListReservedSpaceForHeaderFooter) // Reserve space for header and footer
-            let startIndex = max(0, min(scrollOffset, totalCount - maxVisibleItems))
-            let endIndex = min(totalCount, startIndex + maxVisibleItems)
-
-            for i in startIndex..<endIndex {
-                let floatingIP = filteredFloatingIPs[i]
-                let isSelected = i == selectedIndex
-                let floatingIPComponent = createFloatingIPListItemComponent(
-                    floatingIP: floatingIP,
-                    isSelected: isSelected,
-                    portLookup: portLookup,
-                    serverLookup: serverLookup,
-                    networkDisplayText: networkDisplayText,
-                    width: width
-                )
-                components.append(floatingIPComponent)
-            }
-
-            // Scroll indicator if needed - use string interpolation (compiler optimized)
-            if totalCount > maxVisibleItems {
-                let displayStart = startIndex + 1
-                let scrollText = "[\(displayStart)-\(endIndex)/\(totalCount)]"
-                components.append(Text(scrollText).info()
-                    .padding(Self.floatingIPListScrollInfoEdgeInsets))
-            }
-        }
-
-        // Render unified floating IP list
-        let floatingIPListComponent = VStack(spacing: Self.floatingIPListComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(floatingIPListComponent, on: surface, in: bounds)
+        let statusListView = createFloatingIPStatusListView(
+            cachedServers: cachedServers,
+            cachedPorts: cachedPorts,
+            cachedNetworks: cachedNetworks
+        )
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: cachedFloatingIPs,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex
+        )
     }
 
-    // MARK: - Component Creation Functions
+    // MARK: - Legacy Component Creation Functions (kept for reference)
 
     private static func createFloatingIPListItemComponent(
         floatingIP: FloatingIP,
