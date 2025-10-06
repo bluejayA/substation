@@ -58,6 +58,20 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 - Multi-select capability
 - Handling 10,000+ items
 
+### [StatusListView Guide](statuslistview-guide.md)
+
+**What it does**: Renders primary resource lists with StatusIcon indicators and multi-column display.
+
+**When to use it**: Building primary list views for resources (servers, volumes, networks, images).
+
+**Read this** when you need:
+
+- Primary resource list views
+- StatusIcon + text columns
+- Automatic filtering and scrolling
+- Consistent list rendering
+- 80-90% code reduction
+
 ## Quick Start: Create Your First Form in 5 Minutes
 
 **Scenario**: You need a network creation form. Name, MTU, port security. Let's go.
@@ -226,6 +240,7 @@ func matchesSearch(_ query: String) -> Bool {
 - `/Sources/Substation/Components/FormTextField.swift` - Text input component
 - `/Sources/Substation/Components/FormSelector.swift` - Selection component
 - `/Sources/Substation/Components/FormSelectorRenderer.swift` - Type-specific selector rendering
+- `/Sources/Substation/Components/StatusListView.swift` - Primary list view component
 
 ## Example Forms in the Codebase
 

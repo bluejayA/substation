@@ -423,7 +423,7 @@ substation --cloud staging
 - Compile-time thread safety guarantees
 - Memory safety without garbage collection
 - Cross-platform (macOS and Linux)
-- Zero external dependencies
+- Minimal external dependencies, we know our supply chain.
 
 **Code Statistics:**
 
@@ -589,12 +589,6 @@ We welcome contributions!
 - Actor-based concurrency for shared state
 - Never use Unicode (ASCII only)
 - Building warnings treated as errors
-
-### Where should I add TODOs?
-
-**Don't add TODO comments in code.**
-
-Add to `ModelMemory/TODO.md` instead (tracked and remembered for release).
 
 ### Why the zero-warning requirement?
 

@@ -37,14 +37,14 @@ Substation is a comprehensive terminal user interface for OpenStack that provide
 
 ### For Operators
 
-- **[Navigation Guide](guides/operators/keyboard-shortcuts.md)** - Master keyboard shortcuts
-- **[Common Workflows](guides/operators/workflows.md)** - Everyday operations
+- **[Navigation Guide](reference/operators/keyboard-shortcuts.md)** - Master keyboard shortcuts
+- **[Common Workflows](reference/operators/workflows.md)** - Everyday operations
 - **[Troubleshooting](troubleshooting/index.md)** - When things go wrong
 
 ### For Developers
 
-- **[Developer Guide](guides/developers/index.md)** - Contributing to Substation
-- **[FormBuilder Guide](guides/developers/formbuilder-guide.md)** - Building forms
+- **[Developer Guide](reference/developers/index.md)** - Contributing to Substation
+- **[FormBuilder Guide](reference/developers/formbuilder-guide.md)** - Building forms
 - **[API Reference](reference/api/index.md)** - Using Substation packages
 
 ### Deep Dives

@@ -184,8 +184,8 @@ tail -f ~/substation.log | grep "ms)"
 - **[Installation Guide](installation/index.md)** - Detailed installation options and troubleshooting
 - **[Configuration Guide](configuration/index.md)** - Advanced clouds.yaml setup and authentication
 - **[Getting Started](getting-started/index.md)** - Learn the concepts and first steps
-- **[Navigation Guide](guides/operators/keyboard-shortcuts.md)** - Master all keyboard shortcuts
-- **[Common Workflows](guides/operators/workflows.md)** - Learn everyday operations
+- **[Navigation Guide](reference/operators/keyboard-shortcuts.md)** - Master all keyboard shortcuts
+- **[Common Workflows](reference/operators/workflows.md)** - Learn everyday operations
 - **[Troubleshooting](troubleshooting/index.md)** - Detailed problem solving
 
 ## Getting Help

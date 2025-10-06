@@ -314,7 +314,7 @@ Substation includes a comprehensive form building system designed specifically f
 - Type-safe resource selection that preserves OSClient types
 - Easy extension for new resource types
 
-See [Developer Documentation](../guides/developers/index.md) for implementation guides.
+See [Developer Documentation](../reference/developers/index.md) for implementation guides.
 
 ## Developer Features
 
@@ -349,7 +349,7 @@ See [Developer Documentation](../guides/developers/index.md) for implementation 
 1. **Terminal-First Design**: Built specifically for terminal environments, not a CLI afterthought
 2. **Real-Time Performance**: Instant feedback with intelligent caching
 3. **Features**: Batch operations, telemetry, and automation built-in
-4. **Zero Dependencies**: Single binary with everything included
+4. **Minimal Dependencies**: Single binary with everything included is what we're going for; however, if you need something, let's talk about it.
 5. **Swift-Powered**: Modern, safe, and performant implementation
 6. **Actor-Based**: True concurrent safety without locks
 7. **Operator-Focused**: Designed by operators, for operators

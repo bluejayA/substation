@@ -96,11 +96,6 @@ nav:
   - Installation: installation/index.md
   - Configuration: configuration/index.md
 
-  - Guides:
-    - Operators:
-      - Keyboard Shortcuts: guides/operators/keyboard-shortcuts.md
-      - Common Workflows: guides/operators/workflows.md
-
   - Concepts:
     - Features: concepts/features.md
     - Caching System: concepts/caching.md
@@ -126,11 +121,15 @@ nav:
       - OSClient Library: reference/api/osclient.md
       - SwiftTUI Framework: reference/api/swifttui.md
       - Integration Guide: reference/api/integration.md
+    - Operators:
+      - Keyboard Shortcuts: reference/operators/keyboard-shortcuts.md
+      - Common Workflows: reference/operators/workflows.md
     - Developers:
-      - Overview: guides/developers/index.md
-      - FormBuilder Guide: guides/developers/formbuilder-guide.md
-      - FormTextField Guide: guides/developers/formtextfield-guide.md
-      - FormSelector Guide: guides/developers/formselector-guide.md
+      - Overview: reference/developers/index.md
+      - FormBuilder Guide: reference/developers/formbuilder-guide.md
+      - FormTextField Guide: reference/developers/formtextfield-guide.md
+      - FormSelector Guide: reference/developers/formselector-guide.md
+      - StatusList Guide: docs/reference/developers/statuslistview-guide.md
     - OpenStack Integration: reference/openstack/index.md
     - FAQ: reference/faq.md
     - Troubleshooting: troubleshooting/index.md

@@ -131,7 +131,7 @@ For related architectural documentation:
 - **[Security](../concepts/security.md)** - Security implementation details
 - **[Caching](../concepts/caching.md)** - Multi-level caching architecture
 - **[OpenStack Integration](../reference/openstack/index.md)** - API patterns and service integration
-- **[FormBuilder Guide](../guides/developers/formbuilder-guide.md)** - Developer guide for forms
+- **[FormBuilder Guide](../reference/developers/formbuilder-guide.md)** - Developer guide for forms
 
 ---
 
