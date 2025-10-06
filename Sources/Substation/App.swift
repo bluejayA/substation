@@ -377,6 +377,9 @@ struct Substation {
             Logger.shared.logInfo("Project domain: \(projectDomain)")
             Logger.shared.logInfo("User domain: \(userDomain)")
             Logger.shared.logInfo("Debug mode: \(debugMode)")
+
+            // Phase 1: Pre-warm FloatingIPViews to eliminate cold start penalty
+            FloatingIPViews.warmUp()
             Logger.shared.logInfo("Raw config values from clouds.yaml:")
             let regionDisplay = if let regions = cloudConfig.region_name {
                 switch regions {

@@ -38,7 +38,9 @@ extension OpenStackClient {
     public func getComputeQuotas() async throws -> ComputeQuotaSet {
         return try await executeWithTokenRefresh {
             let nova = await self.nova
-            let projectId = await self.projectName
+            guard let projectId = await self.projectID else {
+                throw OpenStackError.configurationError("Project ID not available - ensure authentication is complete")
+            }
             let quotaSet = try await nova.getQuotas(projectId: projectId)
 
             // Convert QuotaSet to ComputeQuotaSet
@@ -59,7 +61,9 @@ extension OpenStackClient {
     public func getNetworkQuotas() async throws -> NetworkQuotaSet {
         return try await executeWithTokenRefresh {
             let neutron = await self.neutron
-            let projectId = await self.projectName
+            guard let projectId = await self.projectID else {
+                throw OpenStackError.configurationError("Project ID not available - ensure authentication is complete")
+            }
             return try await neutron.getQuotas(projectId: projectId)
         }
     }
@@ -68,7 +72,9 @@ extension OpenStackClient {
     public func getVolumeQuotas() async throws -> VolumeQuotaSet {
         return try await executeWithTokenRefresh {
             let cinder = await self.cinder
-            let projectId = await self.projectName
+            guard let projectId = await self.projectID else {
+                throw OpenStackError.configurationError("Project ID not available - ensure authentication is complete")
+            }
             return try await cinder.getQuotas(projectId: projectId)
         }
     }

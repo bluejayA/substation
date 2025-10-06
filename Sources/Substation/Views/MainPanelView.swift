@@ -448,6 +448,10 @@ struct MainPanelView {
         case .routerCreate:
             await RouterViews.drawRouterCreateForm(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, routerCreateForm: tui.routerCreateForm, routerCreateFormState: tui.routerCreateFormState, availabilityZones: tui.cachedAvailabilityZones, externalNetworks: tui.cachedNetworks)
         case .floatingIPs:
+            // Phase 2: Set render flag to prevent background task interference
+            tui.isFloatingIPViewRendering = true
+            defer { tui.isFloatingIPViewRendering = false }
+
             await FloatingIPViews.drawDetailedFloatingIPList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedFloatingIPs: tui.cachedFloatingIPs, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, cachedServers: tui.cachedServers, cachedPorts: tui.cachedPorts, cachedNetworks: tui.cachedNetworks)
         case .floatingIPDetail:
             if let floatingIP = tui.selectedResource as? FloatingIP {

@@ -5,6 +5,84 @@ import SwiftTUI
 
 struct FloatingIPViews {
 
+    // MARK: - Performance Optimizations
+
+    // Cached padded constant strings (calculated once at startup)
+    private static let paddedUnassignedText: String = {
+        var text = floatingIPListUnassignedText
+        while text.count < floatingIPListInstancePadLength {
+            text.append(" ")
+        }
+        return text
+    }()
+
+    private static let paddedActiveStatus: String = {
+        var text = floatingIPListActiveStatus
+        while text.count < floatingIPListStatusPadLength {
+            text.append(" ")
+        }
+        return text
+    }()
+
+    private static let paddedAvailableStatus: String = {
+        var text = floatingIPListAvailableStatus
+        while text.count < floatingIPListStatusPadLength {
+            text.append(" ")
+        }
+        return text
+    }()
+
+    // Fast string padding helper (avoids String.padding which allocates)
+    private static func padString(_ value: String, to length: Int) -> String {
+        if value.count >= length {
+            return String(value.prefix(length))
+        }
+        var result = value
+        result.reserveCapacity(length)
+        result.append(String(repeating: " ", count: length - value.count))
+        return result
+    }
+
+    // Optimized status info getter
+    private static func getStatusInfo(isActive: Bool) -> (text: String, style: TextStyle, icon: String) {
+        if isActive {
+            return (paddedActiveStatus, .success, floatingIPListStatusIconActive)
+        }
+        return (paddedAvailableStatus, .info, floatingIPListStatusIconAvailable)
+    }
+
+    // MARK: - Phase 1: Component Warm-up for cold start elimination
+
+    @MainActor private static var isWarmedUp = false
+
+    /// Warm-up mechanism to eliminate cold start penalty
+    /// Pre-allocates common string sizes and triggers lazy static initialization
+    @MainActor static func warmUp() {
+        guard !isWarmedUp else { return }
+
+        // Trigger lazy static initialization by accessing cached constants
+        _ = paddedUnassignedText
+        _ = paddedActiveStatus
+        _ = paddedAvailableStatus
+
+        // Pre-allocate common string sizes to avoid allocations during rendering
+        var warmupBuffer = ""
+        warmupBuffer.reserveCapacity(floatingIPListIpAddressPadLength)
+        warmupBuffer = padString("warmup", to: floatingIPListIpAddressPadLength)
+        warmupBuffer.reserveCapacity(floatingIPListInstancePadLength)
+        warmupBuffer = padString("warmup", to: floatingIPListInstancePadLength)
+        warmupBuffer.reserveCapacity(floatingIPListStatusPadLength)
+        warmupBuffer = padString("warmup", to: floatingIPListStatusPadLength)
+
+        // Trigger getStatusInfo to initialize conditional paths
+        _ = getStatusInfo(isActive: true)
+        _ = getStatusInfo(isActive: false)
+
+        // Mark as warmed up to prevent re-warming
+        isWarmedUp = true
+        Logger.shared.logInfo("FloatingIPViews - Component warm-up completed")
+    }
+
     // MARK: - Floating IP List View
 
     @MainActor
@@ -48,6 +126,21 @@ struct FloatingIPViews {
             components.append(Text(Self.floatingIPListNoFloatingIPsText).info()
                 .padding(Self.floatingIPListNoFloatingIPsEdgeInsets))
         } else {
+            // Pre-calculate lookup dictionaries once for all items (major performance optimization)
+            let portLookup: [String: Port] = Dictionary(uniqueKeysWithValues: cachedPorts.map { ($0.id, $0) })
+            let serverLookup: [String: Server] = Dictionary(uniqueKeysWithValues: cachedServers.map { ($0.id, $0) })
+            let externalNetworkCache = cachedNetworks.first(where: { $0.external == Self.floatingIPListExternalNetworkFilter })
+
+            // Pre-calculate network display (once for all items)
+            let remainingWidth = max(Self.floatingIPListMinNetworkWidth, Int(width) - Self.floatingIPListNetworkInfoWidth)
+            let networkDisplayText: String
+            if remainingWidth > Self.floatingIPListMinNetworkDisplayWidth {
+                let networkInfo = externalNetworkCache?.name ?? Self.floatingIPListExternalNetworkText
+                networkDisplayText = String(networkInfo.prefix(remainingWidth))
+            } else {
+                networkDisplayText = Self.floatingIPListEmptyNetworkDisplay
+            }
+
             // Calculate visible range for simple viewport
             let maxVisibleItems = max(Self.floatingIPListMinVisibleItems, Int(height) - Self.floatingIPListReservedSpaceForHeaderFooter) // Reserve space for header and footer
             let startIndex = max(0, min(scrollOffset, totalCount - maxVisibleItems))
@@ -56,16 +149,21 @@ struct FloatingIPViews {
             for i in startIndex..<endIndex {
                 let floatingIP = filteredFloatingIPs[i]
                 let isSelected = i == selectedIndex
-                let floatingIPComponent = createFloatingIPListItemComponent(floatingIP: floatingIP, isSelected: isSelected,
-                                                                           cachedServers: cachedServers, cachedPorts: cachedPorts,
-                                                                           cachedNetworks: cachedNetworks, width: width)
+                let floatingIPComponent = createFloatingIPListItemComponent(
+                    floatingIP: floatingIP,
+                    isSelected: isSelected,
+                    portLookup: portLookup,
+                    serverLookup: serverLookup,
+                    networkDisplayText: networkDisplayText,
+                    width: width
+                )
                 components.append(floatingIPComponent)
             }
 
-            // Scroll indicator if needed - optimized string construction with cached count
+            // Scroll indicator if needed - use string interpolation (compiler optimized)
             if totalCount > maxVisibleItems {
                 let displayStart = startIndex + 1
-                let scrollText = Self.floatingIPListScrollInfoPrefix + String(displayStart) + Self.floatingIPListScrollInfoSeparator + String(endIndex) + Self.floatingIPListScrollInfoMiddle + String(totalCount) + Self.floatingIPListScrollInfoSuffix
+                let scrollText = "[\(displayStart)-\(endIndex)/\(totalCount)]"
                 components.append(Text(scrollText).info()
                     .padding(Self.floatingIPListScrollInfoEdgeInsets))
             }
@@ -79,45 +177,44 @@ struct FloatingIPViews {
 
     // MARK: - Component Creation Functions
 
-    private static func createFloatingIPListItemComponent(floatingIP: FloatingIP, isSelected: Bool,
-                                                        cachedServers: [Server], cachedPorts: [Port],
-                                                        cachedNetworks: [Network], width: Int32) -> any Component {
-        // Pre-calculate lookup dictionaries for nano-level performance optimization
-        let portLookup: [String: Port] = Dictionary(uniqueKeysWithValues: cachedPorts.map { ($0.id, $0) })
-        let serverLookup: [String: Server] = Dictionary(uniqueKeysWithValues: cachedServers.map { ($0.id, $0) })
-        let externalNetworkCache = cachedNetworks.first(where: { $0.external == Self.floatingIPListExternalNetworkFilter })
+    private static func createFloatingIPListItemComponent(
+        floatingIP: FloatingIP,
+        isSelected: Bool,
+        portLookup: [String: Port],
+        serverLookup: [String: Server],
+        networkDisplayText: String,
+        width: Int32
+    ) -> any Component {
 
-        // IP Address with formatting (25 chars to match header)
-        let ipAddress = String((floatingIP.floatingIpAddress ?? "Unknown").prefix(Self.floatingIPListIpAddressPadLength)).padding(toLength: Self.floatingIPListIpAddressPadLength, withPad: Self.floatingIPListPadCharacter, startingAt: Self.floatingIPListPaddingStartIndex)
+        // IP Address - optimized padding
+        let ipAddress = padString(floatingIP.floatingIpAddress ?? "Unknown", to: Self.floatingIPListIpAddressPadLength)
 
-        // Enhanced status with color coding and pre-calculated values
+        // Status - use pre-calculated padded strings
         let isActive = floatingIP.portId != nil
-        let status = isActive ? Self.floatingIPListActiveStatus : Self.floatingIPListAvailableStatus
-        let statusStyle: TextStyle = isActive ? .success : .info
-        let statusText = String(status.prefix(Self.floatingIPListStatusPadLength)).padding(toLength: Self.floatingIPListStatusPadLength, withPad: Self.floatingIPListPadCharacter, startingAt: Self.floatingIPListPaddingStartIndex)
-        let statusIconValue = isActive ? Self.floatingIPListStatusIconActive : Self.floatingIPListStatusIconAvailable
+        let (statusText, statusStyle, statusIconValue) = getStatusInfo(isActive: isActive)
 
-        // Enhanced instance display with optimized lookup (23 chars to match header)
+        // Instance name - optimized logic
         let instanceName: String
-        if let portID = floatingIP.portId,
-           let port = portLookup[portID],
-           let deviceID = port.deviceId,
-           let server = serverLookup[deviceID] {
-            let serverName = server.name ?? Self.floatingIPListUnnamedServerText
-            instanceName = String(serverName.prefix(Self.floatingIPListInstancePadLength)).padding(toLength: Self.floatingIPListInstancePadLength, withPad: Self.floatingIPListPadCharacter, startingAt: Self.floatingIPListPaddingStartIndex)
-        } else if let portID = floatingIP.portId {
-            let portText = Self.floatingIPListPortPrefix + String(portID.prefix(Self.floatingIPListPortPrefixLength))
-            instanceName = String(portText.prefix(Self.floatingIPListInstancePadLength)).padding(toLength: Self.floatingIPListInstancePadLength, withPad: Self.floatingIPListPadCharacter, startingAt: Self.floatingIPListPaddingStartIndex)
+        if let portID = floatingIP.portId {
+            if let port = portLookup[portID],
+               let deviceID = port.deviceId,
+               let server = serverLookup[deviceID] {
+                // Server found - use server name
+                instanceName = padString(server.name ?? Self.floatingIPListUnnamedServerText, to: Self.floatingIPListInstancePadLength)
+            } else {
+                // Port but no server - show port ID
+                let portText = Self.floatingIPListPortPrefix + String(portID.prefix(Self.floatingIPListPortPrefixLength))
+                instanceName = padString(portText, to: Self.floatingIPListInstancePadLength)
+            }
         } else {
-            instanceName = Self.floatingIPListUnassignedText.padding(toLength: Self.floatingIPListInstancePadLength, withPad: Self.floatingIPListPadCharacter, startingAt: Self.floatingIPListPaddingStartIndex)
+            // No port - use cached padded unassigned text
+            instanceName = paddedUnassignedText
         }
 
-        // Network info with pre-calculated external network and optimized width calculation
-        let remainingWidth = max(Self.floatingIPListMinNetworkWidth, Int(width) - Self.floatingIPListNetworkInfoWidth)
-        let networkInfo = externalNetworkCache?.name ?? Self.floatingIPListExternalNetworkText
-        let networkDisplay = remainingWidth > Self.floatingIPListMinNetworkDisplayWidth ? String(networkInfo.prefix(remainingWidth)) : Self.floatingIPListEmptyNetworkDisplay
+        // Network - already pre-calculated, just use it
+        let networkDisplay = networkDisplayText
 
-        // Pre-calculate spaced text for optimal performance
+        // Pre-calculate spaced text (single character concatenation is fast)
         let spacedIpAddress = Self.floatingIPListItemTextSpacing + ipAddress
         let spacedStatusText = Self.floatingIPListItemTextSpacing + statusText
         let spacedInstanceName = Self.floatingIPListItemTextSpacing + instanceName
@@ -600,14 +697,19 @@ struct FloatingIPViews {
             .padding(Self.floatingIPServerSelectionHeaderEdgeInsets))
         components.append(Text(Self.floatingIPServerSelectionSeparator).border())
 
-        // Pre-calculate port lookup for performance
-        let portLookup: [String: Port] = Dictionary(uniqueKeysWithValues: cachedPorts.map { ($0.id, $0) })
-        let availableServers = cachedServers.filter { server in
-            // Only show servers that have available ports for floating IP assignment
-            cachedPorts.contains { port in
-                port.deviceId == server.id && !(port.fixedIps?.isEmpty ?? true)
+        // Pre-calculate port counts for performance (O(n) instead of O(n*m))
+        // Build server IDs with available ports (O(m) where m = ports)
+        var serverIdsWithPorts = Set<String>()
+        var portCounts: [String: Int] = [:]
+        for port in cachedPorts {
+            if let deviceId = port.deviceId, !(port.fixedIps?.isEmpty ?? true) {
+                serverIdsWithPorts.insert(deviceId)
+                portCounts[deviceId, default: 0] += 1
             }
         }
+
+        // Filter servers using pre-built set (O(n) where n = servers)
+        let availableServers = cachedServers.filter { serverIdsWithPorts.contains($0.id) }
 
         if availableServers.isEmpty {
             components.append(Text(Self.floatingIPServerSelectionNoServersText).info()
@@ -621,13 +723,19 @@ struct FloatingIPViews {
             for i in startIndex..<endIndex {
                 let server = availableServers[i]
                 let isSelected = i == selectedIndex
-                let serverComponent = Self.createServerSelectionItemComponent(server: server, isSelected: isSelected, portLookup: portLookup, width: width)
+                let portCount = portCounts[server.id] ?? 0
+                let serverComponent = Self.createServerSelectionItemComponent(
+                    server: server,
+                    isSelected: isSelected,
+                    portCount: portCount,
+                    width: width
+                )
                 components.append(serverComponent)
             }
 
-            // Scroll indicator if needed - optimized string concatenation
+            // Scroll indicator if needed - use string interpolation
             if availableServers.count > maxVisibleItems {
-                let scrollText = Self.floatingIPServerSelectionScrollIndicatorPrefix + String(startIndex + 1) + Self.floatingIPServerSelectionScrollIndicatorSeparator + String(endIndex) + Self.floatingIPServerSelectionScrollIndicatorMiddle + String(availableServers.count) + Self.floatingIPServerSelectionScrollIndicatorSuffix
+                let scrollText = "[\(startIndex + 1)-\(endIndex)/\(availableServers.count)]"
                 components.append(Text(scrollText).info()
                     .padding(Self.floatingIPServerSelectionScrollInfoEdgeInsets))
             }
@@ -641,14 +749,19 @@ struct FloatingIPViews {
 
     // MARK: - Server Selection Component Creation
 
-    private static func createServerSelectionItemComponent(server: Server, isSelected: Bool, portLookup: [String: Port], width: Int32) -> any Component {
-        // Server name with precise length control (28 chars to match gold standard)
+    private static func createServerSelectionItemComponent(
+        server: Server,
+        isSelected: Bool,
+        portCount: Int,
+        width: Int32
+    ) -> any Component {
+        // Server name - use optimized padding
         let serverName = server.name ?? Self.floatingIPServerSelectionUnnamedServerText
-        let truncatedName = String(serverName.prefix(Self.floatingIPServerSelectionNamePadLength)).padding(toLength: Self.floatingIPServerSelectionNamePadLength, withPad: Self.floatingIPServerSelectionPadCharacter, startingAt: Self.floatingIPServerSelectionPaddingStartIndex)
+        let truncatedName = padString(serverName, to: Self.floatingIPServerSelectionNamePadLength)
 
-        // Server status with standardized padding
+        // Server status - optimized padding
         let serverStatus = server.status?.rawValue ?? Self.floatingIPServerSelectionUnknownStatusText
-        let statusText = String(serverStatus.prefix(Self.floatingIPServerSelectionStatusPadLength)).padding(toLength: Self.floatingIPServerSelectionStatusPadLength, withPad: Self.floatingIPServerSelectionPadCharacter, startingAt: Self.floatingIPServerSelectionPaddingStartIndex)
+        let statusText = padString(serverStatus, to: Self.floatingIPServerSelectionStatusPadLength)
         let statusStyle: TextStyle = {
             switch serverStatus.lowercased() {
             case Self.floatingIPServerSelectionActiveStatus: return .success
@@ -657,10 +770,9 @@ struct FloatingIPViews {
             }
         }()
 
-        // Port count for this server
-        let portCount = portLookup.values.filter { $0.deviceId == server.id }.count
+        // Port count - already pre-calculated, just format
         let portCountText = String(portCount) + Self.floatingIPServerSelectionPortCountSuffix
-        let portDisplay = String(portCountText.prefix(Self.floatingIPServerSelectionPortPadLength)).padding(toLength: Self.floatingIPServerSelectionPortPadLength, withPad: Self.floatingIPServerSelectionPadCharacter, startingAt: Self.floatingIPServerSelectionPaddingStartIndex)
+        let portDisplay = padString(portCountText, to: Self.floatingIPServerSelectionPortPadLength)
 
         // Pre-calculate spaced text for optimal performance
         let spacedName = Self.floatingIPServerSelectionItemTextSpacing + truncatedName

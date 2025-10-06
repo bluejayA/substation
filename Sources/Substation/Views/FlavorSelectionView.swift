@@ -106,7 +106,7 @@ struct FlavorSelectionView {
     ) async {
         // Flavors are already sorted by the form, use them as-is
         let selector = FormSelector(
-            label: "Select Server Flavor",
+            label: "Mode: Select Server Flavor",
             tabs: [
                 FormSelectorTab<Flavor>(
                     title: "MANUAL",
@@ -149,7 +149,7 @@ struct FlavorSelectionView {
         let categories = generateWorkloadRecommendations(flavors: flavors)
 
         let selector = FormSelector(
-            label: "Select Workload Category",
+            label: "Mode: Select Workload Category",
             tabs: [
                 FormSelectorTab<WorkloadCategory>(
                     title: "RECOMMENDATIONS",

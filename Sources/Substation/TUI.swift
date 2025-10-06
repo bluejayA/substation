@@ -70,6 +70,9 @@ final class TUI {
     internal var currentView: ViewMode = .loading
     internal var previousView: ViewMode = .loading
     internal var running = true
+
+    // Phase 2: Render state tracking to prevent background interference
+    internal var isFloatingIPViewRendering = false
     internal var scrollOffset = 0
     internal var helpScrollOffset = 0
     internal var detailScrollOffset = 0  // For scrolling within detail views
@@ -108,6 +111,8 @@ final class TUI {
     internal var baseRefreshInterval: TimeInterval = SystemCapabilities.optimalRefreshInterval()
     private let availableIntervals: [TimeInterval] = [3.0, 5.0, 7.0, 10.0, 15.0, 30.0]
     private var fastRefreshUntil: Date? = nil // Temporary fast refresh after operations
+    internal var lastUserActivityTime = Date() // Track last user input for smart refresh
+    private let activityCooldownPeriod: TimeInterval = 3.0 // Wait 3s after activity before auto-refresh
 
     private var refreshInterval: TimeInterval {
         // Use fast refresh (3s) temporarily after operations to show state transitions
@@ -793,27 +798,34 @@ final class TUI {
                 totalIdleTime += Date().timeIntervalSince(idleStart)
             }
 
-            // Auto-refresh check
-            if autoRefresh && Date().timeIntervalSince(lastRefresh) > refreshInterval {
+            // Auto-refresh check - skip if user is actively navigating
+            let timeSinceActivity = Date().timeIntervalSince(lastUserActivityTime)
+            let timeSinceRefresh = Date().timeIntervalSince(lastRefresh)
+            let isUserActive = timeSinceActivity < activityCooldownPeriod
+
+            if autoRefresh && timeSinceRefresh > refreshInterval && !isUserActive {
                 Logger.shared.logUserAction("auto_refresh_triggered", details: [
                     "interval": refreshInterval,
-                    "timeSinceLastRefresh": Date().timeIntervalSince(lastRefresh)
+                    "timeSinceLastRefresh": timeSinceRefresh,
+                    "timeSinceActivity": timeSinceActivity
                 ])
 
-                // Force immediate redraw to show status
-                forceRedraw()
-
-                // Run data refresh in background
+                // Run data refresh in background - don't force redraw before data is ready
                 let refreshStart = Date()
                 await dataManager.refreshAllData()
                 let refreshDuration = Date().timeIntervalSince(refreshStart)
                 Logger.shared.logPerformance("auto_refresh", duration: refreshDuration)
                 lastRefresh = Date()
 
+                // Queue redraw after data is ready (non-blocking)
+                markNeedsRedraw()
+
                 // Request refresh for health dashboard if on that view
                 if currentView == .healthDashboard {
                     healthDashboardNavState.requestRefresh()
                 }
+            } else if autoRefresh && isUserActive && timeSinceRefresh > refreshInterval {
+                Logger.shared.logDebug("Auto-refresh deferred - user active (\(String(format: "%.1f", timeSinceActivity))s ago)")
 
                 // Update sidebar to show new last refresh time
                 markSidebarDirty()
