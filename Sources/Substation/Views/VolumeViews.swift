@@ -218,7 +218,8 @@ struct VolumeViews {
                                 highlightedIndex: state.highlightedIndex,
                                 scrollOffset: state.scrollOffset,
                                 searchQuery: state.searchQuery,
-                                title: "Select Source Image"
+                                title: "Select Source Image",
+                                description: "Select image to create volume from. SPACE: select, ENTER: confirm"
                             )
                         } else if let snapshots = selectorField.items as? [VolumeSnapshot] {
                             await VolumeSnapshotSelectionView.drawVolumeSnapshotSelection(
@@ -234,7 +235,13 @@ struct VolumeViews {
                                 searchQuery: state.searchQuery,
                                 title: "Select Source Snapshot"
                             )
-                        } else if let volumeTypes = selectorField.items as? [VolumeType] {
+                        }
+                        return
+                    }
+                case VolumeCreateFieldId.volumeType.rawValue:
+                    if let state = formBuilderState.selectorStates[selectorField.id] {
+                        let selectedIds = state.selectedItemId.map { Set([$0]) } ?? []
+                        if let volumeTypes = selectorField.items as? [VolumeType] {
                             await VolumeTypeSelectionView.drawVolumeTypeSelection(
                                 screen: screen,
                                 startRow: startRow,

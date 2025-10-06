@@ -6,6 +6,7 @@ enum VolumeCreateFieldId: String, CaseIterable {
     case size = "size"
     case sourceType = "sourceType"
     case source = "source"
+    case volumeType = "volumeType"
 
     var title: String {
         switch self {
@@ -13,6 +14,7 @@ enum VolumeCreateFieldId: String, CaseIterable {
         case .size: return "Volume Size"
         case .sourceType: return "Source Type"
         case .source: return "Source"
+        case .volumeType: return "Volume Type"
         }
     }
 }
@@ -147,24 +149,8 @@ struct VolumeCreateForm {
         // Conditional source selector based on source type
         switch sourceType {
         case .blank:
-            // For blank volumes, show volume type selector
-            let sourceId = VolumeCreateFieldId.source.rawValue
-            fields.append(.selector(FormFieldSelector(
-                id: sourceId,
-                label: "Volume Type",
-                items: volumeTypes,
-                selectedItemId: selectedVolumeTypeID,
-                isRequired: true,
-                isVisible: true,
-                isSelected: selectedFieldId == sourceId,
-                isActive: activeFieldId == sourceId,
-                validationError: getSourceValidationError(),
-                columns: [
-                    FormSelectorItemColumn(header: "Volume Type", width: 40) { item in
-                        (item as? VolumeType)?.name ?? "Unknown"
-                    }
-                ]
-            )))
+            // For blank volumes, no additional source selector needed
+            break
 
         case .image:
             // For image-based volumes, show image selector
@@ -178,7 +164,7 @@ struct VolumeCreateForm {
                 isVisible: true,
                 isSelected: selectedFieldId == sourceId,
                 isActive: activeFieldId == sourceId,
-                validationError: getSourceValidationError(),
+                validationError: getImageValidationError(),
                 columns: [
                     FormSelectorItemColumn(header: "Name", width: 30) { item in
                         (item as? Image)?.name ?? "Unknown"
@@ -204,7 +190,7 @@ struct VolumeCreateForm {
                 isVisible: true,
                 isSelected: selectedFieldId == sourceId,
                 isActive: activeFieldId == sourceId,
-                validationError: getSourceValidationError(),
+                validationError: getSnapshotValidationError(),
                 columns: [
                     FormSelectorItemColumn(header: "Name", width: 30) { item in
                         (item as? VolumeSnapshot)?.name ?? "Unknown"
@@ -218,6 +204,25 @@ struct VolumeCreateForm {
                 ]
             )))
         }
+
+        // Volume Type selector - always shown regardless of source type
+        let volumeTypeId = VolumeCreateFieldId.volumeType.rawValue
+        fields.append(.selector(FormFieldSelector(
+            id: volumeTypeId,
+            label: VolumeCreateFieldId.volumeType.title,
+            items: volumeTypes,
+            selectedItemId: selectedVolumeTypeID,
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == volumeTypeId,
+            isActive: activeFieldId == volumeTypeId,
+            validationError: getVolumeTypeValidationError(),
+            columns: [
+                FormSelectorItemColumn(header: "Volume Type", width: 40) { item in
+                    (item as? VolumeType)?.name ?? "Unknown"
+                }
+            ]
+        )))
 
         return fields
     }
@@ -252,40 +257,40 @@ struct VolumeCreateForm {
         return nil
     }
 
-    private func getSourceValidationError() -> String? {
-        switch sourceType {
-        case .blank:
-            // Blank volumes require a volume type
-            if volumeTypes.isEmpty {
-                return "No volume types available"
-            }
-            if selectedVolumeTypeID == nil {
-                return "Volume type selection is required"
-            }
-            if !volumeTypes.contains(where: { $0.id == selectedVolumeTypeID }) {
+    private func getImageValidationError() -> String? {
+        // Image-based volumes require an image selection
+        if images.isEmpty {
+            return "No images available"
+        }
+        if selectedImageID == nil {
+            return "Image selection is required"
+        }
+        if !images.contains(where: { $0.id == selectedImageID }) {
+            return "Selected image is invalid"
+        }
+        return nil
+    }
+
+    private func getSnapshotValidationError() -> String? {
+        // Snapshot-based volumes require a snapshot selection
+        if snapshots.isEmpty {
+            return "No snapshots available"
+        }
+        if selectedSnapshotID == nil {
+            return "Snapshot selection is required"
+        }
+        if !snapshots.contains(where: { $0.id == selectedSnapshotID }) {
+            return "Selected snapshot is invalid"
+        }
+        return nil
+    }
+
+    private func getVolumeTypeValidationError() -> String? {
+        // Volume type is optional - no validation errors
+        // If selected, verify it exists
+        if let volumeTypeID = selectedVolumeTypeID {
+            if !volumeTypes.contains(where: { $0.id == volumeTypeID }) {
                 return "Selected volume type is invalid"
-            }
-        case .image:
-            // Image-based volumes require an image selection
-            if images.isEmpty {
-                return "No images available"
-            }
-            if selectedImageID == nil {
-                return "Image selection is required"
-            }
-            if !images.contains(where: { $0.id == selectedImageID }) {
-                return "Selected image is invalid"
-            }
-        case .snapshot:
-            // Snapshot-based volumes require a snapshot selection
-            if snapshots.isEmpty {
-                return "No snapshots available"
-            }
-            if selectedSnapshotID == nil {
-                return "Snapshot selection is required"
-            }
-            if !snapshots.contains(where: { $0.id == selectedSnapshotID }) {
-                return "Selected snapshot is invalid"
             }
         }
         return nil
@@ -302,7 +307,23 @@ struct VolumeCreateForm {
             errors.append(error)
         }
 
-        if let error = getSourceValidationError() {
+        // Validate source based on source type
+        switch sourceType {
+        case .blank:
+            // No source validation for blank volumes
+            break
+        case .image:
+            if let error = getImageValidationError() {
+                errors.append(error)
+            }
+        case .snapshot:
+            if let error = getSnapshotValidationError() {
+                errors.append(error)
+            }
+        }
+
+        // Validate volume type (optional)
+        if let error = getVolumeTypeValidationError() {
             errors.append(error)
         }
 
@@ -343,15 +364,13 @@ struct VolumeCreateForm {
                 sourceType = .blank
             case "image":
                 if sourceType != .image {
-                    // Clear volume type and snapshot when switching to image
-                    selectedVolumeTypeID = nil
+                    // Clear snapshot when switching to image
                     selectedSnapshotID = nil
                 }
                 sourceType = .image
             case "snapshot":
                 if sourceType != .snapshot {
-                    // Clear volume type and image when switching to snapshot
-                    selectedVolumeTypeID = nil
+                    // Clear image when switching to snapshot
                     selectedImageID = nil
                 }
                 sourceType = .snapshot
@@ -364,13 +383,17 @@ struct VolumeCreateForm {
         if let selectedSourceId = formState.getSelectorSelectedId(VolumeCreateFieldId.source.rawValue) {
             switch sourceType {
             case .blank:
-                selectedVolumeTypeID = selectedSourceId
+                // No source selector for blank volumes
+                break
             case .image:
                 selectedImageID = selectedSourceId
             case .snapshot:
                 selectedSnapshotID = selectedSourceId
             }
         }
+
+        // Update volume type selection (always available)
+        selectedVolumeTypeID = formState.getSelectorSelectedId(VolumeCreateFieldId.volumeType.rawValue)
     }
 
     mutating func reset() {

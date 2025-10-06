@@ -99,9 +99,50 @@ extension TUI {
                         serverCreateForm.updateFromFormState(serverCreateFormState)
                         await self.draw(screen: screen)
                     case .selector(let selectorField):
-                        // Special handling for flavor selector in workload mode
-                        if selectorField.id == ServerCreateFieldId.flavor.rawValue &&
+                        // Special handling for source selector
+                        if selectorField.id == ServerCreateFieldId.source.rawValue {
+                            // Get the highlighted item from the filtered and sorted list
+                            if let state = serverCreateFormState.selectorStates[selectorField.id] {
+                                let filteredItems = state.getFilteredItems()
+                                let highlightedIndex = state.highlightedIndex
+
+                                if serverCreateForm.bootSource == .image {
+                                    // Sort images alphabetically (same as SourceSelectionView)
+                                    let sortedImages = filteredItems.compactMap { $0 as? Image }.sorted {
+                                        ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending
+                                    }
+                                    if highlightedIndex < sortedImages.count {
+                                        let selectedImage = sortedImages[highlightedIndex]
+                                        serverCreateForm.selectedImageID = selectedImage.id
+                                        serverCreateForm.selectedVolumeID = nil
+                                        // Update the state
+                                        if var state = serverCreateFormState.selectorStates[selectorField.id] {
+                                            state.selectedItemId = selectedImage.id
+                                            serverCreateFormState.selectorStates[selectorField.id] = state
+                                        }
+                                        await self.draw(screen: screen)
+                                    }
+                                } else {
+                                    // Boot from volume - sort volumes alphabetically (same as SourceSelectionView)
+                                    let sortedVolumes = filteredItems.compactMap { $0 as? Volume }.sorted {
+                                        ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending
+                                    }
+                                    if highlightedIndex < sortedVolumes.count {
+                                        let selectedVolume = sortedVolumes[highlightedIndex]
+                                        serverCreateForm.selectedVolumeID = selectedVolume.id
+                                        serverCreateForm.selectedImageID = nil
+                                        // Update the state
+                                        if var state = serverCreateFormState.selectorStates[selectorField.id] {
+                                            state.selectedItemId = selectedVolume.id
+                                            serverCreateFormState.selectorStates[selectorField.id] = state
+                                        }
+                                        await self.draw(screen: screen)
+                                    }
+                                }
+                            }
+                        } else if selectorField.id == ServerCreateFieldId.flavor.rawValue &&
                            serverCreateForm.flavorSelectionMode == .workloadBased {
+                            // Special handling for flavor selector in workload mode
                             if serverCreateForm.selectedCategoryIndex == nil {
                                 // Drill into the highlighted category
                                 serverCreateForm.selectedCategoryIndex = serverCreateFormState.selectorStates[selectorField.id]?.highlightedIndex

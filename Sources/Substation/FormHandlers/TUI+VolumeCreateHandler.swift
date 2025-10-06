@@ -73,8 +73,38 @@ extension TUI {
                         volumeCreateFormState.toggleCurrentField()
                         volumeCreateForm.updateFromFormState(volumeCreateFormState)
                         await self.draw(screen: screen)
-                    case .selector, .multiSelect:
-                        // For selector/multiselect fields, space toggles selection
+                    case .selector(let selectorField):
+                        // Special handling for source selector when showing images
+                        if selectorField.id == VolumeCreateFieldId.source.rawValue,
+                           volumeCreateForm.sourceType == .image {
+                            // Get the highlighted item from the filtered and sorted list
+                            if let state = volumeCreateFormState.selectorStates[selectorField.id] {
+                                let filteredItems = state.getFilteredItems()
+                                let highlightedIndex = state.highlightedIndex
+
+                                // Sort images alphabetically (same as ImageSelectionView)
+                                let sortedImages = filteredItems.compactMap { $0 as? Image }.sorted {
+                                    ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending
+                                }
+                                if highlightedIndex < sortedImages.count {
+                                    let selectedImage = sortedImages[highlightedIndex]
+                                    volumeCreateForm.selectedImageID = selectedImage.id
+                                    // Update the state
+                                    if var state = volumeCreateFormState.selectorStates[selectorField.id] {
+                                        state.selectedItemId = selectedImage.id
+                                        volumeCreateFormState.selectorStates[selectorField.id] = state
+                                    }
+                                    await self.draw(screen: screen)
+                                }
+                            }
+                        } else {
+                            // Normal selection behavior for other selectors
+                            volumeCreateFormState.toggleCurrentField()
+                            volumeCreateForm.updateFromFormState(volumeCreateFormState)
+                            await self.draw(screen: screen)
+                        }
+                    case .multiSelect:
+                        // For multiselect fields, space toggles selection
                         volumeCreateFormState.toggleCurrentField()
                         volumeCreateForm.updateFromFormState(volumeCreateFormState)
                         await self.draw(screen: screen)
