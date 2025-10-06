@@ -513,6 +513,12 @@ class DataManager {
 
         guard let tui = tui else { return }
 
+        // Phase 2: Check if FloatingIP view is actively rendering - defer update to avoid interference
+        if tui.isFloatingIPViewRendering {
+            Logger.shared.logDebug("DataManager - Deferring floating IP refresh while view is rendering")
+            return
+        }
+
         do {
             let apiStart = Date().timeIntervalSinceReferenceDate
             Logger.shared.logDebug("DataManager - Fetching floating IPs (\(priority) priority)...")

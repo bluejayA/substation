@@ -22,6 +22,9 @@ class InputHandler {
             return
         }
 
+        // Update last activity time to prevent auto-refresh during active navigation
+        tui.lastUserActivityTime = Date()
+
         Logger.shared.logUserAction("input_received", details: [
             "keyCode": ch,
             "currentView": "\(tui.currentView)",

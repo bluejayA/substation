@@ -103,11 +103,19 @@ struct FilterUtils {
     }
 
     static func filterFloatingIPs(_ floatingIPs: [FloatingIP], query: String?) -> [FloatingIP] {
-        guard let query = query?.lowercased() else { return floatingIPs }
+        guard let queryLower = query?.lowercased() else { return floatingIPs }
         return floatingIPs.filter { floatingIP in
-            floatingIP.floatingIpAddress?.lowercased().contains(query) == true ||
-            floatingIP.id.lowercased().contains(query) ||
-            floatingIP.portId?.lowercased().contains(query) == true
+            // Use localizedStandardContains for better performance (optimized by Swift runtime)
+            if let ip = floatingIP.floatingIpAddress, ip.localizedStandardContains(queryLower) {
+                return true
+            }
+            if floatingIP.id.localizedStandardContains(queryLower) {
+                return true
+            }
+            if let portId = floatingIP.portId, portId.localizedStandardContains(queryLower) {
+                return true
+            }
+            return false
         }
     }
 
