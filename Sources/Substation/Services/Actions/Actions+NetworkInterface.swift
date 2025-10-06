@@ -103,9 +103,14 @@ extension Actions {
     internal func loadAttachedServersForNetwork(_ network: Network) async {
         attachedServerIds.removeAll()
         // Find servers that have this network attached
+        // Check for both network name and ID since addresses can be keyed by either
         for server in cachedServers {
-            if let addresses = server.addresses, addresses.keys.contains(network.name ?? network.id) {
-                attachedServerIds.insert(server.id)
+            if let addresses = server.addresses {
+                let hasNetwork = addresses.keys.contains(network.id) ||
+                                (network.name != nil && addresses.keys.contains(network.name!))
+                if hasNetwork {
+                    attachedServerIds.insert(server.id)
+                }
             }
         }
     }

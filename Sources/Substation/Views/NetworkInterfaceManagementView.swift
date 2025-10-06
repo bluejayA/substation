@@ -83,31 +83,136 @@ struct NetworkInterfaceManagementView {
             return
         }
 
-        // Mode selection display with optimized string concatenation
-        let modeText = HStack(spacing: 1, children: [
-            Text(Self.networkInterfaceManagementModePrefix).info().bold(),
-            Text(form.currentViewMode == .ports ? "[Ports]" : "Ports").primary().bold(),
-            Text("/").info(),
-            Text(form.currentViewMode == .networks ? "[Networks]" : "Networks").primary().bold()
-        ])
-        components.append(modeText.padding(Self.networkInterfaceManagementModeSelectionEdgeInsets))
+        // Render FormSelector based on current view mode
+        if form.currentViewMode == .ports {
+            // Ports mode - use FormSelector<Port>
+            let ports = managementItems.compactMap { $0 as? Port }
 
+            // Build selected port IDs
+            var selectedPortIds: Set<String> = []
+            selectedPortIds.formUnion(form.pendingPortAttachments)
+            selectedPortIds.formUnion(form.pendingPortDetachments)
 
-        // Render management items with optimized viewport
-        let maxItemsToShow = min(Int(contentHeight) - Self.networkInterfaceManagementContentOffset, managementItems.count)
-        let startIndex = max(0, min(form.selectedResourceIndex - maxItemsToShow + Self.networkInterfaceManagementViewportOffset, managementItems.count - maxItemsToShow))
+            // Clamp highlighted index
+            let safeHighlightedIndex = min(max(0, form.selectedResourceIndex), max(0, ports.count - 1))
 
-        for i in 0..<maxItemsToShow {
-            let itemIndex = startIndex + i
-            if itemIndex >= managementItems.count { break }
+            let portSelector = FormSelector<Port>(
+                label: "Network Interfaces (Ports)",
+                tabs: [
+                    FormSelectorTab<Port>(
+                        title: "PORTS",
+                        columns: [
+                            FormSelectorColumn(header: "Status", width: 4) { port in
+                                let isAttached = form.isPortCurrentlyAttached(port.id)
+                                let isPendingAdd = form.pendingPortAttachments.contains(port.id)
+                                let isPendingRemove = form.pendingPortDetachments.contains(port.id)
 
-            let item = managementItems[itemIndex]
-            let isSelected = itemIndex == form.selectedResourceIndex
-            let itemComponent = Self.createNetworkInterfaceManagementItemComponent(item: item, isSelected: isSelected, form: form, resourceNameCache: resourceNameCache)
-            components.append(itemComponent)
+                                if isPendingAdd {
+                                    return "[+]"
+                                } else if isPendingRemove {
+                                    return "[-]"
+                                } else if isAttached {
+                                    return "[*]"
+                                } else {
+                                    return "[ ]"
+                                }
+                            },
+                            FormSelectorColumn(header: "Port Name", width: 20) { port in
+                                let portName = port.name ?? "port-\(String(port.id.prefix(8)))"
+                                return String(portName.prefix(20))
+                            },
+                            FormSelectorColumn(header: "Network", width: 20) { port in
+                                if let networkName = resourceNameCache.getNetworkName(port.networkId) {
+                                    return String(networkName.prefix(20))
+                                }
+                                if let network = form.availableNetworks.first(where: { $0.id == port.networkId }) {
+                                    return String((network.name ?? "Unknown").prefix(20))
+                                }
+                                return String("net-\(port.networkId.prefix(8))")
+                            },
+                            FormSelectorColumn(header: "IP Address", width: 15) { port in
+                                port.fixedIps?.first?.ipAddress ?? "N/A"
+                            }
+                        ]
+                    )
+                ],
+                selectedTabIndex: 0,
+                items: ports,
+                selectedItemIds: selectedPortIds,
+                highlightedIndex: safeHighlightedIndex,
+                multiSelect: true,
+                scrollOffset: 0,
+                searchQuery: nil,
+                maxWidth: 80,
+                maxHeight: Int(contentHeight) - 5,
+                isActive: true
+            )
+            components.append(portSelector.render())
+
+        } else {
+            // Networks mode - use FormSelector<Network>
+            let networks = managementItems.compactMap { $0 as? Network }
+
+            // Build selected network IDs
+            var selectedNetworkIds: Set<String> = []
+            selectedNetworkIds.formUnion(form.pendingNetworkAttachments)
+            selectedNetworkIds.formUnion(form.pendingNetworkDetachments)
+
+            // Clamp highlighted index
+            let safeHighlightedIndex = min(max(0, form.selectedResourceIndex), max(0, networks.count - 1))
+
+            let networkSelector = FormSelector<Network>(
+                label: "Network Interfaces (Networks)",
+                tabs: [
+                    FormSelectorTab<Network>(
+                        title: "NETWORKS",
+                        columns: [
+                            FormSelectorColumn(header: "Status", width: 4) { network in
+                                let isAttached = form.isNetworkCurrentlyAttached(network.id)
+                                let isPendingAdd = form.pendingNetworkAttachments.contains(network.id)
+                                let isPendingRemove = form.pendingNetworkDetachments.contains(network.id)
+
+                                if isPendingAdd {
+                                    return "[+]"
+                                } else if isPendingRemove {
+                                    return "[-]"
+                                } else if isAttached {
+                                    return "[*]"
+                                } else {
+                                    return "[ ]"
+                                }
+                            },
+                            FormSelectorColumn(header: "Network Name", width: 25) { network in
+                                String((network.name ?? "Unnamed").prefix(25))
+                            },
+                            FormSelectorColumn(header: "Shared", width: 7) { network in
+                                network.shared.map { $0 ? "Yes" : "No" } ?? "Unknown"
+                            },
+                            FormSelectorColumn(header: "External", width: 8) { network in
+                                network.external.map { $0 ? "Yes" : "No" } ?? "Unknown"
+                            }
+                        ]
+                    )
+                ],
+                selectedTabIndex: 0,
+                items: networks,
+                selectedItemIds: selectedNetworkIds,
+                highlightedIndex: safeHighlightedIndex,
+                multiSelect: true,
+                scrollOffset: 0,
+                searchQuery: nil,
+                maxWidth: 80,
+                maxHeight: Int(contentHeight) - 5,
+                isActive: true
+            )
+            components.append(networkSelector.render())
         }
 
-        // Pending changes summary with optimized string building
+        // Add mode switch instructions
+        components.append(Text("TAB: Switch between Ports/Networks | SPACE: Toggle selection | ENTER: Apply").info()
+            .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
+
+        // Pending changes summary
         if form.hasPendingChanges() {
             let changesComponent = Self.createPendingChangesComponent(form: form)
             components.append(changesComponent)
@@ -121,100 +226,6 @@ struct NetworkInterfaceManagementView {
 
     // MARK: - Component Creation Functions
 
-    @MainActor
-    private static func createNetworkInterfaceManagementItemComponent(item: Any, isSelected: Bool, form: NetworkInterfaceManagementForm, resourceNameCache: ResourceNameCache) -> any Component {
-        if let port = item as? Port {
-            return createPortManagementItemComponent(port: port, isSelected: isSelected, form: form, resourceNameCache: resourceNameCache)
-        } else if let network = item as? Network {
-            return createNetworkManagementItemComponent(network: network, isSelected: isSelected, form: form)
-        } else {
-            // Fallback component for unknown item types
-            let itemStyle: TextStyle = isSelected ? .accent : .secondary
-            return Text(Self.networkInterfaceManagementUnknownItemText).styled(itemStyle)
-                .padding(Self.networkInterfaceManagementItemEdgeInsets)
-        }
-    }
-
-    @MainActor
-    private static func createPortManagementItemComponent(port: Port, isSelected: Bool, form: NetworkInterfaceManagementForm, resourceNameCache: ResourceNameCache) -> any Component {
-        // Pre-calculate port attachment status for performance
-        let isAttached = form.isPortCurrentlyAttached(port.id)
-        let isPendingAdd = form.pendingPortAttachments.contains(port.id)
-        let isPendingRemove = form.pendingPortDetachments.contains(port.id)
-
-        // Status indicator with pre-calculated values
-        let statusIndicator: String
-        if isPendingAdd {
-            statusIndicator = Self.networkInterfaceManagementPendingAddIndicator
-        } else if isPendingRemove {
-            statusIndicator = Self.networkInterfaceManagementPendingRemoveIndicator
-        } else if isAttached {
-            statusIndicator = Self.networkInterfaceManagementAttachedIndicator
-        } else {
-            statusIndicator = Self.networkInterfaceManagementAvailableIndicator
-        }
-
-        // Port name with standardized fallback
-        let portName = port.name ?? (Self.networkInterfaceManagementPortPrefix + String(port.id.prefix(Self.networkInterfaceManagementPortIdTruncateLength)))
-        let portID = String(port.id.prefix(Self.networkInterfaceManagementPortIdDisplayLength))
-
-        // Network name resolution with optimized fallback chain
-        let networkName: String
-        if let cachedName = resourceNameCache.getNetworkName(port.networkId), !cachedName.isEmpty {
-            networkName = cachedName
-        } else if let network = form.availableNetworks.first(where: { $0.id == port.networkId }) {
-            networkName = network.name ?? "Unknown Network"
-        } else {
-            networkName = Self.networkInterfaceManagementNetworkPrefix + String(port.networkId.prefix(Self.networkInterfaceManagementNetworkIdTruncateLength))
-        }
-
-        // IP address with standardized fallback
-        let ipAddress = port.fixedIps?.first?.ipAddress ?? Self.networkInterfaceManagementNoIPText
-
-        // Optimized string concatenation for port information
-        let portInfo = portName + Self.networkInterfaceManagementPortInfoSeparator +
-                       Self.networkInterfaceManagementIdLabel + portID + Self.networkInterfaceManagementPortInfoSeparator +
-                       Self.networkInterfaceManagementNetworkLabel + networkName + Self.networkInterfaceManagementPortInfoSeparator +
-                       Self.networkInterfaceManagementIPLabel + ipAddress
-
-        let displayName = String(portInfo.prefix(Self.networkInterfaceManagementDisplayNameMaxLength))
-
-        // Pre-calculate spaced text for optimal performance
-        let spacedStatusIndicator = statusIndicator + Self.networkInterfaceManagementItemTextSpacing
-        let finalDisplayText = spacedStatusIndicator + displayName
-
-        let itemStyle: TextStyle = isSelected ? .accent : .secondary
-        return Text(finalDisplayText).styled(itemStyle)
-            .padding(Self.networkInterfaceManagementItemEdgeInsets)
-    }
-
-    @MainActor
-    private static func createNetworkManagementItemComponent(network: Network, isSelected: Bool, form: NetworkInterfaceManagementForm) -> any Component {
-        // Pre-calculate network attachment status for performance
-        let isAttached = form.isNetworkCurrentlyAttached(network.id)
-        let isPendingAdd = form.pendingNetworkAttachments.contains(network.id)
-        let isPendingRemove = form.pendingNetworkDetachments.contains(network.id)
-
-        // Status indicator with pre-calculated values
-        let statusIndicator: String
-        if isPendingAdd {
-            statusIndicator = Self.networkInterfaceManagementPendingAddIndicator
-        } else if isPendingRemove {
-            statusIndicator = Self.networkInterfaceManagementPendingRemoveIndicator
-        } else if isAttached {
-            statusIndicator = Self.networkInterfaceManagementAttachedIndicator
-        } else {
-            statusIndicator = Self.networkInterfaceManagementAvailableIndicator
-        }
-
-        // Pre-calculate spaced text for optimal performance
-        let spacedStatusIndicator = statusIndicator + Self.networkInterfaceManagementItemTextSpacing
-        let finalDisplayText = spacedStatusIndicator + (network.name ?? "Unknown Network")
-
-        let itemStyle: TextStyle = isSelected ? .accent : .secondary
-        return Text(finalDisplayText).styled(itemStyle)
-            .padding(Self.networkInterfaceManagementItemEdgeInsets)
-    }
 
     @MainActor
     private static func createPendingChangesComponent(form: NetworkInterfaceManagementForm) -> any Component {
