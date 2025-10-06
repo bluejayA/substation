@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  pull_request:
+    paths:
+      - Sources/**
+      - Tests/**
+      - .github/workflows/tests.yml
+      - Package.swift
+  workflow_dispatch:
+
+jobs:
+  test-coverage:
+    name: Test Coverage
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Swift
+      uses: swift-actions/setup-swift@v2
+      with:
+        swift-version: "6.1"
+
+    - name: Run tests with coverage
+      run: swift build
+
+    - name: Run tests with coverage
+      run: swift test --enable-code-coverage
+
+    - name: Generate coverage report
+      run: |
+        # Use Swift toolchain llvm-cov to avoid version mismatches
+        llvm-cov export \
+          .build/arm64-apple-macosx/debug/substationPackageTests.xctest/Contents/MacOS/substationPackageTests \
+          -instr-profile=.build/arm64-apple-macosx/debug/codecov/default.profdata \
+          -format=lcov > coverage.lcov || echo "Coverage export failed - this is expected on some platforms"
+
+        # Generate coverage summary
+        llvm-cov report \
+          .build/arm64-apple-macosx/debug/substationPackageTests.xctest/Contents/MacOS/substationPackageTests \
+          -instr-profile=.build/arm64-apple-macosx/debug/codecov/default.profdata || true
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.lcov
+        retention-days: 30

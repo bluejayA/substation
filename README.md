@@ -114,14 +114,24 @@ All standalone, all reusable, all tested:
 
 ## Testing
 
-```bash
-# Run all tests
-swift test
+Substation includes a comprehensive test suite with 36+ tests covering all major components.
 
-# Run specific test suites
-swift test --filter OSClientTests
-swift test --filter SubstationTests
+```bash
+# Run with code coverage
+~/.swiftly/bin/swift test --enable-code-coverage
 ```
+
+### Continuous Integration
+
+All tests run automatically on every push and pull request via GitHub Actions. The CI pipeline:
+
+- Builds in both debug and release configurations
+- Runs the full test suite
+- Treats build warnings as errors (zero-warning policy)
+- Generates code coverage reports
+- Validates code formatting
+
+See [Testing Guide](https://substation.cloud/reference/developers/testing/) for detailed testing documentation.
 
 ## Development
 

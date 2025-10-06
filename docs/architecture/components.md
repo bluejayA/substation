@@ -188,9 +188,7 @@ extension NovaService: ServerDataManager {
 }
 ```
 
-## Substation Service Layer (Refactored Architecture)
-
-The Substation application layer was refactored in September 2025 to extract business logic from the monolithic TUI.swift file:
+## Substation Service Layer
 
 ```mermaid
 graph TB
@@ -592,7 +590,3 @@ For more detailed information:
 - **[FormBuilder Guide](../reference/developers/formbuilder-guide.md)** - Developer guide for FormBuilder
 - **[Performance](../performance/index.md)** - Performance architecture and benchmarking
 - **[Security](../concepts/security.md)** - Security implementation details
-
----
-
-**Note**: This component architecture is based on the actual implementation in `Sources/` and reflects the September 2025 service layer refactoring. All components mentioned are implemented, tested, and functional.

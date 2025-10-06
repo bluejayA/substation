@@ -91,6 +91,7 @@ let package = Package(
         .testTarget(
             name: "SubstationTests",
             dependencies: ["Substation", "OSClient", "SwiftTUI"],
+            exclude: ["TestFramework.swift", "TestRunner.swift"],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
                 .enableUpcomingFeature("ExistentialAny")
