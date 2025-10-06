@@ -160,95 +160,93 @@ struct VolumeManagementView {
         var components: [any Component] = []
 
         let displayServers = form.getCurrentDisplayItems()
-        let listTitle = getListTitle(for: form.selectedOperation, volume: volume)
 
-        components.append(Text(listTitle).accent())
+        // Build selected server IDs for FormSelector
+        var selectedServerIds: Set<String> = []
+        for serverId in form.pendingAttachments {
+            selectedServerIds.insert(serverId)
+        }
 
-        let maxDisplayRows = max(1, Int(height - Self.headerSpacing))
-        let startIndex = max(0, form.selectedResourceIndex - maxDisplayRows + 1)
-        let endIndex = min(displayServers.count, startIndex + maxDisplayRows)
+        // Determine which tab is active based on operation mode
+        let selectedTabIndex = form.selectedOperation == .view ? 0 : 1
 
+        // Create tabs for View and Attach modes
+        let viewTab = FormSelectorTab<Server>(
+            title: "VIEW ATTACHED",
+            columns: [
+                FormSelectorColumn(header: "Server Name", width: 25) { server in
+                    String((server.name ?? "Unnamed").prefix(25))
+                },
+                FormSelectorColumn(header: "Status", width: 10) { server in
+                    String((server.status?.rawValue ?? "unknown").prefix(10))
+                },
+                FormSelectorColumn(header: "Device", width: 15) { server in
+                    // Get the device path for this attachment
+                    if let attachment = volume.attachments?.first(where: { $0.serverId == server.id }),
+                       let device = attachment.device {
+                        return String(device.prefix(15))
+                    }
+                    return "N/A"
+                }
+            ]
+        )
+
+        let attachTab = FormSelectorTab<Server>(
+            title: "ATTACH TO SERVER",
+            columns: [
+                FormSelectorColumn(header: "Server Name", width: 25) { server in
+                    String((server.name ?? "Unnamed").prefix(25))
+                },
+                FormSelectorColumn(header: "Status", width: 10) { server in
+                    String((server.status?.rawValue ?? "unknown").prefix(10))
+                },
+                FormSelectorColumn(header: "Flavor", width: 15) { server in
+                    if let flavorName = server.flavor?.name {
+                        return String(flavorName.prefix(15))
+                    }
+                    return "Unknown"
+                }
+            ]
+        )
+
+        // Clamp highlighted index to valid range
+        let safeHighlightedIndex = min(max(0, form.selectedResourceIndex), max(0, displayServers.count - 1))
+
+        // Determine multi-select based on operation
+        let multiSelect = form.selectedOperation == .attach && (volume.attachments?.isEmpty ?? true)
+
+        // Show empty message if no servers to display
         if displayServers.isEmpty {
             let emptyMessage = getEmptyMessage(for: form.selectedOperation, volume: volume)
             components.append(Text("  \(emptyMessage)").info())
-        } else {
-            for i in startIndex..<endIndex {
-                let server = displayServers[i]
-                let isSelected = i == form.selectedResourceIndex
-                let serverComponent = createServerItemComponent(server: server, form: form, isSelected: isSelected)
-                components.append(serverComponent)
-            }
+            return components
         }
+
+        let selector = FormSelector<Server>(
+            label: getListTitle(for: form.selectedOperation, volume: volume),
+            tabs: [viewTab, attachTab],
+            selectedTabIndex: selectedTabIndex,
+            items: displayServers,
+            selectedItemIds: selectedServerIds,
+            highlightedIndex: safeHighlightedIndex,
+            multiSelect: multiSelect,
+            scrollOffset: 0,
+            searchQuery: nil,
+            maxWidth: 80,
+            maxHeight: Int(height) - 15,
+            isActive: true
+        )
+
+        components.append(selector.render())
 
         return components
     }
 
-    private static func createServerItemComponent(server: Server, form: VolumeManagementForm, isSelected: Bool) -> any Component {
-        var itemComponents: [any Component] = []
-
-        // Selection indicator
-        let indicator = isSelected ? Self.selectedIndicator : Self.unselectedIndicator
-        itemComponents.append(Text(indicator).styled(isSelected ? .accent : .primary))
-
-        // Toggle indicator for attach mode only
-        if form.selectedOperation == .attach && (form.selectedVolume?.attachments?.isEmpty ?? true) {
-            let isToggled = form.isServerSelected(server.id)
-            let toggleChar = isToggled ? Self.checkboxSelected : Self.checkboxUnselected
-            let toggleStyle: TextStyle = isToggled ? .success : .secondary
-            itemComponents.append(Text("\(toggleChar) ").styled(toggleStyle))
-        }
-
-        // Server info components
-        let serverName = server.name ?? Self.unnamedServerText
-        let displayName = String(serverName.prefix(Self.maxServerNameLength))
-        let status = server.status?.rawValue ?? Self.unknownStatus
-        let statusInfo = " (\(status.uppercased()))"
-
-        var serverInfoText = displayName + statusInfo
-
-        // Server flavor info if available
-        if let flavorId = server.flavor?.id {
-            let flavorInfo = "\(Self.flavorPrefix)\(String(flavorId.prefix(Self.flavorIdDisplayLength)))"
-            serverInfoText += flavorInfo
-        }
-
-        itemComponents.append(Text(serverInfoText).styled(isSelected ? .accent : .secondary))
-
-        // Current attachment indicator
-        if form.isServerCurrentlyAttached(server.id) {
-            let attachmentText: String
-            if let volume = form.selectedVolume,
-               let attachment = volume.attachments?.first(where: { $0.serverId == server.id }),
-               let device = attachment.device {
-                attachmentText = String(format: Self.currentlyAttachedAsText, device)
-            } else {
-                attachmentText = Self.currentlyAttachedText
-            }
-            itemComponents.append(Text(attachmentText).success())
-        }
-
-        // Status indicator for attach mode
-        if form.selectedOperation == .attach && form.isServerCurrentlyAttached(server.id) {
-            itemComponents.append(Text(Self.alreadyAttachedText).info())
-        }
-
-        return HStack(spacing: 0, children: itemComponents)
-    }
 
     @MainActor
     private static func renderFooterComponents(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                              width: Int32, height: Int32, form: VolumeManagementForm, volume: Volume) async {
         let surface = SwiftTUI.surface(from: screen)
-
-        // Scroll indicator
-        let displayServers = form.getCurrentDisplayItems()
-        let maxDisplayRows = max(1, Int(height - Self.headerSpacing))
-        if displayServers.count > maxDisplayRows {
-            let scrollRow = startRow + height - Self.footerSpacing
-            let scrollText = String(format: Self.scrollIndicatorFormat, form.selectedResourceIndex + 1, displayServers.count)
-            let scrollBounds = Rect(x: startCol + Self.contentIndent, y: scrollRow, width: Int32(scrollText.count), height: Self.rowSpacing)
-            await SwiftTUI.render(Text(scrollText).info(), on: surface, in: scrollBounds)
-        }
 
         // Pending changes summary
         if form.hasPendingChanges() {
