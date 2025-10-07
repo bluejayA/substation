@@ -25,61 +25,270 @@ struct ImageViews {
         )
     }
 
-    // MARK: - Image Detail View (Gold Standard Pattern)
+    // MARK: - Image Detail View
 
-    // Detail View Layout Constants
-    private static let imageDetailTopPadding: Int32 = 2
-    private static let imageDetailBottomPadding: Int32 = 2
-    private static let imageDetailLeadingPadding: Int32 = 0
-    private static let imageDetailTrailingPadding: Int32 = 0
-    private static let imageDetailBasicInfoSpacing: Int32 = 0
-    private static let imageDetailTechnicalInfoSpacing: Int32 = 0
-    private static let imageDetailSectionSpacing: Int32 = 1
-    private static let imageDetailMinScreenWidth: Int32 = 40
-    private static let imageDetailMinScreenHeight: Int32 = 15
-    private static let imageDetailBoundsMinWidth: Int32 = 1
-    private static let imageDetailBoundsMinHeight: Int32 = 1
-    private static let imageDetailComponentSpacing: Int32 = 0
+    @MainActor
+    static func drawImageDetail(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        image: Image,
+        scrollOffset: Int = 0
+    ) async {
+        var sections: [DetailSection] = []
 
-    // Detail View Layout Constants (Matching Gold Standard)
-    private static let imageDetailTitleTopPadding: Int32 = 0
-    private static let imageDetailTitleLeadingPadding: Int32 = 0
-    private static let imageDetailTitleBottomPadding: Int32 = 2
-    private static let imageDetailTitleTrailingPadding: Int32 = 0
-    private static let imageDetailSectionTopPadding: Int32 = 0
-    private static let imageDetailSectionLeadingPadding: Int32 = 4
-    private static let imageDetailSectionBottomPadding: Int32 = 1
-    private static let imageDetailSectionTrailingPadding: Int32 = 0
+        // Basic Information Section
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: image.id),
+            DetailView.buildFieldItem(label: "Name", value: image.name),
+            image.status.map { .field(label: "Status", value: $0, style: $0.lowercased() == "active" ? .success : $0.lowercased().contains("error") ? .error : .warning) },
+            DetailView.buildFieldItem(label: "Visibility", value: image.visibility)
+        ]
+
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
+        }
+
+        // Technical Information Section
+        var technicalItems: [DetailItem?] = []
+
+        if let size = image.size {
+            let sizeGB = Double(size) / (1024 * 1024 * 1024)
+            technicalItems.append(.field(label: "Size", value: String(format: "%.2f GB", sizeGB), style: .secondary))
+        }
+
+        if let virtualSize = image.virtualSize {
+            let virtualSizeGB = Double(virtualSize) / (1024 * 1024 * 1024)
+            technicalItems.append(.field(label: "Virtual Size", value: String(format: "%.2f GB", virtualSizeGB), style: .secondary))
+
+            // Show size efficiency if both sizes are available
+            if let size = image.size {
+                let efficiency = (Double(size) / Double(virtualSize)) * 100
+                technicalItems.append(.field(label: "  Efficiency", value: String(format: "%.1f%% (sparse file)", efficiency), style: .info))
+            }
+        }
+
+        if let diskFormat = image.diskFormat {
+            technicalItems.append(.field(label: "Disk Format", value: diskFormat, style: .secondary))
+            let formatDescription = getDiskFormatDescription(diskFormat)
+            if !formatDescription.isEmpty {
+                technicalItems.append(.field(label: "  Description", value: formatDescription, style: .info))
+            }
+        }
+
+        if let containerFormat = image.containerFormat {
+            technicalItems.append(.field(label: "Container Format", value: containerFormat, style: .secondary))
+            let containerDescription = getContainerFormatDescription(containerFormat)
+            if !containerDescription.isEmpty {
+                technicalItems.append(.field(label: "  Description", value: containerDescription, style: .info))
+            }
+        }
+
+        if let minDisk = image.minDisk, minDisk > 0 {
+            technicalItems.append(.field(label: "Minimum Disk", value: "\(minDisk) GB", style: .secondary))
+        }
+
+        if let minRam = image.minRam, minRam > 0 {
+            technicalItems.append(.field(label: "Minimum RAM", value: "\(minRam) MB", style: .secondary))
+        }
+
+        if let technicalSection = DetailView.buildSection(title: "Technical Information", items: technicalItems, titleStyle: .accent) {
+            sections.append(technicalSection)
+        }
+
+        // Classified Properties Sections (preserve intelligent classification)
+        let classifiedProperties = classifyImageProperties(image: image)
+
+        // Operating System Section
+        if !classifiedProperties.operatingSystem.isEmpty {
+            let osItems = classifiedProperties.operatingSystem.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Operating System", items: osItems))
+        }
+
+        // Architecture Section
+        if !classifiedProperties.architecture.isEmpty {
+            let archItems = classifiedProperties.architecture.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Architecture", items: archItems))
+        }
+
+        // Virtualization Section
+        if !classifiedProperties.virtualization.isEmpty {
+            let virtItems = classifiedProperties.virtualization.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Virtualization", items: virtItems))
+        }
+
+        // Security Section
+        if !classifiedProperties.security.isEmpty {
+            let secItems = classifiedProperties.security.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Security", items: secItems))
+        }
+
+        // Storage Section
+        if !classifiedProperties.storage.isEmpty {
+            let storageItems = classifiedProperties.storage.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Storage", items: storageItems))
+        }
+
+        // Cloud Section
+        if !classifiedProperties.cloud.isEmpty {
+            let cloudItems = classifiedProperties.cloud.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Cloud", items: cloudItems))
+        }
+
+        // Other Properties Section
+        if !classifiedProperties.other.isEmpty {
+            let otherItems = classifiedProperties.other.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Other Properties", items: otherItems))
+        }
+
+        // Server Snapshot Section
+        if let metadata = image.metadata {
+            var snapshotItems: [DetailItem?] = []
+
+            if let sourceServerName = metadata["source_server_name"] {
+                snapshotItems.append(.field(label: "Source Server", value: sourceServerName, style: .secondary))
+            }
+
+            if let sourceServerId = metadata["source_server_id"] {
+                snapshotItems.append(.field(label: "Source Server ID", value: sourceServerId, style: .muted))
+            }
+
+            if let createdBy = metadata["snapshot_created_by"] {
+                snapshotItems.append(.field(label: "Created by", value: createdBy, style: .secondary))
+            }
+
+            if let snapshotCreatedAt = metadata["snapshot_created_at"] {
+                snapshotItems.append(.field(label: "Snapshot Created", value: snapshotCreatedAt, style: .secondary))
+            }
+
+            if let snapshotSection = DetailView.buildSection(title: "Server Snapshot", items: snapshotItems) {
+                sections.append(snapshotSection)
+            }
+        }
+
+        // Progress Section
+        if let progress = image.progress, progress < 100 {
+            let progressItems: [DetailItem?] = [
+                .field(label: "Upload Progress", value: "\(progress)%", style: progress >= 75 ? .success : progress >= 50 ? .info : .warning)
+            ]
+
+            if let progressSection = DetailView.buildSection(title: "Upload Status", items: progressItems) {
+                sections.append(progressSection)
+            }
+        }
+
+        // Protection and Ownership Section
+        var protectionItems: [DetailItem?] = []
+
+        if let owner = image.owner {
+            protectionItems.append(.field(label: "Owner", value: owner, style: .secondary))
+        }
+
+        if let protected = image.protected {
+            protectionItems.append(.field(label: "Protected", value: protected ? "Yes" : "No", style: protected ? .success : .secondary))
+            if protected {
+                protectionItems.append(.field(label: "  Warning", value: "Image cannot be deleted while protected", style: .warning))
+            }
+        }
+
+        if let isPublic = image.isPublic {
+            protectionItems.append(.field(label: "Public", value: isPublic ? "Yes" : "No", style: isPublic ? .info : .secondary))
+        }
+
+        if let checksum = image.checksum {
+            protectionItems.append(.field(label: "Checksum", value: checksum, style: .muted))
+        }
+
+        if let protectionSection = DetailView.buildSection(title: "Protection and Ownership", items: protectionItems) {
+            sections.append(protectionSection)
+        }
+
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: image.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: image.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Tags Section
+        if let tags = image.tags, !tags.isEmpty {
+            let tagItems = tags.map { DetailItem.field(label: "Tag", value: $0, style: .secondary) }
+            sections.append(DetailSection(title: "Tags", items: tagItems))
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Image Details: \(image.name ?? "Unnamed Image")",
+            sections: sections,
+            helpText: "Press ESC to return to images list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    // MARK: - Helper Functions for Enhanced Image Information
+
+    private static func getDiskFormatDescription(_ diskFormat: String) -> String {
+        switch diskFormat.lowercased() {
+        case "qcow2": return "QEMU Copy-On-Write v2 (compressed, snapshots)"
+        case "raw": return "Raw disk image (no compression)"
+        case "vdi": return "VirtualBox Disk Image"
+        case "vmdk": return "VMware Virtual Machine Disk"
+        case "vhd": return "Virtual Hard Disk (Hyper-V)"
+        case "vhdx": return "Virtual Hard Disk v2 (Hyper-V)"
+        case "iso": return "ISO 9660 optical disc image"
+        case "aki": return "Amazon Kernel Image"
+        case "ari": return "Amazon Ramdisk Image"
+        case "ami": return "Amazon Machine Image"
+        default: return ""
+        }
+    }
+
+    private static func getContainerFormatDescription(_ containerFormat: String) -> String {
+        switch containerFormat.lowercased() {
+        case "bare": return "No container, just the disk format"
+        case "ovf": return "Open Virtualization Format"
+        case "ova": return "Open Virtual Appliance (OVF + files)"
+        case "ami": return "Amazon Machine Image container"
+        case "aki": return "Amazon Kernel Image container"
+        case "ari": return "Amazon Ramdisk Image container"
+        case "docker": return "Docker container format"
+        default: return ""
+        }
+    }
+
+    // MARK: - Legacy Constants for Gold Standard Line Generation Functions
+
     private static let imageDetailInfoFieldIndent = "  "
     private static let imageDetailFieldValueSeparator = ": "
-
-    // Detail View EdgeInsets (Pre-calculated for Performance)
-    private static let imageDetailTitleEdgeInsets = EdgeInsets(top: imageDetailTitleTopPadding, leading: imageDetailTitleLeadingPadding, bottom: imageDetailTitleBottomPadding, trailing: imageDetailTitleTrailingPadding)
-    private static let imageDetailSectionEdgeInsets = EdgeInsets(top: imageDetailSectionTopPadding, leading: imageDetailSectionLeadingPadding, bottom: imageDetailSectionBottomPadding, trailing: imageDetailSectionTrailingPadding)
-
-    // Detail View Layout Constants (Extended)
-    private static let imageDetailReservedSpace: Int32 = 8
-    private static let imageDetailPropertyKeyMaxLength = 25
-    private static let imageDetailPropertyValueMaxLength = 40
-    private static let imageDetailTagsMaxLineWidth = 70
-    private static let imageDetailChecksumMaxLength = 50
-    private static let imageDetailScrollThreshold = 15
-
-    // Detail View Text Constants
-    private static let imageDetailTitle = "Image Details"
-    private static let imageDetailBasicInfoTitle = "Basic Information"
-    private static let imageDetailTechnicalInfoTitle = "Technical Information"
-    private static let imageDetailServerSnapshotTitle = "Server Snapshot"
-    private static let imageDetailOperatingSystemTitle = "Operating System"
-    private static let imageDetailArchitectureTitle = "Architecture"
-    private static let imageDetailVirtualizationTitle = "Virtualization"
-    private static let imageDetailSecurityTitle = "Security"
-    private static let imageDetailStorageTitle = "Storage"
-    private static let imageDetailCloudTitle = "Cloud"
-    private static let imageDetailTagsTitle = "Tags"
-    private static let imageDetailOtherPropertiesTitle = "Other Properties"
-    private static let imageDetailAdditionalInfoTitle = "Additional Information"
-    private static let imageDetailTimestampsTitle = "Timestamps"
+    private static let imageDetailUnnamedText = "Unnamed Image"
+    private static let imageDetailUnknownText = "Unknown"
     private static let imageDetailNameLabel = "Name"
     private static let imageDetailIdLabel = "ID"
     private static let imageDetailStatusLabel = "Status"
@@ -89,373 +298,41 @@ struct ImageViews {
     private static let imageDetailContainerFormatLabel = "Container Format"
     private static let imageDetailMinDiskLabel = "Minimum Disk"
     private static let imageDetailMinRamLabel = "Minimum RAM"
-    private static let imageDetailOwnerLabel = "Owner"
-    private static let imageDetailProtectedLabel = "Protected"
-    private static let imageDetailChecksumLabel = "Checksum"
-    private static let imageDetailCreatedLabel = "Created"
-    private static let imageDetailUpdatedLabel = "Updated"
+    private static let imageDetailSizeConversionFactor: Double = 1024 * 1024 * 1024
+    private static let imageDetailSizeFormat = "%.2f GB"
+    private static let imageDetailMinDiskFormat = "%d GB"
+    private static let imageDetailMinRamFormat = "%d MB"
+    private static let imageDetailOperatingSystemTitle = "Operating System"
+    private static let imageDetailArchitectureTitle = "Architecture"
+    private static let imageDetailVirtualizationTitle = "Virtualization"
+    private static let imageDetailSecurityTitle = "Security"
+    private static let imageDetailStorageTitle = "Storage"
+    private static let imageDetailCloudTitle = "Cloud"
+    private static let imageDetailOtherPropertiesTitle = "Other Properties"
+    private static let imageDetailPropertyKeyMaxLength = 25
+    private static let imageDetailPropertyValueMaxLength = 40
+    private static let imageDetailTruncationSuffix = "..."
     private static let imageDetailSourceServerLabel = "Source Server"
     private static let imageDetailSourceServerIdLabel = "Source Server ID"
     private static let imageDetailSnapshotCreatedByLabel = "Created by"
     private static let imageDetailSnapshotCreatedAtLabel = "Snapshot Created"
-    private static let imageDetailUnnamedText = "Unnamed Image"
-    private static let imageDetailUnknownText = "Unknown"
-    private static let imageDetailNoOwnerText = "No owner"
-    private static let imageDetailNoChecksumText = "No checksum"
-    private static let imageDetailNoTagsText = "No tags"
+    private static let imageDetailOwnerLabel = "Owner"
+    private static let imageDetailProtectedLabel = "Protected"
+    private static let imageDetailChecksumLabel = "Checksum"
     private static let imageDetailProtectedYes = "Yes"
     private static let imageDetailProtectedNo = "No"
-    private static let imageDetailSizeFormat = "%.2f GB"
-    private static let imageDetailMinDiskFormat = "%d GB"
-    private static let imageDetailMinRamFormat = "%d MB"
-    private static let imageDetailScreenTooSmallText = "Screen too small"
-    private static let imageDetailSizeConversionFactor: Double = 1024 * 1024 * 1024
-    private static let imageDetailPropertyKeySuffix = ":"
-    private static let imageDetailTruncationSuffix = "..."
-    private static let imageDetailTagSeparator = ", "
-    private static let imageDetailScrollIndicatorPrefix = "["
-    private static let imageDetailScrollIndicatorSeparator = "-"
-    private static let imageDetailScrollIndicatorMiddle = "/"
-    private static let imageDetailScrollIndicatorSuffix = "] - Scroll: UP/DOWN"
-
-    @MainActor
-    static func drawImageDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                              width: Int32, height: Int32, image: Image, scrollOffset: Int = 0) async {
-
-        // Create surface for optimal performance (EXACT Gold Standard Pattern)
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > imageDetailMinScreenWidth && height > imageDetailMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow),
-                                   width: max(imageDetailBoundsMinWidth, width),
-                                   height: max(imageDetailBoundsMinHeight, height))
-            await SwiftTUI.render(Text(imageDetailScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Image Detail (following EXACT RouterViews pattern)
-        var components: [any Component] = []
-
-        // Title - EXACT RouterViews pattern
-        let imageName = image.name ?? imageDetailUnnamedText
-        let titleText = imageDetailTitle + imageDetailFieldValueSeparator + imageName
-        components.append(Text(titleText).accent().bold()
-                         .padding(imageDetailTitleEdgeInsets))
-
-        // Basic Information Section - Individual components for proper scrolling
-        components.append(Text(imageDetailBasicInfoTitle).primary().bold())
-        components.append(contentsOf: createBasicInfoComponents(image: image))
-
-        // Technical Information Section
-        components.append(Text(imageDetailTechnicalInfoTitle).primary().bold())
-        components.append(contentsOf: createTechnicalInfoComponents(image: image))
-
-        // Classified Properties Sections (preserve rich metadata)
-        let classifiedProperties = classifyImageProperties(image: image)
-        let classifiedSections = createClassifiedPropertySections(classifiedProperties: classifiedProperties)
-        components.append(contentsOf: classifiedSections)
-
-        // Server Snapshot Section
-        let serverSnapshotComponents = createServerSnapshotComponents(image: image)
-        if !serverSnapshotComponents.isEmpty {
-            components.append(Text(imageDetailServerSnapshotTitle).primary().bold())
-            components.append(contentsOf: serverSnapshotComponents)
-        }
-
-        // Tags Section
-        let tagsComponents = createTagsComponents(image: image)
-        if !tagsComponents.isEmpty {
-            components.append(Text(imageDetailTagsTitle).primary().bold())
-            components.append(contentsOf: tagsComponents)
-        }
-
-        // Additional Information Section
-        let additionalInfoComponents = createAdditionalInfoComponents(image: image)
-        if !additionalInfoComponents.isEmpty {
-            components.append(Text(imageDetailAdditionalInfoTitle).primary().bold())
-            components.append(contentsOf: additionalInfoComponents)
-        }
-
-        // Timestamps Section
-        let timestampComponents = createTimestampComponents(image: image)
-        if !timestampComponents.isEmpty {
-            components.append(Text(imageDetailTimestampsTitle).primary().bold())
-            components.append(contentsOf: timestampComponents)
-        }
-
-        // Apply scrolling and render visible components
-        let maxVisibleComponents = max(1, Int(height) - Int(imageDetailReservedSpace))
-        let startIndex = max(0, min(scrollOffset, components.count - maxVisibleComponents))
-        let endIndex = min(components.count, startIndex + maxVisibleComponents)
-        let visibleComponents = Array(components[startIndex..<endIndex])
-
-        // DEBUG: Log scrolling info to see what's happening
-        Logger.shared.logInfo("ImageViews Debug - scrollOffset: \(scrollOffset), components.count: \(components.count), maxVisibleComponents: \(maxVisibleComponents), startIndex: \(startIndex), endIndex: \(endIndex), height: \(height), reservedSpace: \(imageDetailReservedSpace)")
-
-
-        // Render using EXACT RouterViews pattern with scrolling
-        let imageDetailComponent = VStack(spacing: imageDetailComponentSpacing, children: visibleComponents)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(imageDetailComponent, on: surface, in: bounds)
-
-        // Add scroll indicators if needed
-        if components.count > maxVisibleComponents {
-            let scrollText = imageDetailScrollIndicatorPrefix + String(startIndex + 1) + imageDetailScrollIndicatorSeparator + String(endIndex) + imageDetailScrollIndicatorMiddle + String(components.count) + imageDetailScrollIndicatorSuffix
-            let scrollBounds = Rect(x: startCol, y: startRow + height - 1, width: width, height: 1)
-            await SwiftTUI.render(Text(scrollText).info(), on: surface, in: scrollBounds)
-        }
-    }
-
-    // MARK: - Gold Standard Component Creation Functions (EXACT RouterViews Pattern)
-
-    private static func createBasicInfoComponents(image: Image) -> [any Component] {
-        var components: [any Component] = []
-
-        // Pre-calculate common field prefixes for optimal performance (RouterViews pattern)
-        let fieldPrefix = imageDetailInfoFieldIndent
-        let fieldSeparator = imageDetailFieldValueSeparator
-
-        // Name
-        let imageName = image.name ?? imageDetailUnnamedText
-        let nameText = fieldPrefix + imageDetailNameLabel + fieldSeparator + imageName
-        components.append(Text(nameText).secondary())
-
-        // ID
-        let idText = fieldPrefix + imageDetailIdLabel + fieldSeparator + image.id
-        components.append(Text(idText).secondary())
-
-        // Status - with color coding like RouterViews
-        let status = image.status ?? imageDetailUnknownText
-        let statusText = fieldPrefix + imageDetailStatusLabel + fieldSeparator + status
-        if status.lowercased() == "active" {
-            components.append(Text(statusText).success())
-        } else if status.lowercased().contains("error") {
-            components.append(Text(statusText).error())
-        } else {
-            components.append(Text(statusText).secondary())
-        }
-
-        // Visibility
-        if let visibility = image.visibility {
-            let visibilityText = fieldPrefix + imageDetailVisibilityLabel + fieldSeparator + visibility
-            components.append(Text(visibilityText).secondary())
-        }
-
-        return components
-    }
-
-    private static func createTechnicalInfoComponents(image: Image) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = imageDetailInfoFieldIndent
-        let fieldSeparator = imageDetailFieldValueSeparator
-
-        // Size
-        if let size = image.size {
-            let sizeGB = Double(size) / imageDetailSizeConversionFactor
-            let sizeText = fieldPrefix + imageDetailSizeLabel + fieldSeparator + String(format: imageDetailSizeFormat, sizeGB)
-            components.append(Text(sizeText).secondary())
-        }
-
-        // Disk Format
-        if let diskFormat = image.diskFormat {
-            let diskFormatText = fieldPrefix + imageDetailDiskFormatLabel + fieldSeparator + diskFormat
-            components.append(Text(diskFormatText).secondary())
-        }
-
-        // Container Format
-        if let containerFormat = image.containerFormat {
-            let containerFormatText = fieldPrefix + imageDetailContainerFormatLabel + fieldSeparator + containerFormat
-            components.append(Text(containerFormatText).secondary())
-        }
-
-        // Min Disk
-        if let minDisk = image.minDisk, minDisk > 0 {
-            let minDiskText = fieldPrefix + imageDetailMinDiskLabel + fieldSeparator + String(format: imageDetailMinDiskFormat, minDisk)
-            components.append(Text(minDiskText).secondary())
-        }
-
-        // Min RAM
-        if let minRam = image.minRam, minRam > 0 {
-            let minRamText = fieldPrefix + imageDetailMinRamLabel + fieldSeparator + String(format: imageDetailMinRamFormat, minRam)
-            components.append(Text(minRamText).secondary())
-        }
-
-        return components
-    }
-
-    private static func createClassifiedPropertySections(classifiedProperties: ClassifiedProperties) -> [any Component] {
-        var components: [any Component] = []
-
-        // Operating System Properties
-        if !classifiedProperties.operatingSystem.isEmpty {
-            components.append(Text(imageDetailOperatingSystemTitle).primary().bold())
-            let osComponents = createPropertyComponents(properties: classifiedProperties.operatingSystem)
-            let osSection = VStack(spacing: 0, children: osComponents).padding(imageDetailSectionEdgeInsets)
-            components.append(osSection)
-        }
-
-        // Architecture Properties
-        if !classifiedProperties.architecture.isEmpty {
-            components.append(Text(imageDetailArchitectureTitle).primary().bold())
-            let archComponents = createPropertyComponents(properties: classifiedProperties.architecture)
-            let archSection = VStack(spacing: 0, children: archComponents).padding(imageDetailSectionEdgeInsets)
-            components.append(archSection)
-        }
-
-        // Virtualization Properties
-        if !classifiedProperties.virtualization.isEmpty {
-            components.append(Text(imageDetailVirtualizationTitle).primary().bold())
-            let virtComponents = createPropertyComponents(properties: classifiedProperties.virtualization)
-            let virtSection = VStack(spacing: 0, children: virtComponents).padding(imageDetailSectionEdgeInsets)
-            components.append(virtSection)
-        }
-
-        // Security Properties
-        if !classifiedProperties.security.isEmpty {
-            components.append(Text(imageDetailSecurityTitle).primary().bold())
-            let secComponents = createPropertyComponents(properties: classifiedProperties.security)
-            let secSection = VStack(spacing: 0, children: secComponents).padding(imageDetailSectionEdgeInsets)
-            components.append(secSection)
-        }
-
-        // Storage Properties
-        if !classifiedProperties.storage.isEmpty {
-            components.append(Text(imageDetailStorageTitle).primary().bold())
-            let storageComponents = createPropertyComponents(properties: classifiedProperties.storage)
-            let storageSection = VStack(spacing: 0, children: storageComponents).padding(imageDetailSectionEdgeInsets)
-            components.append(storageSection)
-        }
-
-        // Cloud Properties
-        if !classifiedProperties.cloud.isEmpty {
-            components.append(Text(imageDetailCloudTitle).primary().bold())
-            let cloudComponents = createPropertyComponents(properties: classifiedProperties.cloud)
-            let cloudSection = VStack(spacing: 0, children: cloudComponents).padding(imageDetailSectionEdgeInsets)
-            components.append(cloudSection)
-        }
-
-        // Other Properties
-        if !classifiedProperties.other.isEmpty {
-            components.append(Text(imageDetailOtherPropertiesTitle).primary().bold())
-            let otherComponents = createPropertyComponents(properties: classifiedProperties.other)
-            let otherSection = VStack(spacing: 0, children: otherComponents).padding(imageDetailSectionEdgeInsets)
-            components.append(otherSection)
-        }
-
-        return components
-    }
-
-    private static func createPropertyComponents(properties: [String: String]) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = imageDetailInfoFieldIndent
-        let fieldSeparator = imageDetailFieldValueSeparator
-
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            let propertyText = fieldPrefix + key + fieldSeparator + value
-            components.append(Text(propertyText).secondary())
-        }
-
-        return components
-    }
-
-    private static func createServerSnapshotComponents(image: Image) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = imageDetailInfoFieldIndent
-        let fieldSeparator = imageDetailFieldValueSeparator
-
-        guard let metadata = image.metadata else { return components }
-
-        // Source Server Name
-        if let sourceServerName = metadata["source_server_name"] {
-            let serverText = fieldPrefix + imageDetailSourceServerLabel + fieldSeparator + sourceServerName
-            components.append(Text(serverText).secondary())
-        }
-
-        // Source Server ID
-        if let sourceServerId = metadata["source_server_id"] {
-            let serverIdText = fieldPrefix + imageDetailSourceServerIdLabel + fieldSeparator + sourceServerId
-            components.append(Text(serverIdText).secondary())
-        }
-
-        // Snapshot Created By
-        if let createdBy = metadata["snapshot_created_by"] {
-            let createdByText = fieldPrefix + imageDetailSnapshotCreatedByLabel + fieldSeparator + createdBy
-            components.append(Text(createdByText).secondary())
-        }
-
-        // Snapshot Created At
-        if let snapshotCreatedAt = metadata["snapshot_created_at"] {
-            let snapshotCreatedText = fieldPrefix + imageDetailSnapshotCreatedAtLabel + fieldSeparator + snapshotCreatedAt
-            components.append(Text(snapshotCreatedText).secondary())
-        }
-
-        return components
-    }
-
-    private static func createTagsComponents(image: Image) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = imageDetailInfoFieldIndent
-
-        guard let tags = image.tags, !tags.isEmpty else { return components }
-
-        let tagsString = tags.joined(separator: imageDetailTagSeparator)
-        let tagsText = fieldPrefix + tagsString
-        components.append(Text(tagsText).secondary())
-
-        return components
-    }
-
-    private static func createAdditionalInfoComponents(image: Image) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = imageDetailInfoFieldIndent
-        let fieldSeparator = imageDetailFieldValueSeparator
-
-        // Owner
-        if let owner = image.owner {
-            let ownerText = fieldPrefix + imageDetailOwnerLabel + fieldSeparator + owner
-            components.append(Text(ownerText).secondary())
-        }
-
-        // Protected status
-        if let protected = image.protected {
-            let protectedValue = protected ? imageDetailProtectedYes : imageDetailProtectedNo
-            let protectedText = fieldPrefix + imageDetailProtectedLabel + fieldSeparator + protectedValue
-            if protected {
-                components.append(Text(protectedText).success())
-            } else {
-                components.append(Text(protectedText).secondary())
-            }
-        }
-
-        // Checksum
-        if let checksum = image.checksum {
-            let checksumText = fieldPrefix + imageDetailChecksumLabel + fieldSeparator + checksum
-            components.append(Text(checksumText).secondary())
-        }
-
-        return components
-    }
-
-    private static func createTimestampComponents(image: Image) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = imageDetailInfoFieldIndent
-        let fieldSeparator = imageDetailFieldValueSeparator
-
-        // Created At
-        if let created = image.createdAt {
-            let createdText = fieldPrefix + imageDetailCreatedLabel + fieldSeparator + created.description
-            components.append(Text(createdText).secondary())
-        }
-
-        // Updated At
-        if let updated = image.updatedAt {
-            let updatedText = fieldPrefix + imageDetailUpdatedLabel + fieldSeparator + updated.description
-            components.append(Text(updatedText).secondary())
-        }
-
-        return components
-    }
+    private static let imageDetailChecksumMaxLength = 50
+    private static let imageDetailCreatedLabel = "Created"
+    private static let imageDetailUpdatedLabel = "Updated"
+    private static let imageDetailTagsMaxLineWidth = 70
+    private static let imageDetailTitle = "Image Details"
+    private static let imageDetailBasicInfoTitle = "Basic Information"
+    private static let imageDetailTechnicalInfoTitle = "Technical Information"
+    private static let imageDetailTimestampsTitle = "Timestamps"
+    private static let imageDetailTitleEdgeInsets = EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)
+    private static let imageDetailSectionEdgeInsets = EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0)
+    private static let imageDetailComponentSpacing: Int32 = 0
+    private static let imageDetailScrollThreshold = 15
 
     // MARK: - Gold Standard Line Generation Functions
 
@@ -683,6 +560,91 @@ struct ImageViews {
         return lines
     }
 
+
+    // MARK: - Legacy Helper Functions for Compact Detail Layout
+
+    private static func createBasicInfoComponents(image: Image) -> [any Component] {
+        var components: [any Component] = []
+        let fieldPrefix = imageDetailInfoFieldIndent
+        let fieldSeparator = imageDetailFieldValueSeparator
+
+        let imageName = image.name ?? imageDetailUnnamedText
+        components.append(Text(fieldPrefix + imageDetailNameLabel + fieldSeparator + imageName).secondary())
+        components.append(Text(fieldPrefix + imageDetailIdLabel + fieldSeparator + image.id).secondary())
+
+        let status = image.status ?? imageDetailUnknownText
+        let statusText = fieldPrefix + imageDetailStatusLabel + fieldSeparator + status
+        if status.lowercased() == "active" {
+            components.append(Text(statusText).success())
+        } else if status.lowercased().contains("error") {
+            components.append(Text(statusText).error())
+        } else {
+            components.append(Text(statusText).secondary())
+        }
+
+        if let visibility = image.visibility {
+            components.append(Text(fieldPrefix + imageDetailVisibilityLabel + fieldSeparator + visibility).secondary())
+        }
+
+        return components
+    }
+
+    private static func createTechnicalInfoComponents(image: Image) -> [any Component] {
+        var components: [any Component] = []
+        let fieldPrefix = imageDetailInfoFieldIndent
+        let fieldSeparator = imageDetailFieldValueSeparator
+
+        if let size = image.size {
+            let sizeGB = Double(size) / imageDetailSizeConversionFactor
+            components.append(Text(fieldPrefix + imageDetailSizeLabel + fieldSeparator + String(format: imageDetailSizeFormat, sizeGB)).secondary())
+        }
+
+        if let diskFormat = image.diskFormat {
+            components.append(Text(fieldPrefix + imageDetailDiskFormatLabel + fieldSeparator + diskFormat).secondary())
+        }
+
+        if let containerFormat = image.containerFormat {
+            components.append(Text(fieldPrefix + imageDetailContainerFormatLabel + fieldSeparator + containerFormat).secondary())
+        }
+
+        if let minDisk = image.minDisk, minDisk > 0 {
+            components.append(Text(fieldPrefix + imageDetailMinDiskLabel + fieldSeparator + String(format: imageDetailMinDiskFormat, minDisk)).secondary())
+        }
+
+        if let minRam = image.minRam, minRam > 0 {
+            components.append(Text(fieldPrefix + imageDetailMinRamLabel + fieldSeparator + String(format: imageDetailMinRamFormat, minRam)).secondary())
+        }
+
+        return components
+    }
+
+    private static func createPropertyComponents(properties: [String: String]) -> [any Component] {
+        var components: [any Component] = []
+        let fieldPrefix = imageDetailInfoFieldIndent
+        let fieldSeparator = imageDetailFieldValueSeparator
+
+        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
+            components.append(Text(fieldPrefix + key + fieldSeparator + value).secondary())
+        }
+
+        return components
+    }
+
+    private static func createTimestampComponents(image: Image) -> [any Component] {
+        var components: [any Component] = []
+        let fieldPrefix = imageDetailInfoFieldIndent
+        let fieldSeparator = imageDetailFieldValueSeparator
+
+        if let created = image.createdAt {
+            components.append(Text(fieldPrefix + imageDetailCreatedLabel + fieldSeparator + created.description).secondary())
+        }
+
+        if let updated = image.updatedAt {
+            components.append(Text(fieldPrefix + imageDetailUpdatedLabel + fieldSeparator + updated.description).secondary())
+        }
+
+        return components
+    }
 
     // MARK: - Compact Detail Layout (Gold Standard Pattern)
 
