@@ -29,9 +29,16 @@ extension TUI {
             filteredRouters = cachedRouters
         }
 
-        // Show all routers in both attach and detach modes
-        // Users can decide which routers to attach/detach based on current state
-        let relevantRouters = filteredRouters
+        // Filter routers based on attachment mode
+        let relevantRouters: [Router]
+        switch attachmentMode {
+        case .attach:
+            // Show routers that are NOT currently attached to this subnet
+            relevantRouters = filteredRouters.filter { !attachedRouterIds.contains($0.id) }
+        case .detach:
+            // Show routers that ARE currently attached to this subnet
+            relevantRouters = filteredRouters.filter { attachedRouterIds.contains($0.id) }
+        }
 
         switch ch {
         case Int32(9): // TAB - toggle attachment mode
