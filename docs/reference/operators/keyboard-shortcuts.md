@@ -41,6 +41,7 @@ Print this and tape it to your monitor (we won't judge).
 | `r` | Refresh | Refresh current view |
 | `a` | Auto-refresh Toggle | Cycle between 5s, 10s, 30s, 60s, off |
 | `/` | Search/Filter | Instant local filtering, no API calls |
+| `:` | Command Mode | command mode (see Command Mode section) |
 | `Ctrl-X` | Multi-Select Mode | Toggle multi-select mode for bulk operations |
 | `Esc` | Back/Cancel | Works everywhere, exits everything |
 | `q` | Quit | From main view only |
@@ -398,6 +399,115 @@ Press `/` in any list:
 
 **Use when**: You don't know which service has the resource or need comprehensive search.
 
+## Command Mode
+
+Press `:` to enter command mode - inspired by vim. Command mode provides a powerful way to navigate, switch contexts, and execute actions. Command mode supports tab completion and command history for efficiency, making it easy to switch between OpenStack clouds and perform actions without leaving the keyboard.
+
+### Entering Command Mode
+
+| Key | Result |
+|-----|--------|
+| `:` | Activate command mode |
+| Type command | Enter command name |
+| `Enter` | Execute command |
+| `Esc` | Cancel command mode |
+
+### Command Mode Features
+
+**Tab Completion:**
+- Press `Tab` to auto-complete commands
+- Press `Tab` multiple times to cycle through matches
+- Works for both command names and cloud contexts
+
+**Command History:**
+- Press `↑` (Up arrow) to navigate to previous commands
+- Press `↓` (Down arrow) to navigate to next command
+- History persists between sessions (stored in `~/.config/substation/command_history`)
+- Maximum 50 commands stored
+
+### Available Commands
+
+**Navigation Commands:**
+
+| Command | Shortcut | Action |
+|---------|----------|--------|
+| `:servers` | `:s` | Navigate to servers view |
+| `:networks` | `:n` | Navigate to networks view |
+| `:volumes` | `:v` | Navigate to volumes view |
+| `:images` | `:i` | Navigate to images view |
+| `:flavors` | `:f` | Navigate to flavors view |
+| `:dashboard` | `:d` | Navigate to dashboard |
+| `:routers` | `:r` | Navigate to routers view |
+| `:ports` | `:p` | Navigate to ports view |
+| `:subnets` | `:u` | Navigate to subnets view |
+| `:floatingips` | `:l` | Navigate to floating IPs view |
+| `:securitygroups` | `:e` | Navigate to security groups view |
+| `:servergroups` | `:g` | Navigate to server groups view |
+| `:keypairs` | `:k` | Navigate to key pairs view |
+| `:topology` | `:t` | Navigate to topology view |
+| `:search` | `:z` | Navigate to advanced search |
+| `:help` | `:?` | Show help |
+
+**Context Commands:**
+
+| Command | Action | Example |
+|---------|--------|---------|
+| `:ctx` | List available clouds | Lists all clouds from `clouds.yaml` |
+| `:ctx <cloud>` | Switch to cloud | `:ctx production` |
+| `:context <cloud>` | Switch to cloud | `:context staging` (alias for `:ctx`) |
+
+**Cloud Context Switching:**
+
+Switch between OpenStack clouds defined in your `clouds.yaml`:
+
+```bash
+# List available clouds
+:ctx
+
+# Switch to a specific cloud
+:ctx production
+:ctx staging
+:ctx dev
+
+# Tab completion for cloud names
+:ctx pro<Tab>  # Completes to :ctx production
+:ctx <Tab>     # Shows all available clouds
+```
+
+**Tab Completion for Cloud Names:**
+- Type `:ctx ` (with space) and press `Tab` to see all available clouds
+- Type `:ctx p` and press `Tab` to complete cloud names starting with 'p'
+- Press `Tab` multiple times to cycle through matching clouds
+
+**Example Workflow:**
+
+```bash
+# Switch clouds quickly
+:ctx dev<Tab>    # Auto-completes to :ctx development
+<Enter>          # Switches to development cloud
+
+# Navigate using history
+:↑               # Shows previous command (:ctx development)
+:↑               # Shows earlier command (:servers)
+<Enter>          # Executes :servers
+```
+
+### Command Mode Tips
+
+1. **Use Tab completion** - Faster than typing full commands
+2. **Leverage history** - UP/DOWN arrows save keystrokes
+3. **Cloud switching** - `:ctx <Tab>` shows all clouds
+4. **Fuzzy matching** - Commands suggest closest matches
+5. **Shortcuts work** - Most commands have single-letter shortcuts
+
+### Command History Behavior
+
+- History is **persistent** across sessions
+- Commands are **deduplicated** (no consecutive duplicates)
+- **Maximum 50 commands** retained
+- **Newest commands** at the end
+- Type any character to **reset** to end of history
+
 ## Auto-Refresh Configuration
 
 Press `a` to toggle auto-refresh intervals:
@@ -479,9 +589,11 @@ Every operation can be performed without a mouse:
 Navigation:  d s n v i          (Dashboard, Servers, Networks, Volumes, Images)
 Actions:     C Del Space ? q    (Create, Delete, Details, Help, Quit)
 Search:      / z                (Local, Advanced)
+Commands:    : (then cmd name)  (Command mode - :ctx, :servers, etc.)
 Refresh:     r c                (Refresh, Cache purge)
 Movement:    ↑↓ j k Page-Up/Dn  (List navigation)
 Bulk Ops:    Ctrl-X Space Del   (Multi-select, Select, Bulk delete)
+Cloud:       :ctx <cloud>       (Switch between clouds)
 ```
 
 ### Emergency Shortcuts
@@ -503,6 +615,8 @@ q       - Quit (from main view)
 6. **Learn view keys** - Faster than any mouse
 7. **Use `Space` liberally** - Quick detail inspection
 8. **Vim keys work** - `j/k` for navigation, `g/G` for jumps
+9. **Command mode Tab completion** - `:ctx <Tab>` shows all clouds
+10. **Command history** - UP/DOWN arrows in command mode recall previous commands
 
 ---
 

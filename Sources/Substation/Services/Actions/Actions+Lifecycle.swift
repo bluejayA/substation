@@ -65,7 +65,7 @@ extension Actions {
             // Refresh data to get updated server status
             await dataManager.refreshAllData()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to restart server '\(serverName)'"
             switch error {
             case .authenticationFailed:
@@ -146,7 +146,7 @@ extension Actions {
 
             // Refresh server data to update status
             await dataManager.refreshAllData()
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to start server '\(serverName)'"
             switch error {
             case .authenticationFailed:
@@ -233,7 +233,7 @@ extension Actions {
 
             // Refresh server data to update status
             await dataManager.refreshAllData()
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to stop server '\(serverName)'"
             switch error {
             case .authenticationFailed:

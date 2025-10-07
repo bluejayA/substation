@@ -60,7 +60,7 @@ private final class SilentSubstationLogger: MemoryKitLogger, @unchecked Sendable
 }
 
 // MARK: - OSClient Logger Bridge
-struct LoggerBridge: OpenStackClientLogger {
+internal struct LoggerBridge: OpenStackClientLogger {
     func logError(_ message: String, context: [String: any Sendable]) {
         Logger.shared.logError(message, context: context)
     }
@@ -291,7 +291,7 @@ struct Substation {
             userDomain = cloudConfig.auth.user_domain_name ?? "Default"
         }
 
-        let config = OTConfig(
+        let config = OpenStackConfig(
             authURL: authURL,
             region: region ?? "auto-detect",
             userDomainName: userDomain,
@@ -299,7 +299,7 @@ struct Substation {
         )
 
         // Create credentials based on determined authentication method
-        let credentials: OTCredentials
+        let credentials: OpenStackCredentials
 
         // Validate project_name requirement based on authentication method
         Logger.shared.logDebug("Validating project configuration for authentication method")
@@ -393,7 +393,7 @@ struct Substation {
                 Logger.shared.logInfo("Using project_id: \(projectID)")
             }
 
-            // For now, use the ID-based approach with the name as ID (this may need OTCredentials enhancement)
+            // For now, use the ID-based approach with the name as ID (this may need OpenStackCredentials enhancement)
             credentials = .applicationCredential(
                 id: name,
                 secret: secret,
@@ -402,7 +402,7 @@ struct Substation {
             )
 
         case .token(_, _, _):
-            // Token-based authentication would require extending OTCredentials
+            // Token-based authentication would require extending OpenStackCredentials
             Logger.shared.logError("Token-based authentication is not yet supported")
             printError("Token-based authentication is not yet supported by the OpenStack client. Please use password or application credential authentication.")
             exit(1)
@@ -447,7 +447,7 @@ struct Substation {
             Logger.shared.logInfo("  - region_name: '\(regionDisplay)'")
             Logger.shared.logInfo("  - interface: '\(cloudConfig.interface ?? "nil")'")
             Logger.shared.logInfo("  - auth.project_name: '\(cloudConfig.auth.project_name ?? "nil")'")
-            Logger.shared.logInfo("OTConfig being passed to client:")
+            Logger.shared.logInfo("OpenStackConfig being passed to client:")
             Logger.shared.logInfo("  - authURL: \(config.authURL)")
             Logger.shared.logInfo("  - region: \(config.region)")
             Logger.shared.logInfo("  - userDomainName: \(config.userDomainName)")
@@ -463,18 +463,32 @@ struct Substation {
             // Auto-detect region if not specified in configuration
             if needsRegionDetection {
                 Logger.shared.logInfo("Auto-detecting region from service catalog")
-                let detectedRegion = try await detectRegionFromCatalog(client: client, authURL: authURL, credentials: credentials, config: config)
-                Logger.shared.logInfo("Detected region: \(detectedRegion)")
+                do {
+                    let detectedRegion = try await RegionDetection.detectFromCatalog(
+                        authURL: authURL,
+                        credentials: credentials,
+                        failOnMultiple: true
+                    )
 
-                // Reconnect with the detected region
-                let reconnectConfig = OTConfig(
-                    authURL: authURL,
-                    region: detectedRegion,
-                    userDomainName: config.userDomainName,
-                    projectDomainName: config.projectDomainName
-                )
-                client = try await OSClient.connect(config: reconnectConfig, credentials: credentials, logger: LoggerBridge())
-                Logger.shared.logInfo("Reconnected with detected region: \(detectedRegion)")
+                    // If we got a region (will be non-nil or will have thrown), reconnect
+                    if let region = detectedRegion {
+                        Logger.shared.logInfo("Detected region: \(region)")
+
+                        // Reconnect with the detected region
+                        let reconnectConfig = OpenStackConfig(
+                            authURL: authURL,
+                            region: region,
+                            userDomainName: config.userDomainName,
+                            projectDomainName: config.projectDomainName
+                        )
+                        client = try await OSClient.connect(config: reconnectConfig, credentials: credentials, logger: LoggerBridge())
+                        Logger.shared.logInfo("Reconnected with detected region: \(region)")
+                    }
+                } catch let error as RegionDetectionError {
+                    Logger.shared.logError("Region detection failed: \(error)")
+                    printError(error.description)
+                    exit(1)
+                }
             }
 
             Logger.shared.logDebug("Initializing TUI")
@@ -482,13 +496,13 @@ struct Substation {
             Logger.shared.logInfo("TUI initialized, starting main loop")
             await tui.run()
             Logger.shared.logInfo("TUI main loop exited")
-        } catch OTError.authenticationFailed {
+        } catch OpenStackError.authenticationFailed {
             let errorMsg = "Authentication failed. Please check your credentials in the clouds.yaml file."
             Logger.shared.logError(errorMsg)
             printError(errorMsg)
             printUsage()
             exit(1)
-        } catch OTError.endpointNotFound {
+        } catch OpenStackError.endpointNotFound {
             let errorMsg = """
             Service endpoint not found. Please check your OpenStack configuration:
 
@@ -514,161 +528,6 @@ struct Substation {
         } catch {
             let errorMsg = "Connection error: \(error)"
             Logger.shared.logError("Connection failed", error: error)
-            printError(errorMsg)
-            exit(1)
-        }
-    }
-
-    // Helper structures for token response parsing
-    private struct TokenResponse: Codable {
-        let token: TokenData
-    }
-
-    private struct TokenData: Codable {
-        let catalog: [TokenCatalogEntry]?
-    }
-
-    private static func buildAuthRequest(credentials: OTCredentials) throws -> [String: Any] {
-        switch credentials {
-        case .password(let username, let password, let projectName, let projectID, let userDomain, let userDomainID, let projectDomain, let projectDomainID):
-            // Build user domain
-            let userDomainDict: [String: String]
-            if let userDomainID = userDomainID {
-                userDomainDict = ["id": userDomainID]
-            } else if let userDomain = userDomain {
-                userDomainDict = ["name": userDomain]
-            } else {
-                userDomainDict = ["name": "default"]
-            }
-
-            // Build project scope
-            var projectDict: [String: Any] = [:]
-            if let projectID = projectID {
-                // When using project_id, don't include domain
-                projectDict["id"] = projectID
-            } else if let projectName = projectName {
-                projectDict["name"] = projectName
-                // Include domain only when using project_name
-                if let projectDomainID = projectDomainID {
-                    projectDict["domain"] = ["id": projectDomainID]
-                } else if let projectDomain = projectDomain {
-                    projectDict["domain"] = ["name": projectDomain]
-                } else {
-                    projectDict["domain"] = ["name": "default"]
-                }
-            }
-
-            return [
-                "auth": [
-                    "identity": [
-                        "methods": ["password"],
-                        "password": [
-                            "user": [
-                                "name": username,
-                                "password": password,
-                                "domain": userDomainDict
-                            ]
-                        ]
-                    ],
-                    "scope": [
-                        "project": projectDict
-                    ]
-                ]
-            ]
-
-        case .applicationCredential(let id, let secret, let projectName, let projectID):
-            var authDict: [String: Any] = [
-                "auth": [
-                    "identity": [
-                        "methods": ["application_credential"],
-                        "application_credential": [
-                            "id": id,
-                            "secret": secret
-                        ]
-                    ]
-                ]
-            ]
-
-            // Add scope if project info is provided
-            if let projectID = projectID {
-                authDict["auth"] = [
-                    "identity": authDict["auth"]!,
-                    "scope": [
-                        "project": ["id": projectID]
-                    ]
-                ]
-            } else if let projectName = projectName, !projectName.isEmpty {
-                authDict["auth"] = [
-                    "identity": authDict["auth"]!,
-                    "scope": [
-                        "project": ["name": projectName]
-                    ]
-                ]
-            }
-            return authDict
-        }
-    }
-
-    static func detectRegionFromCatalog(
-        client: OSClient,
-        authURL: URL,
-        credentials: OTCredentials,
-        config: OTConfig
-    ) async throws -> String {
-        // Perform a raw authentication request to get the token catalog
-        // This bypasses the client's service catalog building which requires a region
-        let authRequest = try buildAuthRequest(credentials: credentials)
-
-        var request = URLRequest(url: authURL.appendingPathComponent("auth/tokens"))
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: authRequest, options: [])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 201 else {
-            throw OTError.authenticationFailed
-        }
-
-        // Parse the auth response to get the catalog
-        let authResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-
-        // Extract unique regions from all endpoints in the catalog
-        var regions = Set<String>()
-        for service in authResponse.token.catalog ?? [] {
-            for endpoint in service.endpoints {
-                if let region = endpoint.region, !region.isEmpty {
-                    regions.insert(region)
-                }
-            }
-        }
-
-        let sortedRegions = regions.sorted()
-
-        if sortedRegions.isEmpty {
-            Logger.shared.logError("No regions found in service catalog")
-            printError("No regions found in service catalog. Please configure a region_name in your clouds.yaml")
-            exit(1)
-        } else if sortedRegions.count == 1 {
-            Logger.shared.logInfo("Auto-detected single region: \(sortedRegions[0])")
-            return sortedRegions[0]
-        } else {
-            // Multiple regions detected - user must specify
-            let regionList = sortedRegions.joined(separator: ", ")
-            let errorMsg = """
-
-            Multiple regions detected in service catalog: \(regionList)
-
-            Please update your clouds.yaml configuration to specify which region to use.
-            Add the 'region_name' field to your cloud configuration:
-
-            clouds:
-              your-cloud-name:
-                region_name: <one of: \(regionList)>
-                ...
-
-            """
-            Logger.shared.logError("Multiple regions detected but no region_name configured")
             printError(errorMsg)
             exit(1)
         }

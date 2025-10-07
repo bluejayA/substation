@@ -31,6 +31,13 @@ private func toResourceType(_ searchType: SearchResourceType) -> ResourceType {
     case .keyPair: return .keyPair
     case .floatingIP: return .floatingIP
     case .serverGroup: return .securityGroup // Map to closest type
+    case .volumeSnapshot: return .volume // Map to volume for relationships
+    case .volumeBackup: return .volume // Map to volume for relationships
+    case .barbicanSecret: return .securityGroup // Map to security for relationships
+    case .barbicanContainer: return .securityGroup // Map to security for relationships
+    case .loadBalancer: return .network // Map to network for relationships
+    case .swiftContainer: return .volume // Map to volume for relationships
+    case .swiftObject: return .volume // Map to volume for relationships
     }
 }
 

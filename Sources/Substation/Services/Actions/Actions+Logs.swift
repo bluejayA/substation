@@ -35,7 +35,7 @@ extension Actions {
             // Redraw the main interface after closing the console dialog
             statusMessage = "Console logs closed"
             await tui.draw(screen: screen)
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to get console output for '\(serverName)'"
             switch error {
             case .authenticationFailed:

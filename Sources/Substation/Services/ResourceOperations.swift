@@ -16,11 +16,11 @@ import MemoryKit
 @MainActor
 final class ResourceOperations {
     private let tui: TUI
-    
+
     init(tui: TUI) {
         self.tui = tui
     }
-    
+
     // MARK: - Convenience Accessors
 
     private var client: OSClient { tui.client }
@@ -168,7 +168,7 @@ final class ResourceOperations {
     }
 
     // MARK: - CRUD Operations
-    
+
     internal func createServer() async {
         // Validation
         guard !serverCreateForm.serverName.isEmpty else {
@@ -326,7 +326,7 @@ final class ResourceOperations {
             // Refresh data to get updated server list
             tui.refreshAfterOperation()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create server"
             switch error {
             case .authenticationFailed:
@@ -412,7 +412,7 @@ final class ResourceOperations {
             // Refresh data to get updated server list
             tui.refreshAfterOperation()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete server '\(serverName)'"
             switch error {
             case .authenticationFailed:
@@ -484,7 +484,7 @@ final class ResourceOperations {
             // Refresh data to get updated network list
             tui.refreshAfterOperation()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete network '\(networkName ?? "Unknown")'"
             switch error {
             case .authenticationFailed:
@@ -563,7 +563,7 @@ final class ResourceOperations {
             // Refresh data to get updated subnet list
             tui.refreshAfterOperation()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete subnet '\(subnetName)'"
             switch error {
             case .authenticationFailed:
@@ -648,7 +648,7 @@ final class ResourceOperations {
             // Refresh data to get updated port list
             tui.refreshAfterOperation()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete port '\(portName)'"
             switch error {
             case .authenticationFailed:
@@ -727,7 +727,7 @@ final class ResourceOperations {
             // Refresh data to get updated router list
             tui.refreshAfterOperation()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete router '\(routerName)'"
             switch error {
             case .authenticationFailed:
@@ -844,7 +844,7 @@ final class ResourceOperations {
             // Refresh data to get updated volume list
             tui.refreshAfterOperation()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete volume '\(volumeName)'"
             switch error {
             case .authenticationFailed:
@@ -1024,7 +1024,7 @@ final class ResourceOperations {
             // Refresh keypair cache
             await dataManager.refreshKeyPairData()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete key pair '\(keyPairName)'"
             switch error {
             case .authenticationFailed:
@@ -1097,7 +1097,7 @@ final class ResourceOperations {
             // Refresh secrets cache
             await dataManager.refreshSecretsData()
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete secret '\(secretName)'"
             switch error {
             case .authenticationFailed:
@@ -1164,7 +1164,7 @@ final class ResourceOperations {
             tui.changeView(to: .barbicanSecrets, resetSelection: false)
             tui.barbicanSecretCreateForm = BarbicanSecretCreateForm() // Reset form
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create secret '\(secretName)'"
             switch error {
             case .authenticationFailed:
@@ -1231,7 +1231,7 @@ final class ResourceOperations {
             }
 
             statusMessage = "Image '\(imageName)' deleted successfully"
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to delete image '\(imageName)'"
             switch error {
             case .authenticationFailed:
@@ -1336,7 +1336,7 @@ final class ResourceOperations {
             tui.changeView(to: .keyPairs, resetSelection: false)
             await tui.draw(screen: screen)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create key pair '\(keyPairName)'"
             switch error {
             case .authenticationFailed:
@@ -1457,7 +1457,7 @@ final class ResourceOperations {
             await dataManager.refreshVolumeData()
             tui.changeView(to: .volumes, resetSelection: false)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create volume '\(volumeNameBase)'"
             switch error {
             case .authenticationFailed:
@@ -1544,7 +1544,7 @@ final class ResourceOperations {
             tui.refreshAfterOperation()
             tui.changeView(to: .ports, resetSelection: false)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create port '\(portName)'"
             switch error {
             case .authenticationFailed:
@@ -1618,7 +1618,7 @@ final class ResourceOperations {
             lastRefresh = Date()
             tui.changeView(to: .floatingIPs, resetSelection: false)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create floating IP"
             switch error {
             case .authenticationFailed:
@@ -1687,7 +1687,7 @@ final class ResourceOperations {
             tui.refreshAfterOperation()
             tui.changeView(to: .networks, resetSelection: false)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create network '\(networkName)'"
             switch error {
             case .authenticationFailed:
@@ -1750,7 +1750,7 @@ final class ResourceOperations {
             tui.refreshAfterOperation()
             tui.changeView(to: .securityGroups, resetSelection: false)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create security group '\(securityGroupName)'"
             switch error {
             case .authenticationFailed:
@@ -1844,7 +1844,7 @@ final class ResourceOperations {
             tui.refreshAfterOperation()
             tui.changeView(to: .subnets, resetSelection: false)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create subnet '\(subnetName)'"
             switch error {
             case .authenticationFailed:
@@ -2121,7 +2121,7 @@ final class ResourceOperations {
                 cachedSecurityGroups[index] = updatedSecurityGroup
             }
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to create security group rule"
             switch error {
             case .authenticationFailed:
@@ -2201,7 +2201,7 @@ final class ResourceOperations {
 
             statusMessage = "Security group rule deleted successfully"
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = createNew ? "Failed to update security group rule" : "Failed to delete security group rule"
             switch error {
             case .authenticationFailed:

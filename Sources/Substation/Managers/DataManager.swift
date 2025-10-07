@@ -85,6 +85,14 @@ class DataManager {
         }
     }
 
+    // Force a full refresh (bypassing the throttle)
+    // Use this when switching clouds or when cache is explicitly cleared
+    func forceFullRefresh() async {
+        Logger.shared.logInfo("DataManager.forceFullRefresh() - Forcing full data refresh")
+        await refreshAllDataOptimized()
+        lastFullRefresh = Date()
+    }
+
     // Optimized full refresh with early completion strategy
     private func refreshAllDataOptimized() async {
         guard let tui = tui else { return }
@@ -289,7 +297,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(servers.count) servers in \(String(format: "%.2f", apiDuration))s")
             tui.cachedServers = servers
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Server access may require admin privileges (HTTP 403)")
@@ -311,7 +319,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(serverGroups.count) server groups in \(String(format: "%.2f", apiDuration))s")
             tui.cachedServerGroups = serverGroups
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Server group access may require admin privileges (HTTP 403)")
@@ -335,7 +343,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(networks.count) networks in \(String(format: "%.2f", apiDuration))s")
             tui.cachedNetworks = networks
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Network access may require admin privileges (HTTP 403)")
@@ -356,7 +364,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(volumes.count) volumes in \(String(format: "%.2f", apiDuration))s")
             tui.cachedVolumes = volumes
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Volume access may require admin privileges (HTTP 403)")
@@ -381,7 +389,7 @@ class DataManager {
 
             // Generate flavor recommendations in background after flavors are fetched
             await generateFlavorRecommendationsInBackground(priority: priority)
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Flavor access may require admin privileges (HTTP 403)")
@@ -446,7 +454,7 @@ class DataManager {
             lastImagesRefresh = now
         } catch is TimeoutError {
             Logger.shared.logWarning("DataManager - Images fetch timed out after \((priority == "background") ? 20.0 : 30.0)s, skipping to prevent blocking")
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logWarning("DataManager - Image access may require admin privileges (HTTP 403)")
@@ -487,7 +495,7 @@ class DataManager {
             lastPortsRefresh = now
         } catch is TimeoutError {
             Logger.shared.logWarning("DataManager - Ports fetch timed out after \((priority == "background") ? 10.0 : 12.0)s, skipping to prevent blocking")
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Port access may require admin privileges (HTTP 403)")
@@ -551,7 +559,7 @@ class DataManager {
             Logger.shared.logInfo("DataManager - Updated floating IP cache: \(oldCount) -> \(floatingIPs.count) entries")
         } catch is TimeoutError {
             Logger.shared.logWarning("DataManager - Floating IPs fetch timed out after \((priority == "background") ? 10.0 : 12.0)s, skipping to prevent blocking")
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logWarning("DataManager - Floating IP access may require admin privileges (HTTP 403)")
@@ -573,7 +581,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(subnets.count) subnets in \(String(format: "%.2f", apiDuration))s")
             tui.cachedSubnets = subnets
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Subnet access may require admin privileges (HTTP 403)")
@@ -595,7 +603,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(keyPairs.count) key pairs in \(String(format: "%.2f", apiDuration))s")
             tui.cachedKeyPairs = keyPairs
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Key pair access may require admin privileges (HTTP 403)")
@@ -616,7 +624,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(volumeTypes.count) volume types in \(String(format: "%.2f", apiDuration))s")
             tui.cachedVolumeTypes = volumeTypes
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Volume type access may require admin privileges (HTTP 403)")
@@ -649,7 +657,7 @@ class DataManager {
             }
 
             tui.cachedRouters = routers
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Router access may require admin privileges (HTTP 403)")
@@ -688,7 +696,7 @@ class DataManager {
             lastSecurityGroupsRefresh = now
         } catch is TimeoutError {
             Logger.shared.logWarning("DataManager - Security groups fetch timed out after \((priority == "background") ? 10.0 : 12.0)s, skipping to prevent blocking")
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Security group access may require admin privileges (HTTP 403)")
@@ -709,7 +717,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(secrets.count) secrets in \(String(format: "%.2f", apiDuration))s")
             tui.cachedSecrets = secrets
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Secrets access may require admin privileges (HTTP 403)")
@@ -732,7 +740,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(availabilityZones.count) availability zones in \(String(format: "%.2f", apiDuration))s")
             tui.cachedAvailabilityZones = availabilityZones.map { $0.zoneName }
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
                 Logger.shared.logDebug("Availability zone access may require admin privileges (HTTP 403)")
@@ -761,7 +769,7 @@ class DataManager {
                     await MainActor.run {
                         tui.cachedComputeQuotas = computeQuotas
                     }
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     switch error {
                     case .httpError(400, _):
                         Logger.shared.logWarning("Compute quotas unavailable (HTTP 400) - project ID resolution may have failed")
@@ -788,7 +796,7 @@ class DataManager {
                     await MainActor.run {
                         tui.cachedNetworkQuotas = networkQuotas
                     }
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     switch error {
                     case .httpError(400, _):
                         Logger.shared.logWarning("Network quotas unavailable (HTTP 400)")
@@ -815,7 +823,7 @@ class DataManager {
                     await MainActor.run {
                         tui.cachedVolumeQuotas = volumeQuotas
                     }
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     switch error {
                     case .httpError(400, _):
                         Logger.shared.logWarning("Volume quotas unavailable (HTTP 400)")
@@ -842,7 +850,7 @@ class DataManager {
                     await MainActor.run {
                         tui.cachedComputeLimits = computeLimits
                     }
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     switch error {
                     case .httpError(403, _):
                         Logger.shared.logDebug("Compute limits access may require admin privileges (HTTP 403)")

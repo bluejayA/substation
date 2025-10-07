@@ -20,9 +20,9 @@ struct AdvancedSearchView {
 
     // Enhanced search state
     @MainActor
-    private static var currentQuery: String = ""
+    private static var inputState: UnifiedInputView.InputState = UnifiedInputView.InputState()
     @MainActor
-    private static var displayQuery: String = "" // Immediate display, separate from search query
+    private static var currentQuery: String = ""
     @MainActor
     private static var globalSearchQuery: GlobalSearchQuery = GlobalSearchQuery()
     @MainActor
@@ -36,7 +36,7 @@ struct AdvancedSearchView {
 
     // Enhanced UI state
     @MainActor
-    private static var selectedResultIndex: Int = 0
+    private static var selectedResourceId: String? = nil  // ID-based selection (survives filtering)
     @MainActor
     private static var showingResultDetail: Bool = false
     @MainActor
@@ -54,10 +54,6 @@ struct AdvancedSearchView {
     @MainActor
     private static var enableParallelSearch: Bool = true
     @MainActor
-    private static var cursorPosition: Int = 0
-    @MainActor
-    private static var isInSearchInputMode: Bool = false
-    @MainActor
     private static var isLoadingLiveData: Bool = false
 
     // Pagination
@@ -67,6 +63,35 @@ struct AdvancedSearchView {
     private static var resultsPerPage: Int = 20
     @MainActor
     private static var totalResults: Int = 0
+
+    // MARK: - Selection Helpers
+
+    /// Get the current selected index in the results list
+    /// Converts from ID-based selection to index-based for display
+    @MainActor
+    private static func getSelectedIndex(in results: [SearchResult]) -> Int {
+        guard let resourceId = selectedResourceId else { return 0 }
+        return results.firstIndex { $0.resourceId == resourceId } ?? 0
+    }
+
+    /// Set the selected resource by ID
+    @MainActor
+    private static func selectResource(_ result: SearchResult) {
+        selectedResourceId = result.resourceId
+    }
+
+    /// Move selection up or down by offset
+    @MainActor
+    private static func moveSelection(by offset: Int, in results: [SearchResult]) {
+        guard !results.isEmpty else { return }
+
+        let currentIndex = getSelectedIndex(in: results)
+        let newIndex = max(0, min(currentIndex + offset, results.count - 1))
+
+        if newIndex < results.count {
+            selectedResourceId = results[newIndex].resourceId
+        }
+    }
 
     // MARK: - Layout Constants
 
@@ -105,7 +130,7 @@ struct AdvancedSearchView {
         // Bounds checking
         guard width >= minScreenWidth && height >= minScreenHeight else {
             let errorBounds = Rect(x: startCol, y: startRow, width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small for Advanced Search").error(), on: surface, in: errorBounds)
+            await SwiftTUI.render(Text("Screen too small for Search").error(), on: surface, in: errorBounds)
             return
         }
 
@@ -121,7 +146,7 @@ struct AdvancedSearchView {
         // Add main content based on current view state
         if showingCrossServiceResults {
             components.append(createCrossServiceResults(width: width, height: contentHeight))
-        } else if showingResultDetail && selectedResultIndex < searchResults.count {
+        } else if showingResultDetail && selectedResourceId != nil {
             components.append(createResultDetail(width: width, height: contentHeight))
         } else {
             components.append(createSearchResults(width: width, height: contentHeight))
@@ -141,142 +166,47 @@ struct AdvancedSearchView {
 
     @MainActor
     private static func createSearchBar(width: Int32) -> any Component {
-        var components: [any Component] = []
-        let availableWidth = Int(width) - 4 // Account for padding
-
-        // Modern search input line (inspired by fzf/ripgrep)
-        let searchPrompt = "> "
-        let promptWidth = searchPrompt.count
-        let inputWidth = availableWidth - promptWidth - 15 // Reserve space for status
-
-        // Create query display with proper cursor positioning
-        let queryDisplay = createQueryDisplay(query: displayQuery,
-                                            cursor: cursorPosition,
-                                            maxWidth: inputWidth,
-                                            isSearching: isSearching)
-
-        // Status indicator (like fzf)
-        let statusIndicator = createStatusIndicator()
-        let statusWidth = statusIndicator.count
-
-        // Main input line with prompt, query, and status
-        let inputPadding = max(0, availableWidth - promptWidth - queryDisplay.count - statusWidth - 2)
-        let paddingSpaces = String(repeating: " ", count: inputPadding)
-
-        // Title
-        let titleText = "Search \(statusIndicator)"
-        components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-
-        let searchStack = HStack(spacing: 0, children: [
-            Text(" \(searchPrompt)").styled(.primary),
-            Text(" \(queryDisplay)").styled(.secondary),
-            Text(" \(paddingSpaces)").styled(.secondary),
-        ]).border().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
-
-        components.append(searchStack)
-
-        // Results summary line (like fzf's "x/y" indicator)
-        let resultsSummary = createResultsSummary()
-        components.append(
-            Text(resultsSummary)
-                .secondary()
-                .padding(EdgeInsets(top: 0, leading: 0, bottom: 1, trailing: 0))
+        // Use UnifiedInputView for the search bar
+        let statusIndicator = UnifiedInputView.createStatusIndicator(
+            isSearching: isSearching,
+            resultCount: filteredResults.isEmpty ? searchResults.count : filteredResults.count
         )
 
-        // Quick suggestions (only show if not searching and query is short)
-        if !isSearching && displayQuery.count < 3 && !activeSuggestions.isEmpty {
-            let suggestionsLine = activeSuggestions.prefix(3).map { "[\($0.text)]" }.joined(separator: " ")
-            let truncatedSuggestions = String(suggestionsLine.prefix(availableWidth))
-
-            if !truncatedSuggestions.isEmpty {
-                components.append(
-                    Text(" \(truncatedSuggestions)")
-                        .muted()
-                        .padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
-                )
-            }
-        }
-
-        // Contextual hints (less prominent, adaptive)
-        let hints = getContextualHints()
-        if !hints.isEmpty {
-            let truncatedHints = String(hints.prefix(availableWidth))
-            components.append(
-                Text(truncatedHints)
-                    .muted()
-                    .padding(EdgeInsets(top: 0, leading: 1, bottom: 0, trailing: 0))
+        let resultsSummary: String
+        if isLoadingLiveData {
+            resultsSummary = "  Loading live data..."
+        } else {
+            let totalResults = searchResults.count
+            let filteredCount = filteredResults.isEmpty ? totalResults : filteredResults.count
+            resultsSummary = UnifiedInputView.createResultsSummary(
+                isSearching: isSearching,
+                totalResults: totalResults,
+                filteredCount: filteredCount != totalResults ? filteredCount : nil,
+                searchTime: lastSearchTime > 0 ? lastSearchTime : nil
             )
         }
 
-        return VStack(spacing: 0, children: components)
-    }
+        let hints = getContextualHints()
 
-    @MainActor
-    private static func createQueryDisplay(query: String, cursor: Int, maxWidth: Int, isSearching: Bool) -> String {
-        if query.isEmpty {
-            return isSearching ? "|" : "_"
-        }
-
-        let displayQuery = query.count > maxWidth ? String(query.suffix(maxWidth)) : query
-
-        if isSearching {
-            return "\(displayQuery)|"
-        } else {
-            // Show cursor position within query
-            let safeCursor = min(cursor, displayQuery.count)
-            if safeCursor >= displayQuery.count {
-                return "\(displayQuery)_"
-            } else {
-                let beforeCursor = String(displayQuery.prefix(safeCursor))
-                let atCursor = safeCursor < displayQuery.count ? String(displayQuery[displayQuery.index(displayQuery.startIndex, offsetBy: safeCursor)]) : "_"
-                let afterCursor = safeCursor < displayQuery.count - 1 ? String(displayQuery.suffix(displayQuery.count - safeCursor - 1)) : ""
-                return "\(beforeCursor)[\(atCursor)]\(afterCursor)"
-            }
-        }
-    }
-
-    @MainActor
-    private static func createStatusIndicator() -> String {
-        if isSearching {
-            let elapsed = Date().timeIntervalSinceReferenceDate - lastTypingTime
-            let spinner = ["|", "/", "-", "\\"]
-            let spinnerChar = spinner[Int(elapsed * 4) % spinner.count]
-            return "[\(spinnerChar)]"
-        } else if !filteredResults.isEmpty {
-            return "[\(filteredResults.count)]"
-        } else if !displayQuery.isEmpty {
-            return "[0]"
-        } else {
-            return "[ready]"
-        }
-    }
-
-    @MainActor
-    private static func createResultsSummary() -> String {
-        let totalResults = searchResults.count
-        let filteredCount = filteredResults.isEmpty ? totalResults : filteredResults.count
-
-        if isLoadingLiveData {
-            return "  Loading live data..."
-        } else if isSearching {
-            return "  Searching..."
-        } else if filteredCount == 0 {
-            return "  No matches found"
-        } else {
-            return "  \(filteredCount)/\(totalResults) results"
-        }
+        return UnifiedInputView.createInputComponent(
+            state: inputState,
+            width: width,
+            statusIndicator: statusIndicator,
+            resultsSummary: resultsSummary,
+            hints: hints
+        )
     }
 
     @MainActor
     private static func getContextualHints() -> String {
         if showingCrossServiceResults {
             return "C: Toggle view | ESC: Back"
-        } else if !displayQuery.isEmpty && (!filteredResults.isEmpty || !searchResults.isEmpty) {
+        } else if !inputState.displayText.isEmpty && (!filteredResults.isEmpty || !searchResults.isEmpty) {
             return "UP/DOWN: Navigate | ENTER: Load | ESC: Clear"
-        } else if !displayQuery.isEmpty {
+        } else if !inputState.displayText.isEmpty {
             return "ESC: Clear search"
         } else {
-            return "Type to search across OpenStack services"
+            return "Type to search across OpenStack services | : for commands"
         }
     }
 
@@ -288,7 +218,7 @@ struct AdvancedSearchView {
 
         // Determine what results to show based on search state
         let resultsToShow: [SearchResult]
-        if displayQuery.isEmpty {
+        if inputState.displayText.isEmpty {
             // No query - show all search results (initial load)
             resultsToShow = searchResults
         } else {
@@ -299,7 +229,7 @@ struct AdvancedSearchView {
         if resultsToShow.isEmpty {
             if isLoadingLiveData {
                 return createLoadingDataIndicator()
-            } else if displayQuery.isEmpty {
+            } else if inputState.displayText.isEmpty {
                 return createWelcomeScreen(width: width, height: height)
             } else if isSearching {
                 return createSearchingIndicator()
@@ -341,17 +271,18 @@ struct AdvancedSearchView {
                 .padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
         )
 
-        // Results list
+        // Results list - use ID-based selection
         let availableRows = Int(height) - (lastSearchTime > 0 ? 3 : 2) // Header + column header
-        let startIndex = max(0, selectedResultIndex - availableRows / 2)
+        let selectedIndex = getSelectedIndex(in: resultsToShow)
+        let startIndex = max(0, selectedIndex - availableRows / 2)
         let endIndex = min(startIndex + availableRows, resultsToShow.count)
 
         var resultComponents: [any Component] = []
         for i in startIndex..<endIndex {
             let result = resultsToShow[i]
-            let isSelected = i == selectedResultIndex
+            let isSelected = i == selectedIndex
 
-            resultComponents.append(createSearchResultRow(result, isSelected: isSelected, width: Int(width), query: displayQuery))
+            resultComponents.append(createSearchResultRow(result, isSelected: isSelected, width: Int(width), query: inputState.displayText))
         }
 
         if !resultComponents.isEmpty {
@@ -363,7 +294,7 @@ struct AdvancedSearchView {
 
         // Pagination info (fzf-style)
         if resultsToShow.count > availableRows {
-            let currentPage = selectedResultIndex / availableRows + 1
+            let currentPage = selectedIndex / availableRows + 1
             let totalPages = Int(ceil(Double(resultsToShow.count) / Double(availableRows)))
             let pageInfo = "[\(currentPage)/\(totalPages)]"
             components.append(
@@ -408,7 +339,7 @@ struct AdvancedSearchView {
         var components: [any Component] = []
 
         let welcomeLines = [
-            "Advanced Search",
+            "Search",
             "",
             "Start typing to search across all OpenStack resources",
             "Cross-service search is enabled by default"
@@ -540,16 +471,18 @@ struct AdvancedSearchView {
     @MainActor
     private static func createResultDetail(width: Int32, height: Int32) -> any Component {
         let resultsToShow: [SearchResult]
-        if displayQuery.isEmpty {
+        if inputState.displayText.isEmpty {
             resultsToShow = searchResults
         } else {
             resultsToShow = filteredResults
         }
-        guard selectedResultIndex < resultsToShow.count else {
+
+        let selectedIndex = getSelectedIndex(in: resultsToShow)
+        guard selectedIndex < resultsToShow.count else {
             return Text("No result selected").warning()
         }
 
-        let result = resultsToShow[selectedResultIndex]
+        let result = resultsToShow[selectedIndex]
         var components: [any Component] = []
 
         // Header
@@ -617,12 +550,15 @@ struct AdvancedSearchView {
 
     @MainActor
     private static func createStatusBar(width: Int32) -> any Component {
+        let resultsToShow: [SearchResult] = inputState.displayText.isEmpty ? searchResults : filteredResults
+        let selectedIndex = resultsToShow.isEmpty ? 0 : getSelectedIndex(in: resultsToShow)
+
         let statusText = if isSearching {
             "Searching..."
         } else if searchResults.isEmpty && !currentQuery.isEmpty {
             "No results"
-        } else if !searchResults.isEmpty {
-            "Results: \(searchResults.count) | Selected: \(selectedResultIndex + 1)"
+        } else if !resultsToShow.isEmpty {
+            "Results: \(resultsToShow.count) | Selected: \(selectedIndex + 1)"
         } else {
             "Ready"
         }
@@ -635,150 +571,160 @@ struct AdvancedSearchView {
     }
 
     // MARK: - Input Handling
+    //
+    // This view implements Layer 1 (view-specific) input handling.
+    // See UnifiedInputView documentation for full architecture.
+    //
+    // Input Priority:
+    // 1. Navigation keys (Enter, arrows) - handled here for immediate response
+    // 2. Text input and command mode - delegated to UnifiedInputView
+    // 3. Legacy handlers - fallback for unhandled keys
+    //
+    // Key Design Decision:
+    // Enter key is handled BEFORE UnifiedInputView to prevent it from triggering
+    // a new search when the user wants to navigate to the selected result.
 
     @MainActor
     static func handleInput(_ key: Int32) -> Bool {
         // Determine input mode based on current state
         let inMainSearchMode = !showingCrossServiceResults && !showingResultDetail
 
-        // Handle ESC first (always available)
+        // PRIORITY 1: Handle navigation keys for immediate response
+        // Enter key must be handled HERE (not in UnifiedInputView) to navigate to results
+        // instead of triggering a new search
+        let priority = InputPriority.classify(key)
+
+        if inMainSearchMode && priority == .navigation {
+            // Enter key navigates to selected result
+            if key == 10 || key == 13 {
+                if !filteredResults.isEmpty || !searchResults.isEmpty {
+                    InputPriority.logInput(key, layer: "AdvancedSearchView-Navigation", handled: true)
+                    navigateToDetailView()
+                    return true
+                }
+            }
+            // Arrow keys handled by handleNavigationInput
+        }
+
+        // PRIORITY 2: Try to handle input with UnifiedInputView
+        if inMainSearchMode {
+            let result = UnifiedInputView.handleInput(key, state: &inputState)
+
+            switch result {
+            case .ignored:
+                break // Fall through to legacy handling
+
+            case .updated:
+                lastTypingTime = Date().timeIntervalSinceReferenceDate
+                performClientSideFilter()
+                scheduleSearch()
+                return true
+
+            case .cleared:
+                clearSearchResults()
+                return true
+
+            case .cancelled:
+                if showingResultDetail || showingCrossServiceResults {
+                    showingResultDetail = false
+                    showingCrossServiceResults = false
+                    return true
+                } else if inputState.displayText.isEmpty {
+                    // ESC with empty query - return to previous view
+                    if let tuiInstance = tui {
+                        tuiInstance.changeView(to: tuiInstance.previousView)
+                        return true
+                    }
+                }
+                return false
+
+            case .commandEntered(let command):
+                // Handle command mode in next iteration
+                Logger.shared.logInfo("Command entered: \(command)")
+                inputState.clear()
+                return true
+
+            case .searchEntered(let query):
+                // This case should never be reached due to Enter handling above
+                // But keep it for safety
+                Logger.shared.logInfo("AdvancedSearchView - searchEntered case reached (should not happen)")
+                currentQuery = query
+                Task {
+                    await performSearch()
+                }
+                return true
+
+            case .tabCompletion(_):
+                // Tab completion not used in search view
+                return false
+
+            case .historyPrevious, .historyNext:
+                // History navigation not used in search view
+                return false
+            }
+        }
+
+        // Handle ESC for detail/cross-service views
         if key == 27 { // ESC
             if showingResultDetail || showingCrossServiceResults {
                 showingResultDetail = false
                 showingCrossServiceResults = false
                 return true
-            } else if !displayQuery.isEmpty {
-                // ESC in search mode clears the query
-                displayQuery = ""
-                cursorPosition = 0
-                clearSearchResults()
-                isInSearchInputMode = false
-                return true
-            } else {
-                // ESC with empty query - return to previous view
-                if let tuiInstance = tui {
-                    tuiInstance.changeView(to: tuiInstance.previousView)
-                    return true
-                }
             }
             return false
         }
 
-        // Handle special keys that work in all modes
+        // Handle navigation and special keys
         switch key {
-        case 10, 13: // ENTER
-            if inMainSearchMode && (!filteredResults.isEmpty || !searchResults.isEmpty) {
-                executeSelectedResult()
-                return true
-            }
-            return false
-
-        case 32: // SPACE
-            if inMainSearchMode {
-                // SPACE as text input when in search mode
-                return handleTextInput(key)
-            }
-            return false
-
         case 258, 259: // DOWN (258), UP (259) arrow keys (navigation)
             return handleNavigationInput(key)
 
-        case 127, 8: // BACKSPACE
-            return handleBackspace()
-
-        case 260, 261: // LEFT (260), RIGHT (261) arrow keys - cursor movement
-            if inMainSearchMode && !displayQuery.isEmpty {
-                // Cursor movement when we have text
-                switch key {
-                case 260: // LEFT
-                    cursorPosition = max(0, cursorPosition - 1)
-                case 261: // RIGHT
-                    cursorPosition = min(displayQuery.count, cursorPosition + 1)
-                default:
-                    break
-                }
+        case 10, 13: // ENTER - navigate to detail view
+            if inMainSearchMode && (!filteredResults.isEmpty || !searchResults.isEmpty) {
+                navigateToDetailView()
                 return true
-            } else {
-                return handleNavigationInput(key)
             }
+            return false
 
-        // Number keys as text input
-        case Int32(Character("1").asciiValue!)...Int32(Character("6").asciiValue!):
-            if inMainSearchMode {
-                return handleTextInput(key)
+        case 32: // SPACE - show inline detail
+            if inMainSearchMode && (!filteredResults.isEmpty || !searchResults.isEmpty) {
+                showingResultDetail = true
+                return true
             }
             return false
 
         default:
-            // Handle character input
-            if key >= 32 && key < 127 {
+            // Handle special shortcuts
+            if key >= 32 && key < 127 && inMainSearchMode {
                 let character = Character(UnicodeScalar(Int(key))!)
-
-                // In main search mode, prioritize text input for most characters
-                if inMainSearchMode {
-                    // Check if this is a command shortcut when not actively typing
-                    // Use SHIFT as modifier for commands to avoid conflicts
-                    if !isInSearchInputMode && displayQuery.isEmpty {
-                        switch character {
-                        case "D": // SHIFT+D - detail (only if we have results)
-                            if !filteredResults.isEmpty || !searchResults.isEmpty {
-                                showingResultDetail = true
-                                return true
-                            }
-                            break
-                        default:
-                            break
+                if !inputState.isActive && inputState.displayText.isEmpty {
+                    switch character {
+                    case "D": // SHIFT+D - detail (only if we have results)
+                        if !filteredResults.isEmpty || !searchResults.isEmpty {
+                            showingResultDetail = true
+                            return true
                         }
+                    default:
+                        break
                     }
-
-                    // Handle as text input
-                    return handleTextInput(key)
                 }
             }
             return false
         }
-    }
-
-    @MainActor
-    private static func handleTextInput(_ key: Int32) -> Bool {
-        guard key >= 32 && key < 127 else { return false }
-
-        let character = Character(UnicodeScalar(Int(key))!)
-
-        // Insert character at cursor position
-        if cursorPosition >= displayQuery.count {
-            displayQuery.append(character)
-        } else {
-            let insertIndex = displayQuery.index(displayQuery.startIndex, offsetBy: cursorPosition)
-            displayQuery.insert(character, at: insertIndex)
-        }
-
-        cursorPosition += 1
-        lastTypingTime = Date().timeIntervalSinceReferenceDate
-        isInSearchInputMode = true
-
-        // Immediate UI feedback, debounced search
-        performClientSideFilter()
-        scheduleSearch()
-
-        return true
     }
 
     @MainActor
     private static func handleNavigationInput(_ key: Int32) -> Bool {
+        let resultsToShow: [SearchResult] = inputState.displayText.isEmpty ? searchResults : filteredResults
+        guard !resultsToShow.isEmpty else { return false }
+
         switch key {
         case 258: // DOWN (258)
-            if !filteredResults.isEmpty || !searchResults.isEmpty {
-                let resultsToShow: [SearchResult] = displayQuery.isEmpty ? searchResults : filteredResults
-                let maxIndex = resultsToShow.count - 1
-                selectedResultIndex = min(selectedResultIndex + 1, maxIndex)
-            }
+            moveSelection(by: 1, in: resultsToShow)
             return true
 
         case 259: // UP (259)
-            if !filteredResults.isEmpty || !searchResults.isEmpty {
-                selectedResultIndex = max(selectedResultIndex - 1, 0)
-            }
+            moveSelection(by: -1, in: resultsToShow)
             return true
 
         default:
@@ -787,18 +733,180 @@ struct AdvancedSearchView {
     }
 
     @MainActor
-    private static func handleBackspace() -> Bool {
-        guard !displayQuery.isEmpty && cursorPosition > 0 else {
-            return displayQuery.isEmpty
+    private static func navigateToDetailView() {
+        Logger.shared.logInfo("AdvancedSearchView.navigateToDetailView() - Starting")
+
+        guard let tuiInstance = tui else {
+            Logger.shared.logWarning("AdvancedSearchView.navigateToDetailView() - No TUI instance")
+            return
         }
 
-        displayQuery.remove(at: displayQuery.index(displayQuery.startIndex, offsetBy: cursorPosition - 1))
-        cursorPosition -= 1
-        lastTypingTime = Date().timeIntervalSinceReferenceDate
-        isInSearchInputMode = !displayQuery.isEmpty
-        performClientSideFilter()
-        scheduleSearch()
-        return true
+        let resultsToShow: [SearchResult] = inputState.displayText.isEmpty ? searchResults : filteredResults
+        let selectedIndex = getSelectedIndex(in: resultsToShow)
+        Logger.shared.logInfo("AdvancedSearchView.navigateToDetailView() - resultsToShow.count=\(resultsToShow.count), selectedIndex=\(selectedIndex)")
+
+        guard selectedIndex >= 0 && selectedIndex < resultsToShow.count else {
+            Logger.shared.logWarning("AdvancedSearchView.navigateToDetailView() - Invalid selectedIndex: \(selectedIndex) for \(resultsToShow.count) results")
+            return
+        }
+
+        let selectedResult = resultsToShow[selectedIndex]
+        Logger.shared.logInfo("AdvancedSearchView.navigateToDetailView() - Selected result: \(selectedResult.resourceType) - \(selectedResult.name ?? selectedResult.resourceId)")
+
+        // Map SearchResourceType to detail ViewMode and navigate
+        if let detailView = mapResourceToDetailView(selectedResult.resourceType) {
+            Logger.shared.logInfo("AdvancedSearchView.navigateToDetailView() - Mapped to detail view: \(detailView)")
+
+            // Find and select the resource in the appropriate cached list
+            let foundAndSelected = selectResourceInCache(tuiInstance, selectedResult)
+
+            if !foundAndSelected {
+                Logger.shared.logWarning("Resource not found in cache: \(selectedResult.resourceId)")
+            }
+
+            Logger.shared.logNavigation(".advancedSearch", to: "\(detailView)", details: [
+                "resourceType": "\(selectedResult.resourceType)",
+                "resourceId": selectedResult.resourceId,
+                "foundInCache": "\(foundAndSelected)",
+                "selectedIndex": "\(tuiInstance.selectedIndex)"
+            ])
+
+            tuiInstance.changeView(to: detailView, resetSelection: false)
+        } else {
+            Logger.shared.logWarning("AdvancedSearchView.navigateToDetailView() - No detail view mapped for \(selectedResult.resourceType)")
+        }
+    }
+
+    @MainActor
+    private static func selectResourceInCache(_ tui: TUI, _ result: SearchResult) -> Bool {
+        let resourceId = result.resourceId
+
+        switch result.resourceType {
+        case .server:
+            if let index = tui.cachedServers.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .network:
+            if let index = tui.cachedNetworks.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .subnet:
+            if let index = tui.cachedSubnets.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .port:
+            if let index = tui.cachedPorts.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .router:
+            if let index = tui.cachedRouters.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .volume:
+            if let index = tui.cachedVolumes.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .image:
+            if let index = tui.cachedImages.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .flavor:
+            if let index = tui.cachedFlavors.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .securityGroup:
+            if let index = tui.cachedSecurityGroups.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .keyPair:
+            if let index = tui.cachedKeyPairs.firstIndex(where: { $0.name == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .floatingIP:
+            if let index = tui.cachedFloatingIPs.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .serverGroup:
+            if let index = tui.cachedServerGroups.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .volumeSnapshot:
+            if let index = tui.cachedVolumeSnapshots.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .volumeBackup:
+            if let index = tui.cachedVolumeBackups.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .barbicanSecret:
+            if let index = tui.cachedSecrets.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .barbicanContainer:
+            if let index = tui.cachedBarbicanContainers.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .loadBalancer:
+            if let index = tui.cachedLoadBalancers.firstIndex(where: { $0.id == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .swiftContainer:
+            if let index = tui.cachedSwiftContainers.firstIndex(where: { $0.name == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        case .swiftObject:
+            if let objects = tui.cachedSwiftObjects, let index = objects.firstIndex(where: { $0.name == resourceId }) {
+                tui.selectedIndex = index
+                return true
+            }
+        }
+
+        return false
+    }
+
+    @MainActor
+    private static func mapResourceToDetailView(_ resourceType: SearchResourceType) -> ViewMode? {
+        // Map to LIST views so the user sees the resource highlighted in context
+        // They can then press SPACE to view details if needed
+        switch resourceType {
+        case .server: return .servers
+        case .network: return .networks
+        case .subnet: return .subnets
+        case .port: return .ports
+        case .router: return .routers
+        case .volume: return .volumes
+        case .image: return .images
+        case .flavor: return .flavors
+        case .securityGroup: return .securityGroups
+        case .keyPair: return .keyPairs
+        case .floatingIP: return .floatingIPs
+        case .serverGroup: return .serverGroups
+        case .volumeSnapshot: return .volumes // Navigate to volumes list
+        case .volumeBackup: return .volumes // Navigate to volumes list
+        case .barbicanSecret: return .barbicanSecrets
+        case .barbicanContainer: return .barbicanContainers
+        case .loadBalancer: return .octavia
+        case .swiftContainer: return .swift
+        case .swiftObject: return .swift
+        }
     }
 
     // MARK: - Search Operations
@@ -813,7 +921,7 @@ struct AdvancedSearchView {
             do {
                 try await Task.sleep(nanoseconds: UInt64(searchDebounceDelay * 1_000_000_000))
                 if !Task.isCancelled {
-                    currentQuery = displayQuery
+                    currentQuery = inputState.searchQuery
                     await performSearch()
                     await loadSuggestions()
                 }
@@ -826,24 +934,29 @@ struct AdvancedSearchView {
     @MainActor
     private static func performClientSideFilter() {
         let resultsToFilter = searchResults
+        let query = inputState.searchQuery
 
-        if displayQuery.isEmpty || resultsToFilter.count > maxClientFilterResults {
+        if query.isEmpty || resultsToFilter.count > maxClientFilterResults {
             filteredResults = []
+            // Selection is ID-based, so it automatically persists when switching views
             tui?.forceRedraw()
             return
         }
 
-        let query = displayQuery.lowercased()
+        let queryLower = query.lowercased()
         filteredResults = resultsToFilter.filter { result in
             let name = (result.name ?? result.resourceId).lowercased()
             let resourceType = result.resourceType.displayName.lowercased()
             let status = (result.status ?? "").lowercased()
 
-            return name.contains(query) ||
-                   resourceType.contains(query) ||
-                   status.contains(query) ||
-                   result.metadata.values.contains { $0.lowercased().contains(query) }
+            return name.contains(queryLower) ||
+                   resourceType.contains(queryLower) ||
+                   status.contains(queryLower) ||
+                   result.metadata.values.contains { $0.lowercased().contains(queryLower) }
         }
+
+        // No need to clamp - ID-based selection automatically handles filtered lists
+        // If the selected ID isn't in filtered results, getSelectedIndex() returns 0
 
         tui?.forceRedraw()
     }
@@ -853,20 +966,22 @@ struct AdvancedSearchView {
         searchResults = []
         filteredResults = []
         unifiedResults = nil
-        selectedResultIndex = 0
+        selectedResourceId = nil  // Clear ID-based selection
     }
 
     @MainActor
     private static func executeSelectedResult() {
         let resultsToShow: [SearchResult]
-        if displayQuery.isEmpty {
+        if inputState.displayText.isEmpty {
             resultsToShow = searchResults
         } else {
             resultsToShow = filteredResults
         }
-        guard selectedResultIndex < resultsToShow.count else { return }
 
-        let selectedResult = resultsToShow[selectedResultIndex]
+        let selectedIndex = getSelectedIndex(in: resultsToShow)
+        guard selectedIndex < resultsToShow.count else { return }
+
+        let selectedResult = resultsToShow[selectedIndex]
 
         // Navigate to the appropriate detail view based on resource type
         if let tuiInstance = tui {
@@ -987,7 +1102,8 @@ struct AdvancedSearchView {
 
                 // Update UI state
                 lastSearchTime = unified.searchTime
-                selectedResultIndex = 0
+                // Initialize selection to first result if we have any
+                selectedResourceId = unified.aggregatedItems.first?.resourceId
 
                 Logger.shared.logInfo("AdvancedSearchView - Unified search completed: \(unified.totalCount) results from \(unified.serviceResults.count) services")
             } else {
@@ -997,7 +1113,8 @@ struct AdvancedSearchView {
                 searchResults = results.items
                 totalResults = results.items.count
                 lastSearchTime = Date().timeIntervalSinceReferenceDate - startTime
-                selectedResultIndex = 0
+                // Initialize selection to first result if we have any
+                selectedResourceId = results.items.first?.resourceId
                 unifiedResults = nil
 
                 Logger.shared.logInfo("AdvancedSearchView - Legacy search completed: \(results.items.count) results")
@@ -1333,7 +1450,7 @@ struct AdvancedSearchView {
         return SearchableResources(
             servers: tui.cachedServers,
             networks: tui.cachedNetworks,
-            subnets: [], // TUI doesn't cache subnets separately yet
+            subnets: tui.cachedSubnets,
             ports: tui.cachedPorts,
             routers: tui.cachedRouters,
             volumes: tui.cachedVolumes,
@@ -1342,7 +1459,14 @@ struct AdvancedSearchView {
             securityGroups: tui.cachedSecurityGroups,
             keyPairs: tui.cachedKeyPairs,
             floatingIPs: tui.cachedFloatingIPs,
-            serverGroups: [] // TUI doesn't cache server groups separately yet
+            serverGroups: tui.cachedServerGroups,
+            volumeSnapshots: tui.cachedVolumeSnapshots,
+            volumeBackups: tui.cachedVolumeBackups,
+            barbicanSecrets: tui.cachedSecrets,
+            barbicanContainers: tui.cachedBarbicanContainers,
+            loadBalancers: tui.cachedLoadBalancers,
+            swiftContainers: tui.cachedSwiftContainers,
+            swiftObjects: tui.cachedSwiftObjects ?? []
         )
     }
 

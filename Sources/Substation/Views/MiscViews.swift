@@ -97,7 +97,7 @@ struct MiscViews {
         case .securityGroupRuleManagement:
             return "Help - Security Rule Management"
         case .advancedSearch:
-            return "Help - Advanced Search"
+            return "Help - Search"
         default:
             return "Help - Keyboard Shortcuts"
         }
@@ -112,6 +112,16 @@ struct MiscViews {
             "ENTER: Create/edit/confirm action",
             "ESC: Return to previous view or cancel",
             "TAB: Navigate fields in forms",
+        ])
+
+        let commandNavigation = ("Command Mode Navigation", [
+            ":: Enter command mode for navigation",
+            "Type partial command and press ENTER to navigate",
+            "Example: ':fla' navigates to Flavors",
+            "Example: ':net' navigates to Networks",
+            "TAB: Cycle through command completions",
+            "Sidebar shows filtered results while typing",
+            "Supports fuzzy matching for quick access",
         ])
 
         let generalActions = ("General Actions", [
@@ -241,7 +251,7 @@ struct MiscViews {
         case .advancedSearch:
             return [
                 generalNavigation,
-                ("Advanced Search", [
+                ("Search", [
                     "TAB: Navigate search fields",
                     "ENTER: Execute search",
                     "/: Quick filter results",
@@ -461,10 +471,11 @@ struct MiscViews {
             // General help for all other views
             return [
                 generalNavigation,
-                ("View Navigation", [
+                commandNavigation,
+                ("View Navigation (Single Key)", [
                     "d: Dashboard view",
                     "h: Health Dashboard view",
-                    "k: SSH Key Pairs view",
+                    "k: Key Pairs view",
                     "s: Servers view",
                     "g: Server Groups view",
                     "r: Routers view",
@@ -477,7 +488,27 @@ struct MiscViews {
                     "i: Images view",
                     "f: Flavors view",
                     "t: Topology view",
-                    "z: Advanced Search view",
+                    "z: Search view",
+                ]),
+                ("Command Mode Available Commands", [
+                    ":servers, :srv, :s - Navigate to Servers",
+                    ":networks, :net, :n - Navigate to Networks",
+                    ":volumes, :vol, :v - Navigate to Volumes",
+                    ":flavors, :flv, :f - Navigate to Flavors",
+                    ":images, :img, :i - Navigate to Images",
+                    ":routers, :rtr, :r - Navigate to Routers",
+                    ":subnets, :sub, :u - Navigate to Subnets",
+                    ":ports, :p - Navigate to Ports",
+                    ":floatingips, :fip, :l - Navigate to Floating IPs",
+                    ":securitygroups, :sec, :e - Navigate to Security Groups",
+                    ":servergroups, :sg, :g - Navigate to Server Groups",
+                    ":keypairs, :keys, :k - Navigate to Key Pairs",
+                    ":topology, :topo, :t - Navigate to Topology",
+                    ":search, :find, :z - Navigate to Search",
+                    ":dashboard, :dash, :d - Navigate to Dashboard",
+                    ":health, :h - Navigate to Health Dashboard",
+                    ":help, :? - Show help",
+                    ":quit, :q - Quit application",
                 ]),
                 ("Features", [
                     "Auto-refresh: Data updates every 30 seconds",
@@ -487,6 +518,8 @@ struct MiscViews {
                     "Search and filtering: Quick resource location",
                     "Keyboard-driven: Full functionality without mouse",
                     "Multi-select mode: Bulk operations (CTRL-X)",
+                    "Command mode: Type ':' for smart navigation",
+                    "Fuzzy matching: Partial commands auto-complete",
                 ]),
                 generalActions
             ]

@@ -25,7 +25,7 @@ private final class DefaultTUILogger: MemoryKitLogger, @unchecked Sendable {
 @MainActor
 final class TUI {
     // Core client with enhanced security features
-    internal let client: OSClient
+    internal var client: OSClient
 
     // Enhanced data management
     internal lazy var dataManager: DataManager = DataManager(client: client, tui: self)
@@ -94,9 +94,18 @@ final class TUI {
     internal var lastTopology: TopologyGraph?
     internal var currentTopologyMode: TopologyViewMode = .topology
 
+    // Search result navigation
+    internal var searchSelectedResourceId: String? = nil  // Resource ID selected from search to view in detail
+
     // Floating IP server selection state
     internal var searchQuery: String?
     internal var statusMessage: String?
+
+    // Unified input state for navigation and search
+    internal var unifiedInputState: UnifiedInputView.InputState = UnifiedInputView.InputState()
+    internal var showUnifiedInput: Bool = true // Always show the input bar
+    internal lazy var commandMode: CommandMode = CommandMode()
+    internal lazy var contextSwitcher: ContextSwitcher = ContextSwitcher(cloudConfigManager: CloudConfigManager())
 
     // Health Dashboard navigation state
     internal lazy var healthDashboardNavState: HealthDashboardView.NavigationState = HealthDashboardView.NavigationState()
@@ -438,6 +447,10 @@ final class TUI {
         Task {
             await SearchEngine.shared.setSearchIndexCache(memoryContainer.searchIndexCache)
         }
+
+        // Connect command mode to context switcher for tab completion
+        Logger.shared.logDebug("Connecting command mode to context switcher")
+        self.commandMode.contextSwitcher = self.contextSwitcher
 
         Logger.shared.logInfo("TUI initialization completed successfully")
     }
@@ -1043,7 +1056,7 @@ final class TUI {
     internal func calculateMaxQuotaScrollOffset() -> Int {
         // Check if we're in vertical layout mode for dashboard
         if currentView == .dashboard {
-            let mainWidth = screenCols - calculateSidebarWidth() - 2  // Account for sidebar + separator
+            let mainWidth = screenCols - LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols) - 2  // Account for sidebar + separator
             let mainHeight = screenRows - 4  // Account for header/footer
             let minWidthForGrid = Int32(120)
             let minHeightForGrid = Int32(30)
@@ -1360,7 +1373,8 @@ final class TUI {
         initialDataLoaded = true
         currentView = .dashboard
         previousView = .dashboard
-        await draw(screen: screen)
+        needsRedraw = true
+        renderOptimizer.markFullScreenDirty()
 
         Logger.shared.logInfo("Initial data load completed, transitioning to dashboard")
     }
@@ -1443,7 +1457,7 @@ final class TUI {
 
         if renderPlan.renderSidebar {
             let start = Date()
-            await SidebarView.draw(screen: screen, screenCols: screenCols, screenRows: screenRows, currentView: currentView)
+            await SidebarView.draw(screen: screen, screenCols: screenCols, screenRows: screenRows, currentView: currentView, tui: self)
             componentTimings["sidebar"] = Date().timeIntervalSince(start)
         }
 
@@ -1451,6 +1465,28 @@ final class TUI {
             let start = Date()
             await MainPanelView.draw(screen: screen, tui: self, screenCols: screenCols, screenRows: screenRows)
             componentTimings["mainPanel"] = Date().timeIntervalSince(start)
+        }
+
+        // Render horizontal separator line above bottom bars
+        if renderPlan.renderStatusBar {
+            let surface = SwiftTUI.surface(from: screen)
+            // When unified input is shown: separator at screenRows - 3 (input at -2, status at -1)
+            // When no input: separator at screenRows - 2 (status at -1)
+            let separatorRow = showUnifiedInput ? screenRows - 3 : screenRows - 2
+            let separatorBounds = Rect(x: 0, y: separatorRow, width: screenCols, height: 1)
+
+            // Create separator line text
+            let separatorText = String(repeating: "-", count: Int(screenCols))
+            let separatorComponent = Text(separatorText).info()
+
+            await SwiftTUI.render(separatorComponent, on: surface, in: separatorBounds)
+        }
+
+        // Render unified input bar (above status bar)
+        if showUnifiedInput && renderPlan.renderStatusBar {
+            let start = Date()
+            await UnifiedInputBarView.draw(screen: screen, tui: self, screenCols: screenCols, screenRows: screenRows)
+            componentTimings["inputBar"] = Date().timeIntervalSince(start)
         }
 
         if renderPlan.renderStatusBar {
@@ -1490,15 +1526,6 @@ final class TUI {
         // Track performance degradation
         if totalDrawDuration > 0.05 { // 50ms threshold
             Logger.shared.logWarning("Screen draw exceeded performance target: \(String(format: "%.1f", totalDrawDuration * 1000))ms")
-        }
-    }
-
-    private func calculateSidebarWidth() -> Int32 {
-        // Responsive sidebar width based on screen size
-        if screenCols < 70 {
-            return 7  // Compact mode: "[d]" format
-        } else {
-            return 25 // Full mode: complete text
         }
     }
 

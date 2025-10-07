@@ -117,23 +117,32 @@ public final class OpenStackClient: @unchecked Sendable {
         authenticationError = nil
 
         do {
-            // Test connectivity by attempting to authenticate
-            let _: EmptyTestResponse = try await core.request(
-                service: "compute",
-                method: "GET",
-                path: "/",
-                expected: 200
-            )
+            // Ensure we have a valid token (this triggers authentication if needed)
+            _ = try await core.ensureAuthenticated()
 
             self.isAuthenticated = true
             self.authenticationError = nil
             updateTokenExpiration()
 
+            // Optional: Try to test connectivity with compute service, but don't fail if it doesn't exist
+            do {
+                let _: EmptyTestResponse = try await core.request(
+                    service: "compute",
+                    method: "GET",
+                    path: "/",
+                    expected: 200
+                )
+                await core.clientLogger.logInfo("Successfully validated compute service endpoint", context: [:])
+            } catch {
+                // Compute service might not be available, but authentication succeeded
+                await core.clientLogger.logDebug("Compute service not available (this is OK if not using Nova): \(error.localizedDescription)", context: [:])
+            }
+
         } catch {
             self.isAuthenticated = false
             self.authenticationError = error
 
-            await core.clientLogger.logError("Failed to connect to OpenStack", context: ["error": error.localizedDescription])
+            await core.clientLogger.logError("Failed to authenticate with OpenStack", context: ["error": error.localizedDescription])
         }
 
         isConnecting = false
@@ -376,7 +385,24 @@ public final class OpenStackClient: @unchecked Sendable {
     /// The project name for this client (backward compatibility)
     public var project: String {
         get async {
-            await projectName ?? ""
+            // Try multiple sources in order:
+            // 1. Project name from credentials
+            if let name = await projectName {
+                return name
+            }
+
+            // 2. Project name from token (if authenticated)
+            if let tokenProjectName = await core.projectName {
+                return tokenProjectName
+            }
+
+            // 3. Project ID as fallback
+            if let id = await projectID {
+                return id
+            }
+
+            // 4. Last resort
+            return "Unknown"
         }
     }
 

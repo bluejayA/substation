@@ -42,7 +42,7 @@ extension Actions {
             networkInterfaceForm.serverInterfaces = try await client.getServerInterfaces(serverID: server.id)
             statusMessage = "Managing network interfaces for '\(serverName)'"
             tui.changeView(to: .serverNetworkInterfaces, resetSelection: false)
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to load network interfaces for '\(serverName)'"
             switch error {
             case .authenticationFailed:
@@ -135,7 +135,7 @@ extension Actions {
                 do {
                     try await client.attachPort(serverID: server.id, portID: port.id)
                     changeCount += 1
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     errorCount += 1
                     let baseMsg = "Failed to attach port '\(portName)'"
                     switch error {
@@ -190,7 +190,7 @@ extension Actions {
                 do {
                     try await client.attachNetwork(serverID: server.id, networkID: network.id)
                     changeCount += 1
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     errorCount += 1
                     let baseMsg = "Failed to attach network '\(network.name ?? "Unknown")'"
                     switch error {
@@ -246,7 +246,7 @@ extension Actions {
                 do {
                     try await client.detachPort(serverID: server.id, portID: port.id)
                     changeCount += 1
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     errorCount += 1
                     let baseMsg = "Failed to detach port '\(portName)'"
                     switch error {
@@ -315,7 +315,7 @@ extension Actions {
                     if portDetachCount > 0 {
                         changeCount += 1
                     }
-                } catch let error as OTError {
+                } catch let error as OpenStackError {
                     errorCount += 1
                     let baseMsg = "Failed to detach network '\(network.name ?? "Unknown")'"
                     switch error {

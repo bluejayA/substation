@@ -7,14 +7,6 @@ import FoundationNetworking
 
 /// Primary alias for the main OpenStack client
 public typealias OSClient = OpenStackClient
-
-/// Backward compatibility alias for SecureOpenStackClient (now consolidated into OpenStackClient)
-public typealias SecureOSClient = OpenStackClient
-
-/// Backward compatibility aliases for configuration and credentials
-public typealias OTConfig = OpenStackConfig
-public typealias OTCredentials = OpenStackCredentials
-public typealias OTError = OpenStackError
 public typealias OSClientLogger = OpenStackClientLogger
 
 // MARK: - Extended Compatibility Operations

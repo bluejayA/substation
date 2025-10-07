@@ -346,6 +346,166 @@ class InputHandler {
             "scrollOffset": tui.scrollOffset
         ])
 
+        // PRIORITY 1: Handle unified input if it's active
+        if tui.unifiedInputState.isActive {
+            let result = UnifiedInputView.handleInput(ch, state: &tui.unifiedInputState)
+
+            switch result {
+            case .updated:
+                // Reset tab completion and history when user types (input changed)
+                if tui.unifiedInputState.isCommandMode {
+                    tui.commandMode.resetTabCompletion()
+                    tui.commandMode.resetHistoryPosition()
+                }
+                // Update the search query in real-time for filtering
+                tui.searchQuery = tui.unifiedInputState.searchQuery.isEmpty ? nil : tui.unifiedInputState.searchQuery
+                tui.forceRedraw()
+                return
+
+            case .cleared:
+                tui.searchQuery = nil
+                tui.forceRedraw()
+                return
+
+            case .cancelled:
+                // ESC when input is active - just deactivate
+                tui.unifiedInputState.clear()
+                tui.searchQuery = nil
+                tui.forceRedraw()
+                return
+
+            case .commandEntered(let command):
+                // Execute the command using CommandMode
+                let result = tui.commandMode.executeCommand(command)
+
+                switch result {
+                case .navigateToView(let viewMode):
+                    tui.changeView(to: viewMode)
+                    tui.statusMessage = "Navigated to \(viewMode.title)"
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .showHelp:
+                    tui.changeView(to: .help)
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .showCommands:
+                    let commandList = tui.commandMode.getCommandList()
+                    tui.statusMessage = commandList
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .quit:
+                    tui.running = false
+                    return
+
+                case .error(let message):
+                    tui.statusMessage = message
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .suggestion(let original, let suggested):
+                    tui.statusMessage = "Unknown command '\(original)'. Did you mean ':\(suggested)'?"
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .listContexts:
+                    // List available cloud contexts
+                    Task {
+                        let contextList = await tui.contextSwitcher.formatContextList()
+                        tui.statusMessage = contextList
+                        tui.unifiedInputState.clear()
+                        tui.forceRedraw()
+                    }
+                    return
+
+                case .switchContext(let contextName):
+                    // Switch to a different cloud context
+                    Task {
+                        do {
+                            try await tui.contextSwitcher.switchTo(contextName, client: tui.client, tui: tui)
+                            tui.statusMessage = "Switched to cloud: \(contextName)"
+                            tui.unifiedInputState.clear()
+                            tui.forceRedraw()
+                        } catch {
+                            tui.statusMessage = "Failed to switch context: \(error.localizedDescription)"
+                            tui.unifiedInputState.clear()
+                            tui.forceRedraw()
+                        }
+                    }
+                    return
+
+                case .ignored:
+                    break
+                }
+
+            case .searchEntered(let query):
+                // ENTER in search mode - apply the filter and release keyboard
+                tui.searchQuery = query.isEmpty ? nil : query
+                tui.unifiedInputState.isActive = false
+                tui.forceRedraw()
+                return
+
+            case .tabCompletion(let partial):
+                // Handle Tab completion in command mode
+                if let completion = await tui.commandMode.completeCommand(partial) {
+                    // Replace the current input with the completion
+                    tui.unifiedInputState.displayText = ":\(completion)"
+                    tui.unifiedInputState.cursorPosition = completion.count + 1
+                    tui.forceRedraw()
+                } else {
+                    // No completions available
+                    tui.statusMessage = "No completions for '\(partial)'"
+                    tui.forceRedraw()
+                }
+                return
+
+            case .historyPrevious:
+                // Navigate to previous command in history
+                if let previousCmd = tui.commandMode.previousCommand() {
+                    tui.unifiedInputState.displayText = ":\(previousCmd)"
+                    tui.unifiedInputState.cursorPosition = previousCmd.count + 1
+                    tui.forceRedraw()
+                }
+                return
+
+            case .historyNext:
+                // Navigate to next command in history
+                if let nextCmd = tui.commandMode.nextCommand() {
+                    tui.unifiedInputState.displayText = ":\(nextCmd)"
+                    tui.unifiedInputState.cursorPosition = nextCmd.count + 1
+                } else {
+                    // At the end of history, clear to just ":"
+                    tui.unifiedInputState.displayText = ":"
+                    tui.unifiedInputState.cursorPosition = 1
+                }
+                tui.forceRedraw()
+                return
+
+            case .ignored:
+                break // Fall through to normal handling
+            }
+        }
+
+        // PRIORITY 2: Activate unified input on / or :
+        if ch == 47 { // '/' - Activate search mode
+            tui.unifiedInputState.activate(asCommandMode: false)
+            tui.forceRedraw()
+            return
+        }
+
+        if ch == 58 { // ':' - Activate command mode
+            tui.unifiedInputState.activate(asCommandMode: true)
+            tui.forceRedraw()
+            return
+        }
+
         switch ch {
         case Int32(3): // CTRL-C
             Logger.shared.logUserAction("quit_application")

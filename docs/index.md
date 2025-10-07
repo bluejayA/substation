@@ -9,7 +9,7 @@ Substation is a comprehensive terminal user interface for OpenStack that provide
 
 **Translation**: It's a terminal app for managing OpenStack that doesn't make you want to rage-quit at 3 AM.
 
-![Substation Dashboard](assets/substation-dash.png)
+![Substation Dashboard](assets/substation-enjoy.gif)
 
 ## Why Substation?
 
