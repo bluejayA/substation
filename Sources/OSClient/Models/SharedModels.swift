@@ -161,7 +161,7 @@ public struct SecurityGroupRef: Codable, Sendable, Hashable {
 // MARK: - Flavor Reference
 
 public struct FlavorRef: Codable, Sendable, Hashable {
-    public let id: String?
+    public let id: String
     public let name: String?
     public let originalName: String?
     public let vcpus: Int?
@@ -181,7 +181,7 @@ public struct FlavorRef: Codable, Sendable, Hashable {
         case swap
     }
 
-    public init(id: String? = nil, name: String? = nil, originalName: String? = nil, vcpus: Int? = nil, ram: Int? = nil, disk: Int? = nil, ephemeral: Int? = nil, swap: Int? = nil) {
+    public init(id: String, name: String? = nil, originalName: String? = nil, vcpus: Int? = nil, ram: Int? = nil, disk: Int? = nil, ephemeral: Int? = nil, swap: Int? = nil) {
         self.id = id
         self.name = name
         self.originalName = originalName

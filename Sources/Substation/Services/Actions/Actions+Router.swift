@@ -29,7 +29,10 @@ extension Actions {
         // Switch to subnet router management view
         selectedResource = subnet
         attachmentMode = .attach
-        attachedRouterIds.removeAll()
+
+        // Load attached routers for filtering
+        await loadAttachedRoutersForSubnet(subnet)
+
         tui.changeView(to: .subnetRouterManagement, resetSelection: false)
         statusMessage = "Select a router to attach subnet '\(subnetName)'"
     }

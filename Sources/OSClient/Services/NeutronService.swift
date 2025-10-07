@@ -584,7 +584,16 @@ public actor NeutronService: OpenStackService {
             expected: 200
         )
 
-        let router = response.router
+        var router = response.router
+
+        // Fetch and populate router interfaces
+        do {
+            let interfaces = try await fetchRouterInterfaces(routerId: id)
+            router.interfaces = interfaces
+        } catch {
+            logger.logError("Failed to fetch router interfaces for router \(id): \(error)", context: [:])
+            router.interfaces = []
+        }
 
         await cacheManager.store(
             router,
@@ -594,6 +603,28 @@ public actor NeutronService: OpenStackService {
         )
 
         return router
+    }
+
+    /// Fetch router interfaces by querying ports attached to the router
+    private func fetchRouterInterfaces(routerId: String) async throws -> [RouterInterface] {
+        // Query ports where device_id matches the router ID
+        let ports = try await listPorts(deviceId: routerId)
+
+        // Filter for router interface ports and convert to RouterInterface
+        let interfaces = ports
+            .filter { $0.deviceOwner?.hasPrefix("network:router_interface") == true }
+            .compactMap { port -> RouterInterface? in
+                // Get subnet ID and IP address from fixedIps
+                guard let fixedIp = port.fixedIps?.first else { return nil }
+
+                return RouterInterface(
+                    subnetId: fixedIp.subnetId,
+                    portId: port.id,
+                    ipAddress: fixedIp.ipAddress
+                )
+            }
+
+        return interfaces
     }
 
     /// Create a router
