@@ -41,6 +41,7 @@ Print this and tape it to your monitor (we won't judge).
 | `r` | Refresh | Refresh current view |
 | `a` | Auto-refresh Toggle | Cycle between 5s, 10s, 30s, 60s, off |
 | `/` | Search/Filter | Instant local filtering, no API calls |
+| `Ctrl-X` | Multi-Select Mode | Toggle multi-select mode for bulk operations |
 | `Esc` | Back/Cancel | Works everywhere, exits everything |
 | `q` | Quit | From main view only |
 
@@ -54,8 +55,29 @@ Print this and tape it to your monitor (we won't judge).
 | `Page Down` | Scroll down one page | - |
 | `Home` or `g` | Jump to top | Vim-style |
 | `End` or `G` | Jump to bottom | Vim-style |
-| `Space` | View details | Deep dive into a resource |
+| `Space` | View details (or toggle selection in multi-select) | Deep dive into a resource |
 | `Enter` | View details | Same as Space, because options |
+
+### Multi-Select Mode
+
+| Key | Action | Notes |
+|-----|--------|-------|
+| `Ctrl-X` | Toggle multi-select mode | Enter/exit multi-select mode |
+| `Space` | Toggle item selection | Select/deselect items (in multi-select mode) |
+| `Del` | Bulk delete | Delete all selected items (confirmation required) |
+| `Esc` | Exit multi-select | Cancel and clear selections |
+
+**Multi-Select Workflow:**
+
+1. Press `Ctrl-X` to enter multi-select mode
+2. Use arrow keys to navigate, `Space` to select/deselect items
+3. Status icons change to `[ ]` (unselected) or `[X]` (selected)
+4. Press `Del` to bulk delete selected items
+5. Press `Ctrl-X` or `Esc` to exit multi-select mode
+
+**Supported Views:**
+- Servers, Volumes, Networks, Subnets, Routers, Ports
+- Floating IPs, Security Groups, Server Groups, Key Pairs, Images
 
 ### Resource Actions
 
@@ -71,13 +93,14 @@ Print this and tape it to your monitor (we won't judge).
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Create server | Full server creation form |
-| `Del` | Delete server | Confirmation required |
+| `Del` | Delete server | Confirmation required (or bulk delete in multi-select) |
 | `S` | Start server | Power on |
 | `T` | Stop server | Graceful shutdown |
 | `R` | Restart server | Reboot (soft by default) |
 | `L` | View console logs | Last 100 lines |
 | `P` | Create snapshot | Create image from server |
 | `Z` | Resize server | Change flavor |
+| `Ctrl-X` | Multi-select mode | Bulk operations on multiple servers |
 
 ### Server Groups View (`g`)
 
@@ -109,12 +132,13 @@ Print this and tape it to your monitor (we won't judge).
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Create volume | Size, type, bootable option |
-| `Del` | Delete volume | Must be detached first |
+| `Del` | Delete volume | Must be detached first (or bulk delete in multi-select) |
 | `A` | Attach to server | Select server and device |
 | `X` | Detach from server | Unmount first! |
 | `P` | Create snapshot | Volume backup |
 | `M` | Manage snapshots | View/restore snapshots |
 | `E` | Extend volume size | Can't shrink, only grow |
+| `Ctrl-X` | Multi-select mode | Bulk operations on multiple volumes |
 
 ### Images View (`i`)
 
@@ -457,6 +481,7 @@ Actions:     C Del Space ? q    (Create, Delete, Details, Help, Quit)
 Search:      / z                (Local, Advanced)
 Refresh:     r c                (Refresh, Cache purge)
 Movement:    ↑↓ j k Page-Up/Dn  (List navigation)
+Bulk Ops:    Ctrl-X Space Del   (Multi-select, Select, Bulk delete)
 ```
 
 ### Emergency Shortcuts

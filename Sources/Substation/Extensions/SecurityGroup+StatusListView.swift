@@ -34,7 +34,8 @@ extension SecurityGroupViews {
             getStatusIcon: { _ in "active" },
             filterItems: { securityGroups, query in
                 FilterUtils.filterSecurityGroups(securityGroups, query: query)
-            }
+            },
+            getItemID: { securityGroup in securityGroup.id }
         )
     }
 }

@@ -58,6 +58,9 @@ extension VolumeViews {
             },
             filterItems: { volumes, query in
                 FilterUtils.filterVolumes(volumes, query: query)
+            },
+            getItemID: { volume in
+                volume.id
             }
         )
     }

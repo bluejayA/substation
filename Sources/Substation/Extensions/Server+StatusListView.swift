@@ -58,6 +58,9 @@ extension ServerViews {
             },
             filterItems: { servers, query in
                 FilterUtils.filterServers(servers, query: query)
+            },
+            getItemID: { server in
+                server.id
             }
         )
     }

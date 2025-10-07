@@ -34,7 +34,8 @@ extension RouterViews {
             getStatusIcon: { _ in "active" },
             filterItems: { routers, query in
                 FilterUtils.filterRouters(routers, query: query)
-            }
+            },
+            getItemID: { router in router.id }
         )
     }
 }

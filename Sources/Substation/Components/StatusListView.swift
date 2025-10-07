@@ -31,17 +31,20 @@ struct StatusListView<T: Sendable> {
     private let columns: [StatusListColumn<T>]
     private let getStatusIcon: (T) -> String
     private let filterItems: ([T], String?) -> [T]
+    private let getItemID: (T) -> String
 
     init(
         title: String,
         columns: [StatusListColumn<T>],
         getStatusIcon: @escaping (T) -> String,
-        filterItems: @escaping ([T], String?) -> [T]
+        filterItems: @escaping ([T], String?) -> [T],
+        getItemID: @escaping (T) -> String = { _ in "" }
     ) {
         self.title = title
         self.columns = columns
         self.getStatusIcon = getStatusIcon
         self.filterItems = filterItems
+        self.getItemID = getItemID
     }
 
     // MARK: - Main Draw Function
@@ -57,7 +60,9 @@ struct StatusListView<T: Sendable> {
         scrollOffset: Int,
         selectedIndex: Int,
         dataManager: DataManager? = nil,
-        virtualScrollManager: VirtualScrollManager<T>? = nil
+        virtualScrollManager: VirtualScrollManager<T>? = nil,
+        multiSelectMode: Bool = false,
+        selectedItems: Set<String> = []
     ) async {
         // Defensive bounds checking
         guard width > 10 && height > 10 else {
@@ -70,8 +75,11 @@ struct StatusListView<T: Sendable> {
         let surface = SwiftTUI.surface(from: screen)
         var components: [any Component] = []
 
-        // Title
-        let titleText = searchQuery.map { "\(title) (filtered: \($0))" } ?? title
+        // Title with multi-select indicator
+        var titleText = searchQuery.map { "\(title) (filtered: \($0))" } ?? title
+        if multiSelectMode {
+            titleText += " [MULTI-SELECT: \(selectedItems.count) selected]"
+        }
         components.append(Text(titleText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
 
         // Header
@@ -85,7 +93,9 @@ struct StatusListView<T: Sendable> {
                 components: &components,
                 virtualScrollManager: virtualScrollManager,
                 selectedIndex: selectedIndex,
-                height: height
+                height: height,
+                multiSelectMode: multiSelectMode,
+                selectedItems: selectedItems
             )
         } else if let dataManager = dataManager, dataManager.isPaginationEnabled(for: title.lowercased()) {
             await renderWithPagination(
@@ -93,7 +103,9 @@ struct StatusListView<T: Sendable> {
                 dataManager: dataManager,
                 selectedIndex: selectedIndex,
                 height: height,
-                resourceKey: title.lowercased()
+                resourceKey: title.lowercased(),
+                multiSelectMode: multiSelectMode,
+                selectedItems: selectedItems
             )
         } else {
             await renderTraditional(
@@ -102,7 +114,9 @@ struct StatusListView<T: Sendable> {
                 searchQuery: searchQuery,
                 scrollOffset: scrollOffset,
                 selectedIndex: selectedIndex,
-                height: height
+                height: height,
+                multiSelectMode: multiSelectMode,
+                selectedItems: selectedItems
             )
         }
 
@@ -130,7 +144,9 @@ struct StatusListView<T: Sendable> {
         components: inout [any Component],
         virtualScrollManager: VirtualScrollManager<T>,
         selectedIndex: Int,
-        height: Int32
+        height: Int32,
+        multiSelectMode: Bool = false,
+        selectedItems: Set<String> = []
     ) async {
         let maxVisibleItems = max(1, Int(height) - 10)
         let renderableItems = virtualScrollManager.getRenderableItems(
@@ -144,7 +160,9 @@ struct StatusListView<T: Sendable> {
         } else {
             for (item, _, index) in renderableItems {
                 let isSelected = index == selectedIndex
-                let itemComponent = createItemComponent(item: item, isSelected: isSelected)
+                let itemID = getItemID(item)
+                let isMultiSelected = multiSelectMode && selectedItems.contains(itemID)
+                let itemComponent = createItemComponent(item: item, isSelected: isSelected, isMultiSelected: isMultiSelected, multiSelectMode: multiSelectMode)
                 components.append(itemComponent)
             }
 
@@ -159,7 +177,9 @@ struct StatusListView<T: Sendable> {
         dataManager: DataManager,
         selectedIndex: Int,
         height: Int32,
-        resourceKey: String
+        resourceKey: String,
+        multiSelectMode: Bool = false,
+        selectedItems: Set<String> = []
     ) async {
         let paginatedItems: [T] = await dataManager.getPaginatedItems(for: resourceKey, type: T.self)
 
@@ -173,7 +193,9 @@ struct StatusListView<T: Sendable> {
             for i in 0..<endIndex {
                 let item = paginatedItems[i]
                 let isSelected = i == selectedIndex
-                let itemComponent = createItemComponent(item: item, isSelected: isSelected)
+                let itemID = getItemID(item)
+                let isMultiSelected = multiSelectMode && selectedItems.contains(itemID)
+                let itemComponent = createItemComponent(item: item, isSelected: isSelected, isMultiSelected: isMultiSelected, multiSelectMode: multiSelectMode)
                 components.append(itemComponent)
             }
 
@@ -190,7 +212,9 @@ struct StatusListView<T: Sendable> {
         searchQuery: String?,
         scrollOffset: Int,
         selectedIndex: Int,
-        height: Int32
+        height: Int32,
+        multiSelectMode: Bool = false,
+        selectedItems: Set<String> = []
     ) async {
         let filteredItems = filterItems(items, searchQuery)
 
@@ -214,7 +238,9 @@ struct StatusListView<T: Sendable> {
             for i in startIndex..<endIndex {
                 let item = filteredItems[i]
                 let isSelected = i == selectedIndex
-                let itemComponent = createItemComponent(item: item, isSelected: isSelected)
+                let itemID = getItemID(item)
+                let isMultiSelected = multiSelectMode && selectedItems.contains(itemID)
+                let itemComponent = createItemComponent(item: item, isSelected: isSelected, isMultiSelected: isMultiSelected, multiSelectMode: multiSelectMode)
                 components.append(itemComponent)
             }
 
@@ -228,12 +254,18 @@ struct StatusListView<T: Sendable> {
 
     // MARK: - Item Component Creation
 
-    private func createItemComponent(item: T, isSelected: Bool) -> any Component {
+    private func createItemComponent(item: T, isSelected: Bool, isMultiSelected: Bool = false, multiSelectMode: Bool = false) -> any Component {
         var children: [any Component] = []
 
-        // Status icon
-        let statusIcon = getStatusIcon(item)
-        children.append(StatusIcon(status: statusIcon))
+        // In multi-select mode, replace status icon with checkbox
+        if multiSelectMode {
+            let checkbox = isMultiSelected ? "[X]" : "[ ]"
+            children.append(Text(checkbox).styled(isMultiSelected ? .accent : .secondary))
+        } else {
+            // Status icon when not in multi-select mode
+            let statusIcon = getStatusIcon(item)
+            children.append(StatusIcon(status: statusIcon))
+        }
 
         // Columns
         for column in columns {
@@ -241,7 +273,12 @@ struct StatusListView<T: Sendable> {
             let paddedValue = String(value.prefix(column.width))
                 .padding(toLength: column.width, withPad: " ", startingAt: 0)
 
-            let style = column.getStyle?(item) ?? (isSelected ? .accent : .secondary)
+            let style: TextStyle
+            if isMultiSelected {
+                style = .accent
+            } else {
+                style = column.getStyle?(item) ?? (isSelected ? .accent : .secondary)
+            }
             children.append(Text(" " + paddedValue).styled(style))
         }
 

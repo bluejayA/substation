@@ -90,7 +90,8 @@ struct FloatingIPViews {
                                          width: Int32, height: Int32, cachedFloatingIPs: [FloatingIP],
                                          searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
                                           cachedServers: [Server],
-                                         cachedPorts: [Port], cachedNetworks: [Network]) async {
+                                         cachedPorts: [Port], cachedNetworks: [Network],
+                                         multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createFloatingIPStatusListView(
             cachedServers: cachedServers,
@@ -106,7 +107,9 @@ struct FloatingIPViews {
             items: cachedFloatingIPs,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

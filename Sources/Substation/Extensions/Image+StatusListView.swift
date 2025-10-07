@@ -52,7 +52,8 @@ extension ImageViews {
             getStatusIcon: { _ in "active" },
             filterItems: { images, query in
                 FilterUtils.filterImages(images, query: query)
-            }
+            },
+            getItemID: { image in image.id }
         )
     }
 }

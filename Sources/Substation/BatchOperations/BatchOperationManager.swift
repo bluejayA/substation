@@ -402,6 +402,38 @@ actor BatchOperationManager {
                 try await executeNetworkInterfaceAttach(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
 
+            case (.subnet, .delete):
+                try await executeSubnetDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.router, .delete):
+                try await executeRouterDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.port, .delete):
+                try await executePortDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.floatingIP, .delete):
+                try await executeFloatingIPDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.securityGroup, .delete):
+                try await executeSecurityGroupDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.serverGroup, .delete):
+                try await executeServerGroupDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.keyPair, .delete):
+                try await executeKeyPairDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.image, .delete):
+                try await executeImageDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
             default:
                 throw BatchOperationError.executionFailed("Unsupported operation: \(operation.action.rawValue) \(operation.type.rawValue)")
             }
@@ -662,6 +694,62 @@ actor BatchOperationManager {
             serverID: serverID,
             networkID: networkID
         )
+    }
+
+    private func executeSubnetDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deleteSubnet(id: operation.resourceIdentifier)
+    }
+
+    private func executeRouterDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deleteRouter(id: operation.resourceIdentifier)
+    }
+
+    private func executePortDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deletePort(id: operation.resourceIdentifier)
+    }
+
+    private func executeFloatingIPDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deleteFloatingIP(id: operation.resourceIdentifier)
+    }
+
+    private func executeSecurityGroupDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deleteSecurityGroup(id: operation.resourceIdentifier)
+    }
+
+    private func executeServerGroupDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deleteServerGroup(id: operation.resourceIdentifier)
+    }
+
+    private func executeKeyPairDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deleteKeyPair(name: operation.resourceIdentifier)
+    }
+
+    private func executeImageDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.deleteImage(id: operation.resourceIdentifier)
     }
 
     // MARK: - Helper Methods

@@ -29,7 +29,8 @@ extension KeyPairViews {
             getStatusIcon: { _ in "active" },
             filterItems: { keyPairs, query in
                 FilterUtils.filterKeyPairs(keyPairs, query: query)
-            }
+            },
+            getItemID: { keyPair in keyPair.name ?? "" }
         )
     }
 }

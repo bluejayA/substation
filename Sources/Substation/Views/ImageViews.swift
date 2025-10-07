@@ -9,7 +9,8 @@ struct ImageViews {
     @MainActor
     static func drawDetailedImageList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                     width: Int32, height: Int32, cachedImages: [Image],
-                                    searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
+                                    searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
+                                    multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createImageStatusListView()
         await statusListView.draw(
@@ -21,7 +22,9 @@ struct ImageViews {
             items: cachedImages,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

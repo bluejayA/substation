@@ -707,7 +707,7 @@ chmod 600 ~/.substation/config.yaml
 
 ```bash
 # Ubuntu/Debian
-sudo apt-get install libncurses5
+sudo apt install libncurses6
 
 # RHEL/CentOS
 sudo yum install ncurses

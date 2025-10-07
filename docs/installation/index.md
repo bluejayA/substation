@@ -62,8 +62,8 @@ sudo mv substation /usr/local/bin/
 
 ```bash
 # Install ncurses if not present (Ubuntu/Debian)
-sudo apt-get update
-sudo apt-get install -y libncurses6
+sudo apt update
+sudo apt install -y libncurses6
 
 # For RHEL/CentOS/Fedora
 # sudo dnf install -y ncurses-libs
@@ -112,14 +112,16 @@ swiftly use "6.1"
 
 ```bash
 # Install dependencies
-sudo apt-get update
-sudo apt-get install -y \
+sudo apt update
+sudo apt install -y \
     binutils \
+    build-essential \
     git \
     gnupg2 \
+    libc6-dev \
+    libcurl4-openssl-dev \
     libncurses-dev \
-    build-essential \
-    libc6-dev
+    libssl-dev
 
 # Install Swiftly
 curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
@@ -143,7 +145,8 @@ sudo dnf install -y \
     ncurses-devel \
     gcc \
     gcc-c++ \
-    glibc-devel
+    glibc-devel \
+    libcurl-devel
 
 # Install Swiftly
 curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
@@ -255,7 +258,7 @@ ls -l /usr/local/bin/substation
 
 ```bash
 # Ubuntu/Debian
-sudo apt-get install -y libncurses6
+sudo apt install -y libncurses6
 
 # RHEL/CentOS/Fedora
 sudo dnf install -y ncurses-libs
@@ -282,7 +285,7 @@ swiftly use 6.1
 
 ```bash
 # Ubuntu/Debian
-sudo apt-get install -y libncurses-dev
+sudo apt install -y libncurses-dev
 
 # RHEL/CentOS/Fedora
 sudo dnf install -y ncurses-devel

@@ -6,7 +6,8 @@ struct RouterViews {
     @MainActor
     static func drawDetailedRouterList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                       width: Int32, height: Int32, cachedRouters: [Router],
-                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
+                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
+                                      multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createRouterStatusListView()
         await statusListView.draw(
@@ -18,7 +19,9 @@ struct RouterViews {
             items: cachedRouters,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

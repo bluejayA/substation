@@ -126,7 +126,8 @@ struct SecurityGroupViews {
     @MainActor
     static func drawDetailedSecurityGroupList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                              width: Int32, height: Int32, cachedSecurityGroups: [SecurityGroup],
-                                             searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
+                                             searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
+                                             multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createSecurityGroupStatusListView()
         await statusListView.draw(
@@ -138,7 +139,9 @@ struct SecurityGroupViews {
             items: cachedSecurityGroups,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

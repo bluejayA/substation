@@ -51,6 +51,9 @@ extension NetworkViews {
             },
             filterItems: { networks, query in
                 FilterUtils.filterNetworks(networks, query: query)
+            },
+            getItemID: { network in
+                network.id
             }
         )
     }

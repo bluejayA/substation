@@ -35,7 +35,8 @@ extension SubnetViews {
             getStatusIcon: { _ in "active" },
             filterItems: { subnets, query in
                 FilterUtils.filterSubnets(subnets, query: query)
-            }
+            },
+            getItemID: { subnet in subnet.id }
         )
     }
 }
