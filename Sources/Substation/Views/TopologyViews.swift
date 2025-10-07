@@ -67,7 +67,7 @@ struct TopologyViews {
     @MainActor
     static func drawTopologyView(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                 width: Int32, height: Int32, topology: TopologyGraph?,
-                                scrollOffset: Int32 = 0, mode: TopologyViewMode = .logical) async {
+                                scrollOffset: Int = 0, mode: TopologyViewMode = .logical) async {
 
         // Create surface for optimal performance (EXACT Gold Standard Pattern)
         let surface = SwiftTUI.surface(from: screen)
@@ -371,53 +371,5 @@ struct TopologyViews {
         }
 
         return components
-    }
-
-
-    private static func enhanceTopologyLine(line: String) -> String {
-        var enhancedLine = line
-
-        // Replace basic text with modern icons and status indicators
-        enhancedLine = enhancedLine.replacingOccurrences(of: "Server:", with: "\(topologyIconServer) Server:")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "Network:", with: "\(topologyIconNetwork) Network:")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "Router:", with: "\(topologyIconRouter) Router:")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "Volume:", with: "\(topologyIconVolume) Volume:")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "[ACTIVE]", with: "[\(topologyIconActive)ACTIVE]")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "[BUILD]", with: "[\(topologyIconBuilding)BUILD]")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "[ERROR]", with: "[\(topologyIconError)ERROR]")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "[RTR]", with: "[\(topologyIconRouter)]")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "[VOL]", with: "[\(topologyIconVolume)]")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "[FIP]", with: "[\(topologyIconFloatingIP)]")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "FIP:", with: "\(topologyIconFloatingIP) FIP:")
-        enhancedLine = enhancedLine.replacingOccurrences(of: "Gateway IP:", with: "\(topologyIconFloatingIP) Gateway:")
-
-        return enhancedLine
-    }
-
-    private static func createTopologyLineComponent(line: String) -> any Component {
-        // Revolutionary semantic color scheme based on content analysis
-        if line.contains(topologyIconNetwork) || line.contains("Network:") {
-            return Text(line).accent().padding(topologyViewSectionEdgeInsets)
-        } else if line.contains(topologyIconServer) || line.contains("Server:") {
-            if line.contains(topologyIconActive) {
-                return Text(line).success().padding(topologyViewSectionEdgeInsets)
-            } else if line.contains(topologyIconError) {
-                return Text(line).error().padding(topologyViewSectionEdgeInsets)
-            } else if line.contains(topologyIconBuilding) {
-                return Text(line).warning().padding(topologyViewSectionEdgeInsets)
-            } else {
-                return Text(line).primary().padding(topologyViewSectionEdgeInsets)
-            }
-        } else if line.contains(topologyIconRouter) || line.contains("Router:") {
-            return Text(line).success().padding(topologyViewSectionEdgeInsets)
-        } else if line.contains(topologyIconVolume) || line.contains("Volume:") {
-            return Text(line).secondary().padding(topologyViewSectionEdgeInsets)
-        } else if line.contains(topologyIconFloatingIP) || line.contains("FIP:") || line.contains("Gateway:") {
-            return Text(line).warning().padding(topologyViewSectionEdgeInsets)
-        } else if line.contains("====") || line.contains("----") || line.contains("Resource Summary") {
-            return Text(line).info().padding(topologyViewSectionEdgeInsets)
-        } else {
-            return Text(line).secondary().padding(topologyViewSectionEdgeInsets)
-        }
     }
 }
