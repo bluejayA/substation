@@ -746,31 +746,6 @@ struct ImageViews {
 
     // MARK: - Component Creation Functions (Gold Standard Pattern)
 
-    private static func needsScrollableLayout(image: Image, classifiedProperties: ClassifiedProperties, availableHeight: Int32) -> Bool {
-        // Estimate component count for layout decision
-        var estimatedComponents = imageDetailScrollThreshold // Base components (title, basic info, technical info)
-
-        // Add metadata sections
-        if !classifiedProperties.operatingSystem.isEmpty { estimatedComponents += classifiedProperties.operatingSystem.count + 1 }
-        if !classifiedProperties.architecture.isEmpty { estimatedComponents += classifiedProperties.architecture.count + 1 }
-        if !classifiedProperties.virtualization.isEmpty { estimatedComponents += classifiedProperties.virtualization.count + 1 }
-        if !classifiedProperties.security.isEmpty { estimatedComponents += classifiedProperties.security.count + 1 }
-        if !classifiedProperties.storage.isEmpty { estimatedComponents += classifiedProperties.storage.count + 1 }
-        if !classifiedProperties.cloud.isEmpty { estimatedComponents += classifiedProperties.cloud.count + 1 }
-        if !classifiedProperties.other.isEmpty { estimatedComponents += classifiedProperties.other.count + 1 }
-
-        // Add server snapshot info if available
-        if let metadata = image.metadata, metadata["source_server_id"] != nil {
-            estimatedComponents += 5
-        }
-
-        // Add tags if available
-        if let tags = image.tags, !tags.isEmpty {
-            estimatedComponents += 3
-        }
-
-        return estimatedComponents > Int(availableHeight)
-    }
 
     // MARK: - Legacy Helper Functions (Maintained for Compatibility)
 

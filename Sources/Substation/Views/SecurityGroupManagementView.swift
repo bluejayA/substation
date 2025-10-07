@@ -3,6 +3,64 @@ import OSClient
 import SwiftTUI
 
 struct SecurityGroupViews {
+    // MARK: - Analysis Support
+
+    private struct SecurityGroupAnalysis {
+        let ingressRules: [SecurityGroupRule]
+        let egressRules: [SecurityGroupRule]
+        let uniqueProtocols: Set<String>
+        let uniquePorts: Set<String>
+        let remoteGroups: Set<String>
+        let remoteIPs: Set<String>
+        let ethertypes: Set<String>
+    }
+
+    private static func analyzeSecurityGroup(securityGroup: SecurityGroup) -> SecurityGroupAnalysis {
+        let ingressRules = securityGroup.securityGroupRules?.filter { $0.direction == "ingress" } ?? []
+        let egressRules = securityGroup.securityGroupRules?.filter { $0.direction == "egress" } ?? []
+
+        var uniqueProtocols = Set<String>()
+        var uniquePorts = Set<String>()
+        var remoteGroups = Set<String>()
+        var remoteIPs = Set<String>()
+        var ethertypes = Set<String>()
+
+        for rule in securityGroup.securityGroupRules ?? [] {
+            if let protocolValue = rule.protocolEnum?.rawValue {
+                uniqueProtocols.insert(protocolValue.uppercased())
+            } else {
+                uniqueProtocols.insert("ANY")
+            }
+
+            let portRange = formatPortRange(rule)
+            if !portRange.isEmpty && portRange != "ALL" {
+                uniquePorts.insert(formatPortRange(rule))
+            }
+
+            ethertypes.insert(rule.ethertype ?? "IPv4")
+
+            // Analyze remote description for groups and IPs
+            let remoteDesc = formatRemoteDescription(rule).lowercased()
+            if remoteDesc.contains("group") {
+                remoteGroups.insert(formatRemoteDescription(rule))
+            } else if remoteDesc.contains(".") || remoteDesc.contains(":") {
+                remoteIPs.insert(formatRemoteDescription(rule))
+            }
+        }
+
+        return SecurityGroupAnalysis(
+            ingressRules: ingressRules,
+            egressRules: egressRules,
+            uniqueProtocols: uniqueProtocols,
+            uniquePorts: uniquePorts,
+            remoteGroups: remoteGroups,
+            remoteIPs: remoteIPs,
+            ethertypes: ethertypes
+        )
+    }
+
+    // MARK: - Helper Functions
+
     // Helper functions for SecurityGroupRule compatibility
     private static func formatPortRange(_ rule: SecurityGroupRule) -> String {
         if let min = rule.portRangeMin, let max = rule.portRangeMax {
@@ -402,321 +460,6 @@ struct SecurityGroupViews {
     }
 
     // MARK: - Security Group Analysis (Rich Metadata)
-
-    struct SecurityGroupAnalysis {
-        let ingressRules: [SecurityGroupRule]
-        let egressRules: [SecurityGroupRule]
-        let uniqueProtocols: Set<String>
-        let uniquePorts: Set<String>
-        let remoteGroups: Set<String>
-        let remoteIPs: Set<String>
-        let ethertypes: Set<String>
-    }
-
-    private static func analyzeSecurityGroup(securityGroup: SecurityGroup) -> SecurityGroupAnalysis {
-        let ingressRules = securityGroup.securityGroupRules?.filter { $0.direction == "ingress" } ?? []
-        let egressRules = securityGroup.securityGroupRules?.filter { $0.direction == "egress" } ?? []
-
-        var uniqueProtocols = Set<String>()
-        var uniquePorts = Set<String>()
-        var remoteGroups = Set<String>()
-        var remoteIPs = Set<String>()
-        var ethertypes = Set<String>()
-
-        for rule in securityGroup.securityGroupRules ?? [] {
-            if let protocolValue = rule.protocolEnum?.rawValue {
-                uniqueProtocols.insert(protocolValue.uppercased())
-            } else {
-                uniqueProtocols.insert("ANY")
-            }
-
-            let portRange = formatPortRange(rule)
-            if !portRange.isEmpty && portRange != "ALL" {
-                uniquePorts.insert(formatPortRange(rule))
-            }
-
-            ethertypes.insert(rule.ethertype ?? "IPv4")
-
-            // Analyze remote description for groups and IPs
-            let remoteDesc = formatRemoteDescription(rule).lowercased()
-            if remoteDesc.contains("group") {
-                remoteGroups.insert(formatRemoteDescription(rule))
-            } else if remoteDesc.contains(".") || remoteDesc.contains(":") {
-                remoteIPs.insert(formatRemoteDescription(rule))
-            }
-        }
-
-        return SecurityGroupAnalysis(
-            ingressRules: ingressRules,
-            egressRules: egressRules,
-            uniqueProtocols: uniqueProtocols,
-            uniquePorts: uniquePorts,
-            remoteGroups: remoteGroups,
-            remoteIPs: remoteIPs,
-            ethertypes: ethertypes
-        )
-    }
-
-    private static func needsScrollableLayout(securityGroup: SecurityGroup, analysis: SecurityGroupAnalysis, availableHeight: Int32) -> Bool {
-        // Estimate component count for layout decision
-        var estimatedComponents = 12 // Base components (title, basic info, rules summary)
-
-        // Add rule sections
-        estimatedComponents += analysis.ingressRules.count + 3 // rules + headers
-        estimatedComponents += analysis.egressRules.count + 3 // rules + headers
-
-        // Add metadata sections
-        if !analysis.remoteGroups.isEmpty { estimatedComponents += analysis.remoteGroups.count + 1 }
-        if !analysis.uniqueProtocols.isEmpty { estimatedComponents += 2 }
-        if !analysis.uniquePorts.isEmpty { estimatedComponents += 2 }
-
-        return estimatedComponents > Int(availableHeight)
-    }
-
-    // MARK: - Enhanced Security Group Detail Layouts
-
-    @MainActor
-    private static func drawScrollableSecurityGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                                                        width: Int32, height: Int32, securityGroup: SecurityGroup,
-                                                        analysis: SecurityGroupAnalysis, selectedRuleIndex: Int?) async {
-
-        let surface = SwiftTUI.surface(from: screen)
-        var allComponents: [any Component] = []
-
-        // Title Section (Gold Standard)
-        let titleText = securityGroupDetailTitle + securityGroupDetailFieldValueSeparator + (securityGroup.name ?? "Unknown")
-        allComponents.append(Text(titleText).accent().bold()
-            .padding(securityGroupDetailTitleEdgeInsets))
-
-        // Basic Information Section
-        allComponents.append(Text(securityGroupDetailBasicInfoTitle).primary().bold())
-        allComponents.append(contentsOf: createSecurityGroupBasicInfoComponents(securityGroup: securityGroup))
-        allComponents.append(Text("").muted()) // Blank line for spacing
-
-        // Rules Summary Section
-        allComponents.append(Text(securityGroupDetailRulesSummaryTitle).primary().bold())
-        allComponents.append(contentsOf: createRulesSummaryComponents(analysis: analysis))
-        allComponents.append(Text("").secondary()) // Blank line for spacing
-
-        // Protocols and Ports Section
-        if !analysis.uniqueProtocols.isEmpty || !analysis.uniquePorts.isEmpty {
-            allComponents.append(Text(securityGroupDetailProtocolsTitle).primary().bold())
-            allComponents.append(contentsOf: createProtocolsAndPortsComponents(analysis: analysis))
-            allComponents.append(Text("").secondary()) // Blank line for spacing
-        }
-
-        // Remote Groups Section
-        if !analysis.remoteGroups.isEmpty {
-            allComponents.append(Text(securityGroupDetailRemoteGroupsTitle).primary().bold())
-            allComponents.append(contentsOf: createRemoteGroupsComponents(analysis: analysis))
-            allComponents.append(Text("").secondary()) // Blank line for spacing
-        }
-
-        // Detailed Rules Section
-        allComponents.append(Text(securityGroupDetailRuleDetailsTitle).primary().bold())
-        allComponents.append(contentsOf: createDetailedRuleComponents(analysis: analysis, selectedRuleIndex: selectedRuleIndex))
-
-        // Help text
-        allComponents.append(Text(securityGroupDetailHelpText).info())
-
-        // Apply scrolling and render visible components
-        let maxVisibleComponents = max(1, Int(height) - Int(securityGroupDetailReservedSpace))
-        let startIndex = 0 // For now, always start from beginning
-        let endIndex = min(allComponents.count, startIndex + maxVisibleComponents)
-        let visibleComponents = Array(allComponents[startIndex..<endIndex])
-
-        // Render the scrollable security group detail view using gold standard pattern
-        let securityGroupDetailComponent = VStack(spacing: securityGroupDetailComponentSpacing, children: visibleComponents)
-            .padding(securityGroupDetailSectionEdgeInsets)
-
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(securityGroupDetailComponent, on: surface, in: bounds)
-
-        // Add scroll indicator if needed
-        if allComponents.count > maxVisibleComponents {
-            let scrollText = String(format: securityGroupDetailScrollIndicatorText, startIndex + 1, endIndex, allComponents.count)
-            let scrollBounds = Rect(x: startCol, y: startRow + height - 1, width: width, height: 1)
-            await SwiftTUI.render(Text(scrollText).info(), on: surface, in: scrollBounds)
-        }
-    }
-
-    @MainActor
-    private static func drawCompactSecurityGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                                                     width: Int32, height: Int32, securityGroup: SecurityGroup,
-                                                     analysis: SecurityGroupAnalysis, selectedRuleIndex: Int?) async {
-
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title Section (Gold Standard)
-        let titleText = securityGroupDetailTitle + securityGroupDetailFieldValueSeparator + (securityGroup.name ?? "Unknown")
-        components.append(Text(titleText).accent().bold()
-            .padding(securityGroupDetailTitleEdgeInsets))
-
-        // Basic Information Section
-        components.append(Text(securityGroupDetailBasicInfoTitle).primary().bold())
-        components.append(contentsOf: createSecurityGroupBasicInfoComponents(securityGroup: securityGroup))
-        components.append(Text("").secondary()) // Blank line for spacing
-
-        // Rules Summary Section
-        components.append(Text(securityGroupDetailRulesSummaryTitle).primary().bold())
-        components.append(contentsOf: createRulesSummaryComponents(analysis: analysis))
-        components.append(Text("").secondary()) // Blank line for spacing
-
-        // Most important information for compact view
-        if !analysis.uniqueProtocols.isEmpty {
-            components.append(Text(securityGroupDetailProtocolsTitle).primary().bold())
-            components.append(contentsOf: createProtocolsAndPortsComponents(analysis: analysis))
-            components.append(Text("").secondary()) // Blank line for spacing
-        }
-
-        // Simple rule display for compact view
-        if securityGroup.securityGroupRules?.isEmpty ?? true {
-            components.append(Text(securityGroupDetailNoRules).warning())
-        } else {
-            let rulesToShow = min(securityGroup.securityGroupRules?.count ?? 0, 5) // Show max 5 rules in compact view
-            let visibleRules = Array((securityGroup.securityGroupRules ?? []).prefix(rulesToShow))
-            components.append(contentsOf: createSimpleRuleComponents(rules: visibleRules, selectedRuleIndex: selectedRuleIndex))
-
-            if (securityGroup.securityGroupRules?.count ?? 0) > rulesToShow {
-                let remainingCount = (securityGroup.securityGroupRules?.count ?? 0) - rulesToShow
-                let moreText = "... and \(remainingCount) more rules"
-                components.append(Text(moreText).warning())
-            }
-        }
-
-        // Help text
-        components.append(Text(securityGroupDetailHelpText).muted())
-
-        // Render compact layout using gold standard pattern
-        let securityGroupDetailComponent = VStack(spacing: securityGroupDetailComponentSpacing, children: components)
-            .padding(securityGroupDetailSectionEdgeInsets)
-
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(securityGroupDetailComponent, on: surface, in: bounds)
-    }
-
-    // MARK: - Enhanced Component Creation Functions
-
-    private static func createSecurityGroupBasicInfoComponents(securityGroup: SecurityGroup) -> [any Component] {
-        var components: [any Component] = []
-
-        let nameText = securityGroupDetailInfoFieldIndent + securityGroupDetailNameLabel + securityGroupDetailFieldValueSeparator + (securityGroup.name ?? "Unknown")
-        components.append(Text(nameText).primary())
-
-        let idText = securityGroupDetailInfoFieldIndent + securityGroupDetailIdLabel + securityGroupDetailFieldValueSeparator + securityGroup.id
-        components.append(Text(idText).secondary())
-
-        let description = securityGroup.description?.isEmpty == false ? securityGroup.description! : securityGroupDetailNoDescription
-        let descriptionText = securityGroupDetailInfoFieldIndent + securityGroupDetailDescriptionLabel + securityGroupDetailFieldValueSeparator + description
-        components.append(Text(descriptionText).secondary())
-
-        return components
-    }
-
-    private static func createRulesSummaryComponents(analysis: SecurityGroupAnalysis) -> [any Component] {
-        var components: [any Component] = []
-
-        let totalText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailTotalRulesText, analysis.ingressRules.count + analysis.egressRules.count)
-        components.append(Text(totalText).primary())
-
-        let ingressText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailIngressCountText, analysis.ingressRules.count)
-        components.append(Text(ingressText).success())
-
-        let egressText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailEgressCountText, analysis.egressRules.count)
-        components.append(Text(egressText).error())
-
-        return components
-    }
-
-    private static func createProtocolsAndPortsComponents(analysis: SecurityGroupAnalysis) -> [any Component] {
-        var components: [any Component] = []
-
-        if !analysis.uniqueProtocols.isEmpty {
-            let protocolsList = Array(analysis.uniqueProtocols).sorted().joined(separator: ", ")
-            let protocolsText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailUniqueProtocolsText, protocolsList)
-            components.append(Text(protocolsText).secondary())
-        }
-
-        if !analysis.uniquePorts.isEmpty {
-            let portsList = Array(analysis.uniquePorts).sorted().joined(separator: ", ")
-            let truncatedPorts = portsList.count > securityGroupDetailRuleDetailMaxLength ?
-                String(portsList.prefix(securityGroupDetailRuleDetailMaxLength - 3)) + securityGroupDetailTruncationSuffix : portsList
-            let portsText = securityGroupDetailInfoFieldIndent + String(format: securityGroupDetailUniquePortsText, truncatedPorts)
-            components.append(Text(portsText).secondary())
-        }
-
-        return components
-    }
-
-    private static func createRemoteGroupsComponents(analysis: SecurityGroupAnalysis) -> [any Component] {
-        var components: [any Component] = []
-
-        for remoteGroup in analysis.remoteGroups.sorted() {
-            let truncatedGroup = remoteGroup.count > securityGroupDetailRuleDetailMaxLength ?
-                String(remoteGroup.prefix(securityGroupDetailRuleDetailMaxLength - 3)) + securityGroupDetailTruncationSuffix : remoteGroup
-            let groupText = securityGroupDetailInfoFieldIndent + truncatedGroup
-            components.append(Text(groupText).accent())
-        }
-
-        return components
-    }
-
-    private static func createDetailedRuleComponents(analysis: SecurityGroupAnalysis, selectedRuleIndex: Int?) -> [any Component] {
-        var components: [any Component] = []
-
-        let allRules = analysis.ingressRules + analysis.egressRules
-
-        for (index, rule) in allRules.enumerated() {
-            // Create detailed rule display
-            let directionIcon = rule.direction == "ingress" ? "IN" : "OUT"
-            let directionText = securityGroupDetailInfoFieldIndent + directionIcon + " " + rule.direction.capitalized
-            let directionStyle: TextStyle = rule.direction == "ingress" ? .success : .error
-            components.append(Text(directionText).styled(directionStyle))
-
-            let protocolText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailProtocolLabel + securityGroupDetailFieldValueSeparator + (rule.protocolEnum?.rawValue.uppercased() ?? "ANY")
-            components.append(Text(protocolText).secondary())
-
-            let portRange = formatPortRange(rule)
-            if !portRange.isEmpty && portRange != "ALL" {
-                let portText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailPortRangeLabel + securityGroupDetailFieldValueSeparator + portRange
-                components.append(Text(portText).secondary())
-            }
-
-            let ethertypeText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailEthertypeLabel + securityGroupDetailFieldValueSeparator + (rule.ethertype ?? "IPv4")
-            components.append(Text(ethertypeText).secondary())
-
-            let remoteText = securityGroupDetailInfoFieldIndent + "  " + securityGroupDetailRemoteIpLabel + securityGroupDetailFieldValueSeparator + formatRemoteDescription(rule)
-            let truncatedRemote = remoteText.count > securityGroupDetailRuleDetailMaxLength ?
-                String(remoteText.prefix(securityGroupDetailRuleDetailMaxLength - 3)) + securityGroupDetailTruncationSuffix : remoteText
-            components.append(Text(truncatedRemote).secondary())
-
-            // Add separator between rules
-            if index < allRules.count - 1 {
-                components.append(Text("").secondary())
-            }
-        }
-
-        return components
-    }
-
-    private static func createSimpleRuleComponents(rules: [SecurityGroupRule], selectedRuleIndex: Int?) -> [any Component] {
-        var components: [any Component] = []
-
-        for (index, rule) in rules.enumerated() {
-            let isRuleSelected = selectedRuleIndex == index
-            let directionIcon = rule.direction == "ingress" ? "IN" : "OUT"
-            let protocolValue = rule.protocolEnum?.rawValue.uppercased() ?? "ANY"
-            let portRange = formatPortRange(rule)
-            let port = portRange == "ALL" ? "ALL" : portRange
-
-            let ruleText = securityGroupDetailInfoFieldIndent + directionIcon + " " + protocolValue + " " + port + " -> " + formatRemoteDescription(rule)
-            let ruleStyle: TextStyle = isRuleSelected ? .primary : .secondary
-            components.append(Text(ruleText).styled(ruleStyle))
-        }
-
-        return components
-    }
 
     // MARK: - Security Group Create View
 

@@ -664,6 +664,4 @@ struct MiscViews {
         await SwiftTUI.render(Text(message).info(), on: surface, in: bounds)
     }
 
-    // NOTE: Old drawServerCreate function removed - ServerCreateForm now uses FormBuilder
-    // See ServerCreateView.drawServerCreateForm for the current implementation
 }

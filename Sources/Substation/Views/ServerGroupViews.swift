@@ -580,10 +580,6 @@ struct ServerGroupViews {
 
     // MARK: - Helper Functions
 
-    private static func formatMemberCount(_ count: Int) -> String {
-        let suffix = count == 1 ? serverSingular : serverPlural
-        return "\(count)\(suffix)"
-    }
 
     private static func statusStyleForServer(_ status: String?) -> TextStyle {
         guard let status = status else { return .secondary }
