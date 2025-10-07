@@ -28,108 +28,280 @@ struct PortViews {
 
     // MARK: - Port Detail View
 
-    // Detail View Constants
-    private static let portDetailTitle = "Port Details"
-    private static let portDetailBasicInfoTitle = "Basic Information"
-    private static let portDetailFixedIPsTitle = "Fixed IPs"
-    private static let portDetailSecurityGroupsTitle = "Security Groups"
-    private static let portDetailIdLabel = "ID"
-    private static let portDetailNameLabel = "Name"
-    private static let portDetailNetworkLabel = "Network"
-    private static let portDetailDeviceIDLabel = "Device ID"
-    private static let portDetailFieldValueSeparator = ": "
-    private static let portDetailNotAttachedText = "Not attached"
-    private static let portDetailUnnamedPortText = "Unnamed Port"
-    private static let portDetailIPItemPrefix = "- "
-    private static let portDetailSubnetLabel = " (Subnet: "
-    private static let portDetailSubnetSuffix = ")"
-    private static let portDetailHelpText = "Press ESC to return to port list"
-
-    // Detail View Layout Constants
-    private static let portDetailInfoFieldIndent = "  "
-    private static let portDetailComponentSpacing: Int32 = 0
-
     @MainActor
-    static func drawPortDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                              width: Int32, height: Int32, port: Port,
-                              cachedNetworks: [Network] = [], cachedSubnets: [Subnet] = [],
-                              cachedSecurityGroups: [SecurityGroup] = []) async {
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Port Detail
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let portName = port.name ?? Self.portDetailUnnamedPortText
-        components.append(Text("\(Self.portDetailTitle)\(Self.portDetailFieldValueSeparator)\(portName)").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
+    static func drawPortDetail(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        port: Port,
+        cachedNetworks: [Network] = [],
+        cachedSubnets: [Subnet] = [],
+        cachedSecurityGroups: [SecurityGroup] = [],
+        scrollOffset: Int = 0
+    ) async {
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text(Self.portDetailBasicInfoTitle).primary().bold())
+        let networkName = cachedNetworks.first(where: { $0.id == port.networkId })?.name ?? "Unknown"
 
-        var basicInfo: [any Component] = []
-        basicInfo.append(Text("\(Self.portDetailInfoFieldIndent)\(Self.portDetailIdLabel)\(Self.portDetailFieldValueSeparator)\(port.id)").secondary())
-        basicInfo.append(Text("\(Self.portDetailInfoFieldIndent)\(Self.portDetailNameLabel)\(Self.portDetailFieldValueSeparator)\(portName)").secondary())
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: port.id),
+            DetailView.buildFieldItem(label: "Name", value: port.name),
+            DetailView.buildFieldItem(label: "Description", value: port.description),
+            .field(label: "Network", value: "\(networkName) (\(port.networkId))", style: .secondary),
+            port.status.map { .field(label: "Status", value: $0, style: $0 == "ACTIVE" ? .success : $0 == "DOWN" ? .error : .warning) },
+            port.adminStateUp.map { .field(label: "Admin State", value: $0 ? "UP" : "DOWN", style: $0 ? .success : .error) }
+        ]
 
-        // Network information with ID and name
-        let networkInfo = resolveNetworkInfo(networkID: port.networkId, cachedNetworks: cachedNetworks)
-        basicInfo.append(Text("\(Self.portDetailInfoFieldIndent)\(Self.portDetailNetworkLabel)\(Self.portDetailFieldValueSeparator)\(networkInfo)").secondary())
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
+        }
 
-        // Device ID
-        let deviceIDText = port.deviceId ?? Self.portDetailNotAttachedText
-        basicInfo.append(Text("\(Self.portDetailInfoFieldIndent)\(Self.portDetailDeviceIDLabel)\(Self.portDetailFieldValueSeparator)\(deviceIDText)").secondary())
+        // Network Configuration Section
+        var networkConfigItems: [DetailItem?] = []
 
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-        components.append(basicInfoSection)
+        if let macAddress = port.macAddress {
+            networkConfigItems.append(.field(label: "MAC Address", value: macAddress, style: .secondary))
+        }
+
+        if let bindingVnicType = port.bindingVnicType {
+            networkConfigItems.append(.field(label: "VNIC Type", value: bindingVnicType, style: .secondary))
+            let vnicDescription = getVnicTypeDescription(bindingVnicType)
+            if !vnicDescription.isEmpty {
+                networkConfigItems.append(.field(label: "  Description", value: vnicDescription, style: .info))
+            }
+        }
+
+        if let bindingVifType = port.bindingVifType {
+            networkConfigItems.append(.field(label: "VIF Type", value: bindingVifType, style: .secondary))
+            let vifDescription = getVifTypeDescription(bindingVifType)
+            if !vifDescription.isEmpty {
+                networkConfigItems.append(.field(label: "  Description", value: vifDescription, style: .info))
+            }
+        }
+
+        if let bindingHostId = port.bindingHostId {
+            networkConfigItems.append(.field(label: "Bound Host", value: bindingHostId, style: .accent))
+        }
+
+        if let portSecurityEnabled = port.portSecurityEnabled {
+            networkConfigItems.append(.field(label: "Port Security", value: portSecurityEnabled ? "Enabled" : "Disabled", style: portSecurityEnabled ? .success : .warning))
+            if !portSecurityEnabled {
+                networkConfigItems.append(.field(label: "  Warning", value: "Port security disabled - no security group filtering", style: .warning))
+            }
+        }
+
+        if let networkConfigSection = DetailView.buildSection(title: "Network Configuration", items: networkConfigItems, titleStyle: .accent) {
+            sections.append(networkConfigSection)
+        }
 
         // Fixed IPs Section
-        if !(port.fixedIps?.isEmpty == true) {
-            components.append(Text(Self.portDetailFixedIPsTitle).primary().bold())
+        if let fixedIps = port.fixedIps, !fixedIps.isEmpty {
+            var ipItems: [DetailItem] = []
 
-            var ipComponents: [any Component] = []
-            for fixedIP in port.fixedIps ?? [] {
-                let subnetInfo = resolveSubnetInfo(subnetID: fixedIP.subnetId, cachedSubnets: cachedSubnets)
-                let ipText = "\(Self.portDetailIPItemPrefix)\(fixedIP.ipAddress)\(Self.portDetailSubnetLabel)\(subnetInfo)\(Self.portDetailSubnetSuffix)"
-                ipComponents.append(Text(ipText).secondary())
+            for fixedIP in fixedIps {
+                let subnet = cachedSubnets.first(where: { $0.id == fixedIP.subnetId })
+                let subnetName = subnet?.name ?? "Unknown"
+                let subnetCidr = subnet?.cidr ?? "Unknown"
+
+                ipItems.append(.field(label: "IP Address", value: fixedIP.ipAddress, style: .accent))
+                ipItems.append(.field(label: "  Subnet", value: "\(subnetName) (\(subnetCidr))", style: .secondary))
+                ipItems.append(.field(label: "  Subnet ID", value: fixedIP.subnetId, style: .muted))
+                ipItems.append(.spacer)
             }
 
-            let ipsSection = VStack(spacing: 0, children: ipComponents)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(ipsSection)
+            // Remove trailing spacer
+            if !ipItems.isEmpty && ipItems.last?.isSpacerType == true {
+                ipItems.removeLast()
+            }
+
+            sections.append(DetailSection(title: "Fixed IPs", items: ipItems))
+        } else {
+            sections.append(DetailSection(
+                title: "Fixed IPs",
+                items: [.field(label: "Status", value: "No IP addresses assigned", style: .warning)]
+            ))
+        }
+
+        // Device Attachment Section
+        var deviceItems: [DetailItem?] = []
+
+        if let deviceId = port.deviceId, !deviceId.isEmpty {
+            deviceItems.append(.field(label: "Device ID", value: deviceId, style: .secondary))
+
+            if let deviceOwner = port.deviceOwner {
+                deviceItems.append(.field(label: "Device Owner", value: deviceOwner, style: .secondary))
+                let ownerDescription = getDeviceOwnerDescription(deviceOwner)
+                if !ownerDescription.isEmpty {
+                    deviceItems.append(.field(label: "  Description", value: ownerDescription, style: .info))
+                }
+            }
+        } else {
+            deviceItems.append(.field(label: "Status", value: "Not attached to any device", style: .muted))
+        }
+
+        if let deviceSection = DetailView.buildSection(title: "Device Attachment", items: deviceItems) {
+            sections.append(deviceSection)
         }
 
         // Security Groups Section
-        if !(port.securityGroups?.isEmpty ?? true) {
-            components.append(Text(Self.portDetailSecurityGroupsTitle).primary().bold())
+        if let securityGroups = port.securityGroups, !securityGroups.isEmpty {
+            var sgItems: [DetailItem] = []
 
-            var sgComponents: [any Component] = []
-            for securityGroupID in port.securityGroups ?? [] {
-                let sgInfo = resolveSecurityGroupInfo(securityGroupID: securityGroupID, cachedSecurityGroups: cachedSecurityGroups)
-                sgComponents.append(Text("\(Self.portDetailIPItemPrefix)\(sgInfo)").secondary())
+            for securityGroupID in securityGroups {
+                let securityGroup = cachedSecurityGroups.first(where: { $0.id == securityGroupID })
+                let sgName = securityGroup?.name ?? "Unknown"
+
+                sgItems.append(.field(label: "Security Group", value: sgName, style: .secondary))
+                sgItems.append(.field(label: "  ID", value: securityGroupID, style: .muted))
+                sgItems.append(.spacer)
             }
 
-            let sgSection = VStack(spacing: 0, children: sgComponents)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(sgSection)
+            // Remove trailing spacer
+            if !sgItems.isEmpty && sgItems.last?.isSpacerType == true {
+                sgItems.removeLast()
+            }
+
+            sections.append(DetailSection(title: "Security Groups", items: sgItems))
+        } else if port.portSecurityEnabled == true {
+            sections.append(DetailSection(
+                title: "Security Groups",
+                items: [.field(label: "Warning", value: "No security groups assigned", style: .warning)]
+            ))
         }
 
-        // Help text
-        components.append(Text(Self.portDetailHelpText).info()
-            .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
+        // Allowed Address Pairs Section
+        if let allowedAddressPairs = port.allowedAddressPairs, !allowedAddressPairs.isEmpty {
+            var addressPairItems: [DetailItem] = []
 
-        // Render unified port detail
-        let portDetailComponent = VStack(spacing: Self.portDetailComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(portDetailComponent, on: surface, in: bounds)
+            for pair in allowedAddressPairs {
+                addressPairItems.append(.field(label: "IP Address", value: pair.ipAddress, style: .secondary))
+                if let macAddress = pair.macAddress {
+                    addressPairItems.append(.field(label: "  MAC Address", value: macAddress, style: .muted))
+                }
+                addressPairItems.append(.spacer)
+            }
+
+            // Remove trailing spacer
+            if !addressPairItems.isEmpty && addressPairItems.last?.isSpacerType == true {
+                addressPairItems.removeLast()
+            }
+
+            sections.append(DetailSection(title: "Allowed Address Pairs", items: addressPairItems))
+        }
+
+        // QoS Section
+        if let qosPolicyId = port.qosPolicyId {
+            let qosItems: [DetailItem?] = [
+                .field(label: "QoS Policy ID", value: qosPolicyId, style: .secondary),
+                .field(label: "Status", value: "QoS policy attached", style: .success)
+            ]
+
+            if let qosSection = DetailView.buildSection(title: "Quality of Service", items: qosItems) {
+                sections.append(qosSection)
+            }
+        }
+
+        // Additional Information Section
+        var additionalItems: [DetailItem?] = []
+
+        if let tenantId = port.tenantId {
+            additionalItems.append(.field(label: "Tenant ID", value: tenantId, style: .secondary))
+        }
+
+        if let projectId = port.projectId {
+            additionalItems.append(.field(label: "Project ID", value: projectId, style: .secondary))
+        }
+
+        if let revisionNumber = port.revisionNumber {
+            additionalItems.append(.field(label: "Revision", value: String(revisionNumber), style: .secondary))
+        }
+
+        if let propagateUplinkStatus = port.propagateUplinkStatus {
+            additionalItems.append(.field(label: "Propagate Uplink Status", value: propagateUplinkStatus ? "Yes" : "No", style: .secondary))
+        }
+
+        if let additionalSection = DetailView.buildSection(title: "Additional Information", items: additionalItems) {
+            sections.append(additionalSection)
+        }
+
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: port.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: port.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Tags Section
+        if let tags = port.tags, !tags.isEmpty {
+            let tagItems = tags.map { DetailItem.field(label: "Tag", value: $0, style: .secondary) }
+            sections.append(DetailSection(title: "Tags", items: tagItems))
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Port Details: \(port.name ?? "Unnamed Port")",
+            sections: sections,
+            helpText: "Press ESC to return to ports list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    // MARK: - Helper Functions for Enhanced Port Information
+
+    private static func getVnicTypeDescription(_ vnicType: String) -> String {
+        switch vnicType.lowercased() {
+        case "normal": return "Standard virtual NIC for instances"
+        case "direct": return "SR-IOV direct passthrough to VM"
+        case "direct-physical": return "Physical NIC assigned directly to VM"
+        case "macvtap": return "Kernel MACVTAP device"
+        case "baremetal": return "Bare metal port binding"
+        case "virtio-forwarder": return "High-performance virtio forwarder"
+        default: return ""
+        }
+    }
+
+    private static func getVifTypeDescription(_ vifType: String) -> String {
+        switch vifType.lowercased() {
+        case "ovs": return "Open vSwitch bridge"
+        case "bridge": return "Linux bridge"
+        case "vhostuser": return "vhost-user interface"
+        case "hw_veb": return "Hardware virtual Ethernet bridge"
+        case "hostdev": return "Direct device assignment"
+        case "binding_failed": return "Port binding failed"
+        default: return ""
+        }
+    }
+
+    private static func getDeviceOwnerDescription(_ deviceOwner: String) -> String {
+        switch deviceOwner {
+        case "compute:nova": return "Attached to Nova compute instance"
+        case "network:router_interface": return "Router interface port"
+        case "network:router_gateway": return "Router external gateway port"
+        case "network:dhcp": return "DHCP server port"
+        case "network:floatingip": return "Floating IP port"
+        case "network:ha_router_replicated_interface": return "HA router replicated interface"
+        case "network:router_interface_distributed": return "Distributed router interface"
+        case "network:router_centralized_snat": return "Centralized SNAT port for DVR"
+        default:
+            if deviceOwner.hasPrefix("compute:") {
+                return "Nova compute instance in availability zone"
+            }
+            return ""
+        }
     }
 
     // MARK: - Port Create View
