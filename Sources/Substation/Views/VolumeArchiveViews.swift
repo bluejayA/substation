@@ -269,73 +269,281 @@ struct VolumeArchiveViews {
         startCol: Int32,
         width: Int32,
         height: Int32,
-        snapshot: VolumeSnapshot
+        snapshot: VolumeSnapshot,
+        scrollOffset: Int = 0
     ) async {
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
+        var sections: [DetailSection] = []
 
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        components.append(Text("Volume Snapshot Details: \(snapshot.name ?? "Unnamed")").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
-
-        // Basic Information
-        components.append(Text("Basic Information").primary().bold())
-        var basicInfo: [any Component] = []
-        basicInfo.append(Text("ID: \(snapshot.id)").secondary())
-        basicInfo.append(Text("Name: \(snapshot.name ?? "Unnamed")").secondary())
-
+        // Basic Information Section
         let status = snapshot.status ?? "Unknown"
         let statusStyle: TextStyle = status.lowercased() == "available" ? .success :
-                                   (status.lowercased().contains("error") ? .error : .accent)
-        basicInfo.append(HStack(spacing: 0, children: [
-            Text("Status: ").secondary(),
-            Text(status).styled(statusStyle)
-        ]))
+                                   status.lowercased() == "creating" ? .warning :
+                                   (status.lowercased().contains("error") ? .error : .info)
 
-        if let size = snapshot.size {
-            basicInfo.append(Text("Size: \(size) GB").secondary())
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: snapshot.id),
+            DetailView.buildFieldItem(label: "Name", value: snapshot.name),
+            DetailView.buildFieldItem(label: "Description", value: snapshot.description),
+            .field(label: "Status", value: status, style: statusStyle),
+            snapshot.size.map { .field(label: "Size", value: "\($0) GB", style: .accent) }
+        ]
+
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
         }
 
-        basicInfo.append(Text("Volume ID: \(snapshot.volumeId)").secondary())
+        // Source Volume Section
+        let volumeItems: [DetailItem?] = [
+            .field(label: "Volume ID", value: snapshot.volumeId, style: .secondary),
+            .field(label: "Description", value: "Snapshot of this volume", style: .info)
+        ]
 
-        if let description = snapshot.description, !description.isEmpty {
-            basicInfo.append(Text("Description: \(description)").secondary())
+        if let volumeSection = DetailView.buildSection(title: "Source Volume", items: volumeItems) {
+            sections.append(volumeSection)
         }
 
-        components.append(VStack(children: basicInfo)
-                         .padding(EdgeInsets(top: 0, leading: 2, bottom: 2, trailing: 0)))
-
-        // Timestamps
-        components.append(Text("Timestamps").primary().bold())
-        var timestamps: [any Component] = []
-
-        if let created = snapshot.createdAt {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            timestamps.append(Text("Created: \(formatter.string(from: created))").secondary())
-        }
-        if let updated = snapshot.updatedAt {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            timestamps.append(Text("Updated: \(formatter.string(from: updated))").secondary())
+        // Progress Analysis Section
+        if let progress = snapshot.progress {
+            let progressAnalysisItems = analyzeSnapshotProgress(progress: progress)
+            if !progressAnalysisItems.isEmpty {
+                sections.append(DetailSection(
+                    title: "Snapshot Progress Analysis",
+                    items: progressAnalysisItems,
+                    titleStyle: .accent
+                ))
+            }
         }
 
-        components.append(VStack(children: timestamps)
-                         .padding(EdgeInsets(top: 0, leading: 2, bottom: 2, trailing: 0)))
+        // Restore Time Estimate Section
+        let restoreTimeItems = getRestoreTimeEstimate(size: snapshot.size)
+        if !restoreTimeItems.isEmpty {
+            sections.append(DetailSection(
+                title: "Restore Information",
+                items: restoreTimeItems,
+                titleStyle: .accent
+            ))
+        }
 
-        // Render all components
-        let detailStack = VStack(children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(detailStack, on: surface, in: bounds)
+        // Metadata Section
+        if let metadata = snapshot.metadata, !metadata.isEmpty {
+            let metadataItems = metadata.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Metadata", items: metadataItems))
+        }
+
+        // Ownership Section
+        var ownershipItems: [DetailItem?] = []
+
+        if let projectId = snapshot.projectId {
+            ownershipItems.append(.field(label: "Project ID", value: projectId, style: .secondary))
+        }
+
+        if let userId = snapshot.userId {
+            ownershipItems.append(.field(label: "User ID", value: userId, style: .secondary))
+        }
+
+        if let ownershipSection = DetailView.buildSection(title: "Ownership", items: ownershipItems) {
+            sections.append(ownershipSection)
+        }
+
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: snapshot.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: snapshot.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Volume Snapshot Details: \(snapshot.name ?? "Unnamed Snapshot")",
+            sections: sections,
+            helpText: "Press ESC to return to archive list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    // MARK: - Intelligence Helper Functions
+
+    private static func analyzeSnapshotProgress(progress: String?) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        guard let progress = progress else {
+            return items
+        }
+
+        if let percentageString = progress.components(separatedBy: "%").first,
+           let percentage = Int(percentageString) {
+            items.append(.field(
+                label: "Completion",
+                value: "\(percentage)%",
+                style: percentage == 100 ? .success : .warning
+            ))
+
+            if percentage < 100 {
+                items.append(.field(
+                    label: "Status",
+                    value: "Snapshot in progress",
+                    style: .info
+                ))
+                items.append(.field(
+                    label: "  Note",
+                    value: "Wait for completion before using snapshot",
+                    style: .warning
+                ))
+            } else {
+                items.append(.field(
+                    label: "Status",
+                    value: "Snapshot complete and ready",
+                    style: .success
+                ))
+            }
+        }
+
+        return items
+    }
+
+
+    private static func getRestoreTimeEstimate(size: Int?) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        guard let size = size else {
+            return items
+        }
+
+        let estimatedMinutes: Int
+        if size <= 10 {
+            estimatedMinutes = 2
+        } else if size <= 50 {
+            estimatedMinutes = 5
+        } else if size <= 100 {
+            estimatedMinutes = 10
+        } else if size <= 500 {
+            estimatedMinutes = 30
+        } else {
+            estimatedMinutes = 60
+        }
+
+        items.append(.field(
+            label: "Estimated Restore Time",
+            value: "\(estimatedMinutes) minutes (approximate)",
+            style: .info
+        ))
+        items.append(.field(
+            label: "  Note",
+            value: "Actual time depends on storage backend performance",
+            style: .info
+        ))
+
+        return items
+    }
+
+    private static func analyzeBackupType(backup: VolumeBackup) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        guard let isIncremental = backup.isIncremental else {
+            return items
+        }
+
+        if isIncremental {
+            items.append(.field(
+                label: "Backup Type",
+                value: "Incremental",
+                style: .info
+            ))
+            items.append(.field(
+                label: "  Description",
+                value: "Only stores changes since last backup",
+                style: .info
+            ))
+            items.append(.spacer)
+            items.append(.field(
+                label: "Dependency Note",
+                value: "Incremental backups may depend on previous backups",
+                style: .warning
+            ))
+            items.append(.field(
+                label: "  Warning",
+                value: "Restore requires complete backup chain",
+                style: .warning
+            ))
+
+            if let hasDependent = backup.hasDependent, hasDependent {
+                items.append(.spacer)
+                items.append(.field(
+                    label: "Dependent Backups",
+                    value: "Other backups depend on this one",
+                    style: .warning
+                ))
+                items.append(.field(
+                    label: "  Caution",
+                    value: "Deleting this backup may break backup chain",
+                    style: .error
+                ))
+            }
+        } else {
+            items.append(.field(
+                label: "Backup Type",
+                value: "Full",
+                style: .success
+            ))
+            items.append(.field(
+                label: "  Description",
+                value: "Complete volume backup - no dependencies",
+                style: .success
+            ))
+        }
+
+        return items
+    }
+
+
+    private static func analyzeBackupRetention(backup: VolumeBackup) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        guard let createdAt = backup.createdAt else {
+            return items
+        }
+
+        let ageInDays = Calendar.current.dateComponents([.day], from: createdAt, to: Date()).day ?? 0
+
+        if ageInDays > 90 {
+            items.append(.field(
+                label: "Retention Notice",
+                value: "Backup is \(ageInDays) days old",
+                style: .warning
+            ))
+            items.append(.field(
+                label: "  Recommendation",
+                value: "Consider if this backup is still needed",
+                style: .info
+            ))
+        } else if ageInDays > 30 {
+            items.append(.field(
+                label: "Backup Age",
+                value: "\(ageInDays) days old",
+                style: .info
+            ))
+        } else {
+            items.append(.field(
+                label: "Backup Age",
+                value: "\(ageInDays) days old (recent)",
+                style: .success
+            ))
+        }
+
+        return items
     }
 
     @MainActor
@@ -345,79 +553,170 @@ struct VolumeArchiveViews {
         startCol: Int32,
         width: Int32,
         height: Int32,
-        backup: VolumeBackup
+        backup: VolumeBackup,
+        scrollOffset: Int = 0
     ) async {
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
+        var sections: [DetailSection] = []
 
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        components.append(Text("Volume Backup Details: \(backup.name ?? "Unnamed")").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
-
-        // Basic Information
-        components.append(Text("Basic Information").primary().bold())
-        var basicInfo: [any Component] = []
-        basicInfo.append(Text("ID: \(backup.id)").secondary())
-        basicInfo.append(Text("Name: \(backup.name ?? "Unnamed")").secondary())
-
+        // Basic Information Section
         let status = backup.status ?? "Unknown"
         let statusStyle: TextStyle = status.lowercased() == "available" ? .success :
-                                   (status.lowercased().contains("error") ? .error : .accent)
-        basicInfo.append(HStack(spacing: 0, children: [
-            Text("Status: ").secondary(),
-            Text(status).styled(statusStyle)
-        ]))
+                                   status.lowercased() == "creating" ? .warning :
+                                   (status.lowercased().contains("error") ? .error : .info)
 
-        if let size = backup.size {
-            basicInfo.append(Text("Size: \(size) GB").secondary())
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: backup.id),
+            DetailView.buildFieldItem(label: "Name", value: backup.name),
+            DetailView.buildFieldItem(label: "Description", value: backup.description),
+            .field(label: "Status", value: status, style: statusStyle),
+            backup.size.map { .field(label: "Size", value: "\($0) GB", style: .accent) }
+        ]
+
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
         }
 
-        if let volumeId = backup.volumeId {
-            basicInfo.append(Text("Volume ID: \(volumeId)").secondary())
-        }
+        // Backup Configuration Section
+        var configItems: [DetailItem?] = []
 
         if let isIncremental = backup.isIncremental {
             let backupType = isIncremental ? "Incremental" : "Full"
-            basicInfo.append(Text("Backup Type: \(backupType)").secondary())
+            configItems.append(.field(label: "Backup Type", value: backupType, style: isIncremental ? .info : .accent))
+            if isIncremental {
+                configItems.append(.field(label: "  Description", value: "Only changed blocks since last backup", style: .info))
+            } else {
+                configItems.append(.field(label: "  Description", value: "Complete volume backup", style: .info))
+            }
         }
 
-        if let description = backup.description, !description.isEmpty {
-            basicInfo.append(Text("Description: \(description)").secondary())
+        if let hasDependent = backup.hasDependent {
+            configItems.append(.field(label: "Has Dependents", value: hasDependent ? "Yes" : "No", style: hasDependent ? .warning : .success))
+            if hasDependent {
+                configItems.append(.field(label: "  Warning", value: "Other backups depend on this one", style: .warning))
+            }
         }
 
-        components.append(VStack(children: basicInfo)
-                         .padding(EdgeInsets(top: 0, leading: 2, bottom: 2, trailing: 0)))
-
-        // Timestamps
-        components.append(Text("Timestamps").primary().bold())
-        var timestamps: [any Component] = []
-
-        if let created = backup.createdAt {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            timestamps.append(Text("Created: \(formatter.string(from: created))").secondary())
-        }
-        if let updated = backup.updatedAt {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            timestamps.append(Text("Updated: \(formatter.string(from: updated))").secondary())
+        if let configSection = DetailView.buildSection(title: "Backup Configuration", items: configItems, titleStyle: .accent) {
+            sections.append(configSection)
         }
 
-        components.append(VStack(children: timestamps)
-                         .padding(EdgeInsets(top: 0, leading: 2, bottom: 2, trailing: 0)))
+        // Source Information Section
+        var sourceItems: [DetailItem?] = []
 
-        // Render all components
-        let detailStack = VStack(children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(detailStack, on: surface, in: bounds)
+        if let volumeId = backup.volumeId {
+            sourceItems.append(.field(label: "Volume ID", value: volumeId, style: .secondary))
+        }
+
+        if let snapshotId = backup.snapshotId {
+            sourceItems.append(.field(label: "Snapshot ID", value: snapshotId, style: .secondary))
+            sourceItems.append(.field(label: "  Type", value: "Backup created from snapshot", style: .info))
+        }
+
+        if let sourceSection = DetailView.buildSection(title: "Source Information", items: sourceItems) {
+            sections.append(sourceSection)
+        }
+
+        // Storage Information Section
+        var storageItems: [DetailItem?] = []
+
+        if let container = backup.container {
+            storageItems.append(.field(label: "Container", value: container, style: .secondary))
+        }
+
+        if let objectCount = backup.objectCount {
+            storageItems.append(.field(label: "Object Count", value: String(objectCount), style: .secondary))
+            storageItems.append(.field(label: "  Description", value: "Number of objects in backup storage", style: .info))
+        }
+
+        if let storageSection = DetailView.buildSection(title: "Storage Information", items: storageItems) {
+            sections.append(storageSection)
+        }
+
+        // Location Section
+        if let availabilityZone = backup.availabilityZone {
+            let locationItems: [DetailItem?] = [
+                .field(label: "Availability Zone", value: availabilityZone, style: .secondary)
+            ]
+
+            if let locationSection = DetailView.buildSection(title: "Location", items: locationItems) {
+                sections.append(locationSection)
+            }
+        }
+
+        // Ownership Section
+        var ownershipItems: [DetailItem?] = []
+
+        if let projectId = backup.projectId {
+            ownershipItems.append(.field(label: "Project ID", value: projectId, style: .secondary))
+        }
+
+        if let userId = backup.userId {
+            ownershipItems.append(.field(label: "User ID", value: userId, style: .secondary))
+        }
+
+        if let ownershipSection = DetailView.buildSection(title: "Ownership", items: ownershipItems) {
+            sections.append(ownershipSection)
+        }
+
+        // Backup Type Analysis Section
+        let backupTypeItems = analyzeBackupType(backup: backup)
+        if !backupTypeItems.isEmpty {
+            sections.append(DetailSection(
+                title: "Backup Type Analysis",
+                items: backupTypeItems,
+                titleStyle: .accent
+            ))
+        }
+
+        // Retention Analysis Section
+        let retentionItems = analyzeBackupRetention(backup: backup)
+        if !retentionItems.isEmpty {
+            sections.append(DetailSection(
+                title: "Retention Analysis",
+                items: retentionItems,
+                titleStyle: .accent
+            ))
+        }
+
+        // Restore Time Estimate Section
+        let restoreTimeItems = getRestoreTimeEstimate(size: backup.size)
+        if !restoreTimeItems.isEmpty {
+            sections.append(DetailSection(
+                title: "Restore Information",
+                items: restoreTimeItems,
+                titleStyle: .accent
+            ))
+        }
+
+        // Timestamps Section
+        var timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: backup.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: backup.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let dataTimestamp = backup.dataTimestamp {
+            timestampItems.append(.field(label: "Data Timestamp", value: dataTimestamp.formatted(date: .abbreviated, time: .shortened), style: .secondary))
+            timestampItems.append(.field(label: "  Description", value: "Point-in-time of backed up data", style: .info))
+        }
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Volume Backup Details: \(backup.name ?? "Unnamed Backup")",
+            sections: sections,
+            helpText: "Press ESC to return to archive list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 }
