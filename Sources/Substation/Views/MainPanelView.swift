@@ -309,7 +309,7 @@ struct MainPanelView {
             await KeyPairViews.drawDetailedKeyPairList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedKeyPairs: tui.cachedKeyPairs, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
         case .keyPairDetail:
             if let keyPair = tui.selectedResource as? KeyPair {
-                await KeyPairViews.drawKeyPairDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, keyPair: keyPair)
+                await KeyPairViews.drawKeyPairDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, keyPair: keyPair, scrollOffset: tui.detailScrollOffset)
             }
         case .topology:
             // Auto-load topology data if not available
@@ -318,32 +318,32 @@ struct MainPanelView {
                 tui.lastTopology = await TopologyGraphBuilder.build(client: tui.client)
                 tui.statusMessage = "Topology loaded"
             }
-            await TopologyViews.drawTopologyView(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, topology: tui.lastTopology, scrollOffset: Int32(tui.detailScrollOffset), mode: tui.currentTopologyMode)
+            await TopologyViews.drawTopologyView(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, topology: tui.lastTopology, scrollOffset: tui.detailScrollOffset, mode: tui.currentTopologyMode)
         case .serverDetail:
             if let server = tui.selectedResource as? Server {
                 await ServerViews.drawServerDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, server: server, cachedVolumes: tui.cachedVolumes, cachedFlavors: tui.cachedFlavors, cachedImages: tui.cachedImages, scrollOffset: tui.detailScrollOffset)
             }
         case .serverGroupDetail:
             if let serverGroup = tui.selectedResource as? ServerGroup {
-                await ServerGroupViews.drawServerGroupDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, serverGroup: serverGroup, cachedServers: tui.cachedServers)
+                await ServerGroupViews.drawServerGroupDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, serverGroup: serverGroup, cachedServers: tui.cachedServers, scrollOffset: tui.detailScrollOffset)
             }
         case .networkDetail:
             if let network = tui.selectedResource as? Network {
-                await NetworkViews.drawNetworkDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, network: network)
+                await NetworkViews.drawNetworkDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, network: network, scrollOffset: tui.detailScrollOffset)
             }
         case .securityGroupDetail:
             if let securityGroup = tui.selectedResource as? SecurityGroup {
-                await SecurityGroupViews.drawSecurityGroupDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, securityGroup: securityGroup)
+                await SecurityGroupViews.drawSecurityGroupDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, securityGroup: securityGroup, scrollOffset: tui.detailScrollOffset)
             }
         case .volumeDetail:
             if let volume = tui.selectedResource as? Volume {
-                await VolumeViews.drawVolumeDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, volume: volume)
+                await VolumeViews.drawVolumeDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, volume: volume, scrollOffset: tui.detailScrollOffset)
             }
         case .volumeArchiveDetail:
             if let snapshot = tui.selectedResource as? VolumeSnapshot {
-                await VolumeArchiveViews.drawVolumeSnapshotDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, snapshot: snapshot)
+                await VolumeArchiveViews.drawVolumeSnapshotDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, snapshot: snapshot, scrollOffset: tui.detailScrollOffset)
             } else if let backup = tui.selectedResource as? VolumeBackup {
-                await VolumeArchiveViews.drawVolumeBackupDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, backup: backup)
+                await VolumeArchiveViews.drawVolumeBackupDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, backup: backup, scrollOffset: tui.detailScrollOffset)
             }
         case .imageDetail:
             if let image = tui.selectedResource as? Image {
@@ -351,7 +351,7 @@ struct MainPanelView {
             }
         case .flavorDetail:
             if let flavor = tui.selectedResource as? Flavor {
-                await FlavorViews.drawFlavorDetailGoldStandard(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, flavor: flavor, scrollOffset: Int32(tui.detailScrollOffset))
+                await FlavorViews.drawFlavorDetailGoldStandard(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, flavor: flavor, scrollOffset: tui.detailScrollOffset)
             }
         case .healthDashboardServiceDetail:
             if let service = tui.selectedResource as? HealthDashboardService {
@@ -392,13 +392,13 @@ struct MainPanelView {
             await SubnetViews.drawDetailedSubnetList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedSubnets: tui.cachedSubnets, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
         case .subnetDetail:
             if let subnet = tui.selectedResource as? Subnet {
-                await SubnetViews.drawSubnetDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, subnet: subnet)
+                await SubnetViews.drawSubnetDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, subnet: subnet, scrollOffset: tui.detailScrollOffset)
             }
         case .ports:
             await PortViews.drawDetailedPortList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedPorts: tui.cachedPorts, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
         case .portDetail:
             if let port = tui.selectedResource as? Port {
-                await PortViews.drawPortDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, port: port, cachedNetworks: tui.cachedNetworks, cachedSubnets: tui.cachedSubnets, cachedSecurityGroups: tui.cachedSecurityGroups)
+                await PortViews.drawPortDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, port: port, cachedNetworks: tui.cachedNetworks, cachedSubnets: tui.cachedSubnets, cachedSecurityGroups: tui.cachedSecurityGroups, scrollOffset: tui.detailScrollOffset)
             }
         case .portCreate:
             await PortViews.drawPortCreateForm(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, portCreateForm: tui.portCreateForm, portCreateFormState: tui.portCreateFormState, cachedNetworks: tui.cachedNetworks, cachedSecurityGroups: tui.cachedSecurityGroups, cachedQoSPolicies: tui.cachedQoSPolicies, selectedIndex: tui.selectedIndex)
@@ -443,7 +443,7 @@ struct MainPanelView {
                     "interfaceSubnetIds": routerWithInterfaces.interfaces?.compactMap { $0.subnetId } ?? []
                 ])
 
-                await RouterViews.drawRouterDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, router: routerWithInterfaces, cachedSubnets: tui.cachedSubnets)
+                await RouterViews.drawRouterDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, router: routerWithInterfaces, cachedSubnets: tui.cachedSubnets, scrollOffset: tui.detailScrollOffset)
             }
         case .routerCreate:
             await RouterViews.drawRouterCreateForm(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, routerCreateForm: tui.routerCreateForm, routerCreateFormState: tui.routerCreateFormState, availabilityZones: tui.cachedAvailabilityZones, externalNetworks: tui.cachedNetworks)
@@ -455,7 +455,7 @@ struct MainPanelView {
             await FloatingIPViews.drawDetailedFloatingIPList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedFloatingIPs: tui.cachedFloatingIPs, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, cachedServers: tui.cachedServers, cachedPorts: tui.cachedPorts, cachedNetworks: tui.cachedNetworks)
         case .floatingIPDetail:
             if let floatingIP = tui.selectedResource as? FloatingIP {
-                await FloatingIPViews.drawFloatingIPDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, floatingIP: floatingIP, cachedServers: tui.cachedServers, cachedPorts: tui.cachedPorts, cachedNetworks: tui.cachedNetworks)
+                await FloatingIPViews.drawFloatingIPDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, floatingIP: floatingIP, cachedServers: tui.cachedServers, cachedPorts: tui.cachedPorts, cachedNetworks: tui.cachedNetworks, scrollOffset: tui.detailScrollOffset)
             }
         case .floatingIPCreate:
             let externalNetworks = tui.cachedNetworks.filter { $0.external == true }
@@ -481,7 +481,7 @@ struct MainPanelView {
             await BarbicanViews.drawBarbicanContainerList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, containers: tui.cachedBarbicanContainers, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, filterCache: tui.resourceNameCache)
         case .barbicanSecretDetail:
             if let secret = tui.selectedResource as? Secret {
-                await BarbicanViews.drawBarbicanSecretDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, secret: secret)
+                await BarbicanViews.drawBarbicanSecretDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, secret: secret, scrollOffset: tui.detailScrollOffset)
             }
         case .barbicanContainerDetail:
             if let container = tui.selectedResource as? BarbicanContainer {

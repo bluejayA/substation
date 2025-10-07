@@ -2,120 +2,42 @@ import Foundation
 import OSClient
 import SwiftTUI
 
-// Utility function to wrap text for display
-func wrapText(_ text: String, maxWidth: Int) -> [String] {
-    guard maxWidth > 0 else { return [text] }
-
-    var lines: [String] = []
-    var currentLine = ""
-
-    for char in text {
-        if char == "\n" {
-            lines.append(currentLine)
-            currentLine = ""
-        } else if currentLine.count >= maxWidth {
-            lines.append(currentLine)
-            currentLine = String(char)
-        } else {
-            currentLine.append(char)
-        }
-    }
-
-    if !currentLine.isEmpty {
-        lines.append(currentLine)
-    }
-
-    return lines.isEmpty ? [""] : lines
-}
-
 struct MiscViews {
     @MainActor
     static func drawHelp(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                         width: Int32, height: Int32, scrollOffset: Int = 0,
                         currentView: ViewMode = .help) async {
 
-        // Clear the area behind the window to prevent artifacts
-        await BaseViewComponents.clearArea(screen: screen, startRow: startRow - 1, startCol: startCol,
-                                     width: width, height: height)
-
-        // Enhanced title with border - make it context-aware
+        // Get contextual help title and content
         let helpTitle = getContextualHelpTitle(for: currentView)
-        await BaseViewComponents.drawEnhancedTitle(screen: screen, startRow: startRow, startCol: startCol,
-                                            width: width, title: helpTitle)
+        let helpContent = getContextualHelpContent(for: currentView)
 
-        let initialRow = startRow + 2
+        // Build sections for DetailView
+        var sections: [DetailSection] = []
 
-        // Get contextual help content based on current view
-        let helpText = getContextualHelpContent(for: currentView)
-
-        // Calculate total lines and visible area
-        // Account for header (2 lines) and footer (2 lines)
-        let availableHeight = Int(height - 4)
-
-        // For two-column layout, we can show approximately twice as many items
-        // in the same vertical space as a single column layout
-        let maxRowsPerColumn = availableHeight
-        let maxVisibleLines = maxRowsPerColumn * 2  // Two columns worth of content
-
-        var allLines: [(String, Bool)] = [] // (text, isHeader)
-
-        // Build all lines with section markers
-        for (section, items) in helpText {
-            allLines.append((section, true)) // Section header
+        for (sectionTitle, items) in helpContent {
+            var detailItems: [DetailItem] = []
             for item in items {
-                allLines.append((item, false)) // Item
+                detailItems.append(.field(label: "", value: item, style: .secondary))
             }
-            allLines.append(("", false)) // Spacing
+            sections.append(DetailSection(title: sectionTitle, items: detailItems))
         }
 
-        // Remove last empty line
-        if !allLines.isEmpty && allLines.last?.0 == "" {
-            allLines.removeLast()
-        }
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: helpTitle,
+            sections: sections,
+            helpText: "Press ESC to return to previous view",
+            scrollOffset: scrollOffset
+        )
 
-        // Apply scroll offset with bounds checking
-        let maxPossibleScroll = max(allLines.count - maxVisibleLines, 0)
-        let actualScrollOffset = min(scrollOffset, maxPossibleScroll)
-        let startIndex = actualScrollOffset
-        let endIndex = min(startIndex + maxVisibleLines, allLines.count)
-
-        // Single column layout - use full available width
-        let contentWidth = Int(width - 4) // Leave margin on both sides
-        let colStart = startCol + 2
-
-        // Render single column using SwiftTUI
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        for i in startIndex..<endIndex {
-            let (text, isHeader) = allLines[i]
-
-            if text.isEmpty {
-                components.append(Text(""))
-                continue
-            }
-
-            let truncatedText = String(text.prefix(contentWidth - (isHeader ? 2 : 4)))
-            if isHeader {
-                components.append(Text(truncatedText).primary().bold())
-            } else {
-                components.append(Text("  \(truncatedText)").secondary())
-            }
-        }
-
-        let singleColumn = VStack(spacing: 0, children: components)
-        let columnBounds = Rect(x: colStart, y: initialRow, width: Int32(contentWidth), height: Int32(components.count))
-        await SwiftTUI.render(singleColumn, on: surface, in: columnBounds)
-
-        // Enhanced scroll indicator using SwiftTUI
-        if allLines.count > maxVisibleLines {
-            let scrollInfo = "(\(startIndex + 1)-\(endIndex) of \(allLines.count)) Use UP/DOWN to scroll"
-            let scrollBounds = Rect(x: startCol + 2, y: startRow + height - 3, width: width - 4, height: 1)
-            await SwiftTUI.render(Text(scrollInfo).info(), on: surface, in: scrollBounds)
-        }
-
-        await BaseViewComponents.drawContextHelp(screen: screen, startRow: startRow + height - 2, startCol: startCol,
-                                          helpText: "Press ESC to return to previous view")
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 
     // MARK: - Contextual Help System
@@ -561,72 +483,35 @@ struct MiscViews {
     static func drawAbout(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                          width: Int32, height: Int32, scrollOffset: Int = 0) async {
 
-        // Clear the area behind the window to prevent artifacts
-        await BaseViewComponents.clearArea(screen: screen, startRow: startRow - 1, startCol: startCol,
-                                     width: width, height: height)
-
-        // Enhanced title with border
-        await BaseViewComponents.drawEnhancedTitle(screen: screen, startRow: startRow, startCol: startCol,
-                                            width: width, title: "About Substation")
-
-        let initialRow = startRow + 2
-        let surface = SwiftTUI.surface(from: screen)
-
         // Build about information
         let aboutInfo = getAboutInformation()
 
-        var components: [any Component] = []
+        // Build sections for DetailView
+        var sections: [DetailSection] = []
 
-        for (section, items) in aboutInfo {
-            // Section header
-            components.append(Text(section).primary().bold())
-
-            // Section items
+        for (sectionTitle, items) in aboutInfo {
+            var detailItems: [DetailItem] = []
             for item in items {
-                components.append(Text("  \(item)").secondary())
+                detailItems.append(.field(label: "", value: item, style: .secondary))
             }
-
-            // Add spacing between sections
-            components.append(Text(""))
+            sections.append(DetailSection(title: sectionTitle, items: detailItems))
         }
 
-        // Remove last empty line if it exists
-        if !components.isEmpty {
-            // For simplicity, just keep all components as they contain the section data
-            // The empty Text components provide necessary spacing between sections
-        }
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "About Substation",
+            sections: sections,
+            helpText: "Press ESC to return to previous view",
+            scrollOffset: scrollOffset
+        )
 
-        // Calculate available height for content
-        let availableHeight = Int(height - 4)
-        let maxVisibleLines = availableHeight
-
-        // Apply scroll offset with bounds checking
-        let maxPossibleScroll = max(components.count - maxVisibleLines, 0)
-        let actualScrollOffset = min(scrollOffset, maxPossibleScroll)
-        let startIndex = actualScrollOffset
-        let endIndex = min(startIndex + maxVisibleLines, components.count)
-
-        // Get visible components
-        let visibleComponents = Array(components[startIndex..<endIndex])
-
-        // Render the content
-        if !visibleComponents.isEmpty {
-            let aboutComponent = VStack(spacing: 0, children: visibleComponents)
-                .padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
-
-            let contentBounds = Rect(x: startCol, y: initialRow, width: width - 4, height: Int32(min(maxVisibleLines, visibleComponents.count)))
-            await SwiftTUI.render(aboutComponent, on: surface, in: contentBounds)
-        }
-
-        // Enhanced scroll indicator
-        if components.count > maxVisibleLines {
-            let scrollInfo = "(\(startIndex + 1)-\(endIndex) of \(components.count)) Use UP/DOWN to scroll"
-            let scrollBounds = Rect(x: startCol + 2, y: startRow + height - 3, width: width - 4, height: 1)
-            await SwiftTUI.render(Text(scrollInfo).info(), on: surface, in: scrollBounds)
-        }
-
-        await BaseViewComponents.drawContextHelp(screen: screen, startRow: startRow + height - 2, startCol: startCol,
-                                          helpText: "Press ESC to return to previous view")
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 
     private static func getAboutInformation() -> [(String, [String])] {
