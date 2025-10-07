@@ -186,37 +186,219 @@ struct SecurityGroupViews {
     @MainActor
     static func drawSecurityGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                        width: Int32, height: Int32, securityGroup: SecurityGroup,
-                                       selectedRuleIndex: Int? = nil) async {
+                                       selectedRuleIndex: Int? = nil, scrollOffset: Int = 0) async {
 
-        // Create surface for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
+        var sections: [DetailSection] = []
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > securityGroupDetailMinScreenWidth && height > securityGroupDetailMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow),
-                                   width: max(securityGroupDetailBoundsMinWidth, width),
-                                   height: max(securityGroupDetailBoundsMinHeight, height))
-            await SwiftTUI.render(Text(securityGroupDetailScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
+        // Basic Information Section
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: securityGroup.id),
+            DetailView.buildFieldItem(label: "Name", value: securityGroup.name, defaultValue: "Unknown"),
+            DetailView.buildFieldItem(label: "Description", value: securityGroup.description, defaultValue: "No description"),
+            DetailView.buildFieldItem(label: "Project ID", value: securityGroup.projectId ?? securityGroup.tenantId),
+            DetailView.buildFieldItem(label: "Revision Number", value: securityGroup.revisionNumber)
+        ]
+
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
         }
 
-        // Analyze security group for rich metadata display
-        let securityGroupAnalysis = analyzeSecurityGroup(securityGroup: securityGroup)
-        _ = securityGroup.securityGroupRules?.count ?? 0
+        // Analyze security group for rich metadata
+        let analysis = analyzeSecurityGroup(securityGroup: securityGroup)
 
-        // Determine layout strategy
-        let availableHeight = max(1, height - securityGroupDetailReservedSpace)
-        let needsScrolling = needsScrollableLayout(securityGroup: securityGroup, analysis: securityGroupAnalysis, availableHeight: availableHeight)
+        // Rules Summary Section
+        var summaryItems: [DetailItem] = []
+        summaryItems.append(.field(
+            label: "Total Rules",
+            value: String(analysis.ingressRules.count + analysis.egressRules.count),
+            style: .primary
+        ))
+        summaryItems.append(.field(
+            label: "Ingress Rules",
+            value: String(analysis.ingressRules.count),
+            style: .success
+        ))
+        summaryItems.append(.field(
+            label: "Egress Rules",
+            value: String(analysis.egressRules.count),
+            style: .error
+        ))
 
-        if needsScrolling {
-            await drawScrollableSecurityGroupDetail(screen: screen, startRow: startRow, startCol: startCol,
-                                                  width: width, height: height, securityGroup: securityGroup,
-                                                  analysis: securityGroupAnalysis, selectedRuleIndex: selectedRuleIndex)
-        } else {
-            await drawCompactSecurityGroupDetail(screen: screen, startRow: startRow, startCol: startCol,
-                                               width: width, height: height, securityGroup: securityGroup,
-                                               analysis: securityGroupAnalysis, selectedRuleIndex: selectedRuleIndex)
+        sections.append(DetailSection(title: "Rules Summary", items: summaryItems))
+
+        // Network Configuration Section - NEW!
+        var networkItems: [DetailItem] = []
+
+        if !analysis.uniqueProtocols.isEmpty {
+            let protocols = Array(analysis.uniqueProtocols).sorted().joined(separator: ", ")
+            networkItems.append(.field(label: "Protocols", value: protocols, style: .secondary))
         }
+
+        if !analysis.ethertypes.isEmpty {
+            let ethertypes = Array(analysis.ethertypes).sorted().joined(separator: ", ")
+            networkItems.append(.field(label: "EtherTypes", value: ethertypes, style: .secondary))
+        }
+
+        if !analysis.uniquePorts.isEmpty {
+            let ports = Array(analysis.uniquePorts).sorted().joined(separator: ", ")
+            networkItems.append(.field(label: "Port Ranges", value: ports, style: .info))
+        }
+
+        if !networkItems.isEmpty {
+            sections.append(DetailSection(title: "Network Configuration", items: networkItems))
+        }
+
+        // Remote Sources Section - NEW!
+        if !analysis.remoteIPs.isEmpty || !analysis.remoteGroups.isEmpty {
+            var remoteItems: [DetailItem] = []
+
+            if !analysis.remoteIPs.isEmpty {
+                remoteItems.append(.field(label: "Remote IP Prefixes", value: "\(analysis.remoteIPs.count) configured", style: .info))
+                for ip in analysis.remoteIPs.sorted().prefix(5) {
+                    remoteItems.append(.field(label: "  CIDR", value: ip, style: .secondary))
+                }
+                if analysis.remoteIPs.count > 5 {
+                    remoteItems.append(.field(label: "  Additional", value: "\(analysis.remoteIPs.count - 5) more", style: .muted))
+                }
+            }
+
+            if !analysis.remoteGroups.isEmpty {
+                if !remoteItems.isEmpty {
+                    remoteItems.append(.spacer)
+                }
+                remoteItems.append(.field(label: "Remote Security Groups", value: "\(analysis.remoteGroups.count) referenced", style: .accent))
+                for groupRef in analysis.remoteGroups.sorted().prefix(5) {
+                    remoteItems.append(.field(label: "  Group", value: groupRef, style: .secondary))
+                }
+                if analysis.remoteGroups.count > 5 {
+                    remoteItems.append(.field(label: "  Additional", value: "\(analysis.remoteGroups.count - 5) more", style: .muted))
+                }
+            }
+
+            sections.append(DetailSection(title: "Remote Sources", items: remoteItems))
+        }
+
+        // Ingress Rules Section with enhanced detail
+        if !analysis.ingressRules.isEmpty {
+            var ingressItems: [DetailItem] = []
+
+            for rule in analysis.ingressRules {
+                // Rule header with protocol
+                let protocolDisplay = rule.protocolEnum?.rawValue.uppercased() ?? "ANY"
+                ingressItems.append(.customComponent(
+                    HStack(spacing: 0, children: [
+                        Text("  IN ").success(),
+                        Text(protocolDisplay).secondary()
+                    ])
+                ))
+
+                // Port range
+                let portRange = formatPortRange(rule)
+                if !portRange.isEmpty && portRange != "ALL" {
+                    ingressItems.append(.field(label: "    Ports", value: portRange, style: .secondary))
+                }
+
+                // EtherType
+                if let ethertype = rule.ethertype {
+                    ingressItems.append(.field(label: "    EtherType", value: ethertype, style: .secondary))
+                }
+
+                // Remote source
+                let remoteDesc = formatRemoteDescription(rule)
+                ingressItems.append(.field(label: "    Remote", value: remoteDesc, style: .info))
+
+                // Rule description (if any)
+                if let description = rule.description, !description.isEmpty {
+                    ingressItems.append(.field(label: "    Description", value: description, style: .muted))
+                }
+
+                ingressItems.append(.spacer)
+            }
+
+            sections.append(DetailSection(title: "Ingress Rules (\(analysis.ingressRules.count))", items: ingressItems, titleStyle: .success))
+        }
+
+        // Egress Rules Section with enhanced detail
+        if !analysis.egressRules.isEmpty {
+            var egressItems: [DetailItem] = []
+
+            for rule in analysis.egressRules {
+                // Rule header with protocol
+                let protocolDisplay = rule.protocolEnum?.rawValue.uppercased() ?? "ANY"
+                egressItems.append(.customComponent(
+                    HStack(spacing: 0, children: [
+                        Text("  OUT ").error(),
+                        Text(protocolDisplay).secondary()
+                    ])
+                ))
+
+                // Port range
+                let portRange = formatPortRange(rule)
+                if !portRange.isEmpty && portRange != "ALL" {
+                    egressItems.append(.field(label: "    Ports", value: portRange, style: .secondary))
+                }
+
+                // EtherType
+                if let ethertype = rule.ethertype {
+                    egressItems.append(.field(label: "    EtherType", value: ethertype, style: .secondary))
+                }
+
+                // Remote destination
+                let remoteDesc = formatRemoteDescription(rule)
+                egressItems.append(.field(label: "    Remote", value: remoteDesc, style: .info))
+
+                // Rule description (if any)
+                if let description = rule.description, !description.isEmpty {
+                    egressItems.append(.field(label: "    Description", value: description, style: .muted))
+                }
+
+                egressItems.append(.spacer)
+            }
+
+            sections.append(DetailSection(title: "Egress Rules (\(analysis.egressRules.count))", items: egressItems, titleStyle: .error))
+        }
+
+        // Tags Section
+        if let tags = securityGroup.tags, !tags.isEmpty {
+            var tagItems: [DetailItem] = []
+            for tag in tags {
+                tagItems.append(.field(label: "Tag", value: tag, style: .accent))
+            }
+            sections.append(DetailSection(title: "Tags", items: tagItems))
+        }
+
+        // Timestamps Section
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+
+        var timestampItems: [DetailItem?] = []
+        if let created = securityGroup.createdAt {
+            timestampItems.append(.field(label: "Created", value: formatter.string(from: created), style: .secondary))
+        }
+        if let updated = securityGroup.updatedAt {
+            timestampItems.append(.field(label: "Updated", value: formatter.string(from: updated), style: .secondary))
+        }
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Security Group Details: \(securityGroup.name ?? "Unknown")",
+            sections: sections,
+            helpText: "Press ESC to return to security group list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 
     // MARK: - Security Group Analysis (Rich Metadata)
