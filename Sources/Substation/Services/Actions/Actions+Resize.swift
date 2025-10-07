@@ -215,7 +215,7 @@ extension Actions {
         // Find the current flavor in cached flavors by trying multiple fields
         serverResizeForm.currentFlavor = server.flavor.flatMap { flavorInfo in
             // Try matching by ID first
-            if let flavorId = flavorInfo.id, let matched = cachedFlavors.first(where: { $0.id == flavorId }) {
+            if let matched = cachedFlavors.first(where: { $0.id == flavorInfo.id }) {
                 return matched
             }
             // Try matching by original_name

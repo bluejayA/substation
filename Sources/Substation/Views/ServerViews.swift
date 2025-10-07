@@ -131,11 +131,11 @@ struct ServerViews {
         // Flavor Information with enhanced details
         if let flavor = server.flavor {
             let flavorName = resolveFlavorName(from: server.flavor, cachedFlavors: cachedFlavors)
-            hardwareItems.append(.field(label: "Flavor ID", value: flavor.id ?? "N/A", style: .secondary))
+            hardwareItems.append(.field(label: "Flavor ID", value: flavor.id, style: .secondary))
             hardwareItems.append(.field(label: "Flavor Name", value: flavorName, style: .secondary))
 
             // Add detailed flavor specs if available in cache
-            if let flavorId = flavor.id, let cachedFlavor = cachedFlavors.first(where: { $0.id == flavorId }) {
+            if let cachedFlavor = cachedFlavors.first(where: { $0.id == flavor.id }) {
                 hardwareItems.append(.field(label: "vCPUs", value: String(cachedFlavor.vcpus), style: .info))
                 hardwareItems.append(.field(label: "RAM", value: "\(cachedFlavor.ram) MB", style: .info))
                 hardwareItems.append(.field(label: "Disk", value: "\(cachedFlavor.disk) GB", style: .info))
@@ -350,16 +350,12 @@ struct ServerViews {
         }
 
         // Fall back to cached flavor lookup by ID
-        if let id = flavor.id, let cachedFlavor = cachedFlavors.first(where: { $0.id == id }) {
+        if let cachedFlavor = cachedFlavors.first(where: { $0.id == flavor.id }) {
             return cachedFlavor.name ?? "Unknown Flavor"
         }
 
-        // Last resort: show ID if available
-        if let id = flavor.id {
-            return id
-        }
-
-        return "Unknown"
+        // Last resort: show ID
+        return flavor.id
     }
 
     static func resolveImageName(from image: Server.ImageInfo?, cachedImages: [Image]) -> String {
