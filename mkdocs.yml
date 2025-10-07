@@ -129,7 +129,8 @@ nav:
       - FormBuilder Guide: reference/developers/formbuilder-guide.md
       - FormTextField Guide: reference/developers/formtextfield-guide.md
       - FormSelector Guide: reference/developers/formselector-guide.md
-      - StatusList Guide: reference/developers/statuslistview-guide.md
+      - StatusListView Guide: reference/developers/statuslistview-guide.md
+      - DetailView Guide: reference/developers/detailview-guide.md
       - Testing Guide: reference/developers/testing.md
     - OpenStack Integration: reference/openstack/index.md
     - FAQ: reference/faq.md

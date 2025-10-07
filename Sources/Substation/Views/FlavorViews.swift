@@ -4,83 +4,7 @@ import SwiftTUI
 
 struct FlavorViews {
 
-    // MARK: - Constants
-
-    // Layout Constants
-    private static let flavorDetailMinScreenWidth: Int32 = 40
-    private static let flavorDetailMinScreenHeight: Int32 = 15
-    private static let flavorDetailBoundsMinWidth: Int32 = 1
-    private static let flavorDetailBoundsMinHeight: Int32 = 1
-    private static let flavorDetailComponentSpacing: Int32 = 1
-    private static let flavorDetailTopPadding: Int32 = 2
-    private static let flavorDetailBottomPadding: Int32 = 2
-    private static let flavorDetailLeadingPadding: Int32 = 0
-    private static let flavorDetailTrailingPadding: Int32 = 0
-    private static let flavorDetailReservedSpace: Int32 = 4
-
-    // Title Constants
-    private static let flavorDetailTitleTopPadding: Int32 = 0
-    private static let flavorDetailTitleLeadingPadding: Int32 = 0
-    private static let flavorDetailTitleBottomPadding: Int32 = 2
-    private static let flavorDetailTitleTrailingPadding: Int32 = 0
-    private static let flavorDetailTitleEdgeInsets = EdgeInsets(top: flavorDetailTitleTopPadding, leading: flavorDetailTitleLeadingPadding, bottom: flavorDetailTitleBottomPadding, trailing: flavorDetailTitleTrailingPadding)
-
-    // Section Constants
-    private static let flavorDetailSectionTopPadding: Int32 = 1
-    private static let flavorDetailSectionLeadingPadding: Int32 = 2
-    private static let flavorDetailSectionBottomPadding: Int32 = 1
-    private static let flavorDetailSectionTrailingPadding: Int32 = 0
-    private static let flavorDetailSectionEdgeInsets = EdgeInsets(top: flavorDetailSectionTopPadding, leading: flavorDetailSectionLeadingPadding, bottom: flavorDetailSectionBottomPadding, trailing: flavorDetailSectionTrailingPadding)
-
-    // Section Titles
-    private static let flavorDetailTitle = "Flavor Details"
-    private static let flavorDetailBasicInfoTitle = "Basic Information"
-    private static let flavorDetailResourceTitle = "Resource Specifications"
-    private static let flavorDetailPerformanceTitle = "Performance Analysis"
-    private static let flavorDetailUsageRecommendationsTitle = "Usage Recommendations"
-    private static let flavorDetailAccessTitle = "Access Configuration"
-    private static let flavorDetailNetworkingTitle = "Networking"
-
-    // Field Labels
-    private static let flavorDetailIdLabel = "ID"
-    private static let flavorDetailNameLabel = "Name"
-    private static let flavorDetailVCPUsLabel = "vCPUs"
-    private static let flavorDetailRAMLabel = "RAM"
-    private static let flavorDetailRootDiskLabel = "Root Disk"
-    private static let flavorDetailEphemeralDiskLabel = "Ephemeral Disk"
-    private static let flavorDetailSwapLabel = "Swap"
-    private static let flavorDetailRxtxFactorLabel = "RX/TX Factor"
-    private static let flavorDetailPublicLabel = "Public"
-    private static let flavorDetailDisabledLabel = "Disabled"
-    private static let flavorDetailPerformanceTierLabel = "Performance Tier"
-    private static let flavorDetailCpuMemoryRatioLabel = "CPU/Memory Ratio"
-    private static let flavorDetailStorageTypeLabel = "Storage Type"
-    private static let flavorDetailUsageCategoryLabel = "Usage Category"
-    private static let flavorDetailRecommendedWorkloadsLabel = "Recommended Workloads"
-    private static let flavorDetailLimitationsLabel = "Limitations"
-
-    // Text Constants
-    private static let flavorDetailFieldValueSeparator = ": "
-    private static let flavorDetailInfoFieldIndent = "  "
-    private static let flavorDetailScreenTooSmallText = "Screen too small"
-    private static let flavorDetailMBSuffix = " MB"
-    private static let flavorDetailGBSuffix = " GB"
-    private static let flavorDetailYesText = "Yes"
-    private static let flavorDetailNoText = "No"
-    private static let flavorDetailUnknownText = "Unknown"
-    private static let flavorDetailNoLimitationsText = "None identified"
-    private static let flavorDetailHelpText = "ESC: Return"
-    private static let flavorDetailGBPerVCPUFormat = "%.1f GB per vCPU"
-    private static let flavorDetailWorkloadSeparator = ", "
-    private static let flavorDetailLimitationPrefix = "- "
-
-
-    // Section Management
-    struct Section {
-        let title: String
-        let lines: [(String, Int32)]
-        let priority: Int
-    }
+    // MARK: - Constants (Removed orphaned detail view constants)
     @MainActor
     static func drawDetailedFlavorList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                      width: Int32, height: Int32, cachedFlavors: [Flavor],
@@ -100,103 +24,190 @@ struct FlavorViews {
         )
     }
 
-    // MARK: - Gold Standard Flavor Detail (Enhanced with Rich Metadata)
+    // MARK: - Flavor Detail View
 
     @MainActor
-    static func drawFlavorDetailGoldStandard(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                                           width: Int32, height: Int32, flavor: Flavor, scrollOffset: Int32 = 0) async {
+    static func drawFlavorDetailGoldStandard(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        flavor: Flavor,
+        scrollOffset: Int = 0
+    ) async {
+        var sections: [DetailSection] = []
 
         // Flavor analysis for rich metadata display
         let flavorAnalysis = analyzeFlavorCapabilities(flavor: flavor)
 
-        // Enhanced title using SwiftTUI with gold standard coloring
-        let surface = SwiftTUI.surface(from: screen)
-        let titleBounds = Rect(x: startCol + 2, y: startRow, width: width - 4, height: 1)
-        let titleText = flavorDetailTitle + flavorDetailFieldValueSeparator + (flavor.name ?? "Unknown")
-        await SwiftTUI.render(Text(titleText).accent().bold(), on: surface, in: titleBounds)
+        // Basic Information Section
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: flavor.id),
+            DetailView.buildFieldItem(label: "Name", value: flavor.name),
+            DetailView.buildFieldItem(label: "Description", value: flavor.description)
+        ]
 
-        let contentHeight = Int(height) - 4  // Reserve space for header and footer
-        let contentStartRow = startRow + 2
-        let availableWidth = Int(width) - 6  // Account for margins
-
-        // Use multi-column layout if we have enough width
-        let useMultiColumn = availableWidth >= 120
-        let leftColumnWidth = useMultiColumn ? availableWidth / 2 - 2 : availableWidth
-        let rightColumnWidth = useMultiColumn ? availableWidth / 2 - 2 : 0
-        let rightColumnStart = startCol + Int32(leftColumnWidth) + 6
-
-        var allSections: [Section] = []
-
-        // Create sections for better organization (using gold standard approach)
-        allSections.append(Section(title: flavorDetailBasicInfoTitle,
-                                 lines: generateGoldStandardBasicInfoLines(flavor: flavor),
-                                 priority: 1))
-        allSections.append(Section(title: flavorDetailResourceTitle,
-                                 lines: generateGoldStandardResourceLines(flavor: flavor),
-                                 priority: 1))
-
-        // Add performance analysis sections
-        allSections.append(Section(title: flavorDetailPerformanceTitle,
-                                 lines: generateGoldStandardPerformanceLines(analysis: flavorAnalysis),
-                                 priority: 2))
-        allSections.append(Section(title: flavorDetailUsageRecommendationsTitle,
-                                 lines: generateGoldStandardUsageLines(analysis: flavorAnalysis),
-                                 priority: 2))
-        allSections.append(Section(title: flavorDetailAccessTitle,
-                                 lines: generateGoldStandardAccessLines(flavor: flavor),
-                                 priority: 2))
-        allSections.append(Section(title: flavorDetailNetworkingTitle,
-                                 lines: generateGoldStandardNetworkingLines(flavor: flavor),
-                                 priority: 3))
-
-        // Add detailed properties section
-        allSections.append(Section(title: "Hardware Properties",
-                                 lines: generateHardwarePropertiesLines(flavor: flavor),
-                                 priority: 2))
-
-        // Add quota specifications section
-        allSections.append(Section(title: "Resource Quotas",
-                                 lines: generateResourceQuotasLines(flavor: flavor),
-                                 priority: 3))
-
-        // Add raw properties section for debugging/reference
-        allSections.append(Section(title: "Raw Properties",
-                                 lines: generateRawPropertiesLines(flavor: flavor),
-                                 priority: 4))
-
-        // Filter out empty sections
-        let nonEmptySections = allSections.filter { !$0.lines.isEmpty }
-
-        if useMultiColumn {
-            await drawMultiColumnFlavorLayout(screen: screen, sections: nonEmptySections,
-                                            startRow: contentStartRow, startCol: startCol,
-                                            leftColumnWidth: leftColumnWidth, rightColumnWidth: rightColumnWidth,
-                                            rightColumnStart: rightColumnStart, contentHeight: contentHeight,
-                                            scrollOffset: scrollOffset)
-        } else {
-            await drawSingleColumnFlavorLayout(screen: screen, sections: nonEmptySections,
-                                             startRow: contentStartRow, startCol: startCol,
-                                             columnWidth: leftColumnWidth, contentHeight: contentHeight,
-                                             scrollOffset: scrollOffset)
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
         }
 
-        // Show scroll indicators and navigation help
-        let totalLines = calculateTotalLinesForFlavorSections(sections: nonEmptySections, useMultiColumn: useMultiColumn)
-        let footerRow = startRow + height - 2
-        // Enhanced footer using SwiftTUI
-        let canScrollUp = scrollOffset > 0
-        let canScrollDown = Int(scrollOffset) + contentHeight < totalLines
+        // Resource Specifications Section
+        var resourceItems: [DetailItem?] = [
+            .field(label: "vCPUs", value: String(flavor.vcpus), style: .accent),
+            .field(label: "RAM", value: "\(flavor.ram) MB", style: .accent),
+            .field(label: "Root Disk", value: "\(flavor.disk) GB", style: .accent)
+        ]
 
-        var footerText = "ESC: Return"
-        if totalLines > contentHeight {
-            footerText += " | UP/DOWN: Scroll"
-            if canScrollUp || canScrollDown {
-                footerText += " (Line \\(Int(scrollOffset) + 1)/\\(totalLines))"
+        if let ephemeral = flavor.ephemeral, ephemeral > 0 {
+            resourceItems.append(.field(label: "Ephemeral Disk", value: "\(ephemeral) GB", style: .secondary))
+        }
+
+        if let swap = flavor.swap, swap > 0 {
+            resourceItems.append(.field(label: "Swap", value: "\(swap) MB", style: .secondary))
+        }
+
+        if let rxtxFactor = flavor.rxtxFactor {
+            resourceItems.append(.field(label: "RX/TX Factor", value: String(rxtxFactor), style: .secondary))
+        }
+
+        if let resourceSection = DetailView.buildSection(title: "Resource Specifications", items: resourceItems, titleStyle: .accent) {
+            sections.append(resourceSection)
+        }
+
+        // Performance Analysis Section
+        let performanceItems: [DetailItem?] = [
+            .field(label: "Performance Tier", value: flavorAnalysis.performanceTier.rawValue, style: .success),
+            .field(label: "CPU/Memory Ratio", value: String(format: "%.1f GB per vCPU", flavorAnalysis.cpuToMemoryRatio), style: .info),
+            .field(label: "Storage Type", value: flavorAnalysis.storageType.rawValue, style: .secondary),
+            .field(label: "Usage Category", value: flavorAnalysis.usageCategory.rawValue, style: .accent)
+        ]
+
+        if let performanceSection = DetailView.buildSection(title: "Performance Analysis", items: performanceItems) {
+            sections.append(performanceSection)
+        }
+
+        // Usage Recommendations Section
+        var usageItems: [DetailItem] = []
+
+        if !flavorAnalysis.recommendedWorkloads.isEmpty {
+            usageItems.append(.field(label: "Recommended Workloads", value: "", style: .primary))
+            for workload in flavorAnalysis.recommendedWorkloads {
+                usageItems.append(.field(label: "  - \(workload)", value: "", style: .success))
             }
         }
 
-        let footerBounds = Rect(x: startCol + 2, y: footerRow, width: width - 4, height: 1)
-        await SwiftTUI.render(Text(footerText).info(), on: surface, in: footerBounds)
+        if !flavorAnalysis.limitations.isEmpty {
+            usageItems.append(.spacer)
+            usageItems.append(.field(label: "Limitations", value: "", style: .warning))
+            for limitation in flavorAnalysis.limitations {
+                usageItems.append(.field(label: "  - \(limitation)", value: "", style: .warning))
+            }
+        }
+
+        if !usageItems.isEmpty {
+            sections.append(DetailSection(title: "Usage Recommendations", items: usageItems))
+        }
+
+        // Access Configuration Section
+        var accessItems: [DetailItem?] = []
+
+        if let isPublic = flavor.isPublic {
+            accessItems.append(.field(label: "Public", value: isPublic ? "Yes" : "No", style: isPublic ? .success : .secondary))
+            if isPublic {
+                accessItems.append(.field(label: "  Description", value: "Available to all projects", style: .info))
+            } else {
+                accessItems.append(.field(label: "  Description", value: "Private to specific projects", style: .info))
+            }
+        }
+
+        if let disabled = flavor.disabled {
+            accessItems.append(.field(label: "Disabled", value: disabled ? "Yes" : "No", style: disabled ? .error : .success))
+            if disabled {
+                accessItems.append(.field(label: "  Warning", value: "This flavor is disabled and cannot be used", style: .error))
+            }
+        }
+
+        if let accessSection = DetailView.buildSection(title: "Access Configuration", items: accessItems) {
+            sections.append(accessSection)
+        }
+
+        // Hardware Properties Section
+        if let extraSpecs = flavor.extraSpecs {
+            var gpuItems: [DetailItem] = []
+            var pciItems: [DetailItem] = []
+            var hwTraitItems: [DetailItem] = []
+
+            for (key, value) in extraSpecs.sorted(by: { $0.key < $1.key }) {
+                if key.hasPrefix("resources:VGPU") || key.hasPrefix("resources:PGPU") {
+                    let description = translateGPUResource(key: key, value: value)
+                    gpuItems.append(.field(label: description, value: "", style: .success))
+                } else if key.hasPrefix("trait:CUSTOM_HW_GPU") {
+                    let description = translateGPUTrait(key: key, value: value)
+                    gpuItems.append(.field(label: description, value: "", style: .success))
+                } else if key.hasPrefix("pci_passthrough:alias") {
+                    let description = translatePCIPassthrough(key: key, value: value)
+                    pciItems.append(.field(label: description, value: "", style: .info))
+                } else if key.hasPrefix("trait:CUSTOM_HW_") && !key.hasPrefix("trait:CUSTOM_HW_GPU") {
+                    let description = translateHardwareTrait(key: key, value: value)
+                    hwTraitItems.append(.field(label: description, value: "", style: .info))
+                }
+            }
+
+            let hardwareItems = gpuItems + pciItems + hwTraitItems
+            if !hardwareItems.isEmpty {
+                sections.append(DetailSection(title: "Hardware Properties", items: hardwareItems))
+            }
+        }
+
+        // Resource Quotas Section
+        if let extraSpecs = flavor.extraSpecs {
+            var networkQuotaItems: [DetailItem] = []
+            var storageQuotaItems: [DetailItem] = []
+            var cpuQuotaItems: [DetailItem] = []
+
+            for (key, value) in extraSpecs.sorted(by: { $0.key < $1.key }) {
+                if key.hasPrefix("quota:vif_") {
+                    let description = translateNetworkQuota(key: key, value: value)
+                    networkQuotaItems.append(.field(label: description, value: "", style: .accent))
+                } else if key.hasPrefix("quota:disk_") {
+                    let description = translateStorageQuota(key: key, value: value)
+                    storageQuotaItems.append(.field(label: description, value: "", style: .warning))
+                } else if key.hasPrefix("quota:cpu_") {
+                    let description = translateCPUQuota(key: key, value: value)
+                    cpuQuotaItems.append(.field(label: description, value: "", style: .secondary))
+                }
+            }
+
+            let quotaItems = networkQuotaItems + storageQuotaItems + cpuQuotaItems
+            if !quotaItems.isEmpty {
+                sections.append(DetailSection(title: "Resource Quotas", items: quotaItems))
+            }
+        }
+
+        // Extra Specs Section (Raw Properties)
+        if let extraSpecs = flavor.extraSpecs, !extraSpecs.isEmpty {
+            let extraSpecItems = extraSpecs.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Extra Specs", items: extraSpecItems))
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Flavor Details: \(flavor.name ?? "Unknown")",
+            sections: sections,
+            helpText: "Press ESC to return to flavors list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 
     // MARK: - Flavor Analysis (Rich Metadata)
@@ -336,231 +347,6 @@ struct FlavorViews {
         )
     }
 
-    // MARK: - Gold Standard Line Generation Functions
-
-    private static func generateGoldStandardBasicInfoLines(flavor: Flavor) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        let nameText = flavorDetailInfoFieldIndent + flavorDetailNameLabel + flavorDetailFieldValueSeparator + (flavor.name ?? "Unknown")
-        lines.append((nameText, 6)) // .secondary() like RouterViews
-
-        let idText = flavorDetailInfoFieldIndent + flavorDetailIdLabel + flavorDetailFieldValueSeparator + flavor.id
-        lines.append((idText, 6)) // .secondary() like RouterViews
-
-        return lines
-    }
-
-    private static func generateGoldStandardResourceLines(flavor: Flavor) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        let vcpus = flavor.vcpus
-        if vcpus > 0 {
-            let vcpusText = flavorDetailInfoFieldIndent + flavorDetailVCPUsLabel + flavorDetailFieldValueSeparator + String(vcpus)
-            lines.append((vcpusText, 6)) // .secondary() like RouterViews
-        }
-
-        let ram = flavor.ram
-        if ram > 0 {
-            let ramText = flavorDetailInfoFieldIndent + flavorDetailRAMLabel + flavorDetailFieldValueSeparator + String(ram) + flavorDetailMBSuffix
-            lines.append((ramText, 6)) // .secondary() like RouterViews
-        }
-
-        let disk = flavor.disk
-        if disk > 0 {
-            let diskText = flavorDetailInfoFieldIndent + flavorDetailRootDiskLabel + flavorDetailFieldValueSeparator + String(disk) + flavorDetailGBSuffix
-            lines.append((diskText, 6)) // .secondary() like RouterViews
-        }
-
-        if let ephemeral = flavor.ephemeral, ephemeral > 0 {
-            let ephemeralText = flavorDetailInfoFieldIndent + flavorDetailEphemeralDiskLabel + flavorDetailFieldValueSeparator + String(ephemeral) + flavorDetailGBSuffix
-            lines.append((ephemeralText, 6)) // .secondary() like RouterViews
-        }
-
-        if let swap = flavor.swap, swap > 0 {
-            let swapText = flavorDetailInfoFieldIndent + flavorDetailSwapLabel + flavorDetailFieldValueSeparator + String(swap) + flavorDetailMBSuffix
-            lines.append((swapText, 6)) // .secondary() like RouterViews
-        }
-
-        if let rxtxFactor = flavor.rxtxFactor {
-            let factorText = flavorDetailInfoFieldIndent + flavorDetailRxtxFactorLabel + flavorDetailFieldValueSeparator + String(rxtxFactor)
-            lines.append((factorText, 6)) // .secondary() like RouterViews
-        }
-
-        return lines
-    }
-
-    private static func generateGoldStandardPerformanceLines(analysis: FlavorAnalysis) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        let tierText = flavorDetailInfoFieldIndent + flavorDetailPerformanceTierLabel + flavorDetailFieldValueSeparator + analysis.performanceTier.rawValue
-        lines.append((tierText, 6)) // .secondary() like RouterViews
-
-        let ratioText = flavorDetailInfoFieldIndent + flavorDetailCpuMemoryRatioLabel + flavorDetailFieldValueSeparator + String(format: flavorDetailGBPerVCPUFormat, analysis.cpuToMemoryRatio)
-        lines.append((ratioText, 6)) // .secondary() like RouterViews
-
-        let storageText = flavorDetailInfoFieldIndent + flavorDetailStorageTypeLabel + flavorDetailFieldValueSeparator + analysis.storageType.rawValue
-        lines.append((storageText, 6)) // .secondary() like RouterViews
-
-        let categoryText = flavorDetailInfoFieldIndent + flavorDetailUsageCategoryLabel + flavorDetailFieldValueSeparator + analysis.usageCategory.rawValue
-        lines.append((categoryText, 6)) // .secondary() like RouterViews
-
-        return lines
-    }
-
-    private static func generateGoldStandardUsageLines(analysis: FlavorAnalysis) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        if !analysis.recommendedWorkloads.isEmpty {
-            let workloadsText = flavorDetailInfoFieldIndent + flavorDetailRecommendedWorkloadsLabel + flavorDetailFieldValueSeparator + analysis.recommendedWorkloads.joined(separator: flavorDetailWorkloadSeparator)
-            lines.append((workloadsText, 6)) // .secondary() like RouterViews
-        }
-
-        if !analysis.limitations.isEmpty {
-            let limitationsTitle = flavorDetailInfoFieldIndent + flavorDetailLimitationsLabel + flavorDetailFieldValueSeparator
-            lines.append((limitationsTitle, 6)) // .secondary() like RouterViews
-            for limitation in analysis.limitations {
-                let limitationText = flavorDetailInfoFieldIndent + flavorDetailLimitationPrefix + limitation
-                lines.append((limitationText, 6)) // .secondary() like RouterViews
-            }
-        } else {
-            let noLimitationsText = flavorDetailInfoFieldIndent + flavorDetailLimitationsLabel + flavorDetailFieldValueSeparator + flavorDetailNoLimitationsText
-            lines.append((noLimitationsText, 6)) // .secondary() like RouterViews
-        }
-
-        return lines
-    }
-
-    private static func generateGoldStandardAccessLines(flavor: Flavor) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        if let isPublic = flavor.isPublic {
-            let publicText = isPublic ? flavorDetailYesText : flavorDetailNoText
-            let accessText = flavorDetailInfoFieldIndent + flavorDetailPublicLabel + flavorDetailFieldValueSeparator + publicText
-            lines.append((accessText, 6)) // .secondary() like RouterViews
-        }
-
-        if let disabled = flavor.disabled {
-            let disabledText = disabled ? flavorDetailYesText : flavorDetailNoText
-            let statusText = flavorDetailInfoFieldIndent + flavorDetailDisabledLabel + flavorDetailFieldValueSeparator + disabledText
-            let statusColor: Int32 = disabled ? 7 : 5 // Error for disabled, success for enabled
-            lines.append((statusText, statusColor))
-        }
-
-        return lines
-    }
-
-    private static func generateGoldStandardNetworkingLines(flavor: Flavor) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        if let rxtxFactor = flavor.rxtxFactor {
-            let networkingText = flavorDetailInfoFieldIndent + "Network Performance: " + String(rxtxFactor) + "x baseline"
-            lines.append((networkingText, 6)) // .secondary() like RouterViews
-        }
-
-        return lines
-    }
-
-    private static func generateHardwarePropertiesLines(flavor: Flavor) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        guard let properties = flavor.extraSpecs else {
-            return lines
-        }
-
-        // GPU Properties
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            if key.hasPrefix("resources:VGPU") {
-                let description = translateGPUResource(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 5)) // .success() for GPU
-            } else if key.hasPrefix("resources:PGPU") {
-                let description = translateGPUResource(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 5)) // .success() for GPU
-            } else if key.hasPrefix("trait:CUSTOM_HW_GPU") {
-                let description = translateGPUTrait(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 5)) // .success() for GPU
-            }
-        }
-
-        // PCI Passthrough Properties
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            if key.hasPrefix("pci_passthrough:alias") {
-                let description = translatePCIPassthrough(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 4)) // .info() for PCI
-            }
-        }
-
-        // Other Hardware Traits
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            if key.hasPrefix("trait:CUSTOM_HW_") && !key.hasPrefix("trait:CUSTOM_HW_GPU") {
-                let description = translateHardwareTrait(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 4)) // .info() for other HW
-            }
-        }
-
-        return lines
-    }
-
-    private static func generateResourceQuotasLines(flavor: Flavor) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        guard let properties = flavor.extraSpecs else {
-            return lines
-        }
-
-        // Network Quotas
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            if key.hasPrefix("quota:vif_") {
-                let description = translateNetworkQuota(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 2)) // .accent() for network
-            }
-        }
-
-        // Storage Quotas
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            if key.hasPrefix("quota:disk_") {
-                let description = translateStorageQuota(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 3)) // .warning() for storage
-            }
-        }
-
-        // CPU Quotas
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            if key.hasPrefix("quota:cpu_") {
-                let description = translateCPUQuota(key: key, value: value)
-                lines.append((flavorDetailInfoFieldIndent + description, 6)) // .secondary() for CPU
-            }
-        }
-
-        return lines
-    }
-
-    private static func generateRawPropertiesLines(flavor: Flavor) -> [(String, Int32)] {
-        var lines: [(String, Int32)] = []
-
-        // Debug info about flavor
-        lines.append((flavorDetailInfoFieldIndent + "Debug: Flavor ID = \(flavor.id)", 4)) // .info() for debug
-
-        guard let properties = flavor.extraSpecs else {
-            lines.append((flavorDetailInfoFieldIndent + "Properties field is nil", 7)) // .error() for missing
-            return lines
-        }
-
-        if properties.isEmpty {
-            lines.append((flavorDetailInfoFieldIndent + "Properties field exists but is empty", 3)) // .warning() for empty
-            return lines
-        }
-
-        lines.append((flavorDetailInfoFieldIndent + "Found \(properties.count) properties:", 5)) // .success() for found
-
-        // Sort properties by key for consistent display
-        for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
-            let propertyLine = flavorDetailInfoFieldIndent + "\(key): \(value)"
-            lines.append((propertyLine, 6)) // .secondary() for all raw properties
-        }
-
-        return lines
-    }
-
     // MARK: - Property Translation Functions
 
     private static func translateGPUResource(key: String, value: String) -> String {
@@ -676,152 +462,4 @@ struct FlavorViews {
         }
     }
 
-    // MARK: - Layout Functions
-
-    @MainActor
-    private static func drawSingleColumnFlavorLayout(screen: OpaquePointer?, sections: [Section],
-                                                   startRow: Int32, startCol: Int32,
-                                                   columnWidth: Int, contentHeight: Int,
-                                                   scrollOffset: Int32) async {
-        var allLines: [(String, Int32)] = []
-        for section in sections {
-            if !section.lines.isEmpty {
-                allLines.append((section.title, 3)) // .warning() for section titles
-                allLines.append(contentsOf: section.lines)
-                allLines.append(("", 0)) // Blank line for spacing
-            }
-        }
-
-        let startIndex = Int(scrollOffset)
-        let surface = SwiftTUI.surface(from: screen)
-        for i in 0..<contentHeight {
-            let lineIndex = startIndex + i
-            let row = startRow + Int32(i)
-
-            if lineIndex < allLines.count {
-                let (text, colorPair) = allLines[lineIndex]
-                let truncatedText = String(text.prefix(columnWidth))
-                let textStyle = colorPairToStyle(colorPair)
-                let textBounds = Rect(x: startCol + 2, y: row, width: Int32(columnWidth), height: 1)
-                await SwiftTUI.render(Text(truncatedText).styled(textStyle), on: surface, in: textBounds)
-            }
-        }
-    }
-
-    @MainActor
-    private static func drawMultiColumnFlavorLayout(screen: OpaquePointer?, sections: [Section],
-                                                  startRow: Int32, startCol: Int32,
-                                                  leftColumnWidth: Int, rightColumnWidth: Int,
-                                                  rightColumnStart: Int32, contentHeight: Int,
-                                                  scrollOffset: Int32) async {
-        // Distribute sections between columns based on priority
-        let highPrioritySections = sections.filter { $0.priority == 1 }
-        let mediumPrioritySections = sections.filter { $0.priority == 2 }
-        let lowPrioritySections = sections.filter { $0.priority == 3 }
-        let debugPrioritySections = sections.filter { $0.priority == 4 }
-
-        var leftColumnSections: [Section] = []
-        var rightColumnSections: [Section] = []
-
-        // Distribute sections evenly, starting with high priority in left column
-        leftColumnSections.append(contentsOf: highPrioritySections)
-        rightColumnSections.append(contentsOf: mediumPrioritySections)
-        leftColumnSections.append(contentsOf: lowPrioritySections)
-        rightColumnSections.append(contentsOf: debugPrioritySections)
-
-        // Generate lines for each column
-        var leftColumnLines: [(String, Int32)] = []
-        var rightColumnLines: [(String, Int32)] = []
-
-        for section in leftColumnSections {
-            if !section.lines.isEmpty {
-                leftColumnLines.append((section.title, 3))
-                leftColumnLines.append(contentsOf: section.lines)
-                leftColumnLines.append(("", 0))
-            }
-        }
-
-        for section in rightColumnSections {
-            if !section.lines.isEmpty {
-                rightColumnLines.append((section.title, 3))
-                rightColumnLines.append(contentsOf: section.lines)
-                rightColumnLines.append(("", 0))
-            }
-        }
-
-        let startIndex = Int(scrollOffset)
-        let surface = SwiftTUI.surface(from: screen)
-        for i in 0..<contentHeight {
-            let lineIndex = startIndex + i
-            let row = startRow + Int32(i)
-
-            // Draw left column
-            if lineIndex < leftColumnLines.count {
-                let (text, colorPair) = leftColumnLines[lineIndex]
-                let truncatedText = String(text.prefix(leftColumnWidth))
-                let textStyle = colorPairToStyle(colorPair)
-                let leftBounds = Rect(x: startCol + 2, y: row, width: Int32(leftColumnWidth), height: 1)
-                await SwiftTUI.render(Text(truncatedText).styled(textStyle), on: surface, in: leftBounds)
-            }
-
-            // Draw right column
-            if lineIndex < rightColumnLines.count {
-                let (text, colorPair) = rightColumnLines[lineIndex]
-                let truncatedText = String(text.prefix(rightColumnWidth))
-                let textStyle = colorPairToStyle(colorPair)
-                let rightBounds = Rect(x: rightColumnStart, y: row, width: Int32(rightColumnWidth), height: 1)
-                await SwiftTUI.render(Text(truncatedText).styled(textStyle), on: surface, in: rightBounds)
-            }
-        }
-    }
-
-    private static func calculateTotalLinesForFlavorSections(sections: [Section], useMultiColumn: Bool) -> Int {
-        if useMultiColumn {
-            let highPrioritySections = sections.filter { $0.priority == 1 }
-            let mediumPrioritySections = sections.filter { $0.priority == 2 }
-            let lowPrioritySections = sections.filter { $0.priority == 3 }
-            let debugPrioritySections = sections.filter { $0.priority == 4 }
-
-            var leftColumnLines = 0
-            var rightColumnLines = 0
-
-            // Count lines for left column (high priority + low priority)
-            for section in highPrioritySections + lowPrioritySections {
-                if !section.lines.isEmpty {
-                    leftColumnLines += 1 + section.lines.count + 1 // title + lines + blank
-                }
-            }
-
-            // Count lines for right column (medium priority + debug priority)
-            for section in mediumPrioritySections + debugPrioritySections {
-                if !section.lines.isEmpty {
-                    rightColumnLines += 1 + section.lines.count + 1 // title + lines + blank
-                }
-            }
-
-            return max(leftColumnLines, rightColumnLines)
-        } else {
-            var totalLines = 0
-            for section in sections {
-                if !section.lines.isEmpty {
-                    totalLines += 1 + section.lines.count + 1 // title + lines + blank
-                }
-            }
-            return totalLines
-        }
-    }
-
-    // Helper function to convert color pairs to SwiftTUI styles
-    private static func colorPairToStyle(_ colorPair: Int32) -> TextStyle {
-        switch colorPair {
-        case 1: return .primary
-        case 2: return .accent
-        case 3: return .warning
-        case 4: return .info
-        case 5: return .success
-        case 6: return .secondary
-        case 7: return .error
-        default: return .secondary
-        }
-    }
 }

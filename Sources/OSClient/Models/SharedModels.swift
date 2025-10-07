@@ -208,20 +208,20 @@ public struct ImageRef: Codable, Sendable, Hashable {
 // MARK: - Quota Models
 
 public struct QuotaSet: Codable, Sendable {
-    public let cores: Int
-    public let instances: Int
-    public let ram: Int
-    public let floatingIps: Int
-    public let fixedIps: Int
-    public let metadataItems: Int
-    public let injectedFiles: Int
-    public let injectedFileContentBytes: Int
-    public let injectedFilePathBytes: Int
-    public let keyPairs: Int
-    public let securityGroups: Int
-    public let securityGroupRules: Int
-    public let serverGroups: Int
-    public let serverGroupMembers: Int
+    public let cores: Int?
+    public let instances: Int?
+    public let ram: Int?
+    public let floatingIps: Int?
+    public let fixedIps: Int?
+    public let metadataItems: Int?
+    public let injectedFiles: Int?
+    public let injectedFileContentBytes: Int?
+    public let injectedFilePathBytes: Int?
+    public let keyPairs: Int?
+    public let securityGroups: Int?
+    public let securityGroupRules: Int?
+    public let serverGroups: Int?
+    public let serverGroupMembers: Int?
 
     enum CodingKeys: String, CodingKey {
         case cores

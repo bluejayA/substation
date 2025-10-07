@@ -235,156 +235,419 @@ struct FloatingIPViews {
 
     // MARK: - Floating IP Detail View
 
-    // Detail View Constants
-    private static let floatingIPDetailMinScreenWidth: Int32 = 10
-    private static let floatingIPDetailMinScreenHeight: Int32 = 10
-    private static let floatingIPDetailBoundsMinWidth: Int32 = 1
-    private static let floatingIPDetailBoundsMinHeight: Int32 = 1
-    private static let floatingIPDetailScreenTooSmallText = "Screen too small"
-    private static let floatingIPDetailTitle = "Floating IP Details"
-    private static let floatingIPDetailTitleTopPadding: Int32 = 0
-    private static let floatingIPDetailTitleLeadingPadding: Int32 = 0
-    private static let floatingIPDetailTitleBottomPadding: Int32 = 2
-    private static let floatingIPDetailTitleTrailingPadding: Int32 = 0
-    private static let floatingIPDetailTitleSeparator = ": "
-    private static let floatingIPDetailBasicInfoTitle = "Basic Information"
-    private static let floatingIPDetailAttachmentInfoTitle = "Attachment Information"
-    private static let floatingIPDetailNetworkInfoTitle = "Network Information"
-    private static let floatingIPDetailIdLabel = "ID"
-    private static let floatingIPDetailAddressLabel = "IP Address"
-    private static let floatingIPDetailStatusLabel = "Status"
-    private static let floatingIPDetailProjectIdLabel = "Project ID"
-    private static let floatingIPDetailNetworkIdLabel = "Network ID"
-    private static let floatingIPDetailPortIdLabel = "Port ID"
-    private static let floatingIPDetailFixedIpLabel = "Fixed IP"
-    private static let floatingIPDetailServerLabel = "Server"
-    private static let floatingIPDetailExternalNetworkLabel = "External Network"
-    private static let floatingIPDetailFieldValueSeparator = ": "
-    private static let floatingIPDetailInfoFieldIndent = "  "
-    private static let floatingIPDetailHelpText = "Press ESC to return to floating IP list"
-    private static let floatingIPDetailActiveStatus = "ACTIVE"
-    private static let floatingIPDetailAvailableStatus = "AVAILABLE"
-    private static let floatingIPDetailUnnamedServerText = "Unnamed"
-    private static let floatingIPDetailServerIdSeparator = " ("
-    private static let floatingIPDetailServerIdSuffix = ")"
-    private static let floatingIPDetailSectionTopPadding: Int32 = 0
-    private static let floatingIPDetailSectionLeadingPadding: Int32 = 4
-    private static let floatingIPDetailSectionBottomPadding: Int32 = 1
-    private static let floatingIPDetailSectionTrailingPadding: Int32 = 0
-
     @MainActor
-    static func drawFloatingIPDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                                   width: Int32, height: Int32, floatingIP: FloatingIP,
-                                   cachedServers: [Server], cachedPorts: [Port],
-                                   cachedNetworks: [Network]) async {
-
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.floatingIPDetailMinScreenWidth && height > Self.floatingIPDetailMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.floatingIPDetailBoundsMinWidth, width), height: max(Self.floatingIPDetailBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.floatingIPDetailScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Floating IP Detail
-        var components: [any Component] = []
-
-        // Title - optimized string construction
-        let titleText = Self.floatingIPDetailTitle + Self.floatingIPDetailTitleSeparator + (floatingIP.floatingIpAddress ?? "Unknown")
-        components.append(Text(titleText).accent().bold()
-                         .padding(EdgeInsets(top: Self.floatingIPDetailTitleTopPadding, leading: Self.floatingIPDetailTitleLeadingPadding, bottom: Self.floatingIPDetailTitleBottomPadding, trailing: Self.floatingIPDetailTitleTrailingPadding)))
+    static func drawFloatingIPDetail(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        floatingIP: FloatingIP,
+        cachedServers: [Server],
+        cachedPorts: [Port],
+        cachedNetworks: [Network],
+        scrollOffset: Int = 0
+    ) async {
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text(Self.floatingIPDetailBasicInfoTitle).primary().bold())
+        let isActive = floatingIP.portId != nil
+        let status = isActive ? "ACTIVE" : "AVAILABLE"
 
-        var basicInfo: [any Component] = []
-        // Pre-calculate common field prefixes for optimal performance
-        let fieldSeparator = Self.floatingIPDetailFieldValueSeparator
-        let idPrefix = Self.floatingIPDetailIdLabel + fieldSeparator
-        let addressPrefix = Self.floatingIPDetailAddressLabel + fieldSeparator
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: floatingIP.id),
+            DetailView.buildFieldItem(label: "IP Address", value: floatingIP.floatingIpAddress),
+            .field(label: "Status", value: status, style: isActive ? .success : .info),
+            DetailView.buildFieldItem(label: "Description", value: floatingIP.description)
+        ]
 
-        // Optimized string construction for basic info fields
-        let idText = idPrefix + floatingIP.id
-        let addressText = addressPrefix + (floatingIP.floatingIpAddress ?? "Unknown")
-        basicInfo.append(Text(idText).secondary())
-        basicInfo.append(Text(addressText).secondary())
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
+        }
 
-        // Status with appropriate styling
-        let status = floatingIP.portId != nil ? Self.floatingIPDetailActiveStatus : Self.floatingIPDetailAvailableStatus
-        let statusStyle: TextStyle = floatingIP.portId != nil ? .success : .info
-        let statusLabelText = Self.floatingIPDetailStatusLabel + fieldSeparator
-        basicInfo.append(HStack(spacing: 0, children: [
-            Text(statusLabelText).secondary(),
-            Text(status).styled(statusStyle)
-        ]))
-
-        // FloatingIP doesn't have a description property - removing this section
-
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(EdgeInsets(top: Self.floatingIPDetailSectionTopPadding, leading: Self.floatingIPDetailSectionLeadingPadding, bottom: Self.floatingIPDetailSectionBottomPadding, trailing: Self.floatingIPDetailSectionTrailingPadding))
-        components.append(basicInfoSection)
+        // NAT Intelligence Section
+        let natInfo = getNATTypeDescription(isAttached: isActive)
+        let natItems: [DetailItem?] = [
+            .field(label: "Type", value: natInfo.title, style: natInfo.style),
+            .field(label: "Description", value: natInfo.description, style: .info)
+        ]
+        if let natSection = DetailView.buildSection(title: "NAT Configuration", items: natItems, titleStyle: .accent) {
+            sections.append(natSection)
+        }
 
         // Attachment Information Section
         if let portID = floatingIP.portId {
-            components.append(Text(Self.floatingIPDetailAttachmentInfoTitle).primary().bold())
+            var attachmentItems: [DetailItem?] = []
 
-            var attachmentInfo: [any Component] = []
-            // Pre-calculate prefixes for optimal performance
-            let portPrefix = Self.floatingIPDetailPortIdLabel + fieldSeparator
+            attachmentItems.append(.field(label: "Port ID", value: portID, style: .secondary))
 
-            // Optimized string construction for attachment info
-            let portText = portPrefix + portID
-            attachmentInfo.append(Text(portText).secondary())
+            if let fixedIP = floatingIP.fixedIpAddress {
+                attachmentItems.append(.field(label: "Fixed IP Address", value: fixedIP, style: .accent))
+            }
 
             if let port = cachedPorts.first(where: { $0.id == portID }) {
-                if let fixedIP = port.fixedIps?.first {
-                    let fixedIPPrefix = Self.floatingIPDetailFixedIpLabel + fieldSeparator
-                    let fixedIPText = fixedIPPrefix + fixedIP.ipAddress
-                    attachmentInfo.append(Text(fixedIPText).secondary())
+                if let deviceID = port.deviceId {
+                    attachmentItems.append(.field(label: "Device ID", value: deviceID, style: .muted))
+
+                    if let server = cachedServers.first(where: { $0.id == deviceID }) {
+                        let serverName = server.name ?? "Unnamed Server"
+                        attachmentItems.append(.field(label: "Server", value: serverName, style: .secondary))
+                        attachmentItems.append(.field(label: "  Server Status", value: server.status?.rawValue ?? "Unknown", style: server.status?.rawValue.lowercased() == "active" ? .success : .warning))
+                    }
                 }
-                if let deviceID = port.deviceId,
-                   let server = cachedServers.first(where: { $0.id == deviceID }) {
-                    let serverName = server.name ?? Self.floatingIPDetailUnnamedServerText
-                    let serverPrefix = Self.floatingIPDetailServerLabel + fieldSeparator
-                    let serverText = serverPrefix + serverName + Self.floatingIPDetailServerIdSeparator + deviceID + Self.floatingIPDetailServerIdSuffix
-                    attachmentInfo.append(Text(serverText).secondary())
+
+                if let portName = port.name {
+                    attachmentItems.append(.field(label: "Port Name", value: portName, style: .secondary))
+                }
+
+                if let deviceOwner = port.deviceOwner {
+                    attachmentItems.append(.field(label: "Device Owner", value: deviceOwner, style: .secondary))
+                    let ownerDescription = getDeviceOwnerDescription(deviceOwner)
+                    if !ownerDescription.isEmpty {
+                        attachmentItems.append(.field(label: "  Description", value: ownerDescription, style: .info))
+                    }
                 }
             }
 
-            let attachmentSection = VStack(spacing: 0, children: attachmentInfo)
-                .padding(EdgeInsets(top: Self.floatingIPDetailSectionTopPadding, leading: Self.floatingIPDetailSectionLeadingPadding, bottom: Self.floatingIPDetailSectionBottomPadding, trailing: Self.floatingIPDetailSectionTrailingPadding))
-            components.append(attachmentSection)
+            if let attachmentSection = DetailView.buildSection(title: "Attachment Information", items: attachmentItems, titleStyle: .accent) {
+                sections.append(attachmentSection)
+            }
+        } else {
+            sections.append(DetailSection(
+                title: "Attachment Information",
+                items: [.field(label: "Status", value: "Not attached to any port", style: .info)]
+            ))
+        }
+
+        // Router Information Section
+        if let routerId = floatingIP.routerId {
+            let routerItems: [DetailItem?] = [
+                .field(label: "Router ID", value: routerId, style: .secondary),
+                .field(label: "Description", value: "Floating IP is routed through this router", style: .info)
+            ]
+
+            if let routerSection = DetailView.buildSection(title: "Router Information", items: routerItems) {
+                sections.append(routerSection)
+            }
         }
 
         // Network Information Section
-        if let externalNetwork = cachedNetworks.first(where: { $0.external == true }) {
-            components.append(Text(Self.floatingIPDetailNetworkInfoTitle).primary().bold())
+        let externalNetwork = cachedNetworks.first(where: { $0.id == floatingIP.floatingNetworkId })
+        let networkName = externalNetwork?.name ?? "Unknown"
 
-            var networkInfo: [any Component] = []
-            // Pre-calculate prefixes for optimal performance
-            let externalNetworkPrefix = Self.floatingIPDetailExternalNetworkLabel + fieldSeparator
-            let networkIdPrefix = Self.floatingIPDetailNetworkIdLabel + fieldSeparator
+        var networkItems: [DetailItem?] = [
+            .field(label: "External Network", value: networkName, style: .secondary),
+            .field(label: "Network ID", value: floatingIP.floatingNetworkId, style: .muted)
+        ]
 
-            // Optimized string construction for network info
-            let externalNetworkText = externalNetworkPrefix + (externalNetwork.name ?? "Unknown")
-            let networkIdText = networkIdPrefix + externalNetwork.id
-            networkInfo.append(Text(externalNetworkText).secondary())
-            networkInfo.append(Text(networkIdText).secondary())
-
-            let networkSection = VStack(spacing: 0, children: networkInfo)
-                .padding(EdgeInsets(top: Self.floatingIPDetailSectionTopPadding, leading: Self.floatingIPDetailSectionLeadingPadding, bottom: Self.floatingIPDetailSectionBottomPadding, trailing: Self.floatingIPDetailSectionTrailingPadding))
-            components.append(networkSection)
+        if let externalNetwork = externalNetwork {
+            if let shared = externalNetwork.shared {
+                networkItems.append(.field(label: "Shared Network", value: shared ? "Yes" : "No", style: shared ? .info : .secondary))
+            }
         }
 
-        // Help text
-        components.append(Text(Self.floatingIPDetailHelpText).info())
+        if let networkSection = DetailView.buildSection(title: "Network Information", items: networkItems) {
+            sections.append(networkSection)
+        }
 
-        // Render unified floating IP detail
-        let floatingIPDetailComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(floatingIPDetailComponent, on: surface, in: bounds)
+        // DNS Configuration Section
+        var dnsItems: [DetailItem?] = []
+
+        if let dnsName = floatingIP.dnsName {
+            dnsItems.append(.field(label: "DNS Name", value: dnsName, style: .secondary))
+        }
+
+        if let dnsDomain = floatingIP.dnsDomain {
+            dnsItems.append(.field(label: "DNS Domain", value: dnsDomain, style: .secondary))
+        }
+
+        if let dnsSection = DetailView.buildSection(title: "DNS Configuration", items: dnsItems) {
+            sections.append(dnsSection)
+        }
+
+        // QoS Section with Intelligence
+        if let qosPolicyId = floatingIP.qosPolicyId {
+            let qosItems: [DetailItem?] = [
+                .field(label: "QoS Policy ID", value: qosPolicyId, style: .secondary),
+                .field(label: "Status", value: "QoS policy attached", style: .success),
+                .spacer,
+                .field(label: "Bandwidth Limiting", value: getQoSBandwidthDescription(), style: .info),
+                .field(label: "Note", value: "Check QoS policy details for specific limits", style: .info)
+            ]
+
+            if let qosSection = DetailView.buildSection(title: "Quality of Service", items: qosItems, titleStyle: .accent) {
+                sections.append(qosSection)
+            }
+        }
+
+        // Port Status Intelligence Section
+        if let portID = floatingIP.portId,
+           let port = cachedPorts.first(where: { $0.id == portID }) {
+            let portStatusItems = getPortStatusIntelligence(port: port)
+            if !portStatusItems.isEmpty {
+                sections.append(DetailSection(
+                    title: "Port Status Details",
+                    items: portStatusItems,
+                    titleStyle: .accent
+                ))
+            }
+        }
+
+        // Security Analysis Section
+        let port = floatingIP.portId != nil ? cachedPorts.first(where: { $0.id == floatingIP.portId }) : nil
+        let securityItems = analyzeSecurityPosture(floatingIP: floatingIP, port: port)
+        sections.append(DetailSection(
+            title: "Security Analysis",
+            items: securityItems,
+            titleStyle: .accent
+        ))
+
+        // Additional Information Section
+        var additionalItems: [DetailItem?] = []
+
+        if let tenantId = floatingIP.tenantId {
+            additionalItems.append(.field(label: "Tenant ID", value: tenantId, style: .secondary))
+        }
+
+        if let projectId = floatingIP.projectId {
+            additionalItems.append(.field(label: "Project ID", value: projectId, style: .secondary))
+        }
+
+        if let revisionNumber = floatingIP.revisionNumber {
+            additionalItems.append(.field(label: "Revision", value: String(revisionNumber), style: .secondary))
+        }
+
+        if let additionalSection = DetailView.buildSection(title: "Additional Information", items: additionalItems) {
+            sections.append(additionalSection)
+        }
+
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: floatingIP.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: floatingIP.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Tags Section
+        if let tags = floatingIP.tags, !tags.isEmpty {
+            let tagItems = tags.map { DetailItem.field(label: "Tag", value: $0, style: .secondary) }
+            sections.append(DetailSection(title: "Tags", items: tagItems))
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Floating IP Details: \(floatingIP.floatingIpAddress ?? "Unknown")",
+            sections: sections,
+            helpText: "Press ESC to return to floating IPs list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    // MARK: - Helper Functions for Enhanced Floating IP Information
+
+    private static func getDeviceOwnerDescription(_ deviceOwner: String) -> String {
+        switch deviceOwner {
+        case "compute:nova": return "Attached to Nova compute instance"
+        case "network:router_interface": return "Router interface port"
+        case "network:router_gateway": return "Router external gateway port"
+        case "network:dhcp": return "DHCP server port"
+        case "network:floatingip": return "Floating IP port"
+        case "network:ha_router_replicated_interface": return "HA router replicated interface"
+        case "network:router_interface_distributed": return "Distributed router interface"
+        case "network:router_centralized_snat": return "Centralized SNAT port for DVR"
+        default:
+            if deviceOwner.hasPrefix("compute:") {
+                return "Nova compute instance in availability zone"
+            }
+            return ""
+        }
+    }
+
+    private static func getNATTypeDescription(isAttached: Bool) -> (title: String, description: String, style: TextStyle) {
+        if isAttached {
+            return (
+                "DNAT (Destination NAT) Active",
+                "Inbound traffic to this floating IP is translated to the fixed IP",
+                .success
+            )
+        } else {
+            return (
+                "No NAT Active",
+                "Floating IP is unattached - no NAT translation occurring",
+                .info
+            )
+        }
+    }
+
+    private static func getQoSBandwidthDescription() -> String {
+        return "QoS policy limits bandwidth for this floating IP"
+    }
+
+    private static func analyzeSecurityPosture(floatingIP: FloatingIP, port: Port?) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        if floatingIP.portId == nil {
+            items.append(.field(
+                label: "Security Warning",
+                value: "Floating IP is allocated but unattached",
+                style: .warning
+            ))
+            items.append(.field(
+                label: "  Risk",
+                value: "Unused floating IP consumes public IP space",
+                style: .info
+            ))
+            items.append(.field(
+                label: "  Recommendation",
+                value: "Consider releasing if not needed",
+                style: .info
+            ))
+        } else {
+            items.append(.field(
+                label: "Public Internet Exposure",
+                value: "This floating IP is accessible from the internet",
+                style: .info
+            ))
+
+            if let port = port {
+                if let securityGroups = port.securityGroups, !securityGroups.isEmpty {
+                    items.append(.field(
+                        label: "Security Groups",
+                        value: "\(securityGroups.count) security group(s) applied",
+                        style: .success
+                    ))
+                    items.append(.field(
+                        label: "  Note",
+                        value: "Traffic is filtered by security group rules",
+                        style: .info
+                    ))
+                } else {
+                    items.append(.field(
+                        label: "Security Warning",
+                        value: "No security groups found on port",
+                        style: .warning
+                    ))
+                }
+
+                if let portSecurityEnabled = port.portSecurityEnabled {
+                    let securityStatus = portSecurityEnabled ? "Enabled" : "Disabled"
+                    let securityStyle: TextStyle = portSecurityEnabled ? .success : .error
+                    items.append(.field(
+                        label: "Port Security",
+                        value: securityStatus,
+                        style: securityStyle
+                    ))
+                    if !portSecurityEnabled {
+                        items.append(.field(
+                            label: "  Warning",
+                            value: "Port security disabled - all traffic allowed",
+                            style: .error
+                        ))
+                    }
+                }
+            }
+        }
+
+        items.append(.spacer)
+        items.append(.field(
+            label: "Best Practices",
+            value: "Use security groups to restrict inbound traffic",
+            style: .info
+        ))
+        items.append(.field(
+            label: "",
+            value: "Only attach floating IPs when external access is needed",
+            style: .info
+        ))
+        items.append(.field(
+            label: "",
+            value: "Consider using a bastion host for SSH access",
+            style: .info
+        ))
+
+        return items
+    }
+
+    private static func getPortStatusIntelligence(port: Port) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        if let status = port.status {
+            let statusStyle: TextStyle = status.uppercased() == "ACTIVE" ? .success : .warning
+            items.append(.field(
+                label: "Port Status",
+                value: status.uppercased(),
+                style: statusStyle
+            ))
+
+            if status.uppercased() == "DOWN" {
+                items.append(.field(
+                    label: "  Note",
+                    value: "Port is down - traffic will not flow",
+                    style: .warning
+                ))
+            } else if status.uppercased() == "ACTIVE" {
+                items.append(.field(
+                    label: "  Note",
+                    value: "Port is active and forwarding traffic",
+                    style: .success
+                ))
+            }
+        }
+
+        if let adminStateUp = port.adminStateUp {
+            let adminState = adminStateUp ? "UP" : "DOWN"
+            let adminStyle: TextStyle = adminStateUp ? .success : .error
+            items.append(.field(
+                label: "Admin State",
+                value: adminState,
+                style: adminStyle
+            ))
+        }
+
+        if let deviceOwner = port.deviceOwner {
+            items.append(.field(
+                label: "Port Role",
+                value: getDeviceOwnerDescription(deviceOwner),
+                style: .info
+            ))
+        }
+
+        if let macAddress = port.macAddress {
+            items.append(.field(
+                label: "MAC Address",
+                value: macAddress,
+                style: .secondary
+            ))
+        }
+
+        if let fixedIps = port.fixedIps, !fixedIps.isEmpty {
+            items.append(.spacer)
+            items.append(.field(
+                label: "Fixed IPs on Port",
+                value: "\(fixedIps.count) IP address(es)",
+                style: .info
+            ))
+            for fixedIp in fixedIps {
+                items.append(.field(
+                    label: "  IP",
+                    value: fixedIp.ipAddress,
+                    style: .accent
+                ))
+            }
+        }
+
+        return items
     }
 
     // MARK: - Floating IP Create View

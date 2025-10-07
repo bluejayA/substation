@@ -35,63 +35,6 @@ struct ServerViews {
     // Header text constants
     private static let serverListHeader = " ST  NAME                   STATUS      IP ADDRESS       FLAVOR/IMAGE"
 
-    // MARK: - Server Detail View Constants
-    // Detail View Constants
-    private static let serverDetailTitle = "Server Details"
-    private static let serverDetailBasicInfoTitle = "Basic Information"
-    private static let serverDetailHardwareInfoTitle = "Hardware Information"
-    private static let serverDetailNetworkInfoTitle = "Network Information"
-    private static let serverDetailStorageInfoTitle = "Storage Information"
-    private static let serverDetailTimestampsTitle = "Timestamps"
-    private static let serverDetailIdLabel = "ID"
-    private static let serverDetailNameLabel = "Name"
-    private static let serverDetailStatusLabel = "Status"
-    private static let serverDetailFlavorIdLabel = "Flavor ID"
-    private static let serverDetailFlavorNameLabel = "Flavor Name"
-    private static let serverDetailImageIdLabel = "Image ID"
-    private static let serverDetailImageNameLabel = "Image Name"
-    private static let serverDetailNetworkLabel = "Network"
-    private static let serverDetailVolumeNameLabel = "Volume Name"
-    private static let serverDetailVolumeSizeLabel = "Size"
-    private static let serverDetailVolumeStatusLabel = "Status"
-    private static let serverDetailCreatedLabel = "Created"
-    private static let serverDetailUpdatedLabel = "Updated"
-    private static let serverDetailFieldValueSeparator = ": "
-    private static let serverDetailUnnamedServerText = "Unnamed Server"
-    private static let serverDetailUnknownStatusText = "Unknown"
-    private static let serverDetailUnnamedVolumeText = "Unnamed Volume"
-    private static let serverDetailIpv4Text = "IPv4"
-    private static let serverDetailIpv6Text = "IPv6"
-    private static let serverDetailGbSuffix = " GB"
-    private static let serverDetailHelpText = "Press ESC to return to server list"
-    private static let serverDetailScreenTooSmallText = "Screen too small"
-    private static let serverDetailScrolledToEndText = "End of server details"
-
-    // Detail View Layout Constants
-    private static let serverDetailMinScreenWidth: Int32 = 10
-    private static let serverDetailMinScreenHeight: Int32 = 10
-    private static let serverDetailBoundsMinWidth: Int32 = 1
-    private static let serverDetailBoundsMinHeight: Int32 = 1
-    private static let serverDetailTitleTopPadding: Int32 = 0
-    private static let serverDetailTitleLeadingPadding: Int32 = 0
-    private static let serverDetailTitleBottomPadding: Int32 = 2
-    private static let serverDetailTitleTrailingPadding: Int32 = 0
-    private static let serverDetailSectionTopPadding: Int32 = 0
-    private static let serverDetailSectionLeadingPadding: Int32 = 4
-    private static let serverDetailSectionBottomPadding: Int32 = 1
-    private static let serverDetailSectionTrailingPadding: Int32 = 0
-    private static let serverDetailHelpTopPadding: Int32 = 1
-    private static let serverDetailHelpLeadingPadding: Int32 = 0
-    private static let serverDetailHelpBottomPadding: Int32 = 0
-    private static let serverDetailHelpTrailingPadding: Int32 = 0
-    private static let serverDetailInfoFieldIndent = "  "
-    private static let serverDetailComponentSpacing: Int32 = 0
-    private static let serverDetailItemTextSpacing = " "
-
-    // Pre-calculated EdgeInsets for nano-level performance optimization
-    private static let serverDetailTitleEdgeInsets = EdgeInsets(top: serverDetailTitleTopPadding, leading: serverDetailTitleLeadingPadding, bottom: serverDetailTitleBottomPadding, trailing: serverDetailTitleTrailingPadding)
-    private static let serverDetailSectionEdgeInsets = EdgeInsets(top: serverDetailSectionTopPadding, leading: serverDetailSectionLeadingPadding, bottom: serverDetailSectionBottomPadding, trailing: serverDetailSectionTrailingPadding)
-    private static let serverDetailHelpEdgeInsets = EdgeInsets(top: serverDetailHelpTopPadding, leading: serverDetailHelpLeadingPadding, bottom: serverDetailHelpBottomPadding, trailing: serverDetailHelpTrailingPadding)
 
     @MainActor
     static func drawDetailedServerList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
@@ -124,382 +67,272 @@ struct ServerViews {
                                cachedVolumes: [Volume],
                                cachedFlavors: [Flavor], cachedImages: [Image], scrollOffset: Int = 0) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.serverDetailMinScreenWidth && height > Self.serverDetailMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.serverDetailBoundsMinWidth, width), height: max(Self.serverDetailBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.serverDetailScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Server Detail
-        var components: [any Component] = []
-
-        // Title - optimized string construction
-        let serverName = server.name ?? Self.serverDetailUnnamedServerText
-        let titleText = Self.serverDetailTitle + Self.serverDetailFieldValueSeparator + serverName
-        components.append(Text(titleText).accent().bold()
-                         .padding(Self.serverDetailTitleEdgeInsets))
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text(Self.serverDetailBasicInfoTitle).primary().bold())
+        var basicItems: [DetailItem] = []
+        basicItems.append(.field(label: "ID", value: server.id, style: .secondary))
+        basicItems.append(.field(label: "Name", value: server.name ?? "Unnamed Server", style: .secondary))
 
-        var basicInfo: [any Component] = []
-        // Pre-calculate common field prefixes for optimal performance
-        let fieldPrefix = Self.serverDetailInfoFieldIndent
-        let fieldSeparator = Self.serverDetailFieldValueSeparator
-        let idPrefix = fieldPrefix + Self.serverDetailIdLabel + fieldSeparator
-        let namePrefix = fieldPrefix + Self.serverDetailNameLabel + fieldSeparator
-        let statusPrefix = fieldPrefix + Self.serverDetailStatusLabel + fieldSeparator
+        // Status with custom component for icon
+        basicItems.append(.customComponent(
+            HStack(spacing: 0, children: [
+                Text("  Status: ").secondary(),
+                StatusIcon.server(status: server.status?.rawValue),
+                Text(" " + (server.status?.rawValue ?? "Unknown"))
+                    .styled(TextStyle.forStatus(server.status?.rawValue))
+            ])
+        ))
 
-        // Optimized string construction for basic info fields
-        let idText = idPrefix + server.id
-        let nameText = namePrefix + serverName
-
-        basicInfo.append(Text(idText).secondary())
-        basicInfo.append(Text(nameText).secondary())
-
-        basicInfo.append(HStack(spacing: 0, children: [
-            Text(statusPrefix).secondary(),
-            StatusIcon.server(status: server.status?.rawValue),
-            Text(Self.serverDetailItemTextSpacing + (server.status?.rawValue ?? Self.serverDetailUnknownStatusText)).styled(TextStyle.forStatus(server.status?.rawValue))
-        ]))
-
-        // Task State
         if let taskState = server.taskState {
-            basicInfo.append(Text(fieldPrefix + "Task State" + fieldSeparator + taskState).secondary())
+            basicItems.append(.field(label: "Task State", value: taskState, style: .secondary))
         }
 
-        // Power State
         if let powerState = server.powerState {
             let powerStateText = powerState == .running ? "Running" : (powerState == .shutdown ? "Shutdown" : "Unknown")
-            basicInfo.append(Text(fieldPrefix + "Power State" + fieldSeparator + powerStateText).secondary())
+            basicItems.append(.field(label: "Power State", value: powerStateText, style: .secondary))
         }
 
-        // Availability Zone
         if let az = server.availabilityZone {
-            basicInfo.append(Text(fieldPrefix + "Availability Zone" + fieldSeparator + az).secondary())
+            basicItems.append(.field(label: "Availability Zone", value: az, style: .secondary))
         }
 
-        // Key Pair
         if let keyName = server.keyName {
-            basicInfo.append(Text(fieldPrefix + "Key Pair" + fieldSeparator + keyName).secondary())
+            basicItems.append(.field(label: "Key Pair", value: keyName, style: .secondary))
         }
 
-        // Host ID
         if let hostId = server.hostId, !hostId.isEmpty {
-            basicInfo.append(Text(fieldPrefix + "Host ID" + fieldSeparator + hostId).secondary())
+            basicItems.append(.field(label: "Host ID", value: hostId, style: .secondary))
         }
 
-        // Config Drive
         if let configDrive = server.configDrive, !configDrive.isEmpty {
-            basicInfo.append(Text(fieldPrefix + "Config Drive" + fieldSeparator + configDrive).secondary())
+            basicItems.append(.field(label: "Config Drive", value: configDrive, style: .secondary))
         }
 
-        // Progress
         if let progress = server.progress {
-            basicInfo.append(Text(fieldPrefix + "Progress" + fieldSeparator + String(progress) + "%").secondary())
+            basicItems.append(.field(label: "Progress", value: "\(progress)%", style: .secondary))
         }
 
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(Self.serverDetailSectionEdgeInsets)
-        components.append(basicInfoSection)
+        sections.append(DetailSection(title: "Basic Information", items: basicItems))
+
+        // Server Age / Uptime Section
+        let ageItems = calculateServerAge(createdAt: server.createdAt, launchedAt: server.launchedAt)
+        if !ageItems.isEmpty {
+            sections.append(DetailSection(
+                title: "Server Age",
+                items: ageItems,
+                titleStyle: .accent
+            ))
+        }
 
         // Hardware Information Section
-        var hasHardwareInfo = false
-        var hardwareInfo: [any Component] = []
+        var hardwareItems: [DetailItem] = []
 
-        // Flavor Information
+        // Flavor Information with enhanced details
         if let flavor = server.flavor {
-            hasHardwareInfo = true
             let flavorName = resolveFlavorName(from: server.flavor, cachedFlavors: cachedFlavors)
-            let flavorIdPrefix = fieldPrefix + Self.serverDetailFlavorIdLabel + fieldSeparator
-            let flavorNamePrefix = fieldPrefix + Self.serverDetailFlavorNameLabel + fieldSeparator
-            let flavorIdText = flavorIdPrefix + (flavor.id ?? "N/A")
-            let flavorNameText = flavorNamePrefix + flavorName
-            hardwareInfo.append(Text(flavorIdText).secondary())
-            hardwareInfo.append(Text(flavorNameText).secondary())
+            hardwareItems.append(.field(label: "Flavor ID", value: flavor.id ?? "N/A", style: .secondary))
+            hardwareItems.append(.field(label: "Flavor Name", value: flavorName, style: .secondary))
+
+            // Add detailed flavor specs if available in cache
+            if let flavorId = flavor.id, let cachedFlavor = cachedFlavors.first(where: { $0.id == flavorId }) {
+                hardwareItems.append(.field(label: "vCPUs", value: String(cachedFlavor.vcpus), style: .info))
+                hardwareItems.append(.field(label: "RAM", value: "\(cachedFlavor.ram) MB", style: .info))
+                hardwareItems.append(.field(label: "Disk", value: "\(cachedFlavor.disk) GB", style: .info))
+
+                if let swap = cachedFlavor.swap, swap > 0 {
+                    hardwareItems.append(.field(label: "Swap", value: "\(swap) MB", style: .info))
+                }
+
+                if let ephemeral = cachedFlavor.ephemeral, ephemeral > 0 {
+                    hardwareItems.append(.field(label: "Ephemeral", value: "\(ephemeral) GB", style: .info))
+                }
+            }
         }
 
         // Image Information
         if let image = server.image {
-            hasHardwareInfo = true
             let imageName = resolveImageName(from: server.image, cachedImages: cachedImages)
-            let imageIdPrefix = fieldPrefix + Self.serverDetailImageIdLabel + fieldSeparator
-            let imageNamePrefix = fieldPrefix + Self.serverDetailImageNameLabel + fieldSeparator
-            let imageIdText = imageIdPrefix + image.id
-            let imageNameText = imageNamePrefix + imageName
-            hardwareInfo.append(Text(imageIdText).secondary())
-            hardwareInfo.append(Text(imageNameText).secondary())
+            if !hardwareItems.isEmpty {
+                hardwareItems.append(.spacer)
+            }
+            hardwareItems.append(.field(label: "Image ID", value: image.id, style: .secondary))
+            hardwareItems.append(.field(label: "Image Name", value: imageName, style: .secondary))
         }
 
-        if hasHardwareInfo {
-            components.append(Text(Self.serverDetailHardwareInfoTitle).primary().bold())
-            let hardwareSection = VStack(spacing: 0, children: hardwareInfo)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(hardwareSection)
+        if !hardwareItems.isEmpty {
+            sections.append(DetailSection(title: "Hardware Information", items: hardwareItems))
+        }
+
+        // Flavor Sizing Analysis Section
+        if let flavorId = server.flavor?.id,
+           let cachedFlavor = cachedFlavors.first(where: { $0.id == flavorId }) {
+            let sizingItems = analyzeFlavorSizing(flavor: cachedFlavor)
+            if !sizingItems.isEmpty {
+                sections.append(DetailSection(
+                    title: "Flavor Sizing Analysis",
+                    items: sizingItems,
+                    titleStyle: .accent
+                ))
+            }
+        }
+
+        // Performance Insights Section
+        if let flavorId = server.flavor?.id,
+           let cachedFlavor = cachedFlavors.first(where: { $0.id == flavorId }) {
+            let performanceItems = analyzePerformanceCharacteristics(flavor: cachedFlavor)
+            if !performanceItems.isEmpty {
+                sections.append(DetailSection(
+                    title: "Performance Insights",
+                    items: performanceItems,
+                    titleStyle: .accent
+                ))
+            }
         }
 
         // Network Information Section
         if let addresses = server.addresses, !addresses.isEmpty {
-            components.append(Text(Self.serverDetailNetworkInfoTitle).primary().bold())
-            var networkComponents: [any Component] = []
-            for (networkName, addressList) in addresses {
-                let networkPrefix = fieldPrefix + Self.serverDetailNetworkLabel + fieldSeparator
-                let networkText = networkPrefix + networkName
-                networkComponents.append(Text(networkText).secondary())
+            var networkItems: [DetailItem] = []
+            for (networkName, addressList) in addresses.sorted(by: { $0.key < $1.key }) {
+                networkItems.append(.field(label: "Network", value: networkName, style: .secondary))
                 for address in addressList {
-                    let versionText = address.version == 4 ? Self.serverDetailIpv4Text : Self.serverDetailIpv6Text
-                    let addressPrefix = fieldPrefix + fieldPrefix + versionText + fieldSeparator
-                    let addressText = addressPrefix + address.addr
-                    networkComponents.append(Text(addressText).info())
+                    let versionText = address.version == 4 ? "IPv4" : "IPv6"
+                    networkItems.append(.field(label: "  \(versionText)", value: address.addr, style: .info))
                 }
             }
-            let networkSection = VStack(spacing: 0, children: networkComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(networkSection)
+            sections.append(DetailSection(title: "Network Information", items: networkItems))
         }
 
         // Storage Information Section
         let attachedVolumes = cachedVolumes.filter { $0.attachments?.contains { $0.serverId == server.id } ?? false }
         if !attachedVolumes.isEmpty {
-            components.append(Text(Self.serverDetailStorageInfoTitle).primary().bold())
-            var storageComponents: [any Component] = []
+            var storageItems: [DetailItem] = []
             for volume in attachedVolumes {
-                let volumeNamePrefix = fieldPrefix + Self.serverDetailVolumeNameLabel + fieldSeparator
-                let volumeSizePrefix = fieldPrefix + Self.serverDetailVolumeSizeLabel + fieldSeparator
-                let volumeStatusPrefix = fieldPrefix + Self.serverDetailVolumeStatusLabel + fieldSeparator
-
-                let volumeNameText = volumeNamePrefix + (volume.name ?? Self.serverDetailUnnamedVolumeText)
-                let volumeSizeText = volumeSizePrefix + String(volume.size ?? 0) + Self.serverDetailGbSuffix
-                let volumeStatusText = volumeStatusPrefix + (volume.status ?? Self.serverDetailUnknownStatusText)
-
-                storageComponents.append(Text(volumeNameText).secondary())
-                storageComponents.append(Text(volumeSizeText).secondary())
-                storageComponents.append(Text(volumeStatusText).styled(TextStyle.forStatus(volume.status)))
-                storageComponents.append(Text("").secondary()) // Spacer between volumes
+                storageItems.append(.field(label: "Volume Name", value: volume.name ?? "Unnamed Volume", style: .secondary))
+                storageItems.append(.field(label: "Size", value: "\(volume.size ?? 0) GB", style: .secondary))
+                storageItems.append(.customComponent(
+                    HStack(spacing: 0, children: [
+                        Text("  Status: ").secondary(),
+                        Text(volume.status ?? "Unknown")
+                            .styled(TextStyle.forStatus(volume.status))
+                    ])
+                ))
+                storageItems.append(.spacer)
             }
-            let storageSection = VStack(spacing: 0, children: storageComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(storageSection)
+            sections.append(DetailSection(title: "Storage Information", items: storageItems))
         }
 
         // Security Groups Section
         if let securityGroups = server.securityGroups, !securityGroups.isEmpty {
-            components.append(Text("Security Groups").primary().bold())
-            var sgComponents: [any Component] = []
+            var sgItems: [DetailItem] = []
             for sg in securityGroups {
-                sgComponents.append(Text(fieldPrefix + sg.name).secondary())
+                sgItems.append(.field(label: "Group", value: sg.name, style: .secondary))
             }
-            let sgSection = VStack(spacing: 0, children: sgComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(sgSection)
+            sections.append(DetailSection(title: "Security Groups", items: sgItems))
+        }
+
+        // Security Posture Analysis Section
+        let securityItems = analyzeSecurityPosture(server: server, volumes: cachedVolumes)
+        if !securityItems.isEmpty {
+            sections.append(DetailSection(
+                title: "Security Posture Analysis",
+                items: securityItems,
+                titleStyle: .accent
+            ))
         }
 
         // Access IPs Section
-        if (server.accessIPv4 != nil && !server.accessIPv4!.isEmpty) || (server.accessIPv6 != nil && !server.accessIPv6!.isEmpty) {
-            components.append(Text("Access IPs").primary().bold())
-            var accessIPComponents: [any Component] = []
-            if let ipv4 = server.accessIPv4, !ipv4.isEmpty {
-                accessIPComponents.append(Text(fieldPrefix + "IPv4" + fieldSeparator + ipv4).secondary())
-            }
-            if let ipv6 = server.accessIPv6, !ipv6.isEmpty {
-                accessIPComponents.append(Text(fieldPrefix + "IPv6" + fieldSeparator + ipv6).secondary())
-            }
-            let accessIPSection = VStack(spacing: 0, children: accessIPComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(accessIPSection)
+        let accessIPItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "IPv4", value: server.accessIPv4),
+            DetailView.buildFieldItem(label: "IPv6", value: server.accessIPv6)
+        ]
+
+        if let accessIPSection = DetailView.buildSection(title: "Access IPs", items: accessIPItems) {
+            sections.append(accessIPSection)
         }
 
-        // IDs Section
-        components.append(Text("Project & User").primary().bold())
-        var idsComponents: [any Component] = []
-        if let tenantId = server.tenantId {
-            idsComponents.append(Text(fieldPrefix + "Project ID" + fieldSeparator + tenantId).secondary())
+        // Project & User Section
+        let projectUserItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Project ID", value: server.tenantId),
+            DetailView.buildFieldItem(label: "User ID", value: server.userId)
+        ]
+
+        if let projectUserSection = DetailView.buildSection(title: "Project & User", items: projectUserItems) {
+            sections.append(projectUserSection)
         }
-        if let userId = server.userId {
-            idsComponents.append(Text(fieldPrefix + "User ID" + fieldSeparator + userId).secondary())
-        }
-        let idsSection = VStack(spacing: 0, children: idsComponents)
-            .padding(Self.serverDetailSectionEdgeInsets)
-        components.append(idsSection)
 
         // Hypervisor Information Section
-        if server.hypervisorHostname != nil || server.instanceName != nil || server.hostStatus != nil {
-            components.append(Text("Hypervisor Information").primary().bold())
-            var hypervisorComponents: [any Component] = []
-            if let hypervisorHostname = server.hypervisorHostname {
-                hypervisorComponents.append(Text(fieldPrefix + "Hypervisor" + fieldSeparator + hypervisorHostname).secondary())
-            }
-            if let instanceName = server.instanceName {
-                hypervisorComponents.append(Text(fieldPrefix + "Instance Name" + fieldSeparator + instanceName).secondary())
-            }
-            if let hostStatus = server.hostStatus {
-                hypervisorComponents.append(Text(fieldPrefix + "Host Status" + fieldSeparator + hostStatus).secondary())
-            }
-            let hypervisorSection = VStack(spacing: 0, children: hypervisorComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(hypervisorSection)
+        let hypervisorItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Hypervisor", value: server.hypervisorHostname),
+            DetailView.buildFieldItem(label: "Instance Name", value: server.instanceName),
+            DetailView.buildFieldItem(label: "Host Status", value: server.hostStatus)
+        ]
+
+        if let hypervisorSection = DetailView.buildSection(title: "Hypervisor Information", items: hypervisorItems) {
+            sections.append(hypervisorSection)
         }
 
         // Metadata Section
         if let metadata = server.metadata, !metadata.isEmpty {
-            components.append(Text("Metadata").primary().bold())
-            var metadataComponents: [any Component] = []
+            var metadataItems: [DetailItem] = []
             for (key, value) in metadata.sorted(by: { $0.key < $1.key }) {
-                metadataComponents.append(Text(fieldPrefix + key + fieldSeparator + value).secondary())
+                metadataItems.append(.field(label: key, value: value, style: .secondary))
             }
-            let metadataSection = VStack(spacing: 0, children: metadataComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(metadataSection)
+            sections.append(DetailSection(title: "Metadata", items: metadataItems))
         }
 
         // Timestamps Section
-        if server.createdAt != nil || server.updatedAt != nil || server.launchedAt != nil || server.terminatedAt != nil {
-            components.append(Text(Self.serverDetailTimestampsTitle).primary().bold())
-            var timestampComponents: [any Component] = []
-            if let created = server.createdAt {
-                let createdPrefix = fieldPrefix + Self.serverDetailCreatedLabel + fieldSeparator
-                let createdText = createdPrefix + String(describing: created)
-                timestampComponents.append(Text(createdText).secondary())
-            }
-            if let updated = server.updatedAt {
-                let updatedPrefix = fieldPrefix + Self.serverDetailUpdatedLabel + fieldSeparator
-                let updatedText = updatedPrefix + String(describing: updated)
-                timestampComponents.append(Text(updatedText).secondary())
-            }
-            if let launched = server.launchedAt {
-                timestampComponents.append(Text(fieldPrefix + "Launched At" + fieldSeparator + String(describing: launched)).secondary())
-            }
-            if let terminated = server.terminatedAt {
-                timestampComponents.append(Text(fieldPrefix + "Terminated At" + fieldSeparator + String(describing: terminated)).secondary())
-            }
-            let timestampSection = VStack(spacing: 0, children: timestampComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(timestampSection)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+
+        var timestampItems: [DetailItem?] = []
+        if let created = server.createdAt {
+            timestampItems.append(.field(label: "Created", value: formatter.string(from: created), style: .secondary))
+        }
+        if let updated = server.updatedAt {
+            timestampItems.append(.field(label: "Updated", value: formatter.string(from: updated), style: .secondary))
+        }
+        if let launched = server.launchedAt {
+            timestampItems.append(.field(label: "Launched At", value: formatter.string(from: launched), style: .secondary))
+        }
+        if let terminated = server.terminatedAt {
+            timestampItems.append(.field(label: "Terminated At", value: formatter.string(from: terminated), style: .secondary))
         }
 
-        // Fault Information (if any)
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Fault Information Section
         if let fault = server.fault {
-            components.append(Text("Fault Information").error().bold())
-            var faultComponents: [any Component] = []
-            faultComponents.append(Text(fieldPrefix + "Code" + fieldSeparator + String(fault.code)).error())
-            faultComponents.append(Text(fieldPrefix + "Message" + fieldSeparator + fault.message).error())
+            var faultItems: [DetailItem] = []
+            faultItems.append(.field(label: "Code", value: String(fault.code), style: .error))
+            faultItems.append(.field(label: "Message", value: fault.message, style: .error))
             if let created = fault.created {
-                faultComponents.append(Text(fieldPrefix + "Created" + fieldSeparator + String(describing: created)).error())
+                faultItems.append(.field(label: "Created", value: formatter.string(from: created), style: .error))
             }
-            let faultSection = VStack(spacing: 0, children: faultComponents)
-                .padding(Self.serverDetailSectionEdgeInsets)
-            components.append(faultSection)
+            sections.append(DetailSection(title: "Fault Information", items: faultItems, titleStyle: .error))
         }
 
-        // Help text
-        components.append(Text(Self.serverDetailHelpText).info()
-            .padding(Self.serverDetailHelpEdgeInsets))
-
-        // Apply scroll offset for large server details
-        let visibleComponents: [any Component]
-        if scrollOffset > 0 && scrollOffset < components.count {
-            visibleComponents = Array(components.dropFirst(scrollOffset))
-        } else if scrollOffset >= components.count {
-            visibleComponents = [Text(Self.serverDetailScrolledToEndText).info()]
-        } else {
-            visibleComponents = components
-        }
-
-        // Render unified server detail
-        let serverDetailComponent = VStack(spacing: Self.serverDetailComponentSpacing, children: visibleComponents)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(serverDetailComponent, on: surface, in: bounds)
-    }
-
-
-    @MainActor
-    private static func createServerDetailComponent(
-        server: Server,
-        cachedVolumes: [Volume],
-
-        cachedFlavors: [Flavor],
-        cachedImages: [Image],
-        scrollOffset: Int = 0
-    ) async -> any Component {
-        var components: [any Component] = []
-
-        // Basic Information
-        components.append(Text("Basic Information").accent().bold())
-        components.append(Text("ID: \(server.id)").primary().padding(standardPadding))
-        components.append(
-            HStack {
-                StatusIcon.server(status: server.status?.rawValue)
-                Text("Status: \(server.status?.rawValue ?? "Unknown")").styled(TextStyle.forStatus(server.status?.rawValue))
-            }.padding(sectionPadding)
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Server Details: \(server.name ?? "Unnamed Server")",
+            sections: sections,
+            helpText: "Press ESC to return to server list",
+            scrollOffset: scrollOffset
         )
 
-        // Flavor Information
-        if let flavor = server.flavor {
-            components.append(Text("Flavor").accent().bold())
-            components.append(Text("ID: \(flavor.id ?? "N/A")").primary().padding(standardPadding))
-
-            let flavorName = resolveFlavorName(from: server.flavor, cachedFlavors: cachedFlavors)
-            components.append(Text("Name: \(flavorName)").primary().padding(sectionPadding))
-        }
-
-        // Image Information
-        if let image = server.image {
-            components.append(Text("Image").accent().bold())
-            components.append(Text("ID: \(image.id)").primary().padding(standardPadding))
-            let imageName = resolveImageName(from: server.image, cachedImages: cachedImages)
-            components.append(Text("Name: \(imageName)").primary().padding(sectionPadding))
-        }
-
-        // Network Addresses
-        if let addresses = server.addresses, !addresses.isEmpty {
-            components.append(Text("Network Addresses").accent().bold())
-            for (networkName, addressList) in addresses {
-                components.append(Text("Network: \(networkName)").primary().padding(standardPadding))
-                for address in addressList {
-                    let versionText = address.version == 4 ? "IPv4" : "IPv6"
-                    components.append(Text("\(versionText): \(address.addr)").secondary().padding(networkPadding))
-                }
-            }
-        }
-
-        // Attached Volumes
-        let attachedVolumes = cachedVolumes.filter { $0.attachments?.contains { $0.serverId == server.id } ?? false }
-        if !attachedVolumes.isEmpty {
-            components.append(Text("Attached Volumes").accent().bold())
-            for volume in attachedVolumes {
-                components.append(Text("Name: \(volume.name ?? "Unnamed")").primary().padding(standardPadding))
-                components.append(Text("Size: \(volume.size ?? 0) GB").primary().padding(standardPadding))
-                components.append(Text("Status: \(volume.status ?? "Unknown")").styled(TextStyle.forStatus(volume.status)).padding(sectionPadding))
-            }
-        }
-
-        // Timestamps
-        if server.createdAt != nil || server.updatedAt != nil {
-            components.append(Text("Timestamps").accent().bold())
-            if let created = server.createdAt {
-                components.append(Text("Created: \(String(describing: created))").primary().padding(standardPadding))
-            }
-            if let updated = server.updatedAt {
-                components.append(Text("Updated: \(String(describing: updated))").primary().padding(standardPadding))
-            }
-        }
-
-        // Apply scroll offset to show only visible components
-        let visibleComponents: [any Component]
-        if scrollOffset > 0 && scrollOffset < components.count {
-            visibleComponents = Array(components.dropFirst(scrollOffset))
-        } else if scrollOffset >= components.count {
-            visibleComponents = []  // Scrolled past the end
-        } else {
-            visibleComponents = components  // No scrolling or negative offset
-        }
-
-        return VStack(spacing: 0, children: visibleComponents)
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
+
+
 
     // MARK: - Helper Functions
 
@@ -574,133 +407,252 @@ struct ServerViews {
         return nil
     }
 
-    @MainActor
-    private static func drawCurrentFlavorSection(screen: OpaquePointer?, startRow: inout Int32, startCol: Int32,
-                                               width: Int32, height: Int32, serverResizeForm: ServerResizeForm) async {
+    // MARK: - Intelligence Helper Functions
 
-        // Current Flavor Section using SwiftTUI
-        let surface = SwiftTUI.surface(from: screen)
+    static func calculateServerAge(createdAt: Date?, launchedAt: Date?) -> [DetailItem] {
+        var items: [DetailItem] = []
 
-        let titleBounds = Rect(x: startCol + 2, y: startRow, width: width - 4, height: 1)
-        await SwiftTUI.render(Text("Currently Assigned:").accent().bold(), on: surface, in: titleBounds)
-        startRow += 1
-
-        // Draw border for current flavor section
-        await BaseViewComponents.drawBorder(screen: screen, startRow: startRow, startCol: startCol + 2,
-                                    width: width - 4, height: 7, title: "Current Flavor")
-        startRow += 1
-
-        if let currentFlavor = serverResizeForm.getCurrentFlavor() {
-            var flavorComponents: [any Component] = [
-                Text("Name: \(currentFlavor.name ?? "Unknown")").secondary(),
-                Text("ID: \(currentFlavor.id)").secondary()
-            ]
-
-            flavorComponents.append(Text("vCPUs: \(currentFlavor.vcpus)").secondary())
-
-            flavorComponents.append(Text("RAM: \(currentFlavor.ram) MB").secondary())
-
-            flavorComponents.append(Text("Disk: \(currentFlavor.disk) GB").secondary())
-
-            let flavorSection = VStack(spacing: 0, children: flavorComponents)
-                .padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
-
-            let flavorBounds = Rect(x: startCol + 2, y: startRow, width: width - 4, height: Int32(flavorComponents.count))
-            await SwiftTUI.render(flavorSection, on: surface, in: flavorBounds)
-            startRow += Int32(flavorComponents.count)
-        } else {
-            let noBounds = Rect(x: startCol + 4, y: startRow, width: width - 8, height: 1)
-            await SwiftTUI.render(Text("No current flavor information available").warning(), on: surface, in: noBounds)
-            startRow += 1
-        }
-    }
-
-    @MainActor
-    private static func drawFlavorManagementSection(screen: OpaquePointer?, startRow: inout Int32, startCol: Int32,
-                                                  width: Int32, height: Int32, serverResizeForm: ServerResizeForm) async {
-        // Instructions and Available Flavors Header using SwiftTUI
-        let surface = SwiftTUI.surface(from: screen)
-
-        let instructionBounds = Rect(x: startCol + 2, y: startRow, width: width - 4, height: 1)
-        let instruction = "SPACE: toggle | UP/DOWN: navigate | ENTER: apply changes"
-        await SwiftTUI.render(Text(instruction).info(), on: surface, in: instructionBounds)
-        startRow += 2
-
-        let headerBounds = Rect(x: startCol + 2, y: startRow, width: width - 4, height: 1)
-        await SwiftTUI.render(Text("Available Flavors:").accent().bold(), on: surface, in: headerBounds)
-        startRow += 1
-
-        let availableFlavors = serverResizeForm.getAvailableFlavors()
-        guard !availableFlavors.isEmpty else {
-            let noFlavorsBounds = Rect(x: startCol + 2, y: startRow, width: width - 4, height: 1)
-            await SwiftTUI.render(Text("No flavors available").warning(), on: surface, in: noFlavorsBounds)
-            return
+        let referenceDate = launchedAt ?? createdAt
+        guard let referenceDate = referenceDate else {
+            return items
         }
 
-        let listHeight = height - 3
-        let visibleCount = Int(listHeight)
-        let selectedIndex = serverResizeForm.selectedFlavorIndex
+        let now = Date()
+        let components = Calendar.current.dateComponents([.day, .hour, .minute], from: referenceDate, to: now)
 
-        // Calculate scroll position
-        let scrollOffset = max(0, selectedIndex - visibleCount / 2)
-        let endIndex = min(availableFlavors.count, scrollOffset + visibleCount)
+        if let days = components.day {
+            if days > 0 {
+                let ageText = "\(days) day\(days == 1 ? "" : "s")"
+                items.append(.field(
+                    label: "Server Age",
+                    value: ageText,
+                    style: .info
+                ))
+            } else if let hours = components.hour, hours > 0 {
+                items.append(.field(
+                    label: "Server Age",
+                    value: "\(hours) hour\(hours == 1 ? "" : "s")",
+                    style: .info
+                ))
+            } else if let minutes = components.minute {
+                items.append(.field(
+                    label: "Server Age",
+                    value: "\(minutes) minute\(minutes == 1 ? "" : "s")",
+                    style: .info
+                ))
+            }
 
-        // Draw flavors list using SwiftTUI
-        for i in scrollOffset..<endIndex {
-            let flavor = availableFlavors[i]
-            let isSelected = (i == selectedIndex)
-            let isCurrent = serverResizeForm.isCurrentFlavor(flavor.id)
-            let isPending = serverResizeForm.isFlavorSelected(flavor.id)
-
-            // Selection indicators following SecurityGroupManagementView pattern
-            let indicator: String
-            if isCurrent && isPending {
-                indicator = "[X]" // Current flavor marked for change (will remove current)
-            } else if isPending {
-                indicator = "[*]" // Will change to this flavor
-            } else if isCurrent {
-                indicator = "[+]" // Current flavor (no change)
+            if launchedAt != nil {
+                items.append(.field(
+                    label: "  Reference",
+                    value: "Time since server was launched",
+                    style: .info
+                ))
             } else {
-                indicator = "[ ]" // Available but not selected
+                items.append(.field(
+                    label: "  Reference",
+                    value: "Time since server was created",
+                    style: .info
+                ))
             }
-
-            // Display flavor information
-            let displayText = "\(indicator) \(flavor.name ?? "Unknown")"
-            let availableWidth = Int(width) - 6
-            var finalText = String(displayText.prefix(availableWidth))
-
-            // Add specs if space allows
-            if finalText.count < availableWidth - flavorSpecMinSpace {
-                let specs = buildFlavorSpecs(flavor: flavor)
-                if !specs.isEmpty {
-                    finalText += " \(specs)"
-                }
-            }
-
-            let rowStyle: TextStyle = isSelected ? .primary : .secondary
-            let flavorRow = Text(finalText).styled(rowStyle)
-
-            let rowBounds = Rect(x: startCol + 2, y: startRow, width: width - 4, height: 1)
-            // Clear and render row with SwiftTUI selection highlighting
-            if isSelected {
-                await surface.fill(rect: rowBounds, character: " ", style: .accent)
-            }
-            await SwiftTUI.render(flavorRow, on: surface, in: rowBounds)
-
-            startRow += 1
         }
 
-        // Show scroll indicators if needed using SwiftTUI
-        if scrollOffset > 0 {
-            let upBounds = Rect(x: startCol + width - 3, y: startRow + 1, width: 1, height: 1)
-            await SwiftTUI.render(Text("^").info(), on: surface, in: upBounds)
+        return items
+    }
+
+    static func analyzeFlavorSizing(flavor: Flavor?) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        guard let flavor = flavor else {
+            return items
         }
 
-        if endIndex < availableFlavors.count {
-            let downBounds = Rect(x: startCol + width - 3, y: startRow + height - 2, width: 1, height: 1)
-            await SwiftTUI.render(Text("v").info(), on: surface, in: downBounds)
+        items.append(.field(
+            label: "vCPUs",
+            value: String(flavor.vcpus),
+            style: .info
+        ))
+        items.append(.field(
+            label: "RAM",
+            value: "\(flavor.ram) MB (\(flavor.ram / 1024) GB)",
+            style: .info
+        ))
+        items.append(.field(
+            label: "Disk",
+            value: "\(flavor.disk) GB",
+            style: .info
+        ))
+
+        items.append(.spacer)
+        items.append(.field(
+            label: "Performance Profile",
+            value: getPerformanceProfile(flavor: flavor),
+            style: .accent
+        ))
+
+        if flavor.vcpus < 2 && flavor.ram < 2048 {
+            items.append(.field(
+                label: "  Sizing Note",
+                value: "Small instance - suitable for light workloads",
+                style: .info
+            ))
+        } else if flavor.vcpus >= 8 || flavor.ram >= 16384 {
+            items.append(.field(
+                label: "  Sizing Note",
+                value: "Large instance - suitable for heavy workloads",
+                style: .info
+            ))
+        }
+
+        return items
+    }
+
+    static func getPerformanceProfile(flavor: Flavor) -> String {
+        let cpuToRamRatio = Double(flavor.ram) / Double(flavor.vcpus)
+
+        if cpuToRamRatio < 1024 {
+            return "CPU-Optimized (High CPU, Lower RAM)"
+        } else if cpuToRamRatio > 4096 {
+            return "Memory-Optimized (High RAM, Lower CPU)"
+        } else {
+            return "Balanced (Equal CPU and RAM ratio)"
         }
     }
+
+    static func analyzeSecurityPosture(server: Server, volumes: [Volume]) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        if let keyName = server.keyName {
+            items.append(.field(
+                label: "SSH Key Authentication",
+                value: "Enabled (Key: \(keyName))",
+                style: .success
+            ))
+            items.append(.field(
+                label: "  Note",
+                value: "SSH key authentication is more secure than passwords",
+                style: .info
+            ))
+        } else {
+            items.append(.field(
+                label: "SSH Key Authentication",
+                value: "Not configured",
+                style: .warning
+            ))
+            items.append(.field(
+                label: "  Warning",
+                value: "Consider using SSH keys for better security",
+                style: .warning
+            ))
+        }
+
+        items.append(.spacer)
+
+        let attachedVolumes = volumes.filter { $0.attachments?.contains { $0.serverId == server.id } ?? false }
+        let encryptedVolumes = attachedVolumes.filter { $0.encrypted == true }
+
+        if !attachedVolumes.isEmpty {
+            items.append(.field(
+                label: "Volume Encryption",
+                value: "\(encryptedVolumes.count) of \(attachedVolumes.count) volumes encrypted",
+                style: encryptedVolumes.count == attachedVolumes.count ? .success : .warning
+            ))
+
+            if encryptedVolumes.count < attachedVolumes.count {
+                items.append(.field(
+                    label: "  Warning",
+                    value: "Some volumes are not encrypted",
+                    style: .warning
+                ))
+            }
+        }
+
+        if let securityGroups = server.securityGroups {
+            items.append(.spacer)
+            items.append(.field(
+                label: "Security Groups",
+                value: "\(securityGroups.count) group(s) applied",
+                style: securityGroups.count > 0 ? .success : .error
+            ))
+
+            if securityGroups.isEmpty {
+                items.append(.field(
+                    label: "  Critical",
+                    value: "No security groups - all traffic allowed",
+                    style: .error
+                ))
+            }
+        }
+
+        return items
+    }
+
+    static func analyzePerformanceCharacteristics(flavor: Flavor?) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        guard let flavor = flavor else {
+            return items
+        }
+
+        items.append(.field(
+            label: "CPU Type",
+            value: flavor.vcpus == 1 ? "Shared vCPU" : "Multi-core vCPU",
+            style: .info
+        ))
+
+        if flavor.vcpus == 1 {
+            items.append(.field(
+                label: "  Note",
+                value: "Shared CPU - performance may vary with host load",
+                style: .info
+            ))
+        } else {
+            items.append(.field(
+                label: "  Note",
+                value: "Multi-core processing available",
+                style: .info
+            ))
+        }
+
+        items.append(.spacer)
+
+        if let ephemeral = flavor.ephemeral, ephemeral > 0 {
+            items.append(.field(
+                label: "Ephemeral Storage",
+                value: "\(ephemeral) GB available",
+                style: .accent
+            ))
+            items.append(.field(
+                label: "  Warning",
+                value: "Ephemeral storage is lost on termination",
+                style: .warning
+            ))
+        }
+
+        items.append(.spacer)
+        items.append(.field(
+            label: "Expected Use Cases",
+            value: getFlavorUseCases(flavor: flavor),
+            style: .info
+        ))
+
+        return items
+    }
+
+    static func getFlavorUseCases(flavor: Flavor) -> String {
+        let cpuToRamRatio = Double(flavor.ram) / Double(flavor.vcpus)
+
+        if cpuToRamRatio < 1024 {
+            return "Compute-intensive: batch processing, CI/CD, encoding"
+        } else if cpuToRamRatio > 4096 {
+            return "Memory-intensive: databases, caching, big data analytics"
+        } else if flavor.vcpus < 2 && flavor.ram < 2048 {
+            return "Development, testing, small web applications"
+        } else {
+            return "General purpose: web servers, app servers, microservices"
+        }
+    }
+
 
     private static func buildFlavorSpecs(flavor: Flavor) -> String {
         var specs: [String] = []

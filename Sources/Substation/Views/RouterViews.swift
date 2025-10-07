@@ -150,203 +150,124 @@ struct RouterViews {
 
     @MainActor
     static func drawRouterDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                                width: Int32, height: Int32, router: Router, cachedSubnets: [Subnet]) async {
+                                width: Int32, height: Int32, router: Router, cachedSubnets: [Subnet], scrollOffset: Int = 0) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.routerDetailMinScreenWidth && height > Self.routerDetailMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.routerDetailBoundsMinWidth, width), height: max(Self.routerDetailBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.routerDetailScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Router Detail
-        var components: [any Component] = []
-
-        // Title - optimized string construction
-        let routerName = router.name ?? Self.routerDetailUnnamedRouterText
-        let titleText = Self.routerDetailTitle + Self.routerDetailFieldValueSeparator + routerName
-        components.append(Text(titleText).accent().bold()
-                         .padding(Self.routerDetailTitleEdgeInsets))
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text(Self.routerDetailBasicInfoTitle).primary().bold())
-
-        var basicInfo: [any Component] = []
-        // Pre-calculate common field prefixes for optimal performance
-        let fieldPrefix = Self.routerDetailInfoFieldIndent
-        let fieldSeparator = Self.routerDetailFieldValueSeparator
-        let idPrefix = fieldPrefix + Self.routerDetailIdLabel + fieldSeparator
-        let namePrefix = fieldPrefix + Self.routerDetailNameLabel + fieldSeparator
-
-        // Optimized string construction for basic info fields
-        let idText = idPrefix + router.id
-        let nameText = namePrefix + routerName
-        basicInfo.append(Text(idText).secondary())
-        basicInfo.append(Text(nameText).secondary())
-
-        if let description = router.description, !description.isEmpty {
-            let descPrefix = fieldPrefix + Self.routerDetailDescriptionLabel + fieldSeparator
-            let descText = descPrefix + description
-            basicInfo.append(Text(descText).secondary())
-        }
+        var basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: router.id),
+            DetailView.buildFieldItem(label: "Name", value: router.name, defaultValue: "Unnamed Router"),
+            DetailView.buildFieldItem(label: "Description", value: router.description)
+        ]
 
         if let status = router.status {
-            let statusPrefix = fieldPrefix + Self.routerDetailStatusLabel + fieldSeparator
-            let statusText = statusPrefix + status.uppercased()
-            basicInfo.append(Text(statusText).secondary())
+            let statusStyle: TextStyle = status.uppercased() == "ACTIVE" ? .success : .error
+            basicItems.append(.customComponent(
+                HStack(spacing: 0, children: [
+                    Text("  Status: ").secondary(),
+                    Text(status.uppercased()).styled(statusStyle)
+                ])
+            ))
         }
 
         if let adminState = router.adminStateUp {
-            let adminStateText = adminState ? Self.routerDetailUpText : Self.routerDetailDownText
-            let adminPrefix = fieldPrefix + Self.routerDetailAdminStateLabel + fieldSeparator
-            let adminText = adminPrefix + adminStateText
-            basicInfo.append(Text(adminText).secondary())
+            let adminStateText = adminState ? "UP" : "DOWN"
+            let adminStyle: TextStyle = adminState ? .success : .error
+            basicItems.append(.customComponent(
+                HStack(spacing: 0, children: [
+                    Text("  Admin State: ").secondary(),
+                    Text(adminStateText).styled(adminStyle)
+                ])
+            ))
         }
 
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
+        }
+
+        // Router Configuration Section - Enhanced!
+        var configItems: [DetailItem] = []
+
         if let distributed = router.distributed {
-            let distributedText = distributed ? Self.routerDetailYesText : Self.routerDetailNoText
-            let distributedPrefix = fieldPrefix + Self.routerDetailDistributedLabel + fieldSeparator
-            let distributedDisplayText = distributedPrefix + distributedText
-            basicInfo.append(Text(distributedDisplayText).secondary())
+            let distText = distributed ? "Yes (DVR)" : "No (Centralized)"
+            let distStyle: TextStyle = distributed ? .success : .secondary
+            configItems.append(.customComponent(
+                HStack(spacing: 0, children: [
+                    Text("  Distributed: ").secondary(),
+                    Text(distText).styled(distStyle)
+                ])
+            ))
+
+            // Add DVR explanation
+            if distributed {
+                configItems.append(.field(label: "  Note", value: "Distributed Virtual Router - Better performance", style: .info))
+            }
         }
 
         if let ha = router.ha {
-            let haText = ha ? Self.routerDetailEnabledText : Self.routerDetailDisabledText
-            let haPrefix = fieldPrefix + Self.routerDetailHALabel + fieldSeparator
-            let haDisplayText = haPrefix + haText
-            basicInfo.append(Text(haDisplayText).secondary())
-        }
+            let haText = ha ? "Enabled" : "Disabled"
+            let haStyle: TextStyle = ha ? .success : .warning
+            configItems.append(.customComponent(
+                HStack(spacing: 0, children: [
+                    Text("  High Availability: ").secondary(),
+                    Text(haText).styled(haStyle)
+                ])
+            ))
 
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(Self.routerDetailSectionEdgeInsets)
-        components.append(basicInfoSection)
-
-        // Metadata Section
-        components.append(Text(Self.routerDetailMetadataTitle).primary().bold())
-
-        var metadataInfo: [any Component] = []
-
-        if let tenantId = router.tenantId {
-            let tenantPrefix = fieldPrefix + Self.routerDetailTenantIdLabel + fieldSeparator
-            let tenantText = tenantPrefix + tenantId
-            metadataInfo.append(Text(tenantText).secondary())
-        }
-
-        if let projectId = router.projectId {
-            let projectPrefix = fieldPrefix + Self.routerDetailProjectIdLabel + fieldSeparator
-            let projectText = projectPrefix + projectId
-            metadataInfo.append(Text(projectText).secondary())
-        }
-
-        if let createdAt = router.createdAt {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            let createdPrefix = fieldPrefix + Self.routerDetailCreatedAtLabel + fieldSeparator
-            let createdText = createdPrefix + formatter.string(from: createdAt)
-            metadataInfo.append(Text(createdText).secondary())
-        }
-
-        if let updatedAt = router.updatedAt {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            let updatedPrefix = fieldPrefix + Self.routerDetailUpdatedAtLabel + fieldSeparator
-            let updatedText = updatedPrefix + formatter.string(from: updatedAt)
-            metadataInfo.append(Text(updatedText).secondary())
-        }
-
-        if let revisionNumber = router.revisionNumber {
-            let revisionPrefix = fieldPrefix + Self.routerDetailRevisionLabel + fieldSeparator
-            let revisionText = revisionPrefix + String(revisionNumber)
-            metadataInfo.append(Text(revisionText).secondary())
-        }
-
-        if let flavorId = router.flavor_id {
-            let flavorPrefix = fieldPrefix + Self.routerDetailFlavorIdLabel + fieldSeparator
-            let flavorText = flavorPrefix + flavorId
-            metadataInfo.append(Text(flavorText).secondary())
-        }
-
-        if let serviceTypeId = router.service_type_id {
-            let servicePrefix = fieldPrefix + Self.routerDetailServiceTypeIdLabel + fieldSeparator
-            let serviceText = servicePrefix + serviceTypeId
-            metadataInfo.append(Text(serviceText).secondary())
-        }
-
-        if let tags = router.tags, !tags.isEmpty {
-            let tagsPrefix = fieldPrefix + Self.routerDetailTagsLabel + fieldSeparator
-            let tagsText = tagsPrefix + tags.joined(separator: ", ")
-            metadataInfo.append(Text(tagsText).secondary())
-        } else {
-            let noTagsText = fieldPrefix + Self.routerDetailTagsLabel + fieldSeparator + Self.routerDetailNoTagsText
-            metadataInfo.append(Text(noTagsText).muted())
-        }
-
-        let metadataSection = VStack(spacing: 0, children: metadataInfo)
-            .padding(Self.routerDetailSectionEdgeInsets)
-        components.append(metadataSection)
-
-        // External Gateway Information
-        if let externalGateway = router.externalGatewayInfo {
-            components.append(Text(Self.routerDetailExternalGatewayTitle).primary().bold())
-
-            var gatewayInfo: [any Component] = []
-            if let networkId = externalGateway.networkId {
-                let networkPrefix = fieldPrefix + Self.routerDetailNetworkIdLabel + fieldSeparator
-                let networkText = networkPrefix + networkId
-                gatewayInfo.append(Text(networkText).secondary())
+            // Add HA explanation
+            if ha {
+                configItems.append(.field(label: "  Note", value: "VRRP-based failover for redundancy", style: .info))
+            } else {
+                configItems.append(.field(label: "  Warning", value: "No HA - single point of failure", style: .warning))
             }
+        }
+
+        if !configItems.isEmpty {
+            sections.append(DetailSection(title: "Router Configuration", items: configItems, titleStyle: .accent))
+        }
+
+        // External Gateway Section
+        if let externalGateway = router.externalGatewayInfo {
+            var gatewayItems: [DetailItem?] = [
+                DetailView.buildFieldItem(label: "Network ID", value: externalGateway.networkId)
+            ]
 
             if let enableSnat = externalGateway.enableSnat {
-                let snatText = enableSnat ? Self.routerDetailYesText : Self.routerDetailNoText
-                let snatPrefix = fieldPrefix + Self.routerDetailSNATEnabledLabel + fieldSeparator
-                let snatFieldText = snatPrefix + snatText
-                gatewayInfo.append(Text(snatFieldText).secondary())
+                let snatText = enableSnat ? "Yes (Outbound NAT enabled)" : "No (No outbound NAT)"
+                let snatStyle: TextStyle = enableSnat ? .success : .warning
+                gatewayItems.append(.customComponent(
+                    HStack(spacing: 0, children: [
+                        Text("  SNAT Enabled: ").secondary(),
+                        Text(snatText).styled(snatStyle)
+                    ])
+                ))
+
+                if !enableSnat {
+                    gatewayItems.append(.field(label: "  Note", value: "Instances need floating IPs for external access", style: .info))
+                }
             }
 
             if let externalFixedIps = externalGateway.externalFixedIps, !externalFixedIps.isEmpty {
-                let externalIpsPrefix = fieldPrefix + Self.routerDetailExternalFixedIpsLabel + fieldSeparator
-                gatewayInfo.append(Text(externalIpsPrefix).secondary())
-
+                gatewayItems.append(.spacer)
                 for fixedIp in externalFixedIps {
-                    var ipDetails: [String] = []
-                    if let subnetId = fixedIp.subnetId {
-                        ipDetails.append("Subnet: " + subnetId)
-                    }
                     if let ipAddress = fixedIp.ipAddress {
-                        ipDetails.append("IP: " + ipAddress)
+                        gatewayItems.append(.field(label: "External IP", value: ipAddress, style: .info))
                     }
-                    let ipText = fieldPrefix + "  " + Self.routerDetailItemPrefix + ipDetails.joined(separator: ", ")
-                    gatewayInfo.append(Text(ipText).muted())
+                    if let subnetId = fixedIp.subnetId {
+                        gatewayItems.append(.field(label: "  Subnet", value: subnetId, style: .secondary))
+                    }
                 }
-            } else {
-                let noExternalIpsText = fieldPrefix + Self.routerDetailExternalFixedIpsLabel + fieldSeparator + Self.routerDetailNoExternalFixedIpsText
-                gatewayInfo.append(Text(noExternalIpsText).muted())
             }
 
-            let gatewaySection = VStack(spacing: 0, children: gatewayInfo)
-                .padding(Self.routerDetailSectionEdgeInsets)
-            components.append(gatewaySection)
+            if let gatewaySection = DetailView.buildSection(title: "External Gateway", items: gatewayItems) {
+                sections.append(gatewaySection)
+            }
         }
-
-        // Log router interface data for debugging
-        Logger.shared.logInfo("RouterDetailView - Interface debugging", context: [
-            "routerId": router.id,
-            "routerName": router.name ?? "Unknown",
-            "interfacesPresent": router.interfaces != nil,
-            "interfaceCount": router.interfaces?.count ?? 0,
-            "interfaceSubnetIds": router.interfaces?.compactMap { $0.subnetId } ?? []
-        ])
 
         // Attached Subnets Section
         if let interfaces = router.interfaces, !interfaces.isEmpty {
-            components.append(Text(Self.routerDetailAttachedSubnetsTitle).primary().bold())
-
-            var subnetInfo: [any Component] = []
+            var subnetItems: [DetailItem] = []
 
             for interface in interfaces {
                 guard let subnetId = interface.subnetId else { continue }
@@ -356,70 +277,88 @@ struct RouterViews {
                 let subnetName = subnet?.name ?? "Unknown"
                 let subnetCidr = subnet?.cidr ?? "Unknown"
 
-                let subnetText = Self.routerDetailSubnetItemPrefix + subnetName + " (" + subnetCidr + ")"
-                subnetInfo.append(Text(subnetText).secondary())
+                subnetItems.append(.field(label: "Subnet", value: "\(subnetName) (\(subnetCidr))", style: .secondary))
+                subnetItems.append(.field(label: "  Subnet ID", value: subnetId, style: .muted))
 
-                // Add detailed interface information
-                let subnetIdText = Self.routerDetailInfoFieldIndent + "  Subnet ID: " + subnetId
-                subnetInfo.append(Text(subnetIdText).muted())
-
-                // Add port ID if available
                 if let portId = interface.portId {
-                    let portIdText = Self.routerDetailInfoFieldIndent + "  " + Self.routerDetailPortIdLabel + ": " + portId
-                    subnetInfo.append(Text(portIdText).muted())
+                    subnetItems.append(.field(label: "  Port ID", value: portId, style: .muted))
                 }
 
-                // Add IP address if available
                 if let ipAddress = interface.ipAddress {
-                    let ipText = Self.routerDetailInfoFieldIndent + "  " + Self.routerDetailIpAddressLabel + ": " + ipAddress
-                    subnetInfo.append(Text(ipText).muted())
+                    subnetItems.append(.field(label: "  IP Address", value: ipAddress, style: .info))
                 }
+
+                subnetItems.append(.spacer)
             }
 
-            let subnetSection = VStack(spacing: 0, children: subnetInfo)
-                .padding(Self.routerDetailSectionEdgeInsets)
-            components.append(subnetSection)
-        } else {
-            // Show "No subnets attached" section
-            components.append(Text(Self.routerDetailAttachedSubnetsTitle).primary().bold())
+            // Remove trailing spacer
+            if !subnetItems.isEmpty && subnetItems.last?.isSpacerType == true {
+                subnetItems.removeLast()
+            }
 
-            let noSubnetsText = Self.routerDetailInfoFieldIndent + Self.routerDetailNoSubnetsText
-            let noSubnetsSection = VStack(spacing: 0, children: [Text(noSubnetsText).muted()])
-                .padding(Self.routerDetailSectionEdgeInsets)
-            components.append(noSubnetsSection)
+            sections.append(DetailSection(title: "Attached Subnets", items: subnetItems))
+        } else {
+            sections.append(DetailSection(
+                title: "Attached Subnets",
+                items: [.field(label: "Status", value: "No subnets attached", style: .muted)]
+            ))
         }
 
         // Routes Section
         if let routes = router.routes, !routes.isEmpty {
-            components.append(Text(Self.routerDetailRoutesTitle).primary().bold())
+            var routeItems: [DetailItem] = []
 
-            var routeInfo: [any Component] = []
             for route in routes {
-                let routeText = Self.routerDetailItemPrefix + "Destination: " + route.destination + ", Next Hop: " + route.nexthop
-                routeInfo.append(Text(routeText).secondary())
+                routeItems.append(.field(label: "Route", value: "Destination: \(route.destination), Next Hop: \(route.nexthop)", style: .secondary))
+                routeItems.append(.field(label: "  Destination", value: route.destination, style: .muted))
+                routeItems.append(.field(label: "  Next Hop", value: route.nexthop, style: .info))
+                routeItems.append(.spacer)
             }
 
-            let routeSection = VStack(spacing: 0, children: routeInfo)
-                .padding(Self.routerDetailSectionEdgeInsets)
-            components.append(routeSection)
-        } else {
-            // Show "No routes" section
-            components.append(Text(Self.routerDetailRoutesTitle).primary().bold())
+            // Remove trailing spacer
+            if !routeItems.isEmpty && routeItems.last?.isSpacerType == true {
+                routeItems.removeLast()
+            }
 
-            let noRoutesText = Self.routerDetailInfoFieldIndent + Self.routerDetailNoRoutesText
-            let noRoutesSection = VStack(spacing: 0, children: [Text(noRoutesText).muted()])
-                .padding(Self.routerDetailSectionEdgeInsets)
-            components.append(noRoutesSection)
+            sections.append(DetailSection(title: "Static Routes", items: routeItems))
+        } else {
+            sections.append(DetailSection(
+                title: "Static Routes",
+                items: [.field(label: "Status", value: "No static routes configured", style: .muted)]
+            ))
         }
 
-        // Help text
-        components.append(Text(Self.routerDetailHelpText).info()
-            .padding(Self.routerDetailHelpEdgeInsets))
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: router.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: router.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
 
-        // Render unified router detail
-        let routerDetailComponent = VStack(spacing: Self.routerDetailComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(routerDetailComponent, on: surface, in: bounds)
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Tags Section
+        if let tags = router.tags, !tags.isEmpty {
+            let tagItems = tags.map { DetailItem.field(label: "Tag", value: $0, style: .secondary) }
+            sections.append(DetailSection(title: "Tags", items: tagItems))
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Router Details: \(router.name ?? "Unnamed Router")",
+            sections: sections,
+            helpText: "Press ESC to return to routers list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 
     // MARK: - Router Create View

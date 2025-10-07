@@ -26,90 +26,280 @@ struct KeyPairViews {
 
     @MainActor
     static func drawKeyPairDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                                width: Int32, height: Int32, keyPair: KeyPair) async {
+                                width: Int32, height: Int32, keyPair: KeyPair, scrollOffset: Int = 0) async {
 
-        // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
-
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > Self.keyPairDetailMinScreenWidth && height > Self.keyPairDetailMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.keyPairDetailBoundsMinWidth, width), height: max(Self.keyPairDetailBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.keyPairListScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Key Pair Detail
-        var components: [any Component] = []
-
-        // Title - optimized string construction
-        let keyPairName = keyPair.name
-        let titleText = Self.keyPairDetailTitlePrefix + Self.keyPairDetailTitle + Self.keyPairDetailFieldValueSeparator + (keyPairName ?? "Unnamed")
-        components.append(Text(titleText).accent().bold()
-                         .padding(Self.keyPairDetailTitleEdgeInsets))
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text(Self.keyPairDetailBasicInfoTitle).primary().bold())
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Name", value: keyPair.name, defaultValue: "Unnamed"),
+            DetailView.buildFieldItem(label: "User ID", value: keyPair.userID)
+        ]
 
-        var basicInfo: [any Component] = []
-        // Pre-calculate common field prefixes for optimal performance
-        let fieldPrefix = Self.keyPairDetailInfoFieldIndent
-        let fieldSeparator = Self.keyPairDetailFieldValueSeparator
-        let namePrefix = fieldPrefix + Self.keyPairDetailNameLabel + fieldSeparator
-
-        // Optimized string construction for basic info fields
-        let nameText = namePrefix + (keyPairName ?? "Unnamed")
-        basicInfo.append(Text(nameText).secondary())
-
-        if let fingerprint = keyPair.fingerprint {
-            let fingerprintPrefix = fieldPrefix + Self.keyPairDetailFingerprintLabel + fieldSeparator
-            let fingerprintText = fingerprintPrefix + fingerprint
-            basicInfo.append(Text(fingerprintText).secondary())
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
         }
 
+        // Key Type Analysis Section - Enhanced!
         if let type = keyPair.type {
-            let typePrefix = fieldPrefix + Self.keyPairDetailTypeLabel + fieldSeparator
-            let typeText = typePrefix + type
-            basicInfo.append(Text(typeText).secondary())
+            var typeItems: [DetailItem] = []
+            typeItems.append(.field(label: "Algorithm", value: type, style: .secondary))
+
+            // Add algorithm description
+            let typeDesc = getKeyTypeDescription(type)
+            if !typeDesc.isEmpty {
+                typeItems.append(.field(label: "  Description", value: typeDesc, style: .info))
+            }
+
+            // Add security assessment
+            let securityAssessment = getKeyTypeSecurityAssessment(type)
+            if !securityAssessment.isEmpty {
+                let style: TextStyle = securityAssessment.contains("Strong") ? .success :
+                                       (securityAssessment.contains("Legacy") || securityAssessment.contains("Deprecated") ? .warning : .secondary)
+                typeItems.append(.field(label: "  Security", value: securityAssessment, style: style))
+            }
+
+            sections.append(DetailSection(title: "Key Algorithm", items: typeItems, titleStyle: .accent))
         }
 
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(Self.keyPairDetailSectionEdgeInsets)
-        components.append(basicInfoSection)
+        // Fingerprint Analysis Section - Enhanced!
+        if let fingerprint = keyPair.fingerprint {
+            var fingerprintItems: [DetailItem] = []
+            fingerprintItems.append(.field(label: "Fingerprint", value: fingerprint, style: .secondary))
 
-        // Public Key Information
+            // Detect fingerprint format
+            let fingerprintFormat = detectFingerprintFormat(fingerprint)
+            if !fingerprintFormat.isEmpty {
+                fingerprintItems.append(.field(label: "  Format", value: fingerprintFormat, style: .info))
+            }
+
+            // Calculate fingerprint length for security analysis
+            let fingerprintLength = fingerprint.count
+            if fingerprintLength > 0 {
+                fingerprintItems.append(.field(label: "  Length", value: "\(fingerprintLength) characters", style: .secondary))
+            }
+
+            sections.append(DetailSection(title: "Fingerprint Information", items: fingerprintItems))
+        }
+
+        // Public Key Section with analysis
         if let publicKey = keyPair.publicKey {
-            components.append(Text(Self.keyPairDetailPublicKeyTitle).primary().bold())
+            var keyItems: [DetailItem] = []
 
-            var keyInfo: [any Component] = []
-            // Split the public key into multiple lines if needed
-            let maxKeyWidth = Int(width) - Self.keyPairDetailKeyWidth
-            let keyLines = FormatUtils.wrapText(publicKey, maxWidth: maxKeyWidth)
-            let maxDisplayLines = Int(height) - Self.keyPairDetailFooterReservedHeight // Account for title, basic info, and footer
-            let displayLines = Array(keyLines.prefix(maxDisplayLines))
+            // Analyze public key
+            let keyAnalysis = analyzePublicKey(publicKey)
 
-            for line in displayLines {
-                let lineText = fieldPrefix + line
-                keyInfo.append(Text(lineText).secondary())
+            if !keyAnalysis.keyType.isEmpty {
+                keyItems.append(.field(label: "Detected Type", value: keyAnalysis.keyType, style: .info))
             }
 
-            if keyLines.count > displayLines.count {
-                let truncatedText = fieldPrefix + Self.keyPairDetailTruncatedText
-                keyInfo.append(Text(truncatedText).info())
+            if keyAnalysis.keySize > 0 {
+                keyItems.append(.field(label: "Key Size", value: "\(keyAnalysis.keySize) bits (estimated)", style: .secondary))
+
+                // Add key size security assessment
+                let sizeAssessment = getKeySizeAssessment(keyAnalysis.keyType, size: keyAnalysis.keySize)
+                if !sizeAssessment.isEmpty {
+                    let style: TextStyle = sizeAssessment.contains("Strong") ? .success :
+                                           (sizeAssessment.contains("Weak") ? .error : .warning)
+                    keyItems.append(.field(label: "  Strength", value: sizeAssessment, style: style))
+                }
             }
 
-            let keySection = VStack(spacing: 0, children: keyInfo)
-                .padding(Self.keyPairDetailSectionEdgeInsets)
-            components.append(keySection)
+            keyItems.append(.field(label: "Length", value: "\(publicKey.count) characters", style: .secondary))
+
+            if !keyAnalysis.comment.isEmpty {
+                keyItems.append(.field(label: "Comment", value: keyAnalysis.comment, style: .info))
+            }
+
+            keyItems.append(.spacer)
+
+            // Public key content (first few lines)
+            keyItems.append(.field(label: "Key Content", value: "First 100 characters", style: .muted))
+            let preview = String(publicKey.prefix(100))
+            keyItems.append(.field(label: "", value: preview + "...", style: .secondary))
+
+            sections.append(DetailSection(title: "Public Key", items: keyItems))
         }
 
-        // Help text
-        components.append(Text(Self.keyPairDetailHelpText).info()
-            .padding(Self.keyPairDetailHelpEdgeInsets))
+        // Security Best Practices Section - NEW!
+        var securityItems: [DetailItem] = []
 
-        // Render unified key pair detail
-        let keyPairDetailComponent = VStack(spacing: Self.keyPairDetailComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(keyPairDetailComponent, on: surface, in: bounds)
+        // General recommendations
+        securityItems.append(.field(label: "Recommendation", value: "Rotate SSH keys regularly (every 6-12 months)", style: .info))
+
+        // Type-specific warnings
+        if let type = keyPair.type {
+            if type.uppercased().contains("DSA") {
+                securityItems.append(.field(label: "Warning", value: "DSA is deprecated - migrate to Ed25519 or RSA", style: .error))
+            } else if type.uppercased().contains("RSA") {
+                securityItems.append(.field(label: "Note", value: "Ensure RSA keys are at least 2048 bits", style: .info))
+            } else if type.uppercased().contains("ED25519") {
+                securityItems.append(.field(label: "Status", value: "Ed25519 is modern and secure", style: .success))
+            }
+        }
+
+        // Fingerprint-based recommendations
+        if keyPair.fingerprint != nil {
+            securityItems.append(.field(label: "Best Practice", value: "Verify fingerprint when adding to servers", style: .info))
+        }
+
+        sections.append(DetailSection(title: "Security Best Practices", items: securityItems, titleStyle: .accent))
+
+        // Usage Information Section - NEW!
+        var usageItems: [DetailItem] = []
+        usageItems.append(.field(label: "SSH Connection", value: "ssh -i /path/to/private_key user@host", style: .info))
+        usageItems.append(.field(label: "Add to Agent", value: "ssh-add /path/to/private_key", style: .info))
+
+        if let name = keyPair.name {
+            usageItems.append(.field(label: "Key Name", value: name, style: .secondary))
+        }
+
+        sections.append(DetailSection(title: "Usage Information", items: usageItems))
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "SSH Key Pair Details: \(keyPair.name ?? "Unnamed")",
+            sections: sections,
+            helpText: "Press ESC to return to key pair list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    // MARK: - Helper Functions for Enhanced SSH Key Analysis
+
+    private static func getKeyTypeDescription(_ type: String) -> String {
+        switch type.uppercased() {
+        case "SSH-RSA", "RSA":
+            return "RSA - Widely supported, secure with adequate key size"
+        case "SSH-DSS", "DSA":
+            return "DSA - Deprecated, limited to 1024 bits"
+        case "ECDSA-SHA2-NISTP256", "ECDSA-SHA2-NISTP384", "ECDSA-SHA2-NISTP521", "ECDSA":
+            return "ECDSA - Elliptic Curve, compact and efficient"
+        case "SSH-ED25519", "ED25519":
+            return "Ed25519 - Modern, fast, and highly secure"
+        default:
+            return ""
+        }
+    }
+
+    private static func getKeyTypeSecurityAssessment(_ type: String) -> String {
+        switch type.uppercased() {
+        case "SSH-RSA", "RSA":
+            return "Strong (with 2048+ bit keys)"
+        case "SSH-DSS", "DSA":
+            return "Legacy - Deprecated, migrate to Ed25519"
+        case "ECDSA-SHA2-NISTP256", "ECDSA-SHA2-NISTP384", "ECDSA-SHA2-NISTP521", "ECDSA":
+            return "Strong - Modern elliptic curve"
+        case "SSH-ED25519", "ED25519":
+            return "Very Strong - Recommended for new keys"
+        default:
+            return "Unknown algorithm"
+        }
+    }
+
+    private static func detectFingerprintFormat(_ fingerprint: String) -> String {
+        if fingerprint.contains(":") {
+            let colonCount = fingerprint.filter { $0 == ":" }.count
+            if colonCount == 15 {
+                return "MD5 (hexadecimal with colons)"
+            } else if colonCount > 15 {
+                return "SHA256 (hexadecimal with colons)"
+            }
+            return "Hexadecimal with colons"
+        } else if fingerprint.hasPrefix("SHA256:") {
+            return "SHA256 (Base64)"
+        } else if fingerprint.hasPrefix("MD5:") {
+            return "MD5 (Base64)"
+        } else if fingerprint.count == 43 || fingerprint.count == 44 {
+            return "SHA256 (Base64, likely)"
+        } else if fingerprint.count == 32 {
+            return "MD5 (hexadecimal)"
+        }
+        return "Unknown format"
+    }
+
+    private struct PublicKeyAnalysis {
+        var keyType: String = ""
+        var keySize: Int = 0
+        var comment: String = ""
+    }
+
+    private static func analyzePublicKey(_ publicKey: String) -> PublicKeyAnalysis {
+        var analysis = PublicKeyAnalysis()
+
+        let parts = publicKey.split(separator: " ").map(String.init)
+
+        if parts.count >= 1 {
+            // First part is usually the key type
+            let keyType = parts[0]
+            if keyType.hasPrefix("ssh-") || keyType.hasPrefix("ecdsa-") {
+                analysis.keyType = keyType
+            }
+        }
+
+        if parts.count >= 2 {
+            // Second part is the base64 encoded key - estimate size
+            let keyData = parts[1]
+            // Very rough estimation based on base64 length
+            if analysis.keyType.uppercased().contains("RSA") {
+                // RSA key size estimation
+                switch keyData.count {
+                case ..<400: analysis.keySize = 1024
+                case 400..<600: analysis.keySize = 2048
+                case 600..<800: analysis.keySize = 3072
+                case 800...: analysis.keySize = 4096
+                default: break
+                }
+            } else if analysis.keyType.uppercased().contains("ED25519") {
+                analysis.keySize = 256 // Ed25519 is always 256 bits
+            } else if analysis.keyType.uppercased().contains("ECDSA") {
+                if analysis.keyType.contains("256") {
+                    analysis.keySize = 256
+                } else if analysis.keyType.contains("384") {
+                    analysis.keySize = 384
+                } else if analysis.keyType.contains("521") {
+                    analysis.keySize = 521
+                }
+            }
+        }
+
+        if parts.count >= 3 {
+            // Third part onwards is usually a comment (email, hostname, etc.)
+            analysis.comment = parts[2...].joined(separator: " ")
+        }
+
+        return analysis
+    }
+
+    private static func getKeySizeAssessment(_ keyType: String, size: Int) -> String {
+        if keyType.uppercased().contains("RSA") {
+            switch size {
+            case ..<2048: return "Weak - Below 2048 bits"
+            case 2048: return "Adequate - 2048 bits (minimum recommended)"
+            case 3072: return "Strong - 3072 bits"
+            case 4096...: return "Very Strong - 4096+ bits"
+            default: return ""
+            }
+        } else if keyType.uppercased().contains("ED25519") {
+            return "Strong - 256 bits (EdDSA standard)"
+        } else if keyType.uppercased().contains("ECDSA") {
+            switch size {
+            case ..<256: return "Adequate"
+            case 256: return "Strong - 256 bits"
+            case 384: return "Very Strong - 384 bits"
+            case 521...: return "Very Strong - 521 bits"
+            default: return ""
+            }
+        }
+        return ""
     }
 
     // MARK: - Key Pair List View Constants

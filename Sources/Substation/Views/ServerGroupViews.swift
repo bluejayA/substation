@@ -86,158 +86,217 @@ struct ServerGroupViews {
 
     // MARK: - Server Group Detail View
 
-    // Detail View Constants
-    private static let sgDetailTitle = "Server Group Details"
-    private static let sgDetailBasicInfoTitle = "Basic Information"
-    private static let sgDetailMembersTitle = "Members"
-    private static let sgDetailMetadataTitle = "Metadata"
-    private static let sgDetailIdLabel = "ID"
-    private static let sgDetailNameLabel = "Name"
-    private static let sgDetailPolicyLabel = "Policy"
-    private static let sgDetailDescriptionLabel = "Description"
-    private static let sgDetailProjectIdLabel = "Project ID"
-    private static let sgDetailUserIdLabel = "User ID"
-    private static let sgDetailFieldValueSeparator = ": "
-    private static let sgDetailMetadataKeySeparator = ": "
-    private static let sgDetailMemberNameSuffix = " - "
-    private static let sgDetailNoMembersText = "No servers in this group"
-    private static let sgDetailScrollMoreText = "... and "
-    private static let sgDetailScrollSuffix = " more - Use Server Management for full list"
-
-    // Detail View Layout Constants
-    private static let sgDetailMaxVisibleMembers = 5
-    private static let sgDetailMaxMetadataItems = 8
-    private static let sgDetailMetadataValueMaxLength = 50
-    private static let sgDetailMemberNameMaxLength = 25
-    private static let sgDetailInfoFieldIndent = "  "
-    private static let sgDetailComponentSpacing: Int32 = 0
-
     @MainActor
     static func drawServerGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                     width: Int32, height: Int32, serverGroup: ServerGroup,
-                                    cachedServers: [Server]) async {
+                                    cachedServers: [Server], scrollOffset: Int = 0) async {
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Server Group Detail
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        components.append(Text("\(Self.sgDetailTitle)\(Self.sgDetailFieldValueSeparator)\(serverGroup.name ?? unknownText)").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text(Self.sgDetailBasicInfoTitle).primary().bold())
+        var basicItems: [DetailItem] = []
+        basicItems.append(.field(label: "ID", value: serverGroup.id, style: .secondary))
+        basicItems.append(.field(label: "Name", value: serverGroup.name ?? "Unknown", style: .secondary))
 
-        var basicInfo: [any Component] = []
-        basicInfo.append(Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailIdLabel)\(Self.sgDetailFieldValueSeparator)\(serverGroup.id)").secondary())
-        basicInfo.append(Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailNameLabel)\(Self.sgDetailFieldValueSeparator)\(serverGroup.name ?? unknownText)").secondary())
-
-        // Policy with appropriate styling
+        // Policy with custom component for styling
         let policyStyle = policyStyleForDetail(serverGroup.primaryPolicy)
-        basicInfo.append(HStack(spacing: 0, children: [
-            Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailPolicyLabel)\(Self.sgDetailFieldValueSeparator)").secondary(),
-            Text(serverGroup.primaryPolicy?.displayName ?? Self.unknownText).styled(policyStyle)
-        ]))
+        basicItems.append(.customComponent(
+            HStack(spacing: 0, children: [
+                Text("  Policy: ").secondary(),
+                Text(serverGroup.primaryPolicy?.displayName ?? "Unknown").styled(policyStyle)
+            ])
+        ))
 
         // Policy Description
         if let policy = serverGroup.primaryPolicy {
-            basicInfo.append(Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailDescriptionLabel)\(Self.sgDetailFieldValueSeparator)\(policy.description)").info())
+            basicItems.append(.field(label: "Description", value: policy.description, style: .info))
         }
 
-        // Project ID
+        // Project and User IDs
         if let projectId = serverGroup.project_id {
-            basicInfo.append(Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailProjectIdLabel)\(Self.sgDetailFieldValueSeparator)\(projectId)").secondary())
+            basicItems.append(.field(label: "Project ID", value: projectId, style: .secondary))
         }
 
-        // User ID
         if let userId = serverGroup.user_id {
-            basicInfo.append(Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailUserIdLabel)\(Self.sgDetailFieldValueSeparator)\(userId)").secondary())
+            basicItems.append(.field(label: "User ID", value: userId, style: .secondary))
         }
 
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-        components.append(basicInfoSection)
+        sections.append(DetailSection(title: "Basic Information", items: basicItems))
 
-        // Members Section
-        components.append(Text("\(Self.sgDetailMembersTitle) (\(serverGroup.members.count))").primary().bold())
+        // Policy Details Section - Enhanced!
+        if let policy = serverGroup.primaryPolicy {
+            var policyItems: [DetailItem] = []
+            policyItems.append(.field(label: "Type", value: policy.displayName, style: .secondary))
+            policyItems.append(.field(label: "Strategy", value: policy.description, style: .info))
 
+            // Add explanation based on policy type
+            let explanation: String
+            switch policy {
+            case .antiAffinity:
+                explanation = "Servers must run on different physical hosts"
+            case .affinity:
+                explanation = "Servers should run on the same physical host"
+            case .softAntiAffinity:
+                explanation = "Servers preferably run on different hosts (best effort)"
+            case .softAffinity:
+                explanation = "Servers preferably run on the same host (best effort)"
+            }
+            policyItems.append(.field(label: "Behavior", value: explanation, style: .accent))
+
+            sections.append(DetailSection(title: "Policy Details", items: policyItems, titleStyle: .accent))
+        }
+
+        // Members Section with enhanced details
         if serverGroup.members.isEmpty {
-            components.append(Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailNoMembersText)").info()
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0)))
+            let noMembersSection = DetailSection(
+                title: "Members (0)",
+                items: [.field(label: "Status", value: "No servers in this group", style: .info)]
+            )
+            sections.append(noMembersSection)
         } else {
-            // Get member servers and sort them by name for consistent display
+            // Get member servers and sort them by name
             let memberServers = cachedServers.filter { serverGroup.members.contains($0.id) }
-                                             .sorted { ($0.name ?? Self.unnamedServerText) < ($1.name ?? Self.unnamedServerText) }
+                                             .sorted { ($0.name ?? "Unnamed Server") < ($1.name ?? "Unnamed Server") }
 
-            var memberComponents: [any Component] = []
+            var memberItems: [DetailItem] = []
 
-            // Show members with limit
-            let visibleMembers = memberServers.prefix(Self.sgDetailMaxVisibleMembers)
-            for server in visibleMembers {
-                let serverName = server.name ?? Self.unnamedServerText
-                let truncatedName = String(serverName.prefix(Self.sgDetailMemberNameMaxLength))
-                let status = server.status?.rawValue ?? Self.unknownText
+            // Enhanced member information
+            for server in memberServers {
+                let serverName = server.name ?? "Unnamed Server"
+
+                // Server name with status icon
+                memberItems.append(.customComponent(
+                    HStack(spacing: 0, children: [
+                        Text("  ").secondary(),
+                        StatusIcon(status: server.status?.rawValue),
+                        Text(" \(serverName)").secondary()
+                    ])
+                ))
+
+                // Status with styling
+                let status = server.status?.rawValue ?? "Unknown"
                 let statusStyle = statusStyleForMember(server.status?.rawValue)
-                let ip = getServerIP(server) ?? Self.noneIPText
+                memberItems.append(.customComponent(
+                    HStack(spacing: 0, children: [
+                        Text("    Status: ").secondary(),
+                        Text(status).styled(statusStyle)
+                    ])
+                ))
 
-                let memberRow = HStack(spacing: 0, children: [
-                    StatusIcon(status: server.status?.rawValue),
-                    Text(" \(truncatedName)").secondary(),
-                    Text(" (\(status))").styled(statusStyle),
-                    Text("\(Self.sgDetailMemberNameSuffix)\(ip)").info()
-                ])
-                memberComponents.append(memberRow)
+                // IP Address
+                if let ip = getServerIP(server) {
+                    memberItems.append(.field(label: "    IP Address", value: ip, style: .info))
+                }
+
+                // Availability Zone
+                if let az = server.availabilityZone {
+                    memberItems.append(.field(label: "    Availability Zone", value: az, style: .secondary))
+                }
+
+                // Hypervisor (useful for verifying policy compliance)
+                if let hypervisor = server.hypervisorHostname {
+                    memberItems.append(.field(label: "    Hypervisor", value: hypervisor, style: .accent))
+                }
+
+                memberItems.append(.spacer)
             }
 
-            // Show scroll indicator if there are more members
-            if memberServers.count > Self.sgDetailMaxVisibleMembers {
-                let remainingCount = memberServers.count - Self.sgDetailMaxVisibleMembers
-                let scrollText = "\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailScrollMoreText)\(remainingCount) more\(Self.sgDetailScrollSuffix)"
-                memberComponents.append(Text(scrollText).warning())
+            // Member count in title
+            let memberTitle = "Members (\(memberServers.count))"
+            sections.append(DetailSection(title: memberTitle, items: memberItems))
+
+            // Hypervisor Distribution Analysis
+            if !memberServers.isEmpty {
+                let distributionItems = analyzeHypervisorDistribution(
+                    policy: serverGroup.primaryPolicy,
+                    memberServers: memberServers
+                )
+                if !distributionItems.isEmpty {
+                    sections.append(DetailSection(
+                        title: "Hypervisor Distribution Analysis",
+                        items: distributionItems,
+                        titleStyle: .accent
+                    ))
+                }
             }
 
-            let membersSection = VStack(spacing: 0, children: memberComponents)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(membersSection)
+            // Capacity Analysis
+            if !memberServers.isEmpty {
+                let capacityItems = getCapacityAnalysis(
+                    policy: serverGroup.primaryPolicy,
+                    memberServers: memberServers
+                )
+                if !capacityItems.isEmpty {
+                    sections.append(DetailSection(
+                        title: "Capacity Analysis",
+                        items: capacityItems,
+                        titleStyle: .accent
+                    ))
+                }
+            }
+
+            // Policy Use Cases
+            if serverGroup.primaryPolicy != nil {
+                let useCaseItems = getPolicyUseCases(policy: serverGroup.primaryPolicy)
+                if !useCaseItems.isEmpty {
+                    sections.append(DetailSection(
+                        title: "When to Use This Policy",
+                        items: useCaseItems,
+                        titleStyle: .accent
+                    ))
+                }
+            }
+
+            // Unresolved Members (if any)
+            let unresolvedMembers = serverGroup.members.filter { memberId in
+                !memberServers.contains { $0.id == memberId }
+            }
+
+            if !unresolvedMembers.isEmpty {
+                var unresolvedItems: [DetailItem] = []
+                unresolvedItems.append(.field(
+                    label: "Note",
+                    value: "\(unresolvedMembers.count) member(s) not found in cache",
+                    style: .warning
+                ))
+                for memberId in unresolvedMembers.prefix(5) {
+                    unresolvedItems.append(.field(label: "Server ID", value: memberId, style: .secondary))
+                }
+                if unresolvedMembers.count > 5 {
+                    unresolvedItems.append(.field(
+                        label: "Additional",
+                        value: "\(unresolvedMembers.count - 5) more unresolved",
+                        style: .warning
+                    ))
+                }
+                sections.append(DetailSection(title: "Unresolved Members", items: unresolvedItems, titleStyle: .warning))
+            }
         }
 
         // Metadata Section
         if let metadata = serverGroup.metadata, !metadata.isEmpty {
-            components.append(Text(Self.sgDetailMetadataTitle).primary().bold())
-
-            var metadataComponents: [any Component] = []
-            let visibleMetadata = metadata.prefix(Self.sgDetailMaxMetadataItems)
-            for (key, value) in visibleMetadata {
-                let truncatedValue = String(value.prefix(Self.sgDetailMetadataValueMaxLength))
-                let metadataRow = HStack(spacing: 0, children: [
-                    Text("\(Self.sgDetailInfoFieldIndent)\(key)\(Self.sgDetailMetadataKeySeparator)").secondary(),
-                    Text(truncatedValue).primary()
-                ])
-                metadataComponents.append(metadataRow)
+            var metadataItems: [DetailItem] = []
+            for (key, value) in metadata.sorted(by: { $0.key < $1.key }) {
+                metadataItems.append(.field(label: key, value: value, style: .secondary))
             }
-
-            if metadata.count > Self.sgDetailMaxMetadataItems {
-                let remainingCount = metadata.count - Self.sgDetailMaxMetadataItems
-                metadataComponents.append(Text("\(Self.sgDetailInfoFieldIndent)\(Self.sgDetailScrollMoreText)\(remainingCount) more items").warning())
-            }
-
-            let metadataSection = VStack(spacing: 0, children: metadataComponents)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(metadataSection)
+            sections.append(DetailSection(title: "Metadata", items: metadataItems))
         }
 
-        // Render unified server group detail
-        let serverGroupDetailComponent = VStack(spacing: Self.sgDetailComponentSpacing, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(serverGroupDetailComponent, on: surface, in: bounds)
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Server Group Details: \(serverGroup.name ?? "Unknown")",
+            sections: sections,
+            helpText: "Press ESC to return to server group list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 
     // MARK: - Server Group Create View
@@ -521,10 +580,6 @@ struct ServerGroupViews {
 
     // MARK: - Helper Functions
 
-    private static func formatMemberCount(_ count: Int) -> String {
-        let suffix = count == 1 ? serverSingular : serverPlural
-        return "\(count)\(suffix)"
-    }
 
     private static func statusStyleForServer(_ status: String?) -> TextStyle {
         guard let status = status else { return .secondary }
@@ -586,5 +641,274 @@ struct ServerGroupViews {
             }
         }
         return nil
+    }
+
+    // MARK: - Intelligence Helper Functions
+
+    private static func analyzeHypervisorDistribution(
+        policy: ServerGroupPolicy?,
+        memberServers: [Server]
+    ) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        let serversWithHypervisor = memberServers.filter { $0.hypervisorHostname != nil }
+        let hypervisorNames = Set(serversWithHypervisor.compactMap { $0.hypervisorHostname })
+
+        guard let policy = policy else {
+            return items
+        }
+
+        switch policy {
+        case .antiAffinity, .softAntiAffinity:
+            let isCompliant = hypervisorNames.count == serversWithHypervisor.count && serversWithHypervisor.count == memberServers.count
+
+            if isCompliant {
+                items.append(.field(
+                    label: "Compliance Status",
+                    value: "All \(memberServers.count) members on different hosts",
+                    style: .success
+                ))
+            } else if serversWithHypervisor.isEmpty {
+                items.append(.field(
+                    label: "Compliance Status",
+                    value: "Unknown - hypervisor information not available",
+                    style: .info
+                ))
+            } else {
+                let complianceStatus = "\(hypervisorNames.count) unique hypervisors for \(serversWithHypervisor.count) servers"
+                items.append(.field(
+                    label: "Compliance Status",
+                    value: complianceStatus,
+                    style: policy == .antiAffinity ? .warning : .info
+                ))
+
+                if policy == .antiAffinity {
+                    items.append(.field(
+                        label: "  Warning",
+                        value: "Anti-affinity policy may be violated",
+                        style: .warning
+                    ))
+                } else {
+                    items.append(.field(
+                        label: "  Note",
+                        value: "Soft anti-affinity allows same-host placement if needed",
+                        style: .info
+                    ))
+                }
+            }
+
+            if !hypervisorNames.isEmpty {
+                items.append(.spacer)
+                items.append(.field(
+                    label: "Hypervisor Distribution",
+                    value: "\(hypervisorNames.count) hypervisor(s) in use",
+                    style: .info
+                ))
+                for hypervisor in hypervisorNames.sorted() {
+                    let serverCount = serversWithHypervisor.filter { $0.hypervisorHostname == hypervisor }.count
+                    items.append(.field(
+                        label: "  \(hypervisor)",
+                        value: "\(serverCount) server(s)",
+                        style: serverCount > 1 ? .warning : .success
+                    ))
+                }
+            }
+
+        case .affinity, .softAffinity:
+            let isCompliant = hypervisorNames.count == 1 && serversWithHypervisor.count == memberServers.count
+
+            if isCompliant {
+                let hypervisorName = hypervisorNames.first ?? "Unknown"
+                items.append(.field(
+                    label: "Compliance Status",
+                    value: "All \(memberServers.count) members on same host",
+                    style: .success
+                ))
+                items.append(.field(
+                    label: "Hypervisor",
+                    value: hypervisorName,
+                    style: .accent
+                ))
+            } else if serversWithHypervisor.isEmpty {
+                items.append(.field(
+                    label: "Compliance Status",
+                    value: "Unknown - hypervisor information not available",
+                    style: .info
+                ))
+            } else {
+                items.append(.field(
+                    label: "Compliance Status",
+                    value: "Servers distributed across \(hypervisorNames.count) hypervisors",
+                    style: policy == .affinity ? .warning : .info
+                ))
+
+                if policy == .affinity {
+                    items.append(.field(
+                        label: "  Warning",
+                        value: "Affinity policy may be violated",
+                        style: .warning
+                    ))
+                } else {
+                    items.append(.field(
+                        label: "  Note",
+                        value: "Soft affinity allows multi-host placement if needed",
+                        style: .info
+                    ))
+                }
+
+                items.append(.spacer)
+                items.append(.field(
+                    label: "Hypervisor Distribution",
+                    value: "\(hypervisorNames.count) hypervisor(s) in use",
+                    style: .info
+                ))
+                for hypervisor in hypervisorNames.sorted() {
+                    let serverCount = serversWithHypervisor.filter { $0.hypervisorHostname == hypervisor }.count
+                    items.append(.field(
+                        label: "  \(hypervisor)",
+                        value: "\(serverCount) server(s)",
+                        style: .accent
+                    ))
+                }
+            }
+        }
+
+        return items
+    }
+
+    private static func getCapacityAnalysis(
+        policy: ServerGroupPolicy?,
+        memberServers: [Server]
+    ) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        let serversWithHypervisor = memberServers.filter { $0.hypervisorHostname != nil }
+        let uniqueHypervisors = Set(serversWithHypervisor.compactMap { $0.hypervisorHostname })
+
+        guard let policy = policy else {
+            return items
+        }
+
+        switch policy {
+        case .antiAffinity, .softAntiAffinity:
+            if !uniqueHypervisors.isEmpty {
+                items.append(.field(
+                    label: "Unique Hypervisors Used",
+                    value: "\(uniqueHypervisors.count) of available in cluster",
+                    style: .info
+                ))
+
+                if policy == .antiAffinity {
+                    items.append(.field(
+                        label: "Capacity Note",
+                        value: "Maximum group size limited by hypervisor count",
+                        style: .info
+                    ))
+                    items.append(.field(
+                        label: "  Warning",
+                        value: "Adding more servers requires available hypervisors",
+                        style: .warning
+                    ))
+                }
+            }
+
+        case .affinity, .softAffinity:
+            if uniqueHypervisors.count == 1 {
+                items.append(.field(
+                    label: "Capacity Note",
+                    value: "All servers on single hypervisor",
+                    style: .info
+                ))
+                items.append(.field(
+                    label: "  Consideration",
+                    value: "Single host failure would impact all members",
+                    style: .warning
+                ))
+            }
+        }
+
+        return items
+    }
+
+    private static func getPolicyUseCases(policy: ServerGroupPolicy?) -> [DetailItem] {
+        var items: [DetailItem] = []
+
+        guard let policy = policy else {
+            return items
+        }
+
+        items.append(.field(label: "Use Case", value: "", style: .info))
+
+        switch policy {
+        case .antiAffinity:
+            items.append(.field(
+                label: "  Ideal For",
+                value: "High availability applications",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "Fault tolerance (servers on different physical hardware)",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "Critical workloads requiring redundancy",
+                style: .info
+            ))
+
+        case .affinity:
+            items.append(.field(
+                label: "  Ideal For",
+                value: "Performance-sensitive applications",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "Low-latency inter-server communication",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "Workloads with high network traffic between servers",
+                style: .info
+            ))
+
+        case .softAntiAffinity:
+            items.append(.field(
+                label: "  Ideal For",
+                value: "Applications preferring high availability",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "When strict anti-affinity might fail due to capacity",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "Balanced approach between HA and flexibility",
+                style: .info
+            ))
+
+        case .softAffinity:
+            items.append(.field(
+                label: "  Ideal For",
+                value: "Applications preferring performance",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "When strict affinity might fail due to capacity",
+                style: .info
+            ))
+            items.append(.field(
+                label: "",
+                value: "Balanced approach between performance and flexibility",
+                style: .info
+            ))
+        }
+
+        return items
     }
 }

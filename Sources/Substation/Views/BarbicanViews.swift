@@ -64,137 +64,226 @@ struct BarbicanViews {
         startCol: Int32,
         width: Int32,
         height: Int32,
-        secret: Secret
+        secret: Secret,
+        scrollOffset: Int = 0
     ) async {
-        // Defensive bounds checking
-        guard width > 20 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let secretName = secret.name ?? "Unnamed Secret"
-        components.append(Text("Secret Details: \(secretName)").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text("Basic Information").primary().bold())
-        var basicInfo: [any Component] = []
-
-        // Extract secret ID from secretRef
         let secretId = secret.id.isEmpty ? (secret.secretRef ?? "Unknown") : secret.id
-        basicInfo.append(Text("ID: \(secretId)").secondary())
-        basicInfo.append(Text("Name: \(secretName)").secondary())
+        var basicItems: [DetailItem] = []
+        basicItems.append(.field(label: "ID", value: secretId, style: .secondary))
+        basicItems.append(.field(label: "Name", value: secret.name ?? "Unnamed Secret", style: .secondary))
 
-        // Status with styling
+        // Status with custom component for styling
         let status = secret.status ?? "Unknown"
         let statusStyle: TextStyle = status.lowercased() == "active" ? .success :
                                    (status.lowercased().contains("error") ? .error : .accent)
-        basicInfo.append(HStack(spacing: 0, children: [
-            Text("Status: ").secondary(),
-            Text(status).styled(statusStyle)
-        ]))
+        basicItems.append(.customComponent(
+            HStack(spacing: 0, children: [
+                Text("  Status: ").secondary(),
+                Text(status).styled(statusStyle)
+            ])
+        ))
 
         if let secretType = secret.secretType {
-            basicInfo.append(Text("Type: \(secretType)").secondary())
+            basicItems.append(.field(label: "Type", value: secretType, style: .secondary))
         }
 
         if let creatorId = secret.creatorId {
-            basicInfo.append(Text("Creator ID: \(creatorId)").secondary())
+            basicItems.append(.field(label: "Creator ID", value: creatorId, style: .secondary))
         }
 
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-        components.append(basicInfoSection)
+        sections.append(DetailSection(title: "Basic Information", items: basicItems))
 
-        // Cryptographic Information Section
-        if secret.algorithm != nil || secret.bitLength != nil || secret.mode != nil {
-            components.append(Text("Cryptographic Information").primary().bold())
-            var cryptoInfo: [any Component] = []
+        // Cryptographic Information Section - Enhanced!
+        var cryptoItems: [DetailItem?] = []
 
-            if let algorithm = secret.algorithm {
-                cryptoInfo.append(Text("Algorithm: \(algorithm)").secondary())
+        if let algorithm = secret.algorithm {
+            cryptoItems.append(.field(label: "Algorithm", value: algorithm, style: .secondary))
+
+            // Add algorithm description for common types
+            let algorithmDesc = getAlgorithmDescription(algorithm)
+            if !algorithmDesc.isEmpty {
+                cryptoItems.append(.field(label: "  Description", value: algorithmDesc, style: .info))
             }
+        }
 
-            if let bitLength = secret.bitLength {
-                cryptoInfo.append(Text("Key Length: \(bitLength) bits").secondary())
+        if let bitLength = secret.bitLength {
+            cryptoItems.append(.field(label: "Key Length", value: "\(bitLength) bits", style: .secondary))
+
+            // Add security strength indicator
+            let strengthIndicator = getKeyStrengthIndicator(bitLength)
+            if !strengthIndicator.isEmpty {
+                cryptoItems.append(.field(label: "  Strength", value: strengthIndicator, style: strengthIndicator.contains("Strong") ? .success : .warning))
             }
+        }
 
-            if let mode = secret.mode {
-                cryptoInfo.append(Text("Mode: \(mode)").secondary())
+        if let mode = secret.mode {
+            cryptoItems.append(.field(label: "Mode", value: mode, style: .secondary))
+
+            // Add mode description
+            let modeDesc = getModeDescription(mode)
+            if !modeDesc.isEmpty {
+                cryptoItems.append(.field(label: "  Description", value: modeDesc, style: .info))
             }
-
-            let cryptoSection = VStack(spacing: 0, children: cryptoInfo)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(cryptoSection)
         }
 
-        // Timestamps Section
-        components.append(Text("Timestamps").primary().bold())
-        var timestamps: [any Component] = []
-
-        if let created = secret.created {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            timestamps.append(Text("Created: \(formatter.string(from: created))").secondary())
+        if let cryptoSection = DetailView.buildSection(title: "Cryptographic Information", items: cryptoItems, titleStyle: .accent) {
+            sections.append(cryptoSection)
         }
 
-        if let updated = secret.updated {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            timestamps.append(Text("Updated: \(formatter.string(from: updated))").secondary())
+        // Content Types Section
+        if let contentTypes = secret.contentTypes, !contentTypes.isEmpty {
+            var contentItems: [DetailItem] = []
+            for (key, value) in contentTypes.sorted(by: { $0.key < $1.key }) {
+                contentItems.append(.field(label: key, value: value, style: .secondary))
+            }
+            sections.append(DetailSection(title: "Content Types", items: contentItems))
         }
 
+        // Expiration Information Section - Enhanced!
         if let expiration = secret.expiration {
             let formatter = DateFormatter()
             formatter.dateStyle = .medium
             formatter.timeStyle = .short
-            let isExpired = expiration < Date()
-            let expirationStyle: TextStyle = isExpired ? .error : .secondary
-            let expirationPrefix = isExpired ? "Expired: " : "Expires: "
-            timestamps.append(Text("\(expirationPrefix)\(formatter.string(from: expiration))").styled(expirationStyle))
-        }
 
-        let timestampsSection = VStack(spacing: 0, children: timestamps)
-            .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-        components.append(timestampsSection)
+            let now = Date()
+            let isExpired = expiration < now
+            let timeInterval = expiration.timeIntervalSince(now)
 
-        // Content Types Section
-        if let contentTypes = secret.contentTypes, !contentTypes.isEmpty {
-            components.append(Text("Content Types").primary().bold())
-            var contentInfo: [any Component] = []
+            var expirationItems: [DetailItem] = []
 
-            for (key, value) in contentTypes.sorted(by: { $0.key < $1.key }) {
-                contentInfo.append(Text("\(key): \(value)").secondary())
+            if isExpired {
+                expirationItems.append(.field(label: "Status", value: "EXPIRED", style: .error))
+                expirationItems.append(.field(label: "Expired At", value: formatter.string(from: expiration), style: .error))
+
+                // Calculate how long ago it expired
+                let daysExpired = Int(-timeInterval / 86400)
+                if daysExpired > 0 {
+                    expirationItems.append(.field(label: "Expired", value: "\(daysExpired) day(s) ago", style: .error))
+                }
+            } else {
+                expirationItems.append(.field(label: "Status", value: "Active", style: .success))
+                expirationItems.append(.field(label: "Expires At", value: formatter.string(from: expiration), style: .secondary))
+
+                // Calculate time until expiration
+                let daysUntilExpiration = Int(timeInterval / 86400)
+                if daysUntilExpiration <= 7 {
+                    expirationItems.append(.field(label: "Warning", value: "Expires in \(daysUntilExpiration) day(s)!", style: .warning))
+                } else if daysUntilExpiration <= 30 {
+                    expirationItems.append(.field(label: "Notice", value: "Expires in \(daysUntilExpiration) day(s)", style: .info))
+                } else {
+                    expirationItems.append(.field(label: "Time Remaining", value: "\(daysUntilExpiration) day(s)", style: .secondary))
+                }
             }
 
-            let contentSection = VStack(spacing: 0, children: contentInfo)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(contentSection)
+            let titleStyle: TextStyle = isExpired ? .error : (timeInterval <= 604800 ? .warning : .primary) // 7 days = 604800 seconds
+            sections.append(DetailSection(title: "Expiration Information", items: expirationItems, titleStyle: titleStyle))
+        } else {
+            // No expiration set
+            let noExpirationSection = DetailSection(
+                title: "Expiration Information",
+                items: [.field(label: "Status", value: "No expiration set (secret never expires)", style: .success)]
+            )
+            sections.append(noExpirationSection)
         }
 
-        // Secret Reference Section (for API reference)
+        // Timestamps Section
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+
+        var timestampItems: [DetailItem?] = []
+        if let created = secret.created {
+            timestampItems.append(.field(label: "Created", value: formatter.string(from: created), style: .secondary))
+        }
+        if let updated = secret.updated {
+            timestampItems.append(.field(label: "Updated", value: formatter.string(from: updated), style: .secondary))
+        }
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // API Reference Section
         if let secretRef = secret.secretRef {
-            components.append(Text("API Reference").primary().bold())
-            let refSection = VStack(spacing: 0, children: [
-                Text("Secret Ref: \(secretRef)").secondary()
-            ]).padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(refSection)
+            let refSection = DetailSection(
+                title: "API Reference",
+                items: [.field(label: "Secret Ref", value: secretRef, style: .secondary)]
+            )
+            sections.append(refSection)
         }
 
-        // Render the final component
-        let secretDetailComponent = VStack(spacing: 1, children: components)
-            .padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0))
+        // Security Best Practices Section - NEW!
+        var securityItems: [DetailItem] = []
+        securityItems.append(.field(label: "Recommendation", value: "Secrets should be rotated regularly", style: .info))
 
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(secretDetailComponent, on: surface, in: bounds)
+        if secret.expiration == nil {
+            securityItems.append(.field(label: "Warning", value: "Consider setting an expiration date", style: .warning))
+        }
+
+        if let bitLength = secret.bitLength, bitLength < 2048 {
+            securityItems.append(.field(label: "Warning", value: "Key length below recommended 2048 bits", style: .warning))
+        }
+
+        sections.append(DetailSection(title: "Security Best Practices", items: securityItems, titleStyle: .accent))
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Secret Details: \(secret.name ?? "Unnamed Secret")",
+            sections: sections,
+            helpText: "Press ESC to return to secrets list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    // MARK: - Helper Functions for Enhanced Information
+
+    private static func getAlgorithmDescription(_ algorithm: String) -> String {
+        switch algorithm.uppercased() {
+        case "AES": return "Advanced Encryption Standard - Symmetric block cipher"
+        case "RSA": return "Rivest-Shamir-Adleman - Asymmetric encryption"
+        case "DES": return "Data Encryption Standard - Legacy symmetric cipher"
+        case "3DES": return "Triple DES - Enhanced DES with triple encryption"
+        case "HMAC": return "Hash-based Message Authentication Code"
+        case "DSA": return "Digital Signature Algorithm"
+        case "EC": return "Elliptic Curve - Modern asymmetric cryptography"
+        default: return ""
+        }
+    }
+
+    private static func getKeyStrengthIndicator(_ bitLength: Int) -> String {
+        switch bitLength {
+        case ..<128: return "Weak (below modern standards)"
+        case 128..<256: return "Moderate (128-bit security)"
+        case 256..<512: return "Strong (256-bit security)"
+        case 512..<1024: return "Strong (512-bit key)"
+        case 1024..<2048: return "Moderate (consider 2048+ for RSA)"
+        case 2048..<4096: return "Strong (2048-bit RSA standard)"
+        case 4096...: return "Very Strong (4096+ bit key)"
+        default: return ""
+        }
+    }
+
+    private static func getModeDescription(_ mode: String) -> String {
+        switch mode.uppercased() {
+        case "CBC": return "Cipher Block Chaining - Standard block cipher mode"
+        case "ECB": return "Electronic Codebook - Not recommended (no IV)"
+        case "CTR": return "Counter - Converts block cipher to stream cipher"
+        case "GCM": return "Galois/Counter Mode - Provides authentication"
+        case "CFB": return "Cipher Feedback - Stream cipher mode"
+        case "OFB": return "Output Feedback - Stream cipher mode"
+        default: return ""
+        }
     }
 
     @MainActor

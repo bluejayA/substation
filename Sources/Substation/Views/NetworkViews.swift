@@ -26,195 +26,284 @@ struct NetworkViews {
         )
     }
 
-    // MARK: - Network Detail View (Gold Standard Pattern)
-
-    // Detail View Layout Constants (Matching Gold Standard)
-    private static let networkDetailMinScreenWidth: Int32 = 40
-    private static let networkDetailMinScreenHeight: Int32 = 15
-    private static let networkDetailBoundsMinWidth: Int32 = 1
-    private static let networkDetailBoundsMinHeight: Int32 = 1
-    private static let networkDetailComponentSpacing: Int32 = 0
-    private static let networkDetailReservedSpace: Int32 = 8
-
-    // Detail View Layout Constants (Exact Gold Standard)
-    private static let networkDetailTitleTopPadding: Int32 = 0
-    private static let networkDetailTitleLeadingPadding: Int32 = 0
-    private static let networkDetailTitleBottomPadding: Int32 = 2
-    private static let networkDetailTitleTrailingPadding: Int32 = 0
-    private static let networkDetailSectionTopPadding: Int32 = 0
-    private static let networkDetailSectionLeadingPadding: Int32 = 4
-    private static let networkDetailSectionBottomPadding: Int32 = 1
-    private static let networkDetailSectionTrailingPadding: Int32 = 0
-
-    // Detail View EdgeInsets (Pre-calculated for Performance)
-    private static let networkDetailTitleEdgeInsets = EdgeInsets(top: networkDetailTitleTopPadding, leading: networkDetailTitleLeadingPadding, bottom: networkDetailTitleBottomPadding, trailing: networkDetailTitleTrailingPadding)
-    private static let networkDetailSectionEdgeInsets = EdgeInsets(top: networkDetailSectionTopPadding, leading: networkDetailSectionLeadingPadding, bottom: networkDetailSectionBottomPadding, trailing: networkDetailSectionTrailingPadding)
-
-    // Detail View Text Constants
-    private static let networkDetailTitle = "Network Details"
-    private static let networkDetailBasicInfoTitle = "Basic Information"
-    private static let networkDetailConfigurationTitle = "Configuration"
-    private static let networkDetailSubnetsTitle = "Subnets"
-    private static let networkDetailNameLabel = "Name"
-    private static let networkDetailIdLabel = "ID"
-    private static let networkDetailStatusLabel = "Status"
-    private static let networkDetailAdminStateLabel = "Admin State"
-    private static let networkDetailSharedLabel = "Shared"
-    private static let networkDetailExternalLabel = "External"
-    private static let networkDetailUnnamedText = "Unnamed Network"
-    private static let networkDetailUnknownText = "Unknown"
-    private static let networkDetailYesText = "Yes"
-    private static let networkDetailNoText = "No"
-    private static let networkDetailUpText = "UP"
-    private static let networkDetailDownText = "DOWN"
-    private static let networkDetailInfoFieldIndent = "  "
-    private static let networkDetailFieldValueSeparator = ": "
-    private static let networkDetailScreenTooSmallText = "Screen too small"
-    private static let networkDetailScrollIndicatorPrefix = "["
-    private static let networkDetailScrollIndicatorSeparator = "-"
-    private static let networkDetailScrollIndicatorMiddle = "/"
-    private static let networkDetailScrollIndicatorSuffix = "] - Scroll: UP/DOWN"
+    // MARK: - Network Detail View
 
     @MainActor
-    static func drawNetworkDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                                width: Int32, height: Int32, network: Network, scrollOffset: Int32 = 0) async {
+    static func drawNetworkDetail(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        network: Network,
+        scrollOffset: Int = 0
+    ) async {
+        var sections: [DetailSection] = []
 
-        // Create surface for optimal performance (EXACT Gold Standard Pattern)
-        let surface = SwiftTUI.surface(from: screen)
+        // Basic Information Section
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: network.id),
+            DetailView.buildFieldItem(label: "Name", value: network.name),
+            DetailView.buildFieldItem(label: "Description", value: network.description),
+            network.status.map { .field(label: "Status", value: $0, style: $0.lowercased() == "active" ? .success : $0.lowercased().contains("error") ? .error : .warning) },
+            network.adminStateUp.map { .field(label: "Admin State", value: $0 ? "UP" : "DOWN", style: $0 ? .success : .error) }
+        ]
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > networkDetailMinScreenWidth && height > networkDetailMinScreenHeight else {
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow),
-                                   width: max(networkDetailBoundsMinWidth, width),
-                                   height: max(networkDetailBoundsMinHeight, height))
-            await SwiftTUI.render(Text(networkDetailScreenTooSmallText).error(), on: surface, in: errorBounds)
-            return
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
         }
 
-        // Main Network Detail (following EXACT RouterViews pattern)
-        var components: [any Component] = []
+        // Network Configuration Section
+        var configItems: [DetailItem?] = []
 
-        // Title - EXACT RouterViews pattern
-        let networkName = (network.name?.isEmpty != false) ? networkDetailUnnamedText : network.name!
-        let titleText = networkDetailTitle + networkDetailFieldValueSeparator + networkName
-        components.append(Text(titleText).accent().bold()
-                         .padding(networkDetailTitleEdgeInsets))
+        if let shared = network.shared {
+            configItems.append(.field(label: "Shared", value: shared ? "Yes" : "No", style: shared ? .success : .secondary))
+            if shared {
+                configItems.append(.field(label: "  Description", value: "Available to all projects", style: .info))
+            } else {
+                configItems.append(.field(label: "  Description", value: "Private to project", style: .info))
+            }
+        }
 
-        // Basic Information Section - EXACT RouterViews pattern
-        components.append(Text(networkDetailBasicInfoTitle).primary().bold())
-        let basicInfoComponents = createBasicInfoComponents(network: network)
-        let basicInfoSection = VStack(spacing: 0, children: basicInfoComponents)
-            .padding(networkDetailSectionEdgeInsets)
-        components.append(basicInfoSection)
+        if let external = network.external {
+            configItems.append(.field(label: "External", value: external ? "Yes" : "No", style: external ? .success : .secondary))
+            if external {
+                configItems.append(.field(label: "  Description", value: "Can be used as router gateway", style: .info))
+            }
+        }
 
-        // Configuration Section
-        components.append(Text(networkDetailConfigurationTitle).primary().bold())
-        let configurationComponents = createConfigurationComponents(network: network)
-        let configurationSection = VStack(spacing: 0, children: configurationComponents)
-            .padding(networkDetailSectionEdgeInsets)
-        components.append(configurationSection)
+        if let mtu = network.mtu {
+            configItems.append(.field(label: "MTU", value: String(mtu), style: .secondary))
+            let mtuAssessment = getMTUAssessment(mtu)
+            if !mtuAssessment.isEmpty {
+                configItems.append(.field(label: "  Description", value: mtuAssessment, style: .info))
+            }
+        }
+
+        if let portSecurityEnabled = network.portSecurityEnabled {
+            configItems.append(.field(label: "Port Security", value: portSecurityEnabled ? "Enabled" : "Disabled", style: portSecurityEnabled ? .success : .warning))
+            if !portSecurityEnabled {
+                configItems.append(.field(label: "  Warning", value: "Security groups disabled by default on ports", style: .warning))
+            }
+        }
+
+        if let configSection = DetailView.buildSection(title: "Network Configuration", items: configItems, titleStyle: .accent) {
+            sections.append(configSection)
+        }
+
+        // Provider Network Section
+        var providerItems: [DetailItem?] = []
+
+        if let providerNetworkType = network.providerNetworkType {
+            providerItems.append(.field(label: "Network Type", value: providerNetworkType, style: .secondary))
+            let typeDescription = getProviderNetworkTypeDescription(providerNetworkType)
+            if !typeDescription.isEmpty {
+                providerItems.append(.field(label: "  Description", value: typeDescription, style: .info))
+            }
+        }
+
+        if let providerPhysicalNetwork = network.providerPhysicalNetwork {
+            providerItems.append(.field(label: "Physical Network", value: providerPhysicalNetwork, style: .secondary))
+        }
+
+        if let providerSegmentationId = network.providerSegmentationId {
+            providerItems.append(.field(label: "Segmentation ID", value: String(providerSegmentationId), style: .secondary))
+            if let networkType = network.providerNetworkType {
+                let segmentDescription = getSegmentationDescription(networkType, id: providerSegmentationId)
+                if !segmentDescription.isEmpty {
+                    providerItems.append(.field(label: "  Description", value: segmentDescription, style: .info))
+                }
+            }
+        }
+
+        if let providerSection = DetailView.buildSection(title: "Provider Network", items: providerItems) {
+            sections.append(providerSection)
+        }
+
+        // Network Segments Section
+        if let segments = network.segments, !segments.isEmpty {
+            var segmentItems: [DetailItem] = []
+
+            for (index, segment) in segments.enumerated() {
+                segmentItems.append(.field(label: "Segment \(index + 1)", value: "", style: .accent))
+
+                if let networkType = segment.providerNetworkType {
+                    segmentItems.append(.field(label: "  Network Type", value: networkType, style: .secondary))
+                }
+
+                if let physicalNetwork = segment.providerPhysicalNetwork {
+                    segmentItems.append(.field(label: "  Physical Network", value: physicalNetwork, style: .secondary))
+                }
+
+                if let segmentationId = segment.providerSegmentationId {
+                    segmentItems.append(.field(label: "  Segmentation ID", value: String(segmentationId), style: .secondary))
+                }
+
+                segmentItems.append(.spacer)
+            }
+
+            // Remove trailing spacer
+            if !segmentItems.isEmpty && segmentItems.last?.isSpacerType == true {
+                segmentItems.removeLast()
+            }
+
+            sections.append(DetailSection(title: "Network Segments", items: segmentItems))
+        }
 
         // Subnets Section
-        let subnetComponents = createSubnetComponents(network: network)
-        if !subnetComponents.isEmpty {
-            components.append(Text(networkDetailSubnetsTitle).primary().bold())
-            let subnetsSection = VStack(spacing: 0, children: subnetComponents)
-                .padding(networkDetailSectionEdgeInsets)
-            components.append(subnetsSection)
-        }
-
-        // Apply scrolling and render visible components
-        let maxVisibleComponents = max(1, Int(height) - Int(networkDetailReservedSpace))
-        let startIndex = max(0, min(Int(scrollOffset), components.count - maxVisibleComponents))
-        let endIndex = min(components.count, startIndex + maxVisibleComponents)
-        let visibleComponents = Array(components[startIndex..<endIndex])
-
-        // Render using EXACT RouterViews pattern with scrolling
-        let networkDetailComponent = VStack(spacing: networkDetailComponentSpacing, children: visibleComponents)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(networkDetailComponent, on: surface, in: bounds)
-
-        // Add scroll indicators if needed
-        if components.count > maxVisibleComponents {
-            let scrollText = networkDetailScrollIndicatorPrefix + String(startIndex + 1) + networkDetailScrollIndicatorSeparator + String(endIndex) + networkDetailScrollIndicatorMiddle + String(components.count) + networkDetailScrollIndicatorSuffix
-            let scrollBounds = Rect(x: startCol, y: startRow + height - 1, width: width, height: 1)
-            await SwiftTUI.render(Text(scrollText).info(), on: surface, in: scrollBounds)
-        }
-    }
-
-    // MARK: - Gold Standard Component Creation Functions (EXACT RouterViews Pattern)
-
-    private static func createBasicInfoComponents(network: Network) -> [any Component] {
-        var components: [any Component] = []
-
-        // Pre-calculate common field prefixes for optimal performance (RouterViews pattern)
-        let fieldPrefix = networkDetailInfoFieldIndent
-        let fieldSeparator = networkDetailFieldValueSeparator
-
-        // Name
-        let networkName = (network.name?.isEmpty != false) ? networkDetailUnnamedText : network.name!
-        let nameText = fieldPrefix + networkDetailNameLabel + fieldSeparator + networkName
-        components.append(Text(nameText).secondary())
-
-        // ID
-        let idText = fieldPrefix + networkDetailIdLabel + fieldSeparator + network.id
-        components.append(Text(idText).secondary())
-
-        // Status - with color coding like RouterViews
-        let status = network.status ?? networkDetailUnknownText
-        let statusText = fieldPrefix + networkDetailStatusLabel + fieldSeparator + status
-        if status.lowercased() == "active" {
-            components.append(Text(statusText).success())
-        } else if status.lowercased().contains("down") || status.lowercased().contains("error") {
-            components.append(Text(statusText).error())
+        if let subnets = network.subnets, !subnets.isEmpty {
+            let subnetItems = subnets.map { DetailItem.field(label: "Subnet ID", value: $0, style: .secondary) }
+            sections.append(DetailSection(title: "Subnets", items: subnetItems))
         } else {
-            components.append(Text(statusText).secondary())
+            sections.append(DetailSection(
+                title: "Subnets",
+                items: [.field(label: "Status", value: "No subnets configured", style: .warning)]
+            ))
         }
 
-        // Admin State
-        if let adminStateUp = network.adminStateUp {
-            let adminStateValue = adminStateUp ? networkDetailUpText : networkDetailDownText
-            let adminStateText = fieldPrefix + networkDetailAdminStateLabel + fieldSeparator + adminStateValue
-            components.append(Text(adminStateText).secondary())
+        // DNS Configuration Section
+        var dnsItems: [DetailItem?] = []
+
+        if let dnsName = network.dnsName {
+            dnsItems.append(.field(label: "DNS Name", value: dnsName, style: .secondary))
         }
 
-        return components
+        if let dnsDomain = network.dnsDomain {
+            dnsItems.append(.field(label: "DNS Domain", value: dnsDomain, style: .secondary))
+        }
+
+        if let dnsSection = DetailView.buildSection(title: "DNS Configuration", items: dnsItems) {
+            sections.append(dnsSection)
+        }
+
+        // Address Scopes Section
+        var addressScopeItems: [DetailItem?] = []
+
+        if let ipv4AddressScope = network.ipv4AddressScope {
+            addressScopeItems.append(.field(label: "IPv4 Address Scope", value: ipv4AddressScope, style: .secondary))
+        }
+
+        if let ipv6AddressScope = network.ipv6AddressScope {
+            addressScopeItems.append(.field(label: "IPv6 Address Scope", value: ipv6AddressScope, style: .secondary))
+        }
+
+        if let addressScopeSection = DetailView.buildSection(title: "Address Scopes", items: addressScopeItems) {
+            sections.append(addressScopeSection)
+        }
+
+        // Availability Zones Section
+        var azItems: [DetailItem?] = []
+
+        if let availabilityZones = network.availabilityZones, !availabilityZones.isEmpty {
+            let azList = availabilityZones.joined(separator: ", ")
+            azItems.append(.field(label: "Availability Zones", value: azList, style: .success))
+        }
+
+        if let availabilityZoneHints = network.availabilityZoneHints, !availabilityZoneHints.isEmpty {
+            let hintsList = availabilityZoneHints.joined(separator: ", ")
+            azItems.append(.field(label: "AZ Hints", value: hintsList, style: .secondary))
+        }
+
+        if let azSection = DetailView.buildSection(title: "Availability Zones", items: azItems) {
+            sections.append(azSection)
+        }
+
+        // QoS Section
+        if let qosPolicyId = network.qosPolicyId {
+            let qosItems: [DetailItem?] = [
+                .field(label: "QoS Policy ID", value: qosPolicyId, style: .secondary),
+                .field(label: "Status", value: "QoS policy attached to network", style: .success)
+            ]
+
+            if let qosSection = DetailView.buildSection(title: "Quality of Service", items: qosItems) {
+                sections.append(qosSection)
+            }
+        }
+
+        // Additional Information Section
+        var additionalItems: [DetailItem?] = []
+
+        if let tenantId = network.tenantId {
+            additionalItems.append(.field(label: "Tenant ID", value: tenantId, style: .secondary))
+        }
+
+        if let projectId = network.projectId {
+            additionalItems.append(.field(label: "Project ID", value: projectId, style: .secondary))
+        }
+
+        if let revisionNumber = network.revisionNumber {
+            additionalItems.append(.field(label: "Revision", value: String(revisionNumber), style: .secondary))
+        }
+
+        if let additionalSection = DetailView.buildSection(title: "Additional Information", items: additionalItems) {
+            sections.append(additionalSection)
+        }
+
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: network.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: network.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Tags Section
+        if let tags = network.tags, !tags.isEmpty {
+            let tagItems = tags.map { DetailItem.field(label: "Tag", value: $0, style: .secondary) }
+            sections.append(DetailSection(title: "Tags", items: tagItems))
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Network Details: \(network.name ?? "Unnamed Network")",
+            sections: sections,
+            helpText: "Press ESC to return to networks list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 
-    private static func createConfigurationComponents(network: Network) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = networkDetailInfoFieldIndent
-        let fieldSeparator = networkDetailFieldValueSeparator
+    // MARK: - Helper Functions for Enhanced Network Information
 
-        // Shared
-        if let shared = network.shared {
-            let sharedValue = shared ? networkDetailYesText : networkDetailNoText
-            let sharedText = fieldPrefix + networkDetailSharedLabel + fieldSeparator + sharedValue
-            components.append(Text(sharedText).secondary())
+    private static func getProviderNetworkTypeDescription(_ networkType: String) -> String {
+        switch networkType.lowercased() {
+        case "flat": return "Flat network without VLAN tagging"
+        case "vlan": return "VLAN-based network isolation"
+        case "vxlan": return "VXLAN overlay network"
+        case "gre": return "GRE tunnel-based network"
+        case "geneve": return "Geneve overlay network"
+        case "local": return "Local network isolated to single host"
+        default: return ""
         }
-
-        // External
-        if let external = network.external {
-            let externalValue = external ? networkDetailYesText : networkDetailNoText
-            let externalText = fieldPrefix + networkDetailExternalLabel + fieldSeparator + externalValue
-            components.append(Text(externalText).secondary())
-        }
-
-        return components
     }
 
-    private static func createSubnetComponents(network: Network) -> [any Component] {
-        var components: [any Component] = []
-        let fieldPrefix = networkDetailInfoFieldIndent
-
-        guard let subnets = network.subnets, !subnets.isEmpty else { return components }
-
-        for subnet in subnets {
-            let subnetText = fieldPrefix + "- " + subnet
-            components.append(Text(subnetText).secondary())
+    private static func getSegmentationDescription(_ networkType: String, id: Int) -> String {
+        switch networkType.lowercased() {
+        case "vlan": return "VLAN ID: \(id) (1-4094)"
+        case "vxlan": return "VNI: \(id) (VXLAN Network Identifier)"
+        case "gre": return "GRE Key: \(id)"
+        case "geneve": return "VNI: \(id) (Geneve Network Identifier)"
+        default: return "Segmentation ID: \(id)"
         }
+    }
 
-        return components
+    private static func getMTUAssessment(_ mtu: Int) -> String {
+        switch mtu {
+        case 1500: return "Standard Ethernet MTU"
+        case 9000...9216: return "Jumbo frames enabled"
+        case 1400...1499: return "Reduced for overlay tunneling"
+        case 1280: return "IPv6 minimum MTU"
+        default: return "Custom MTU: \(mtu)"
+        }
     }
 
     // MARK: - Network Create View
@@ -298,73 +387,4 @@ struct NetworkViews {
         await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
     }
 
-    // MARK: - Pagination and Virtual Scrolling Navigation Helpers
-
-    /// Handle navigation for paginated network list
-    @MainActor
-    static func handlePaginatedNavigation(dataManager: DataManager?, direction: NavigationDirection) async -> Bool {
-        guard let dataManager = dataManager, dataManager.isPaginationEnabled(for: "networks") else {
-            return false
-        }
-
-        switch direction {
-        case .nextPage:
-            return await dataManager.nextPage(for: "networks")
-        case .previousPage:
-            return await dataManager.previousPage(for: "networks")
-        case .scrollUp, .scrollDown:
-            // Individual item scrolling handled differently for networks
-            return false
-        }
-    }
-
-    /// Handle navigation for virtual scrolling network list
-    @MainActor
-    static func handleVirtualScrollNavigation(virtualScrollManager: VirtualScrollManager<Network>?, direction: NavigationDirection) async -> Bool {
-        guard let virtualScrollManager = virtualScrollManager else {
-            return false
-        }
-
-        switch direction {
-        case .scrollUp:
-            await virtualScrollManager.scrollUp()
-            return true
-        case .scrollDown:
-            await virtualScrollManager.scrollDown()
-            return true
-        case .nextPage:
-            await virtualScrollManager.pageDown()
-            return true
-        case .previousPage:
-            await virtualScrollManager.pageUp()
-            return true
-        }
-    }
-
-    /// Get current network list status (pagination or virtual scrolling)
-    @MainActor
-    static func getNetworkListStatus(dataManager: DataManager?, virtualScrollManager: VirtualScrollManager<Network>?) -> String? {
-        if let virtualScrollManager = virtualScrollManager {
-            return "Virtual: \(virtualScrollManager.getScrollInfo())"
-        } else if let dataManager = dataManager, dataManager.isPaginationEnabled(for: "networks") {
-            if let status = dataManager.getPaginationStatus(for: "networks") {
-                return "Pages: \(status)"
-            }
-        }
-        return nil
-    }
-
-    /// Check if enhanced scrolling (pagination or virtual) is available
-    @MainActor
-    static func hasEnhancedScrolling(dataManager: DataManager?, virtualScrollManager: VirtualScrollManager<Network>?) -> Bool {
-        return virtualScrollManager != nil || (dataManager?.isPaginationEnabled(for: "networks") == true)
-    }
-
-    // Navigation direction enum for cleaner API
-    enum NavigationDirection {
-        case scrollUp
-        case scrollDown
-        case nextPage
-        case previousPage
-    }
 }

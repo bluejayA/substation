@@ -771,7 +771,7 @@ class InputHandler {
             let maxIndex = tui.getMaxSelectionIndex()
             tui.selectedIndex = min(tui.selectedIndex + 1, maxIndex)
             // Adjust scroll to keep selection in view
-            let visibleItems = Int(tui.screenRows) - 8 // Account for headers/borders
+            let visibleItems = Int(tui.screenRows) - 10 // Must match StatusListView maxVisibleItems calculation
             if tui.selectedIndex >= tui.scrollOffset + visibleItems {
                 tui.scrollOffset = tui.selectedIndex - visibleItems + 1
             }

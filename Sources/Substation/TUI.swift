@@ -1024,51 +1024,16 @@ final class TUI {
     }
 
     internal func calculateMaxDetailScrollOffset() -> Int {
-        switch currentView {
-        case .imageDetail:
-            if let _ = getSelectedImage() {
-                let contentHeight = Int(screenRows) - 8 // Account for header and footer (matching imageDetailReservedSpace)
+        // For DetailView-based views, we use a generous max scroll value
+        // The DetailView itself handles bounds checking and shows "End of details" when appropriate
+        // This allows scrolling to work for all detail views without needing specific calculations
 
-                // Use the actual component count that drawImageDetail creates (based on debug logs showing 28 components)
-                let actualComponents = 28
-
-                return max(0, actualComponents - contentHeight)
-            }
-        case .serverDetail:
-            // Calculate the total content height for server detail view
-            guard let server = selectedResource as? Server else { return 0 }
-
-            // Estimate content lines based on server detail sections
-            var totalLines = 0
-
-            // Basic info section (name, id, status, flavor, image, etc.)
-            totalLines += 8
-
-            // Network addresses section
-            if let addresses = server.addresses {
-                totalLines += 2 + addresses.values.reduce(0) { total, addressList in
-                    total + addressList.count
-                }
-            }
-
-            // Metadata section
-            if let metadata = server.metadata {
-                totalLines += 2 + metadata.count  // Header + metadata entries
-            }
-
-            // Volume attachments section (estimated)
-            totalLines += 5  // Approximate for volume info
-
-            // Additional server info (flavor, image, etc.)
-            totalLines += 5
-
-            // Calculate available content height
-            let availableHeight = Int(screenRows) - 6  // Account for header, footer, borders
-
-            return max(0, totalLines - availableHeight)
-        default:
-            return 0
+        if currentView.isDetailView {
+            // Allow scrolling up to 200 lines - DetailView will handle the actual limit
+            // This is much simpler than trying to calculate exact line counts for each view type
+            return 200
         }
+
         return 0
     }
 

@@ -33,93 +33,257 @@ struct VolumeViews {
 
     @MainActor
     static func drawVolumeDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
-                               width: Int32, height: Int32, volume: Volume) async {
+                               width: Int32, height: Int32, volume: Volume, scrollOffset: Int = 0) async {
 
-        // Defensive bounds checking to prevent crashes on small terminals
-        guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
-            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
-            return
-        }
-
-        // Main Volume Detail
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        components.append(Text("Volume Details: \(volume.name ?? "Unnamed")").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
+        var sections: [DetailSection] = []
 
         // Basic Information Section
-        components.append(Text("Basic Information").primary().bold())
-
-        var basicInfo: [any Component] = []
-        basicInfo.append(Text("ID: \(volume.id)").secondary())
-        basicInfo.append(Text("Name: \(volume.name ?? "Unnamed")").secondary())
-
-        // Status with appropriate styling
         let status = volume.status ?? "Unknown"
         let statusStyle: TextStyle = status.lowercased() == "available" ? .success :
-                                   (status.lowercased().contains("error") ? .error : .accent)
-        basicInfo.append(HStack(spacing: 0, children: [
-            Text("Status: ").secondary(),
-            Text(status).styled(statusStyle)
-        ]))
+                                   status.lowercased() == "in-use" ? .info :
+                                   (status.lowercased().contains("error") ? .error : .warning)
 
-        if let size = volume.size {
-            basicInfo.append(Text("Size: \(size)GB").secondary())
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: volume.id),
+            DetailView.buildFieldItem(label: "Name", value: volume.name),
+            DetailView.buildFieldItem(label: "Description", value: volume.description),
+            .field(label: "Status", value: status, style: statusStyle),
+            volume.size.map { .field(label: "Size", value: "\($0) GB", style: .accent) }
+        ]
+
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
         }
+
+        // Volume Configuration Section
+        var configItems: [DetailItem?] = []
 
         if let volumeType = volume.volumeType {
-            basicInfo.append(Text("Type: \(volumeType)").secondary())
+            configItems.append(.field(label: "Volume Type", value: volumeType, style: .secondary))
+            let typeDescription = getVolumeTypeDescription(volumeType)
+            if !typeDescription.isEmpty {
+                configItems.append(.field(label: "  Description", value: typeDescription, style: .info))
+            }
         }
 
-        let basicInfoSection = VStack(spacing: 0, children: basicInfo)
-            .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-        components.append(basicInfoSection)
-
-        // Properties Section
-        components.append(Text("Properties").primary().bold())
-
-        var properties: [any Component] = []
         if let bootable = volume.bootable {
-            properties.append(Text("Bootable: \(bootable == "true" ? "Yes" : "No")").secondary())
-        }
-        if let encrypted = volume.encrypted {
-            properties.append(Text("Encrypted: \(encrypted ? "Yes" : "No")").secondary())
+            let bootableValue = bootable.lowercased() == "true"
+            configItems.append(.field(label: "Bootable", value: bootableValue ? "Yes" : "No", style: bootableValue ? .success : .secondary))
+            if bootableValue {
+                configItems.append(.field(label: "  Description", value: "Can be used to boot an instance", style: .info))
+            }
         }
 
-        if !properties.isEmpty {
-            let propertiesSection = VStack(spacing: 0, children: properties)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(propertiesSection)
+        if let encrypted = volume.encrypted {
+            configItems.append(.field(label: "Encrypted", value: encrypted ? "Yes" : "No", style: encrypted ? .success : .warning))
+            if !encrypted {
+                configItems.append(.field(label: "  Warning", value: "Volume data is not encrypted at rest", style: .warning))
+            }
+        }
+
+        if let multiattach = volume.multiattach {
+            configItems.append(.field(label: "Multi-attach", value: multiattach ? "Enabled" : "Disabled", style: multiattach ? .success : .secondary))
+            if multiattach {
+                configItems.append(.field(label: "  Description", value: "Volume can be attached to multiple instances", style: .info))
+            }
+        }
+
+        if let sharedTargets = volume.sharedTargets {
+            configItems.append(.field(label: "Shared Targets", value: sharedTargets ? "Yes" : "No", style: .secondary))
+        }
+
+        if let configSection = DetailView.buildSection(title: "Volume Configuration", items: configItems, titleStyle: .accent) {
+            sections.append(configSection)
+        }
+
+        // Source Information Section
+        var sourceItems: [DetailItem?] = []
+
+        if let sourceVolid = volume.sourceVolid {
+            sourceItems.append(.field(label: "Source Volume ID", value: sourceVolid, style: .secondary))
+            sourceItems.append(.field(label: "  Type", value: "Cloned from volume", style: .info))
+        }
+
+        if let snapshotId = volume.snapshotId {
+            sourceItems.append(.field(label: "Snapshot ID", value: snapshotId, style: .secondary))
+            sourceItems.append(.field(label: "  Type", value: "Created from snapshot", style: .info))
+        }
+
+        if let imageId = volume.imageId {
+            sourceItems.append(.field(label: "Image ID", value: imageId, style: .secondary))
+            sourceItems.append(.field(label: "  Type", value: "Created from image", style: .info))
+        }
+
+        if let sourceSection = DetailView.buildSection(title: "Source Information", items: sourceItems) {
+            sections.append(sourceSection)
         }
 
         // Attachments Section
-        if !(volume.attachments?.isEmpty ?? true) {
-            components.append(Text("Attachments").primary().bold())
+        if let attachments = volume.attachments, !attachments.isEmpty {
+            var attachmentItems: [DetailItem] = []
 
-            var attachmentComponents: [any Component] = []
-            for attachment in volume.attachments ?? [] {
-                if let serverId = attachment.serverId, let device = attachment.device {
-                    attachmentComponents.append(Text("- Server: \(serverId) (Device: \(device))").secondary())
-                } else if let serverId = attachment.serverId {
-                    attachmentComponents.append(Text("- Server: \(serverId)").secondary())
-                } else {
-                    attachmentComponents.append(Text("- Attached").secondary())
+            for attachment in attachments {
+                if let serverId = attachment.serverId {
+                    attachmentItems.append(.field(label: "Server ID", value: serverId, style: .secondary))
+
+                    if let device = attachment.device {
+                        attachmentItems.append(.field(label: "  Device", value: device, style: .accent))
+                    }
+
+                    if let attachmentId = attachment.id {
+                        attachmentItems.append(.field(label: "  Attachment ID", value: attachmentId, style: .muted))
+                    }
+
+                    if let volumeId = attachment.volumeId {
+                        attachmentItems.append(.field(label: "  Volume ID", value: volumeId, style: .muted))
+                    }
+
+                    attachmentItems.append(.spacer)
                 }
             }
 
-            let attachmentsSection = VStack(spacing: 0, children: attachmentComponents)
-                .padding(EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0))
-            components.append(attachmentsSection)
+            // Remove trailing spacer
+            if !attachmentItems.isEmpty && attachmentItems.last?.isSpacerType == true {
+                attachmentItems.removeLast()
+            }
+
+            sections.append(DetailSection(title: "Attachments", items: attachmentItems))
+        } else {
+            sections.append(DetailSection(
+                title: "Attachments",
+                items: [.field(label: "Status", value: "Not attached to any server", style: .info)]
+            ))
         }
 
-        // Render unified volume detail
-        let volumeDetailComponent = VStack(spacing: 0, children: components)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(volumeDetailComponent, on: surface, in: bounds)
+        // Status Information Section
+        var statusInfoItems: [DetailItem?] = []
+
+        if let replicationStatus = volume.replicationStatus {
+            statusInfoItems.append(.field(label: "Replication Status", value: replicationStatus, style: .secondary))
+        }
+
+        if let migrationStatus = volume.migrationStatus {
+            statusInfoItems.append(.field(label: "Migration Status", value: migrationStatus, style: .warning))
+        }
+
+        if let statusInfoSection = DetailView.buildSection(title: "Status Information", items: statusInfoItems) {
+            sections.append(statusInfoSection)
+        }
+
+        // Location and Placement Section
+        var locationItems: [DetailItem?] = []
+
+        if let availabilityZone = volume.availabilityZone {
+            locationItems.append(.field(label: "Availability Zone", value: availabilityZone, style: .secondary))
+        }
+
+        if let hostAttr = volume.hostAttr {
+            locationItems.append(.field(label: "Host", value: hostAttr, style: .secondary))
+        }
+
+        if let clusterName = volume.clusterName {
+            locationItems.append(.field(label: "Cluster", value: clusterName, style: .secondary))
+        }
+
+        if let locationSection = DetailView.buildSection(title: "Location and Placement", items: locationItems) {
+            sections.append(locationSection)
+        }
+
+        // Group Information Section
+        var groupItems: [DetailItem?] = []
+
+        if let consistencygroupId = volume.consistencygroupId {
+            groupItems.append(.field(label: "Consistency Group ID", value: consistencygroupId, style: .secondary))
+            groupItems.append(.field(label: "  Description", value: "Part of consistency group for snapshots", style: .info))
+        }
+
+        if let groupId = volume.groupId {
+            groupItems.append(.field(label: "Group ID", value: groupId, style: .secondary))
+        }
+
+        if let groupSection = DetailView.buildSection(title: "Group Information", items: groupItems) {
+            sections.append(groupSection)
+        }
+
+        // Provider Information Section
+        var providerItems: [DetailItem?] = []
+
+        if let providerId = volume.providerId {
+            providerItems.append(.field(label: "Provider ID", value: providerId, style: .secondary))
+        }
+
+        if let serviceUuid = volume.serviceUuid {
+            providerItems.append(.field(label: "Service UUID", value: serviceUuid, style: .secondary))
+        }
+
+        if let providerSection = DetailView.buildSection(title: "Provider Information", items: providerItems) {
+            sections.append(providerSection)
+        }
+
+        // Metadata Section
+        if let metadata = volume.metadata, !metadata.isEmpty {
+            let metadataItems = metadata.sorted(by: { $0.key < $1.key }).map {
+                DetailItem.field(label: $0.key, value: $0.value, style: .secondary)
+            }
+            sections.append(DetailSection(title: "Metadata", items: metadataItems))
+        }
+
+        // Ownership Section
+        var ownershipItems: [DetailItem?] = []
+
+        if let projectId = volume.projectId {
+            ownershipItems.append(.field(label: "Project ID", value: projectId, style: .secondary))
+        }
+
+        if let userId = volume.userId {
+            ownershipItems.append(.field(label: "User ID", value: userId, style: .secondary))
+        }
+
+        if let ownershipSection = DetailView.buildSection(title: "Ownership", items: ownershipItems) {
+            sections.append(ownershipSection)
+        }
+
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: volume.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: volume.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Volume Details: \(volume.name ?? "Unnamed Volume")",
+            sections: sections,
+            helpText: "Press ESC to return to volume list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    // MARK: - Helper Functions for Enhanced Volume Information
+
+    private static func getVolumeTypeDescription(_ volumeType: String) -> String {
+        switch volumeType.lowercased() {
+        case "ssd": return "Solid State Drive - High IOPS, low latency"
+        case "hdd": return "Hard Disk Drive - High capacity, lower IOPS"
+        case "nvme": return "NVMe SSD - Ultra-high IOPS, ultra-low latency"
+        case "iscsi": return "iSCSI network storage"
+        case "rbd": return "Ceph RBD block storage"
+        case "lvm": return "LVM-based local storage"
+        case let type where type.contains("ssd"): return "SSD-based storage"
+        case let type where type.contains("hdd"): return "HDD-based storage"
+        default: return ""
+        }
     }
 
     // MARK: - Volume Create View

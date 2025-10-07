@@ -199,8 +199,17 @@ struct StatusListView<T: Sendable> {
                 .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
         } else {
             let maxVisibleItems = max(1, Int(height) - 10)
-            let startIndex = max(0, min(scrollOffset, filteredItems.count - maxVisibleItems))
-            let endIndex = min(filteredItems.count, startIndex + maxVisibleItems)
+
+            var startIndex = max(0, scrollOffset)
+            var endIndex = min(filteredItems.count, startIndex + maxVisibleItems)
+
+            if selectedIndex < startIndex {
+                startIndex = selectedIndex
+                endIndex = min(filteredItems.count, startIndex + maxVisibleItems)
+            } else if selectedIndex >= endIndex {
+                endIndex = min(filteredItems.count, selectedIndex + 1)
+                startIndex = max(0, endIndex - maxVisibleItems)
+            }
 
             for i in startIndex..<endIndex {
                 let item = filteredItems[i]

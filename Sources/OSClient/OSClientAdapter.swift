@@ -49,10 +49,11 @@ extension OpenStackClient {
                 instances: quotaSet.instances,
                 ram: quotaSet.ram,
                 keyPairs: quotaSet.keyPairs,
-                securityGroups: nil, // QuotaSet doesn't have securityGroups
-                securityGroupRules: nil, // QuotaSet doesn't have securityGroupRules
+                securityGroups: quotaSet.securityGroups,
+                securityGroupRules: quotaSet.securityGroupRules,
                 serverGroups: quotaSet.serverGroups,
-                serverGroupMembers: quotaSet.serverGroupMembers
+                serverGroupMembers: quotaSet.serverGroupMembers,
+                floatingIps: quotaSet.floatingIps
             )
         }
     }
