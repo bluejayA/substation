@@ -877,6 +877,7 @@ public struct ComputeQuotaSet: Codable, Sendable {
     public let securityGroupRules: Int?
     public let serverGroups: Int?
     public let serverGroupMembers: Int?
+    public let floatingIps: Int? // Some deployments return this in compute quotas
 
     enum CodingKeys: String, CodingKey {
         case cores
@@ -887,12 +888,13 @@ public struct ComputeQuotaSet: Codable, Sendable {
         case securityGroupRules = "security_group_rules"
         case serverGroups = "server_groups"
         case serverGroupMembers = "server_group_members"
+        case floatingIps = "floating_ips"
     }
 
     public init(cores: Int? = nil, instances: Int? = nil, ram: Int? = nil,
                 keyPairs: Int? = nil, securityGroups: Int? = nil,
                 securityGroupRules: Int? = nil, serverGroups: Int? = nil,
-                serverGroupMembers: Int? = nil) {
+                serverGroupMembers: Int? = nil, floatingIps: Int? = nil) {
         self.cores = cores
         self.instances = instances
         self.ram = ram
@@ -901,5 +903,6 @@ public struct ComputeQuotaSet: Codable, Sendable {
         self.securityGroupRules = securityGroupRules
         self.serverGroups = serverGroups
         self.serverGroupMembers = serverGroupMembers
+        self.floatingIps = floatingIps
     }
 }
