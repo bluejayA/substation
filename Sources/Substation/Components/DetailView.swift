@@ -32,6 +32,13 @@ enum DetailItem {
             return Text("")
         }
     }
+
+    var isSpacerType: Bool {
+        if case .spacer = self {
+            return true
+        }
+        return false
+    }
 }
 
 // MARK: - DetailView
@@ -44,6 +51,10 @@ struct DetailView {
     private let scrollOffset: Int
     private let scrolledToEndText: String
 
+    // Cache for built components to reduce CPU usage
+    private static var componentCache: [String: [any Component]] = [:]
+    private static var lastScrollOffset: Int = -1
+
     // Layout constants
     private static let minScreenWidth: Int32 = 10
     private static let minScreenHeight: Int32 = 10
@@ -55,9 +66,11 @@ struct DetailView {
     private static let defaultInfoFieldIndent = "  "
     private static let componentSpacing: Int32 = 0
 
-    // Pre-calculated EdgeInsets
+    // Pre-calculated EdgeInsets (restored original spacing for better visual)
     private static let titleEdgeInsets = EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)
-    private static let sectionEdgeInsets = EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0)
+    private static let sectionTitlePadding = EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+    private static let sectionItemPadding = EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 0)
+    private static let sectionBottomPadding = EdgeInsets(top: 0, leading: 0, bottom: 1, trailing: 0)
     private static let helpEdgeInsets = EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)
 
     init(
@@ -97,53 +110,88 @@ struct DetailView {
             return
         }
 
-        var components: [any Component] = []
+        // Only clear surface when scrolling to reduce flicker
+        let scrollChanged = scrollOffset != Self.lastScrollOffset
+        if scrollChanged {
+            let clearBounds = Rect(x: startCol, y: startRow, width: width, height: height)
+            surface.clear(rect: clearBounds)
+            Self.lastScrollOffset = scrollOffset
+        }
 
-        // Title
-        components.append(
-            Text(title).accent().bold()
-                .padding(Self.titleEdgeInsets)
-        )
+        // Use cache key based on title to avoid rebuilding components
+        let cacheKey = title
+        let components: [any Component]
 
-        // Sections
-        for section in sections where !section.items.isEmpty {
-            // Section title
-            components.append(Text(section.title).styled(section.titleStyle).bold())
+        // Check if we can use cached components
+        if let cachedComponents = Self.componentCache[cacheKey] {
+            components = cachedComponents
+        } else {
+            // Build components only when not cached
+            var newComponents: [any Component] = []
 
-            // Section items
-            var sectionComponents: [any Component] = []
-            for item in section.items {
-                let component = item.toComponent(
-                    indent: Self.defaultInfoFieldIndent,
-                    separator: Self.defaultFieldValueSeparator
-                )
-                sectionComponents.append(component)
+            // Title
+            newComponents.append(
+                Text(title).accent().bold()
+                    .padding(Self.titleEdgeInsets)
+            )
+
+            // Build sections using nested VStacks for better visual appearance
+            for section in sections where !section.items.isEmpty {
+                // Section title
+                let sectionTitle = Text(section.title).styled(section.titleStyle).bold()
+                    .padding(Self.sectionTitlePadding)
+
+                // Build section items
+                var sectionComponents: [any Component] = []
+                for item in section.items {
+                    let component = item.toComponent(
+                        indent: Self.defaultInfoFieldIndent,
+                        separator: Self.defaultFieldValueSeparator
+                    )
+                    sectionComponents.append(component.padding(Self.sectionItemPadding))
+                }
+
+                // Create nested VStack for section items
+                let sectionItems = VStack(spacing: 0, children: sectionComponents)
+
+                // Add section title and items as a group
+                newComponents.append(sectionTitle)
+                newComponents.append(sectionItems)
+
+                // Add spacing after section
+                newComponents.append(Text("").padding(Self.sectionBottomPadding))
             }
 
-            let sectionContent = VStack(spacing: 0, children: sectionComponents)
-                .padding(Self.sectionEdgeInsets)
-            components.append(sectionContent)
+            // Help text
+            if let helpText = helpText {
+                newComponents.append(
+                    Text(helpText).info()
+                        .padding(Self.helpEdgeInsets)
+                )
+            }
+
+            // Cache the built components
+            Self.componentCache[cacheKey] = newComponents
+            components = newComponents
         }
 
-        // Help text
-        if let helpText = helpText {
-            components.append(
-                Text(helpText).info()
-                    .padding(Self.helpEdgeInsets)
-            )
-        }
-
-        // Apply scroll offset
+        // Apply scroll offset and limit visible components to screen height for performance
+        // Only render what can actually be displayed to reduce CPU usage
+        let maxVisibleComponents = Int(height) + 5 // Add small buffer for smooth scrolling
         let visibleComponents: [any Component]
+
         if scrollOffset > 0 && scrollOffset < components.count {
-            visibleComponents = Array(components.dropFirst(scrollOffset))
+            let remainingComponents = Array(components.dropFirst(scrollOffset))
+            // Limit to what can be visible on screen
+            visibleComponents = Array(remainingComponents.prefix(maxVisibleComponents))
         } else if scrollOffset >= components.count {
             visibleComponents = [Text(scrolledToEndText).info()]
         } else {
-            visibleComponents = components
+            // Even when not scrolled, only render what fits on screen
+            visibleComponents = Array(components.prefix(maxVisibleComponents))
         }
 
-        // Render
+        // Render using VStack (let SwiftTUI handle the layout)
         let detailComponent = VStack(spacing: Self.componentSpacing, children: visibleComponents)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         await SwiftTUI.render(detailComponent, on: surface, in: bounds)
