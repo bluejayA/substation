@@ -41,7 +41,8 @@ struct ServerViews {
                                      width: Int32, height: Int32, cachedServers: [Server],
                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
                                       cachedFlavors: [Flavor], cachedImages: [Image],
-                                     dataManager: DataManager? = nil, virtualScrollManager: VirtualScrollManager<Server>? = nil) async {
+                                     dataManager: DataManager? = nil, virtualScrollManager: VirtualScrollManager<Server>? = nil,
+                                     multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createServerStatusListView(cachedFlavors: cachedFlavors, cachedImages: cachedImages)
         await statusListView.draw(
@@ -55,7 +56,9 @@ struct ServerViews {
             scrollOffset: scrollOffset,
             selectedIndex: selectedIndex,
             dataManager: dataManager,
-            virtualScrollManager: virtualScrollManager
+            virtualScrollManager: virtualScrollManager,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

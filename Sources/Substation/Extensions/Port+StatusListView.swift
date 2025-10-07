@@ -40,7 +40,8 @@ extension PortViews {
             },
             filterItems: { ports, query in
                 FilterUtils.filterPorts(ports, query: query)
-            }
+            },
+            getItemID: { port in port.id }
         )
     }
 }

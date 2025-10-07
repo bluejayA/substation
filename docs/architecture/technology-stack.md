@@ -257,7 +257,7 @@ Substation has exactly **one** external dependency:
 **Linux (Ubuntu/Debian):**
 
 ```bash
-sudo apt-get install -y libncurses6 libncurses-dev
+sudo apt install -y libncurses6 libncurses-dev
 ```
 
 **Linux (RHEL/CentOS/Fedora):**

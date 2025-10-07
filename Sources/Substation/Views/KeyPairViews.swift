@@ -6,7 +6,8 @@ struct KeyPairViews {
     @MainActor
     static func drawDetailedKeyPairList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                       width: Int32, height: Int32, cachedKeyPairs: [KeyPair],
-                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
+                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
+                                      multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createKeyPairStatusListView()
         await statusListView.draw(
@@ -18,7 +19,9 @@ struct KeyPairViews {
             items: cachedKeyPairs,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

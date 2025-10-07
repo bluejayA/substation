@@ -118,6 +118,7 @@ struct MiscViews {
             "/: Search/filter current list",
             "a: Toggle auto-refresh (ON/OFF)",
             "c: Manual refresh",
+            "CTRL-X: Toggle multi-select mode (bulk operations)",
             "q/Q: Quit application",
             "?: Show help for current view",
             "@: Show about page",
@@ -140,6 +141,13 @@ struct MiscViews {
                     "DELETE: Delete selected server",
                     "Server States: ACTIVE, SHUTOFF, ERROR, BUILD",
                 ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected servers",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
                 generalActions
             ]
 
@@ -153,6 +161,13 @@ struct MiscViews {
                     "P: Create volume snapshot",
                     "DELETE: Delete selected volume",
                     "Volume States: Available, In-use, Creating, Deleting",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected volumes",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
                 ]),
                 generalActions
             ]
@@ -471,6 +486,7 @@ struct MiscViews {
                     "Color coding: Visual status indicators",
                     "Search and filtering: Quick resource location",
                     "Keyboard-driven: Full functionality without mouse",
+                    "Multi-select mode: Bulk operations (CTRL-X)",
                 ]),
                 generalActions
             ]

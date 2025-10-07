@@ -15,8 +15,17 @@ public enum BatchOperationType: Sendable, Hashable {
     case volumeBulkDelete(volumeIDs: [String])
     case floatingIPBulkCreate(configs: [FloatingIPCreateConfig])
     case floatingIPBulkAssign(assignments: [FloatingIPAssignment])
+    case floatingIPBulkDelete(floatingIPIDs: [String])
     case securityGroupBulkCreate(configs: [SecurityGroupCreateConfig])
+    case securityGroupBulkDelete(securityGroupIDs: [String])
     case networkInterfaceBulkAttach(operations: [NetworkInterfaceOperation])
+    case networkBulkDelete(networkIDs: [String])
+    case subnetBulkDelete(subnetIDs: [String])
+    case routerBulkDelete(routerIDs: [String])
+    case portBulkDelete(portIDs: [String])
+    case serverGroupBulkDelete(serverGroupIDs: [String])
+    case keyPairBulkDelete(keyPairNames: [String])
+    case imageBulkDelete(imageIDs: [String])
 
     public var description: String {
         switch self {
@@ -40,10 +49,28 @@ public enum BatchOperationType: Sendable, Hashable {
             return "Bulk create \(configs.count) floating IPs"
         case .floatingIPBulkAssign(let assignments):
             return "Bulk assign \(assignments.count) floating IPs"
+        case .floatingIPBulkDelete(let floatingIPIDs):
+            return "Bulk delete \(floatingIPIDs.count) floating IPs"
         case .securityGroupBulkCreate(let configs):
             return "Bulk create \(configs.count) security groups"
+        case .securityGroupBulkDelete(let securityGroupIDs):
+            return "Bulk delete \(securityGroupIDs.count) security groups"
         case .networkInterfaceBulkAttach(let operations):
             return "Bulk attach \(operations.count) network interfaces"
+        case .networkBulkDelete(let networkIDs):
+            return "Bulk delete \(networkIDs.count) networks"
+        case .subnetBulkDelete(let subnetIDs):
+            return "Bulk delete \(subnetIDs.count) subnets"
+        case .routerBulkDelete(let routerIDs):
+            return "Bulk delete \(routerIDs.count) routers"
+        case .portBulkDelete(let portIDs):
+            return "Bulk delete \(portIDs.count) ports"
+        case .serverGroupBulkDelete(let serverGroupIDs):
+            return "Bulk delete \(serverGroupIDs.count) server groups"
+        case .keyPairBulkDelete(let keyPairNames):
+            return "Bulk delete \(keyPairNames.count) key pairs"
+        case .imageBulkDelete(let imageIDs):
+            return "Bulk delete \(imageIDs.count) images"
         }
     }
 
@@ -69,10 +96,28 @@ public enum BatchOperationType: Sendable, Hashable {
             return max(1, configs.count / 20) // ~20 IPs per minute
         case .floatingIPBulkAssign(let assignments):
             return max(1, assignments.count / 15) // ~15 assignments per minute
+        case .floatingIPBulkDelete(let floatingIPIDs):
+            return max(1, floatingIPIDs.count / 20) // ~20 deletions per minute
         case .securityGroupBulkCreate(let configs):
             return max(1, configs.count / 10) // ~10 security groups per minute
+        case .securityGroupBulkDelete(let securityGroupIDs):
+            return max(1, securityGroupIDs.count / 15) // ~15 deletions per minute
         case .networkInterfaceBulkAttach(let operations):
             return max(1, operations.count / 12) // ~12 attachments per minute
+        case .networkBulkDelete(let networkIDs):
+            return max(1, networkIDs.count / 10) // ~10 deletions per minute
+        case .subnetBulkDelete(let subnetIDs):
+            return max(1, subnetIDs.count / 15) // ~15 deletions per minute
+        case .routerBulkDelete(let routerIDs):
+            return max(1, routerIDs.count / 10) // ~10 deletions per minute
+        case .portBulkDelete(let portIDs):
+            return max(1, portIDs.count / 20) // ~20 deletions per minute
+        case .serverGroupBulkDelete(let serverGroupIDs):
+            return max(1, serverGroupIDs.count / 15) // ~15 deletions per minute
+        case .keyPairBulkDelete(let keyPairNames):
+            return max(1, keyPairNames.count / 30) // ~30 deletions per minute
+        case .imageBulkDelete(let imageIDs):
+            return max(1, imageIDs.count / 8) // ~8 deletions per minute (slower due to image size)
         }
     }
 }

@@ -56,8 +56,6 @@ Substation is built as a modular Swift package (because monoliths are so 2010):
 - **`CrossPlatformTimer`**: Cross-platform timer utilities - Because macOS and Linux can't agree on anything
 - **`Substation`**: Main executable combining all components - Where the magic happens
 
-**Zero external dependencies** - We built it all ourselves. Every. Single. Line.
-
 ## Quick Start in 1 minute
 
 ### Get the container

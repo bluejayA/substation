@@ -49,7 +49,8 @@ extension ServerGroupViews {
             getStatusIcon: { _ in "active" },
             filterItems: { serverGroups, query in
                 FilterUtils.filterServerGroups(serverGroups, query: query)
-            }
+            },
+            getItemID: { serverGroup in serverGroup.id }
         )
     }
 }

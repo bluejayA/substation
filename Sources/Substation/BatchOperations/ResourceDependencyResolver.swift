@@ -17,6 +17,7 @@ actor ResourceDependencyResolver {
         case volume
         case floatingIP
         case securityGroup
+        case serverGroup
         case keyPair
         case image
         case flavor
@@ -39,6 +40,8 @@ actor ResourceDependencyResolver {
             case .floatingIP:
                 return [.network] // External network
             case .securityGroup:
+                return []
+            case .serverGroup:
                 return []
             case .keyPair:
                 return []
@@ -75,6 +78,8 @@ actor ResourceDependencyResolver {
                 return 7 // Then networks
             case .securityGroup:
                 return 8 // Security groups can be deleted late
+            case .serverGroup:
+                return 8 // Server groups can be deleted late
             case .keyPair, .image, .flavor:
                 return 9 // System resources last
             }
@@ -333,6 +338,33 @@ actor ResourceDependencyResolver {
 
         case .resourceCleanup(let criteria):
             operations = await buildResourceCleanupOperations(criteria)
+
+        case .networkBulkDelete(let networkIDs):
+            operations = await buildNetworkDeleteOperations(networkIDs)
+
+        case .subnetBulkDelete(let subnetIDs):
+            operations = await buildSubnetDeleteOperations(subnetIDs)
+
+        case .routerBulkDelete(let routerIDs):
+            operations = await buildRouterDeleteOperations(routerIDs)
+
+        case .portBulkDelete(let portIDs):
+            operations = await buildPortDeleteOperations(portIDs)
+
+        case .floatingIPBulkDelete(let floatingIPIDs):
+            operations = await buildFloatingIPDeleteOperations(floatingIPIDs)
+
+        case .securityGroupBulkDelete(let securityGroupIDs):
+            operations = await buildSecurityGroupDeleteOperations(securityGroupIDs)
+
+        case .serverGroupBulkDelete(let serverGroupIDs):
+            operations = await buildServerGroupDeleteOperations(serverGroupIDs)
+
+        case .keyPairBulkDelete(let keyPairNames):
+            operations = await buildKeyPairDeleteOperations(keyPairNames)
+
+        case .imageBulkDelete(let imageIDs):
+            operations = await buildImageDeleteOperations(imageIDs)
         }
 
         return operations
@@ -749,5 +781,122 @@ actor ResourceDependencyResolver {
         }
 
         return warnings
+    }
+
+    private func buildNetworkDeleteOperations(_ networkIDs: [String]) async -> [PlannedOperation] {
+        return networkIDs.enumerated().map { (index, networkID) in
+            PlannedOperation(
+                id: "network-delete-\(index)",
+                type: .network,
+                action: .delete,
+                resourceIdentifier: networkID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildSubnetDeleteOperations(_ subnetIDs: [String]) async -> [PlannedOperation] {
+        return subnetIDs.enumerated().map { (index, subnetID) in
+            PlannedOperation(
+                id: "subnet-delete-\(index)",
+                type: .subnet,
+                action: .delete,
+                resourceIdentifier: subnetID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildRouterDeleteOperations(_ routerIDs: [String]) async -> [PlannedOperation] {
+        return routerIDs.enumerated().map { (index, routerID) in
+            PlannedOperation(
+                id: "router-delete-\(index)",
+                type: .router,
+                action: .delete,
+                resourceIdentifier: routerID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildPortDeleteOperations(_ portIDs: [String]) async -> [PlannedOperation] {
+        return portIDs.enumerated().map { (index, portID) in
+            PlannedOperation(
+                id: "port-delete-\(index)",
+                type: .port,
+                action: .delete,
+                resourceIdentifier: portID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildFloatingIPDeleteOperations(_ floatingIPIDs: [String]) async -> [PlannedOperation] {
+        return floatingIPIDs.enumerated().map { (index, floatingIPID) in
+            PlannedOperation(
+                id: "floatingip-delete-\(index)",
+                type: .floatingIP,
+                action: .delete,
+                resourceIdentifier: floatingIPID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildSecurityGroupDeleteOperations(_ securityGroupIDs: [String]) async -> [PlannedOperation] {
+        return securityGroupIDs.enumerated().map { (index, securityGroupID) in
+            PlannedOperation(
+                id: "securitygroup-delete-\(index)",
+                type: .securityGroup,
+                action: .delete,
+                resourceIdentifier: securityGroupID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildServerGroupDeleteOperations(_ serverGroupIDs: [String]) async -> [PlannedOperation] {
+        return serverGroupIDs.enumerated().map { (index, serverGroupID) in
+            PlannedOperation(
+                id: "servergroup-delete-\(index)",
+                type: .serverGroup,
+                action: .delete,
+                resourceIdentifier: serverGroupID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildKeyPairDeleteOperations(_ keyPairNames: [String]) async -> [PlannedOperation] {
+        return keyPairNames.enumerated().map { (index, keyPairName) in
+            PlannedOperation(
+                id: "keypair-delete-\(index)",
+                type: .keyPair,
+                action: .delete,
+                resourceIdentifier: keyPairName,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    private func buildImageDeleteOperations(_ imageIDs: [String]) async -> [PlannedOperation] {
+        return imageIDs.enumerated().map { (index, imageID) in
+            PlannedOperation(
+                id: "image-delete-\(index)",
+                type: .image,
+                action: .delete,
+                resourceIdentifier: imageID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
     }
 }

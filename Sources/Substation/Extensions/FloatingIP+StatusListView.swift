@@ -64,7 +64,8 @@ extension FloatingIPViews {
             },
             filterItems: { floatingIPs, query in
                 FilterUtils.filterFloatingIPs(floatingIPs, query: query)
-            }
+            },
+            getItemID: { floatingIP in floatingIP.id }
         )
     }
 }

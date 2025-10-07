@@ -6,7 +6,8 @@ struct SubnetViews {
     @MainActor
     static func drawDetailedSubnetList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                       width: Int32, height: Int32, cachedSubnets: [Subnet],
-                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int) async {
+                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
+                                      multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createSubnetStatusListView()
         await statusListView.draw(
@@ -18,7 +19,9 @@ struct SubnetViews {
             items: cachedSubnets,
             searchQuery: searchQuery,
             scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

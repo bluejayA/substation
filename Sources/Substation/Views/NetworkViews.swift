@@ -8,7 +8,8 @@ struct NetworkViews {
                                       width: Int32, height: Int32, cachedNetworks: [Network],
                                       searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
                                        dataManager: DataManager? = nil,
-                                      virtualScrollManager: VirtualScrollManager<Network>? = nil) async {
+                                      virtualScrollManager: VirtualScrollManager<Network>? = nil,
+                                      multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createNetworkStatusListView()
         await statusListView.draw(
@@ -22,7 +23,9 @@ struct NetworkViews {
             scrollOffset: scrollOffset,
             selectedIndex: selectedIndex,
             dataManager: dataManager,
-            virtualScrollManager: virtualScrollManager
+            virtualScrollManager: virtualScrollManager,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

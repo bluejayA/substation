@@ -506,6 +506,19 @@ class InputHandler {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".swift")
                 tui.changeView(to: .swift)
             }
+        case Int32(24): // CTRL-X - Toggle multi-select mode
+            if !tui.currentView.isDetailView && tui.currentView.supportsMultiSelect {
+                Logger.shared.logUserAction("toggle_multi_select_mode", details: [
+                    "view": "\(tui.currentView)",
+                    "wasEnabled": tui.multiSelectMode
+                ])
+                handleToggleMultiSelectMode()
+            }
+        case Int32(77): // M - Manage security group rules
+            if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.selectedIndex])
+                await handleManageSecurityGroupRules(screen: screen)
+            }
         case Int32(109): // m - Volume Archives navigation
             if tui.currentView.isDetailView {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".volumeArchives", details: ["action": "exit_detail"])
@@ -553,8 +566,14 @@ class InputHandler {
         case Int32(339): // PAGE_UP
             Logger.shared.logUserAction("page_up", details: ["view": "\(tui.currentView)"])
             await handlePageUpKey()
-        case Int32(32): // SPACEBAR - Show details
-            if !tui.currentView.isDetailView {
+        case Int32(32): // SPACEBAR - Toggle item selection in multi-select mode or show details
+            if tui.multiSelectMode && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("toggle_multi_select_item", details: [
+                    "view": "\(tui.currentView)",
+                    "selectedIndex": tui.selectedIndex
+                ])
+                await handleMultiSelectToggle()
+            } else if !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("open_detail_view", details: [
                     "view": "\(tui.currentView)",
                     "selectedIndex": tui.selectedIndex
@@ -647,11 +666,6 @@ class InputHandler {
         case Int32(90): // Z - Resize selected server
             Logger.shared.logUserAction("resize_server", details: ["selectedIndex": tui.selectedIndex])
             await handleResizeServer(screen: screen)
-        case Int32(77): // M - Manage security group rules
-            if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.selectedIndex])
-                await handleManageSecurityGroupRules(screen: screen)
-            }
         case Int32(65): // A - Context-sensitive: Attach security group to server OR network to server OR volume to server OR floating IP attach OR toggle auto-refresh interval
             if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("attach_security_group", details: ["selectedIndex": tui.selectedIndex])
@@ -873,10 +887,16 @@ class InputHandler {
         Logger.shared.logUserAction("escape_key_handling", details: [
             "view": "\(tui.currentView)",
             "isDetailView": tui.currentView.isDetailView,
-            "hasSearchQuery": tui.searchQuery != nil
+            "hasSearchQuery": tui.searchQuery != nil,
+            "multiSelectMode": tui.multiSelectMode
         ])
 
-        if tui.currentView == .help {
+        if tui.multiSelectMode {
+            Logger.shared.logUserAction("exit_multi_select_mode", details: ["selectedCount": tui.multiSelectedResourceIDs.count])
+            tui.multiSelectMode = false
+            tui.multiSelectedResourceIDs.removeAll()
+            tui.statusMessage = "Exited multi-select mode"
+        } else if tui.currentView == .help {
             Logger.shared.logNavigation(".help", to: "\(tui.previousView)")
             tui.changeView(to: tui.previousView, resetSelection: false)
         } else if tui.currentView.isDetailView {
@@ -1126,9 +1146,87 @@ class InputHandler {
         }
     }
 
+    // MARK: - Multi-Select Helper Methods
+    private func handleToggleMultiSelectMode() {
+        guard let tui = tui else { return }
+
+        tui.multiSelectMode.toggle()
+        if !tui.multiSelectMode {
+            tui.multiSelectedResourceIDs.removeAll()
+            tui.statusMessage = "Multi-select mode OFF"
+        } else {
+            tui.statusMessage = "Multi-select mode ON - Use SPACE to select items, CTRL-X to exit, DELETE to bulk delete"
+        }
+    }
+
+    private func handleMultiSelectToggle() async {
+        guard let tui = tui else { return }
+
+        let resourceID = getSelectedResourceID()
+        guard !resourceID.isEmpty else { return }
+
+        if tui.multiSelectedResourceIDs.contains(resourceID) {
+            tui.multiSelectedResourceIDs.remove(resourceID)
+            Logger.shared.logUserAction("deselect_resource", details: ["resourceID": resourceID])
+        } else {
+            tui.multiSelectedResourceIDs.insert(resourceID)
+            Logger.shared.logUserAction("select_resource", details: ["resourceID": resourceID])
+        }
+
+        tui.statusMessage = "\(tui.multiSelectedResourceIDs.count) items selected"
+    }
+
+    private func getSelectedResourceID() -> String {
+        guard let tui = tui else { return "" }
+
+        switch tui.currentView {
+        case .servers:
+            guard tui.selectedIndex < tui.cachedServers.count else { return "" }
+            return tui.cachedServers[tui.selectedIndex].id
+        case .volumes:
+            guard tui.selectedIndex < tui.cachedVolumes.count else { return "" }
+            return tui.cachedVolumes[tui.selectedIndex].id
+        case .networks:
+            guard tui.selectedIndex < tui.cachedNetworks.count else { return "" }
+            return tui.cachedNetworks[tui.selectedIndex].id
+        case .subnets:
+            guard tui.selectedIndex < tui.cachedSubnets.count else { return "" }
+            return tui.cachedSubnets[tui.selectedIndex].id
+        case .routers:
+            guard tui.selectedIndex < tui.cachedRouters.count else { return "" }
+            return tui.cachedRouters[tui.selectedIndex].id
+        case .ports:
+            guard tui.selectedIndex < tui.cachedPorts.count else { return "" }
+            return tui.cachedPorts[tui.selectedIndex].id
+        case .floatingIPs:
+            guard tui.selectedIndex < tui.cachedFloatingIPs.count else { return "" }
+            return tui.cachedFloatingIPs[tui.selectedIndex].id
+        case .securityGroups:
+            guard tui.selectedIndex < tui.cachedSecurityGroups.count else { return "" }
+            return tui.cachedSecurityGroups[tui.selectedIndex].id
+        case .serverGroups:
+            guard tui.selectedIndex < tui.cachedServerGroups.count else { return "" }
+            return tui.cachedServerGroups[tui.selectedIndex].id
+        case .keyPairs:
+            guard tui.selectedIndex < tui.cachedKeyPairs.count else { return "" }
+            return tui.cachedKeyPairs[tui.selectedIndex].name ?? ""
+        case .images:
+            guard tui.selectedIndex < tui.cachedImages.count else { return "" }
+            return tui.cachedImages[tui.selectedIndex].id
+        default:
+            return ""
+        }
+    }
+
     // MARK: - Server Action Methods
     private func handleDeleteKey(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
+
+        // Handle bulk delete in multi-select mode
+        if tui.multiSelectMode && !tui.multiSelectedResourceIDs.isEmpty {
+            await handleBulkDelete(screen: screen)
+            return
+        }
 
         if tui.currentView == .servers && !tui.currentView.isDetailView {
             await tui.resourceOperations.deleteServer(screen: screen)
@@ -1392,6 +1490,91 @@ class InputHandler {
         if tui.currentView == .subnets && !tui.currentView.isDetailView {
             await tui.actions.manageSubnetRouterAttachment(screen: screen)
         }
+    }
+
+    private func handleBulkDelete(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        let itemCount = tui.multiSelectedResourceIDs.count
+        let resourceType = tui.currentView.title
+
+        // Show confirmation modal
+        let confirmed = await ConfirmationModal.show(
+            title: "Bulk Delete Confirmation",
+            message: "Delete \(itemCount) \(resourceType)?",
+            details: ["This action cannot be undone", "\(itemCount) items will be permanently deleted"],
+            screen: screen,
+            screenRows: tui.screenRows,
+            screenCols: tui.screenCols
+        )
+
+        guard confirmed else {
+            tui.statusMessage = "Bulk delete cancelled"
+            return
+        }
+
+        Logger.shared.logUserAction("bulk_delete_initiated", details: [
+            "view": "\(tui.currentView)",
+            "count": itemCount
+        ])
+
+        tui.statusMessage = "Deleting \(itemCount) \(resourceType)..."
+
+        let batchOperation: BatchOperationType
+
+        switch tui.currentView {
+        case .servers:
+            batchOperation = .serverBulkDelete(serverIDs: Array(tui.multiSelectedResourceIDs))
+        case .volumes:
+            batchOperation = .volumeBulkDelete(volumeIDs: Array(tui.multiSelectedResourceIDs))
+        case .networks:
+            batchOperation = .networkBulkDelete(networkIDs: Array(tui.multiSelectedResourceIDs))
+        case .subnets:
+            batchOperation = .subnetBulkDelete(subnetIDs: Array(tui.multiSelectedResourceIDs))
+        case .routers:
+            batchOperation = .routerBulkDelete(routerIDs: Array(tui.multiSelectedResourceIDs))
+        case .ports:
+            batchOperation = .portBulkDelete(portIDs: Array(tui.multiSelectedResourceIDs))
+        case .floatingIPs:
+            batchOperation = .floatingIPBulkDelete(floatingIPIDs: Array(tui.multiSelectedResourceIDs))
+        case .securityGroups:
+            batchOperation = .securityGroupBulkDelete(securityGroupIDs: Array(tui.multiSelectedResourceIDs))
+        case .serverGroups:
+            batchOperation = .serverGroupBulkDelete(serverGroupIDs: Array(tui.multiSelectedResourceIDs))
+        case .keyPairs:
+            batchOperation = .keyPairBulkDelete(keyPairNames: Array(tui.multiSelectedResourceIDs))
+        case .images:
+            batchOperation = .imageBulkDelete(imageIDs: Array(tui.multiSelectedResourceIDs))
+        default:
+            tui.statusMessage = "Bulk operations not supported for \(resourceType)"
+            return
+        }
+
+        let result = await tui.batchOperationManager.execute(batchOperation) { @Sendable progress in
+            Task { @MainActor [weak tui] in
+                tui?.statusMessage = "Deleting: \(progress.currentOperation)/\(progress.totalOperations) (\(Int(progress.completionPercentage * 100))%)"
+            }
+        }
+
+        if result.status == .completed {
+            tui.statusMessage = "Successfully deleted \(result.successfulOperations)/\(itemCount) \(resourceType)"
+            if result.failedOperations > 0 {
+                tui.statusMessage = tui.statusMessage! + " (\(result.failedOperations) failed)"
+            }
+        } else {
+            tui.statusMessage = "Bulk delete failed: \(result.error?.localizedDescription ?? "Unknown error")"
+        }
+
+        tui.multiSelectMode = false
+        tui.multiSelectedResourceIDs.removeAll()
+
+        await tui.dataManager.refreshAllData()
+
+        Logger.shared.logUserAction("bulk_delete_completed", details: [
+            "view": "\(tui.currentView)",
+            "successful": result.successfulOperations,
+            "failed": result.failedOperations
+        ])
     }
 
 

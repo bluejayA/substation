@@ -11,7 +11,8 @@ struct VolumeViews {
                                      width: Int32, height: Int32, cachedVolumes: [Volume],
                                      searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
                                       dataManager: DataManager? = nil,
-                                     virtualScrollManager: VirtualScrollManager<Volume>? = nil) async {
+                                     virtualScrollManager: VirtualScrollManager<Volume>? = nil,
+                                     multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
         let statusListView = createVolumeStatusListView()
         await statusListView.draw(
@@ -25,7 +26,9 @@ struct VolumeViews {
             scrollOffset: scrollOffset,
             selectedIndex: selectedIndex,
             dataManager: dataManager,
-            virtualScrollManager: virtualScrollManager
+            virtualScrollManager: virtualScrollManager,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

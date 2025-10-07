@@ -82,6 +82,9 @@ final class TUI {
     internal var selectedServers: Set<String> = Set<String>()  // Selected server IDs for network attachment
     internal var attachedServerIds: Set<String> = Set<String>()  // Server IDs that have the selected resource attached
     internal var attachmentMode: AttachmentMode = .attach  // Current attachment mode (attach/detach)
+    // Multi-select mode state
+    internal var multiSelectMode: Bool = false  // Whether multi-select mode is enabled
+    internal var multiSelectedResourceIDs: Set<String> = Set<String>()  // IDs of selected resources in multi-select mode
     // Floating IP server management (single-select)
     internal var selectedServerId: String? = nil  // Selected server ID for floating IP management
     internal var attachedServerId: String? = nil  // Server ID that has the selected floating IP attached
