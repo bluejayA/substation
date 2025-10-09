@@ -93,6 +93,54 @@ actor SearchIndex {
             resourceCount += 1
         }
 
+        // Index server groups
+        for serverGroup in resources.serverGroups {
+            await indexServerGroup(serverGroup)
+            resourceCount += 1
+        }
+
+        // Index volume snapshots
+        for volumeSnapshot in resources.volumeSnapshots {
+            await indexVolumeSnapshot(volumeSnapshot)
+            resourceCount += 1
+        }
+
+        // Index volume backups
+        for volumeBackup in resources.volumeBackups {
+            await indexVolumeBackup(volumeBackup)
+            resourceCount += 1
+        }
+
+        // Index Barbican secrets
+        for secret in resources.barbicanSecrets {
+            await indexBarbicanSecret(secret)
+            resourceCount += 1
+        }
+
+        // Index Barbican containers
+        for container in resources.barbicanContainers {
+            await indexBarbicanContainer(container)
+            resourceCount += 1
+        }
+
+        // Index load balancers
+        for loadBalancer in resources.loadBalancers {
+            await indexLoadBalancer(loadBalancer)
+            resourceCount += 1
+        }
+
+        // Index Swift containers
+        for swiftContainer in resources.swiftContainers {
+            await indexSwiftContainer(swiftContainer)
+            resourceCount += 1
+        }
+
+        // Index Swift objects
+        for swiftObject in resources.swiftObjects {
+            await indexSwiftObject(swiftObject)
+            resourceCount += 1
+        }
+
         totalResources = resourceCount
         lastUpdateTime = Date()
 
@@ -425,6 +473,183 @@ actor SearchIndex {
         await ipIndex.addEntries(ipAddresses, result: result)
     }
 
+    private func indexServerGroup(_ serverGroup: ServerGroup) async {
+        let searchableText = buildServerGroupSearchText(serverGroup)
+
+        let result = SearchResult(
+            resourceId: serverGroup.id,
+            resourceType: .serverGroup,
+            name: serverGroup.name,
+            description: nil,
+            status: nil,
+            createdAt: nil,
+            updatedAt: nil,
+            ipAddresses: [],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+    }
+
+    private func indexVolumeSnapshot(_ snapshot: VolumeSnapshot) async {
+        let searchableText = buildVolumeSnapshotSearchText(snapshot)
+
+        let result = SearchResult(
+            resourceId: snapshot.id,
+            resourceType: .volumeSnapshot,
+            name: snapshot.name,
+            description: snapshot.description,
+            status: snapshot.status,
+            createdAt: snapshot.createdAt,
+            updatedAt: snapshot.updatedAt,
+            ipAddresses: [],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+    }
+
+    private func indexVolumeBackup(_ backup: VolumeBackup) async {
+        let searchableText = buildVolumeBackupSearchText(backup)
+
+        let result = SearchResult(
+            resourceId: backup.id,
+            resourceType: .volumeBackup,
+            name: backup.name,
+            description: backup.description,
+            status: backup.status,
+            createdAt: backup.createdAt,
+            updatedAt: backup.updatedAt,
+            ipAddresses: [],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+    }
+
+    private func indexBarbicanSecret(_ secret: Secret) async {
+        let searchableText = buildBarbicanSecretSearchText(secret)
+
+        let result = SearchResult(
+            resourceId: secret.secretRef ?? secret.id,
+            resourceType: .barbicanSecret,
+            name: secret.name,
+            description: nil,
+            status: secret.status,
+            createdAt: secret.created,
+            updatedAt: secret.updated,
+            ipAddresses: [],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+    }
+
+    private func indexBarbicanContainer(_ container: BarbicanContainer) async {
+        let searchableText = buildBarbicanContainerSearchText(container)
+
+        let result = SearchResult(
+            resourceId: container.containerRef ?? container.id,
+            resourceType: .barbicanContainer,
+            name: container.name,
+            description: nil,
+            status: container.status,
+            createdAt: container.created,
+            updatedAt: container.updated,
+            ipAddresses: [],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+    }
+
+    private func indexLoadBalancer(_ loadBalancer: LoadBalancer) async {
+        let searchableText = buildLoadBalancerSearchText(loadBalancer)
+
+        let result = SearchResult(
+            resourceId: loadBalancer.id,
+            resourceType: .loadBalancer,
+            name: loadBalancer.name,
+            description: nil,
+            status: loadBalancer.provisioningStatus,
+            createdAt: nil,
+            updatedAt: nil,
+            ipAddresses: [loadBalancer.vipAddress],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+        await ipIndex.addEntries([loadBalancer.vipAddress], result: result)
+    }
+
+    private func indexSwiftContainer(_ container: SwiftContainer) async {
+        let searchableText = buildSwiftContainerSearchText(container)
+
+        let result = SearchResult(
+            resourceId: container.name,
+            resourceType: .swiftContainer,
+            name: container.name,
+            description: nil,
+            status: nil,
+            createdAt: nil,
+            updatedAt: nil,
+            ipAddresses: [],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+    }
+
+    private func indexSwiftObject(_ object: SwiftObject) async {
+        let searchableText = buildSwiftObjectSearchText(object)
+
+        let result = SearchResult(
+            resourceId: object.name,
+            resourceType: .swiftObject,
+            name: object.name,
+            description: nil,
+            status: nil,
+            createdAt: nil,
+            updatedAt: object.lastModified,
+            ipAddresses: [],
+            metadata: [:],
+            tags: [],
+            relevanceScore: 0.0,
+            matchHighlights: [],
+            relationships: []
+        )
+
+        await textIndex.addEntry(searchableText, result: result)
+    }
+
     // MARK: - Text Building Methods
 
     private func buildServerSearchText(_ server: Server) -> String {
@@ -558,6 +783,97 @@ actor SearchIndex {
         components.append(floatingIP.id)
 
         if let portId = floatingIP.portId { components.append(portId) }
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildServerGroupSearchText(_ serverGroup: ServerGroup) -> String {
+        var components: [String] = []
+
+        if let name = serverGroup.name { components.append(name) }
+        components.append(serverGroup.id)
+
+        if let policies = serverGroup.policies {
+            components.append(contentsOf: policies)
+        }
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildVolumeSnapshotSearchText(_ snapshot: VolumeSnapshot) -> String {
+        var components: [String] = []
+
+        if let name = snapshot.name { components.append(name) }
+        if let description = snapshot.description { components.append(description) }
+        if let status = snapshot.status { components.append(status) }
+        components.append(snapshot.id)
+        components.append(snapshot.volumeId)
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildVolumeBackupSearchText(_ backup: VolumeBackup) -> String {
+        var components: [String] = []
+
+        if let name = backup.name { components.append(name) }
+        if let description = backup.description { components.append(description) }
+        if let status = backup.status { components.append(status) }
+        components.append(backup.id)
+        if let volumeId = backup.volumeId { components.append(volumeId) }
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildBarbicanSecretSearchText(_ secret: Secret) -> String {
+        var components: [String] = []
+
+        if let name = secret.name { components.append(name) }
+        if let status = secret.status { components.append(status) }
+        if let algorithm = secret.algorithm { components.append(algorithm) }
+        if let secretRef = secret.secretRef { components.append(secretRef) }
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildBarbicanContainerSearchText(_ container: BarbicanContainer) -> String {
+        var components: [String] = []
+
+        if let name = container.name { components.append(name) }
+        if let type = container.type { components.append(type) }
+        if let status = container.status { components.append(status) }
+        if let containerRef = container.containerRef { components.append(containerRef) }
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildLoadBalancerSearchText(_ loadBalancer: LoadBalancer) -> String {
+        var components: [String] = []
+
+        components.append(loadBalancer.name)
+        components.append(loadBalancer.provisioningStatus)
+        components.append(loadBalancer.operatingStatus)
+        components.append(loadBalancer.vipAddress)
+        components.append(loadBalancer.id)
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildSwiftContainerSearchText(_ container: SwiftContainer) -> String {
+        var components: [String] = []
+
+        components.append(container.name)
+        components.append(String(container.count))
+        components.append(String(container.bytes))
+
+        return components.joined(separator: " ")
+    }
+
+    private func buildSwiftObjectSearchText(_ object: SwiftObject) -> String {
+        var components: [String] = []
+
+        components.append(object.name)
+        components.append(object.contentType)
+        components.append(String(object.bytes))
 
         return components.joined(separator: " ")
     }

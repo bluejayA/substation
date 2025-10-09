@@ -302,6 +302,13 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
     case keyPair = "key_pair"
     case floatingIP = "floating_ip"
     case serverGroup = "server_group"
+    case volumeSnapshot = "volume_snapshot"
+    case volumeBackup = "volume_backup"
+    case barbicanSecret = "barbican_secret"
+    case barbicanContainer = "barbican_container"
+    case loadBalancer = "load_balancer"
+    case swiftContainer = "swift_container"
+    case swiftObject = "swift_object"
 
     public var displayName: String {
         switch self {
@@ -317,6 +324,13 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
         case .keyPair: return "Key Pair"
         case .floatingIP: return "Floating IP"
         case .serverGroup: return "Server Group"
+        case .volumeSnapshot: return "Volume Snapshot"
+        case .volumeBackup: return "Volume Backup"
+        case .barbicanSecret: return "Secret"
+        case .barbicanContainer: return "Secret Container"
+        case .loadBalancer: return "Load Balancer"
+        case .swiftContainer: return "Object Container"
+        case .swiftObject: return "Object"
         }
     }
 
@@ -334,6 +348,13 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
         case .keyPair: return "Key Pairs"
         case .floatingIP: return "Floating IPs"
         case .serverGroup: return "Server Groups"
+        case .volumeSnapshot: return "Volume Snapshots"
+        case .volumeBackup: return "Volume Backups"
+        case .barbicanSecret: return "Secrets"
+        case .barbicanContainer: return "Secret Containers"
+        case .loadBalancer: return "Load Balancers"
+        case .swiftContainer: return "Object Containers"
+        case .swiftObject: return "Objects"
         }
     }
 
@@ -344,13 +365,20 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
         case .subnet: return "[PRIV]"
         case .port: return "[PORT]"
         case .router: return "[ROUTER]"
-        case .volume: return "[IMG]"
-        case .image: return "[VOL]"
+        case .volume: return "[VOL]"
+        case .image: return "[IMG]"
         case .flavor: return "[CONF]"
         case .securityGroup: return "[SEC]"
         case .keyPair: return "[KEY]"
         case .floatingIP: return "[LINK]"
         case .serverGroup: return "[GROUP]"
+        case .volumeSnapshot: return "[SNAP]"
+        case .volumeBackup: return "[BACKUP]"
+        case .barbicanSecret: return "[SECRET]"
+        case .barbicanContainer: return "[VAULT]"
+        case .loadBalancer: return "[LB]"
+        case .swiftContainer: return "[BUCKET]"
+        case .swiftObject: return "[FILE]"
         }
     }
 }
@@ -370,6 +398,13 @@ public struct SearchableResources: Sendable {
     let keyPairs: [KeyPair]
     let floatingIPs: [FloatingIP]
     let serverGroups: [ServerGroup]
+    let volumeSnapshots: [VolumeSnapshot]
+    let volumeBackups: [VolumeBackup]
+    let barbicanSecrets: [Secret]
+    let barbicanContainers: [BarbicanContainer]
+    let loadBalancers: [LoadBalancer]
+    let swiftContainers: [SwiftContainer]
+    let swiftObjects: [SwiftObject]
 
     public init(
         servers: [Server] = [],
@@ -383,7 +418,14 @@ public struct SearchableResources: Sendable {
         securityGroups: [SecurityGroup] = [],
         keyPairs: [KeyPair] = [],
         floatingIPs: [FloatingIP] = [],
-        serverGroups: [ServerGroup] = []
+        serverGroups: [ServerGroup] = [],
+        volumeSnapshots: [VolumeSnapshot] = [],
+        volumeBackups: [VolumeBackup] = [],
+        barbicanSecrets: [Secret] = [],
+        barbicanContainers: [BarbicanContainer] = [],
+        loadBalancers: [LoadBalancer] = [],
+        swiftContainers: [SwiftContainer] = [],
+        swiftObjects: [SwiftObject] = []
     ) {
         self.servers = servers
         self.networks = networks
@@ -397,13 +439,22 @@ public struct SearchableResources: Sendable {
         self.keyPairs = keyPairs
         self.floatingIPs = floatingIPs
         self.serverGroups = serverGroups
+        self.volumeSnapshots = volumeSnapshots
+        self.volumeBackups = volumeBackups
+        self.barbicanSecrets = barbicanSecrets
+        self.barbicanContainers = barbicanContainers
+        self.loadBalancers = loadBalancers
+        self.swiftContainers = swiftContainers
+        self.swiftObjects = swiftObjects
     }
 
     public var totalResourceCount: Int {
         let count1 = servers.count + networks.count + subnets.count + ports.count
         let count2 = routers.count + volumes.count + images.count + flavors.count
         let count3 = securityGroups.count + keyPairs.count + floatingIPs.count + serverGroups.count
-        return count1 + count2 + count3
+        let count4 = volumeSnapshots.count + volumeBackups.count + barbicanSecrets.count + barbicanContainers.count
+        let count5 = loadBalancers.count + swiftContainers.count + swiftObjects.count
+        return count1 + count2 + count3 + count4 + count5
     }
 
     public func resourcesOfType(_ type: SearchResourceType) -> Int {
@@ -420,6 +471,13 @@ public struct SearchableResources: Sendable {
         case .keyPair: return keyPairs.count
         case .floatingIP: return floatingIPs.count
         case .serverGroup: return serverGroups.count
+        case .volumeSnapshot: return volumeSnapshots.count
+        case .volumeBackup: return volumeBackups.count
+        case .barbicanSecret: return barbicanSecrets.count
+        case .barbicanContainer: return barbicanContainers.count
+        case .loadBalancer: return loadBalancers.count
+        case .swiftContainer: return swiftContainers.count
+        case .swiftObject: return swiftObjects.count
         }
     }
 }

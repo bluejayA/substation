@@ -959,13 +959,13 @@ public final class EnhancedErrorHandler {
 
     private func getUserFriendlyMessage(for error: any Error, context: String) -> String {
         switch error {
-        case OTError.authenticationFailed:
+        case OpenStackError.authenticationFailed:
             return "Authentication failed. Please check your credentials."
 
-        case OTError.endpointNotFound:
+        case OpenStackError.endpointNotFound:
             return "Service endpoint not found. The OpenStack service may not be available."
 
-        case OTError.httpError(let code, _):
+        case OpenStackError.httpError(let code, _):
             switch code {
             case 401:
                 return "Authentication required. Your session may have expired."

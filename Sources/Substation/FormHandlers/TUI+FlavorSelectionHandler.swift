@@ -26,7 +26,7 @@ extension TUI {
             // Clear only the main panel area to remove artifacts before redrawing
             if let screen = screen {
                 let surface = SwiftTUI.surface(from: screen)
-                let sidebarWidth = MainPanelView.calculateSidebarWidth(screenCols: screenCols)
+                let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols)
                 let mainStartCol = sidebarWidth + 1
                 let mainStartRow: Int32 = 2
                 let mainWidth = max(10, screenCols - mainStartCol - 1)
@@ -62,7 +62,7 @@ extension TUI {
                     // Clear only the main panel area to remove artifacts before redrawing
                     if let screen = screen {
                         let surface = SwiftTUI.surface(from: screen)
-                        let sidebarWidth = MainPanelView.calculateSidebarWidth(screenCols: screenCols)
+                        let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols)
                         let mainStartCol = sidebarWidth + 1
                         let mainStartRow: Int32 = 2
                         let mainWidth = max(10, screenCols - mainStartCol - 1)
@@ -128,7 +128,7 @@ extension TUI {
                 // Clear only the main panel area to remove artifacts before redrawing
                 if let screen = screen {
                     let surface = SwiftTUI.surface(from: screen)
-                    let sidebarWidth = MainPanelView.calculateSidebarWidth(screenCols: screenCols)
+                    let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols)
                     let mainStartCol = sidebarWidth + 1
                     let mainStartRow: Int32 = 2
                     let mainWidth = max(10, screenCols - mainStartCol - 1)

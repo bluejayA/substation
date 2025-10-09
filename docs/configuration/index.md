@@ -712,6 +712,38 @@ tail -f ~/substation.log
 
 3. **Use a YAML validator** or editor with YAML support
 
+## Substation Application Data
+
+Substation stores application-specific data in `~/.config/substation/`:
+
+### Command History
+
+**Location**: `~/.config/substation/command_history`
+
+**Purpose**: Stores command mode history for UP/DOWN arrow navigation
+
+**Details**:
+- Persistent across sessions
+- Maximum 50 commands stored
+- Commands are deduplicated (no consecutive duplicates)
+- Plain text file, one command per line
+
+**Clearing History**:
+
+```bash
+# Remove command history
+rm ~/.config/substation/command_history
+
+# Or clear all Substation data
+rm -rf ~/.config/substation/
+```
+
+**Privacy Note**: Command history may contain cloud names and commands you've executed. Ensure appropriate file permissions if sensitive:
+
+```bash
+chmod 600 ~/.config/substation/command_history
+```
+
 ## Next Steps
 
 Now that Substation is configured, learn how to use it:

@@ -62,11 +62,11 @@ enum ViewMode: CaseIterable {
             case .imageDetail: return "Image Details"
             case .flavors: return "Flavors"
             case .flavorDetail: return "Flavor Details"
-            case .keyPairs: return "SSH Key Pairs"
+            case .keyPairs: return "Key Pairs"
             case .keyPairDetail: return "Key Pair Details"
             case .keyPairCreate: return "Create Key Pair"
             case .topology: return "Topology"
-            case .advancedSearch: return "Advanced Search"
+            case .advancedSearch: return "Search"
             case .healthDashboard: return "Health Dashboard"
             case .healthDashboardServiceDetail: return "Service Details"
             case .barbican: return "Secrets"
@@ -143,8 +143,8 @@ enum ViewMode: CaseIterable {
         case .keyPairDetail: return ""
         case .keyPairCreate: return ""
         // OpenStack Services
-        case .barbican: return "[b]"
-        case .barbicanSecrets: return ""
+        case .barbican: return ""
+        case .barbicanSecrets: return "[b]"
         case .barbicanContainers: return ""
         case .octavia: return "[o]"
         case .swift: return "[j]"
@@ -272,11 +272,15 @@ enum ViewMode: CaseIterable {
 struct MainPanelView {
 
     static func draw(screen: OpaquePointer?, tui: TUI, screenCols: Int32, screenRows: Int32) async {
-        let sidebarWidth = calculateSidebarWidth(screenCols: screenCols)
-        let mainStartCol: Int32 = sidebarWidth + 1  // Start immediately after separator to eliminate gap
+        let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols)
+        // When sidebar is hidden (width = 0), start from left edge
+        let mainStartCol: Int32 = sidebarWidth > 0 ? sidebarWidth + 1 : 0
         let mainWidth = max(10, screenCols - mainStartCol - 1)  // Minimum width check
         let mainStartRow: Int32 = 2
-        let mainHeight = max(5, screenRows - mainStartRow - 2)  // Minimum height check
+        // Reserve rows at bottom: separator (1) + input bar (1) + status bar (1) when input shown
+        // Or: separator (1) + status bar (1) when input hidden
+        let bottomReserved: Int32 = tui.showUnifiedInput ? 3 : 2
+        let mainHeight = max(5, screenRows - mainStartRow - bottomReserved)  // Minimum height check
 
         // Only draw if we have sufficient space
         guard mainWidth > 10 && mainHeight > 5 else { return }
@@ -562,12 +566,4 @@ struct MainPanelView {
         }
     }
 
-    internal static func calculateSidebarWidth(screenCols: Int32) -> Int32 {
-        // Responsive sidebar width based on screen size
-        if screenCols < 70 {
-            return 7  // Compact mode: "[d]" format
-        } else {
-            return 25 // Full mode: complete text
-        }
-    }
 }

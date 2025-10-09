@@ -25,7 +25,7 @@ extension Actions {
             } else {
                 statusMessage = "Loaded \(tui.cachedVolumeSnapshots.count) snapshots for volume \(volumeId.prefix(8))"
             }
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to load snapshots for volume \(volumeId.prefix(8))"
             switch error {
             case .authenticationFailed:
@@ -66,7 +66,7 @@ extension Actions {
             Logger.shared.logInfo("All volume snapshots loaded", context: [
                 "totalSnapshots": tui.cachedVolumeSnapshots.count
             ])
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to load all volume snapshots"
             switch error {
             case .authenticationFailed:
@@ -107,7 +107,7 @@ extension Actions {
             Logger.shared.logInfo("All volume backups loaded", context: [
                 "totalBackups": tui.cachedVolumeBackups.count
             ])
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             let baseMsg = "Failed to load all volume backups"
             switch error {
             case .authenticationFailed:
@@ -187,7 +187,7 @@ extension Actions {
             Logger.shared.logNavigation(".serverSnapshotManagement", to: ".servers", details: ["action": "snapshot_created_success"])
             tui.changeView(to: .servers, resetSelection: false, preserveStatus: true)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             snapshotManagementForm.isLoading = false
             let baseMsg = "Failed to create snapshot '\(snapshotName)'"
             let statusMsg: String
@@ -292,7 +292,7 @@ extension Actions {
             // Note: Volume snapshots are not images, so we don't refresh image cache here
             // In a full implementation, you might want to create a separate cache for volume snapshots
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             volumeSnapshotManagementForm.isLoading = false
             let baseMsg = "Failed to create volume snapshot '\(snapshotName)'"
             switch error {

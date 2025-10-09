@@ -62,7 +62,7 @@ extension Actions {
 
                 // Refresh server data
                 await dataManager.refreshAllData()
-            } catch let error as OTError {
+            } catch let error as OpenStackError {
                 let baseMsg = "Failed to \(actionName) resize for server '\(serverName)'"
                 switch error {
                 case .authenticationFailed:
@@ -156,7 +156,7 @@ extension Actions {
 
                 // Refresh server data
                 await dataManager.refreshAllData()
-            } catch let error as OTError {
+            } catch let error as OpenStackError {
                 let baseMsg = "Failed to resize server '\(serverName)'"
                 switch error {
                 case .authenticationFailed:

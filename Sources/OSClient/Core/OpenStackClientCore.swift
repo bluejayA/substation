@@ -96,7 +96,7 @@ public struct OpenStackConfig: Sendable {
 
     public init(
         authURL: URL,
-        region: String = "RegionOne",
+        region: String = "auto-detect",
         userDomainName: String = "default",
         projectDomainName: String = "default",
         timeout: TimeInterval = 30.0,
@@ -513,6 +513,7 @@ public actor OpenStackClientCore {
     private let urlSessionDelegate: EnhancedSecureURLSessionDelegate
     private var serviceCatalog: [String: URL] = [:]
     private var currentProjectId: String?
+    private var currentProjectName: String?
     private let microversionManager: MicroversionManager
 
     internal init(config: OpenStackConfig, credentials: OpenStackCredentials, logger: any OpenStackClientLogger) {
@@ -565,6 +566,11 @@ public actor OpenStackClientCore {
     /// Access to the current project ID
     public var projectId: String? {
         currentProjectId
+    }
+
+    /// Access to the current project name (from token)
+    public var projectName: String? {
+        currentProjectName
     }
 
     // MARK: - Authentication
@@ -697,8 +703,9 @@ public actor OpenStackClientCore {
 
             let authResponse = try SharedResources.jsonDecoder.decode(AuthResponse.self, from: data)
 
-            // Store project ID if available
+            // Store project ID and name if available
             self.currentProjectId = authResponse.token.project?.id
+            self.currentProjectName = authResponse.token.project?.name
 
             await tokenManager.setToken(token, expiresAt: authResponse.token.expiresAt)
 

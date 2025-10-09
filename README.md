@@ -16,7 +16,7 @@ Because listing 50,000 servers shouldn't take 10 minutes and three cups of coffe
 
 ## Features
 
-![Substation Logo](assets/substation-dash.png)
+![Substation Logo](assets/substation-enjoy.gif)
 
 ### Resource Management
 
@@ -97,6 +97,7 @@ Press `?` anytime for help. Here are the essentials:
 | `e` | Security Groups | `i` | Images |
 | `z` | Advanced Search | `c` | Purge cache |
 | `/` | Filter list | `q` | Quit |
+| `:` | Command mode | `h` | Help |
 
 **Full keyboard guide:** [Keyboard Shortcuts & Navigation](https://substation.cloud/guides/operators/keyboard-shortcuts/)
 

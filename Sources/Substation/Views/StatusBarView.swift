@@ -7,7 +7,8 @@ struct StatusBarView {
 
     static func draw(screen: OpaquePointer?, tui: TUI, screenCols: Int32, screenRows: Int32) async {
         let surface = SwiftTUI.surface(from: screen)
-        let statusRow = screenRows - 2
+        // Status bar is now at the very bottom (last row)
+        let statusRow = screenRows - 1
 
         // Status bar using SwiftTUI
         let statusBounds = Rect(x: 0, y: statusRow, width: screenCols, height: 1)
@@ -17,26 +18,24 @@ struct StatusBarView {
 
         await surface.fill(rect: statusBounds, character: " ", style: .border)
         await SwiftTUI.render(statusComponent, on: surface, in: statusBounds)
-
-        // Help line using SwiftTUI
-        let helpBounds = Rect(x: 0, y: screenRows - 1, width: screenCols, height: 1)
-
-        let helpText = getDynamicHelpText(for: tui.currentView)
-        let maxWidth = Int(screenCols) - 2
-        let truncatedText = String(helpText.prefix(maxWidth))
-        let helpComponent = Text(" \(truncatedText)").muted()
-
-        await surface.fill(rect: helpBounds, character: " ", style: .border)
-        await SwiftTUI.render(helpComponent, on: surface, in: helpBounds)
-    }
-
-    private static func getDynamicHelpText(for currentView: ViewMode) -> String {
-        return UIUtils.getDynamicHelpText(for: currentView)
     }
 
     /// Builds enhanced status text that includes progress indicators and user-friendly error messages
     private static func buildEnhancedStatusText(tui: TUI, screenCols: Int32) async -> String {
         let maxWidth = Int(screenCols) - 4 // Leave some padding
+
+        // Build status components
+        var statusComponents: [String] = []
+
+        // Add current cloud context if available
+        if let currentCloud = tui.contextSwitcher.currentContext {
+            statusComponents.append("Cloud: \(currentCloud)")
+        }
+
+        // Add command mode indicator if active
+        if tui.unifiedInputState.isCommandMode && tui.unifiedInputState.isActive {
+            statusComponents.append("CMD")
+        }
 
         // Check for active progress indicators
         let activeOperations = tui.progressIndicator.activeOperations
@@ -44,7 +43,8 @@ struct StatusBarView {
             // Show the most recent active operation
             if let operation = activeOperations.values.first {
                 let progressText = formatProgressOperation(operation)
-                return ViewUtils.truncateStatusText(progressText, maxWidth: maxWidth)
+                let fullStatus = buildFullStatus(components: statusComponents, mainText: progressText)
+                return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
             }
         }
 
@@ -52,16 +52,29 @@ struct StatusBarView {
         let activeLoadingStates = tui.loadingStateManager.activeLoadingStates
         if !activeLoadingStates.isEmpty {
             if let loadingState = activeLoadingStates.values.first {
-                let loadingText = " \(loadingState.message)..."
-                return ViewUtils.truncateStatusText(loadingText, maxWidth: maxWidth)
+                let loadingText = "\(loadingState.message)..."
+                let fullStatus = buildFullStatus(components: statusComponents, mainText: loadingText)
+                return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
             }
         }
 
         // Show regular status message or ready state
         if let status = tui.statusMessage {
-            return ViewUtils.truncateStatusText(" Status: \(status)", maxWidth: maxWidth)
+            let fullStatus = buildFullStatus(components: statusComponents, mainText: status)
+            return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
         } else {
-            return " Ready"
+            let fullStatus = buildFullStatus(components: statusComponents, mainText: "Ready")
+            return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
+        }
+    }
+
+    /// Build full status string from components and main text
+    private static func buildFullStatus(components: [String], mainText: String) -> String {
+        if components.isEmpty {
+            return " \(mainText)"
+        } else {
+            let prefix = components.joined(separator: " | ")
+            return " [\(prefix)] \(mainText)"
         }
     }
 

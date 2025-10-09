@@ -743,3 +743,110 @@ substation performance report
 # Health check
 substation health-check --all
 ```
+
+## Command Mode Issues and Debugging
+
+### Issue: Command not working
+
+**Symptoms**: Typing `:servers` doesn't navigate
+
+**Diagnosis**:
+
+1. Check if command is in ResourceRegistry
+2. Verify ViewMode exists
+3. Check logs for command execution
+
+**Solution**:
+
+```swift
+// Add to ResourceRegistry if missing
+.myView: ["myview", "mv"],
+```
+
+### Issue: Selection jumps when filtering
+
+**Symptoms**: Typing in search box resets selection to top
+
+**Status**: FIXED in v2.0 with ID-based selection
+
+**If still occurs**:
+
+1. Verify `selectedResourceId` is being used (not `selectedResultIndex`)
+2. Check `getSelectedIndex()` is called correctly
+3. Verify `moveSelection()` updates ID
+
+### Issue: Enter key triggers search instead of navigation
+
+**Symptoms**: Pressing Enter re-searches instead of navigating
+
+**Diagnosis**: Input priority issue
+
+**Solution**: Ensure Layer 1 handles Enter BEFORE UnifiedInputView
+
+```swift
+// In handleInput()
+if priority == .navigation && key == 10 || key == 13 {
+    navigateToDetailView()
+    return true
+}
+```
+
+### Issue: Fuzzy matching too slow
+
+**Symptoms**: Lag when typing in command mode
+
+**Diagnosis**: Too many aliases or inefficient matching
+
+**Solution**:
+
+1. Reduce number of aliases
+2. Add early exit in `rankedMatches()`:
+
+```swift
+if let limit = limit, foundCount >= limit * 2, score < 80 {
+    break  // Stop if we have enough good matches
+}
+```
+
+### Issue: Tab completion not working
+
+**Symptoms**: Tab key doesn't complete commands
+
+**Diagnosis**: Command mode not active or no matches
+
+**Solution**:
+
+1. Verify command mode is active (`inputState.isCommandMode`)
+2. Check `getSuggestions()` returns matches
+3. Verify Tab key (9) is being handled
+
+### Debugging Tips
+
+1. **Enable input logging**:
+
+   ```swift
+   InputPriority.logInput(key, layer: "Debug", handled: true)
+   ```
+
+2. **Check command resolution**:
+
+   ```swift
+   let view = ResourceRegistry.shared.resolve("mycommand")
+   print("Resolved to: \(view)")
+   ```
+
+3. **View ranked matches**:
+
+   ```swift
+   let matches = ResourceRegistry.shared.rankedMatches(for: "ser")
+   for match in matches {
+       print("\(match.command): \(match.score)")
+   }
+   ```
+
+4. **Monitor selection state**:
+
+   ```swift
+   print("Selected ID: \(selectedResourceId)")
+   print("Selected Index: \(getSelectedIndex(in: results))")
+   ```

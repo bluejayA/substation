@@ -145,7 +145,7 @@ extension Actions {
             tui.refreshAfterOperation()
             tui.changeView(to: .volumes, resetSelection: false)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             volumeManagementForm.isLoading = false
             let baseMsg = "Failed to attach volume '\(volumeName)' to server '\(serverName)'"
             switch error {
@@ -266,7 +266,7 @@ extension Actions {
             Logger.shared.logNavigation(".volumeBackupManagement", to: ".volumes", details: ["action": "backup_created_success"])
             tui.changeView(to: .volumes, resetSelection: false, preserveStatus: true)
 
-        } catch let error as OTError {
+        } catch let error as OpenStackError {
             tui.volumeBackupManagementForm.isLoading = false
             let baseMsg = "Failed to create volume backup '\(backupName)'"
             switch error {
@@ -377,7 +377,7 @@ extension Actions {
 
                 // Refresh data
                 await tui.actions.loadAllVolumeSnapshots()
-            } catch let error as OTError {
+            } catch let error as OpenStackError {
                 let baseMsg = "Failed to delete volume snapshot"
                 switch error {
                 case .authenticationFailed:
@@ -411,7 +411,7 @@ extension Actions {
 
                 // Refresh data
                 await tui.actions.loadAllVolumeBackups()
-            } catch let error as OTError {
+            } catch let error as OpenStackError {
                 let baseMsg = "Failed to delete volume backup"
                 switch error {
                 case .authenticationFailed:
