@@ -795,8 +795,7 @@ final class UIHelpers {
 
             do {
                 if attachmentMode == .attach {
-                    // Create a new port for this network, then attach it to the server
-                    _ = try await client.createPort(
+                    let port = try await client.createPort(
                         name: "server-\(serverId)-network-\(selectedNetwork.id)",
                         description: "Auto-created port for enhanced management",
                         networkID: selectedNetwork.id,
@@ -804,8 +803,7 @@ final class UIHelpers {
                         securityGroups: nil,
                         qosPolicyID: nil
                     )
-                    // Note: In a real implementation, you would need to use Nova API to attach the port to the server
-                    // For now, this creates the port which can be manually attached later
+                    try await client.attachPort(serverID: serverId, portID: port.id)
                 } else {
                     // Find and delete the port connecting this server to the network
                     let ports = try await client.listPorts()
