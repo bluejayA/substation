@@ -4,14 +4,14 @@ import OSClient
 import SwiftTUI
 
 enum ViewMode: CaseIterable {
-    case loading, dashboard, servers, serverGroups, networks, securityGroups, volumes, volumeArchives, images, flavors, topology, advancedSearch, healthDashboard
+    case loading, dashboard, servers, serverGroups, networks, securityGroups, volumes, volumeArchives, images, flavors, advancedSearch, healthDashboard
     case subnets, ports, routers, floatingIPs
     // OpenStack Services
     case barbican, barbicanSecrets, barbicanContainers, octavia, swift
     case serverDetail, serverGroupDetail, networkDetail, securityGroupDetail, volumeDetail, volumeArchiveDetail, imageDetail, flavorDetail, subnetDetail, portDetail, routerDetail, floatingIPDetail, healthDashboardServiceDetail
     // OpenStack Services Details
     case barbicanSecretDetail, barbicanContainerDetail, octaviaLoadBalancerDetail, swiftContainerDetail, swiftObjectDetail
-    case serverCreate, serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement, subnetCreate, volumeCreate, portCreate, routerCreate, floatingIPCreate, keyPairs, keyPairDetail, keyPairCreate, help, about, serverSecurityGroups, serverNetworkInterfaces, serverGroupManagement, volumeManagement, floatingIPServerSelect, serverSnapshotManagement, serverResize, volumeSnapshotManagement, volumeBackupManagement, networkServerAttachment, securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement, volumeServerManagement, floatingIPServerManagement, subnetRouterManagement, flavorSelection
+    case serverCreate, serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement, subnetCreate, volumeCreate, portCreate, routerCreate, floatingIPCreate, keyPairs, keyPairDetail, keyPairCreate, help, about, serverSecurityGroups, serverNetworkInterfaces, serverGroupManagement, volumeManagement, floatingIPServerSelect, serverSnapshotManagement, serverResize, volumeSnapshotManagement, volumeBackupManagement, networkServerAttachment, securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement, volumeServerManagement, floatingIPServerManagement, floatingIPPortManagement, portServerManagement, portAllowedAddressPairManagement, subnetRouterManagement, flavorSelection
     // OpenStack Services Create Forms
     case barbicanSecretCreate, barbicanContainerCreate, octaviaLoadBalancerCreate, swiftContainerCreate, swiftUpload
 
@@ -65,7 +65,6 @@ enum ViewMode: CaseIterable {
             case .keyPairs: return "Key Pairs"
             case .keyPairDetail: return "Key Pair Details"
             case .keyPairCreate: return "Create Key Pair"
-            case .topology: return "Topology"
             case .advancedSearch: return "Search"
             case .healthDashboard: return "Health Dashboard"
             case .healthDashboardServiceDetail: return "Service Details"
@@ -92,6 +91,9 @@ enum ViewMode: CaseIterable {
             case .networkServerManagement: return "Manage Network Server Attachments"
             case .volumeServerManagement: return "Manage Volume Server Attachments"
             case .floatingIPServerManagement: return "Manage Floating IP Server Assignment"
+            case .floatingIPPortManagement: return "Manage Floating IP Port Assignment"
+            case .portServerManagement: return "Manage Port Server Attachment"
+            case .portAllowedAddressPairManagement: return "Manage Allowed Address Pairs"
             case .subnetRouterManagement: return "Manage Subnet Router Attachment"
             case .flavorSelection: return "Select Server Flavor"
         }
@@ -109,7 +111,6 @@ enum ViewMode: CaseIterable {
         case .volumeArchives: return "[m]"
         case .images: return "[i]"
         case .flavors: return "[f]"
-        case .topology: return "[t]"
         case .advancedSearch: return "[z]"
         case .healthDashboard: return "[h]"
         case .subnets: return "[u]"
@@ -177,6 +178,9 @@ enum ViewMode: CaseIterable {
         case .networkServerManagement: return ""
         case .volumeServerManagement: return ""
         case .floatingIPServerManagement: return ""
+        case .floatingIPPortManagement: return ""
+        case .portServerManagement: return ""
+        case .portAllowedAddressPairManagement: return ""
         case .subnetRouterManagement: return ""
         case .flavorSelection: return ""
         }
@@ -184,7 +188,7 @@ enum ViewMode: CaseIterable {
 
     var isDetailView: Bool {
         switch self {
-        case .serverDetail, .serverGroupDetail, .networkDetail, .securityGroupDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .healthDashboardServiceDetail, .serverCreate, .serverGroupCreate, .networkCreate, .securityGroupCreate, .securityGroupRuleManagement, .subnetCreate, .volumeCreate, .portCreate, .routerCreate, .floatingIPCreate, .keyPairDetail, .keyPairCreate, .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement, .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement, .serverResize, .volumeSnapshotManagement, .volumeBackupManagement, .networkServerAttachment, .securityGroupServerAttachment, .securityGroupServerManagement, .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement, .subnetRouterManagement:
+        case .serverDetail, .serverGroupDetail, .networkDetail, .securityGroupDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .healthDashboardServiceDetail, .serverCreate, .serverGroupCreate, .networkCreate, .securityGroupCreate, .securityGroupRuleManagement, .subnetCreate, .volumeCreate, .portCreate, .routerCreate, .floatingIPCreate, .keyPairDetail, .keyPairCreate, .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement, .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement, .serverResize, .volumeSnapshotManagement, .volumeBackupManagement, .networkServerAttachment, .securityGroupServerAttachment, .securityGroupServerManagement, .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement, .floatingIPPortManagement, .portServerManagement, .portAllowedAddressPairManagement, .subnetRouterManagement:
             return true
         // OpenStack Services Detail Views
         case .barbicanSecretDetail, .barbicanContainerDetail, .octaviaLoadBalancerDetail, .swiftContainerDetail, .swiftObjectDetail:
@@ -199,8 +203,13 @@ enum ViewMode: CaseIterable {
 
     var supportsMultiSelect: Bool {
         switch self {
+        // Main resource list views
         case .servers, .volumes, .networks, .subnets, .routers, .ports, .floatingIPs, .securityGroups, .serverGroups, .keyPairs, .images:
             return true
+        // Service list views (barbicanSecrets and volumeArchives support multi-select)
+        case .barbican, .barbicanSecrets, .barbicanContainers, .octavia, .swift, .volumeArchives:
+            return true
+        // Note: flavors excluded - read-only, managed by cloud admin
         default:
             return false
         }
@@ -261,6 +270,9 @@ enum ViewMode: CaseIterable {
         case .networkServerManagement: return .networks
         case .volumeServerManagement: return .volumes
         case .floatingIPServerManagement: return .floatingIPs
+        case .floatingIPPortManagement: return .floatingIPs
+        case .portServerManagement: return .ports
+        case .portAllowedAddressPairManagement: return .ports
         case .subnetRouterManagement: return .subnets
         case .flavorSelection: return .serverCreate
         default: return self
@@ -313,7 +325,7 @@ struct MainPanelView {
         case .volumes:
             await VolumeViews.drawDetailedVolumeList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedVolumes: tui.cachedVolumes, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
         case .volumeArchives:
-            await VolumeArchiveViews.drawDetailedArchiveList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedVolumeSnapshots: tui.cachedVolumeSnapshots, cachedVolumeBackups: tui.cachedVolumeBackups, cachedImages: tui.cachedImages, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
+            await VolumeArchiveViews.drawArchiveList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedVolumeSnapshots: tui.cachedVolumeSnapshots, cachedVolumeBackups: tui.cachedVolumeBackups, cachedImages: tui.cachedImages, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
         case .images:
             await ImageViews.drawDetailedImageList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedImages: tui.cachedImages, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
         case .flavors:
@@ -324,14 +336,6 @@ struct MainPanelView {
             if let keyPair = tui.selectedResource as? KeyPair {
                 await KeyPairViews.drawKeyPairDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, keyPair: keyPair, scrollOffset: tui.detailScrollOffset)
             }
-        case .topology:
-            // Auto-load topology data if not available
-            if tui.lastTopology == nil {
-                tui.statusMessage = "Loading topology data..."
-                tui.lastTopology = await TopologyGraphBuilder.build(client: tui.client)
-                tui.statusMessage = "Topology loaded"
-            }
-            await TopologyViews.drawTopologyView(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, topology: tui.lastTopology, scrollOffset: tui.detailScrollOffset, mode: tui.currentTopologyMode)
         case .serverDetail:
             if let server = tui.selectedResource as? Server {
                 await ServerViews.drawServerDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, server: server, cachedVolumes: tui.cachedVolumes, cachedFlavors: tui.cachedFlavors, cachedImages: tui.cachedImages, scrollOffset: tui.detailScrollOffset)
@@ -408,7 +412,7 @@ struct MainPanelView {
                 await SubnetViews.drawSubnetDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, subnet: subnet, scrollOffset: tui.detailScrollOffset)
             }
         case .ports:
-            await PortViews.drawDetailedPortList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedPorts: tui.cachedPorts, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
+            await PortViews.drawDetailedPortList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, cachedPorts: tui.cachedPorts, cachedNetworks: tui.cachedNetworks, cachedServers: tui.cachedServers, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
         case .portDetail:
             if let port = tui.selectedResource as? Port {
                 await PortViews.drawPortDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, port: port, cachedNetworks: tui.cachedNetworks, cachedSubnets: tui.cachedSubnets, cachedSecurityGroups: tui.cachedSecurityGroups, scrollOffset: tui.detailScrollOffset)
@@ -489,7 +493,7 @@ struct MainPanelView {
 
         // Barbican views
         case .barbican, .barbicanSecrets:
-            await BarbicanViews.drawBarbicanSecretList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, secrets: tui.cachedSecrets, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, filterCache: tui.resourceNameCache)
+            await BarbicanViews.drawBarbicanSecretList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, secrets: tui.cachedSecrets, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, filterCache: tui.resourceNameCache, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
         case .barbicanContainers:
             await BarbicanViews.drawBarbicanContainerList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, containers: tui.cachedBarbicanContainers, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, filterCache: tui.resourceNameCache)
         case .barbicanSecretDetail:
@@ -550,6 +554,18 @@ struct MainPanelView {
         case .floatingIPServerManagement:
             if let floatingIP = tui.selectedResource as? FloatingIP {
                 await FloatingIPServerManagementView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, floatingIP: floatingIP, servers: tui.cachedServers, attachedServerId: tui.attachedServerId, selectedServerId: tui.selectedServerId, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, mode: tui.attachmentMode, resourceResolver: tui.resourceResolver)
+            }
+        case .floatingIPPortManagement:
+            if let floatingIP = tui.selectedResource as? FloatingIP {
+                await FloatingIPPortManagementView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, floatingIP: floatingIP, ports: tui.cachedPorts, attachedPortId: tui.attachedPortId, selectedPortId: tui.selectedPortId, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, mode: tui.attachmentMode, resourceResolver: tui.resourceResolver)
+            }
+        case .portServerManagement:
+            if let port = tui.selectedResource as? Port {
+                await PortServerManagementView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, port: port, servers: tui.cachedServers, attachedServerId: tui.attachedServerId, selectedServerId: tui.selectedServerId, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, mode: tui.attachmentMode, resourceResolver: tui.resourceResolver)
+            }
+        case .portAllowedAddressPairManagement:
+            if let form = tui.allowedAddressPairForm {
+                await AllowedAddressPairManagementView.drawAllowedAddressPairManagement(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, form: form, resourceNameCache: tui.resourceNameCache)
             }
         case .subnetRouterManagement:
             if let subnet = tui.selectedResource as? Subnet {

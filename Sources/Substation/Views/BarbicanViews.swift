@@ -16,7 +16,9 @@ struct BarbicanViews {
         searchQuery: String,
         scrollOffset: Int,
         selectedIndex: Int,
-        filterCache: ResourceNameCache?
+        filterCache: ResourceNameCache?,
+        multiSelectMode: Bool = false,
+        selectedItems: Set<String> = []
     ) async {
         let statusListView = createBarbicanSecretStatusListView()
         await statusListView.draw(
@@ -28,7 +30,9 @@ struct BarbicanViews {
             items: secrets,
             searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
         )
     }
 

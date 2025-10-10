@@ -1,15 +1,29 @@
 import Foundation
 import SwiftTUI
 
+// MARK: - Checkbox Mode Enum
+
+/// Defines the checkbox behavior for FormSelector
+enum FormSelectorCheckboxMode {
+    case basic             // Basic checkbox: [ ] / [X] for single selection
+    case multiSelect       // Multi-select checkbox: [ ] / [X] for multiple selections
+    case multiFunctional   // Multi-functional: [ ] / [X] / [*] / [-] with custom status callback
+}
+
 // MARK: - FormSelector Component
 
 /// A unified selector component for forms that provides:
 /// - Multi-tab mode switching
-/// - Multi-select capability
+/// - Multi-select capability with flexible checkbox modes
 /// - Search/filtering
 /// - Column-based display with headers
 /// - Scrolling with indicators
 /// - Detailed view for selected item
+///
+/// Checkbox Modes:
+/// - .basic: Simple checkbox for single selection [ ] / [X]
+/// - .multiSelect: Standard multi-select checkbox [ ] / [X]
+/// - .multiFunctional: Custom status indicators [ ] / [X] / [*] / [-]
 ///
 /// Usage:
 /// - TAB: Switch between tabs/modes
@@ -25,13 +39,14 @@ struct FormSelector<Item: FormSelectableItem> {
     let items: [Item]
     let selectedItemIds: Set<String>
     let highlightedIndex: Int
-    let multiSelect: Bool
+    let checkboxMode: FormSelectorCheckboxMode
     let scrollOffset: Int
     let searchQuery: String?
     let maxWidth: Int?
     let maxHeight: Int?
     let isActive: Bool
     let validationError: String?
+    let statusProvider: ((Item) -> String)?  // Custom status callback for multiFunctional mode
 
     init(
         label: String,
@@ -40,13 +55,14 @@ struct FormSelector<Item: FormSelectableItem> {
         items: [Item] = [],
         selectedItemIds: Set<String> = [],
         highlightedIndex: Int = 0,
-        multiSelect: Bool = false,
+        checkboxMode: FormSelectorCheckboxMode = .basic,
         scrollOffset: Int = 0,
         searchQuery: String? = nil,
         maxWidth: Int? = nil,
         maxHeight: Int? = nil,
         isActive: Bool = false,
-        validationError: String? = nil
+        validationError: String? = nil,
+        statusProvider: ((Item) -> String)? = nil
     ) {
         self.label = label
         self.tabs = tabs
@@ -54,13 +70,14 @@ struct FormSelector<Item: FormSelectableItem> {
         self.items = items
         self.selectedItemIds = selectedItemIds
         self.highlightedIndex = highlightedIndex
-        self.multiSelect = multiSelect
+        self.checkboxMode = checkboxMode
         self.scrollOffset = scrollOffset
         self.searchQuery = searchQuery
         self.maxWidth = maxWidth
         self.maxHeight = maxHeight
         self.isActive = isActive
         self.validationError = validationError
+        self.statusProvider = statusProvider
     }
 
     /// Render the selector as a component
@@ -94,9 +111,15 @@ struct FormSelector<Item: FormSelectableItem> {
         }
 
         // Instructions
-        let instructions = multiSelect ?
-            "Browse and select items. SPACE: toggle, ENTER: confirm" :
-            "Browse and select item. SPACE: select, ENTER: confirm"
+        let instructions: String
+        switch checkboxMode {
+        case .basic:
+            instructions = "Browse and select item. SPACE: select, ENTER: confirm"
+        case .multiSelect:
+            instructions = "Browse and select items. SPACE: toggle, ENTER: confirm"
+        case .multiFunctional:
+            instructions = "SPACE: toggle status, ENTER: apply changes"
+        }
         components.append(
             Text(instructions).secondary()
                 .padding(EdgeInsets(top: 0, leading: 0, bottom: 1, trailing: 0))
@@ -115,8 +138,14 @@ struct FormSelector<Item: FormSelectableItem> {
         let formattedHeaders = currentTab.columns.map { column in
             column.header.padding(toLength: column.width, withPad: " ", startingAt: 0)
         }.joined(separator: "  ")
+
+        let headerText: String
+        switch checkboxMode {
+        case .basic, .multiSelect, .multiFunctional:
+            headerText = "[ ] \(formattedHeaders)"
+        }
         components.append(
-            Text("[ ] \(formattedHeaders)").secondary()
+            Text(headerText).secondary()
                 .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         )
 
@@ -222,9 +251,6 @@ struct FormSelector<Item: FormSelectableItem> {
     private func renderItem(item: Item, isHighlighted: Bool, isSelected: Bool) -> any Component {
         let currentTab = tabs[selectedTabIndex]
 
-        // Checkbox
-        let checkbox = isSelected ? "[X]" : "[ ]"
-
         // Format columns
         var columnValues: [String] = []
         for column in currentTab.columns {
@@ -233,7 +259,24 @@ struct FormSelector<Item: FormSelectableItem> {
             columnValues.append(formatted)
         }
 
-        let itemText = "\(checkbox) \(columnValues.joined(separator: "  "))"
+        // Build item text with checkbox based on mode
+        let itemText: String
+        switch checkboxMode {
+        case .basic, .multiSelect:
+            // Standard checkbox: [ ] or [X]
+            let checkbox = isSelected ? "[X]" : "[ ]"
+            itemText = "\(checkbox) \(columnValues.joined(separator: "  "))"
+        case .multiFunctional:
+            // Custom status indicator from statusProvider
+            let statusIndicator: String
+            if let provider = statusProvider {
+                statusIndicator = provider(item)
+            } else {
+                // Fallback to standard checkbox if no provider
+                statusIndicator = isSelected ? "[X]" : "[ ]"
+            }
+            itemText = "\(statusIndicator) \(columnValues.joined(separator: "  "))"
+        }
 
         // Apply styling
         let style: TextStyle
@@ -312,16 +355,16 @@ struct FormSelectorState<Item: FormSelectableItem> {
     var selectedTabIndex: Int
     var scrollOffset: Int
     var searchQuery: String
-    var multiSelect: Bool
+    var checkboxMode: FormSelectorCheckboxMode
 
-    init(items: [Item] = [], multiSelect: Bool = false) {
+    init(items: [Item] = [], checkboxMode: FormSelectorCheckboxMode = .basic) {
         self.items = items
         self.selectedItemIds = []
         self.highlightedIndex = 0
         self.selectedTabIndex = 0
         self.scrollOffset = 0
         self.searchQuery = ""
-        self.multiSelect = multiSelect
+        self.checkboxMode = checkboxMode
     }
 
     // MARK: - Navigation
@@ -354,7 +397,7 @@ struct FormSelectorState<Item: FormSelectableItem> {
         guard highlightedIndex < displayItems.count else { return }
         let itemId = displayItems[highlightedIndex].id
 
-        if multiSelect {
+        if checkboxMode == .multiSelect || checkboxMode == .multiFunctional {
             // Toggle selection in multi-select mode
             if selectedItemIds.contains(itemId) {
                 selectedItemIds.remove(itemId)

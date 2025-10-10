@@ -40,7 +40,7 @@ struct SecurityGroupSelectionView {
             items: securityGroups,
             selectedItemIds: selectedSecurityGroupIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: true,
+            checkboxMode: .multiSelect,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

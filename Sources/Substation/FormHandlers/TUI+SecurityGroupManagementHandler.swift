@@ -15,30 +15,24 @@ import MemoryKit
 extension TUI {
 
     internal func handleSecurityGroupInput(_ ch: Int32, screen: OpaquePointer?) async {
-        switch ch {
-        case Int32(259): // UP
-            let managementGroups = securityGroupForm.getManagementGroups()
-            if !managementGroups.isEmpty {
-                securityGroupForm.selectedSecurityGroupIndex = max(0, securityGroupForm.selectedSecurityGroupIndex - 1)
+        let managementGroups = securityGroupForm.getManagementGroups()
+
+        let _ = await formInputHandler.handleManagementInput(
+            ch,
+            screen: screen,
+            itemCount: managementGroups.count,
+            onToggle: {
+                if self.securityGroupForm.selectedSecurityGroupIndex < managementGroups.count {
+                    let selectedGroup = managementGroups[self.securityGroupForm.selectedSecurityGroupIndex]
+                    self.securityGroupForm.toggleSecurityGroupManagement(selectedGroup.id)
+                }
+            },
+            onEnter: {
+                self.needsRedraw = true
+                if self.securityGroupForm.hasPendingChanges() {
+                    await self.actions.applySecurityGroupChanges(screen: screen)
+                }
             }
-        case Int32(258): // DOWN
-            let managementGroups = securityGroupForm.getManagementGroups()
-            if !managementGroups.isEmpty {
-                securityGroupForm.selectedSecurityGroupIndex = min(managementGroups.count - 1, securityGroupForm.selectedSecurityGroupIndex + 1)
-            }
-        case Int32(32): // SPACE - Toggle security group selection with intelligent assign/remove
-            let managementGroups = securityGroupForm.getManagementGroups()
-            if securityGroupForm.selectedSecurityGroupIndex < managementGroups.count {
-                let selectedGroup = managementGroups[securityGroupForm.selectedSecurityGroupIndex]
-                securityGroupForm.toggleSecurityGroupManagement(selectedGroup.id)
-            }
-        case Int32(10), Int32(13): // ENTER - Apply changes
-            needsRedraw = true
-            if securityGroupForm.hasPendingChanges() {
-                await actions.applySecurityGroupChanges(screen: screen)
-            }
-        default:
-            break
-        }
+        )
     }
 }

@@ -31,7 +31,7 @@ struct SecurityGroupServerManagementView {
             scrollOffset: scrollOffset,
             searchQuery: searchQuery ?? "",
             title: title,
-            multiSelect: true
+            checkboxMode: .multiSelect
         )
     }
 }

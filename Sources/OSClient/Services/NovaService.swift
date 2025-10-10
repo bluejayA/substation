@@ -79,9 +79,9 @@ public actor NovaService: OpenStackService {
 
             // Log flavor information for debugging
             if let flavor = server.flavor {
-                logger.logInfo("Server '\(server.name ?? server.id)' has flavor: originalName=\(flavor.originalName ?? "nil"), id=\(flavor.id)", context: [:])
+                logger.logDebug("Server '\(server.name ?? server.id)' flavor: id=\(flavor.id), name=\(flavor.name ?? "nil"), originalName=\(flavor.originalName ?? "nil"), vcpus=\(flavor.vcpus?.description ?? "nil"), ram=\(flavor.ram?.description ?? "nil"), disk=\(flavor.disk?.description ?? "nil")", context: [:])
             } else {
-                logger.logInfo("Server '\(server.name ?? server.id)' has nil flavor field", context: [:])
+                logger.logInfo("Server '\(server.name ?? server.id)' has nil flavor field - this may indicate a deleted flavor or API issue", context: [:])
             }
         }
 

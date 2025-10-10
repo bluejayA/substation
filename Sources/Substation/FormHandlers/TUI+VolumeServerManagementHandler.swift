@@ -38,64 +38,37 @@ extension TUI {
             relevantServers = filteredServers.filter { attachedServerIds.contains($0.id) }
         }
 
-        switch ch {
-        case Int32(9): // TAB - toggle attachment mode
-            attachmentMode = (attachmentMode == .attach) ? .detach : .attach
-            selectedServers.removeAll()
-            selectedIndex = 0
-            scrollOffset = 0
-            statusMessage = "Switched to \(attachmentMode == .attach ? "ATTACH" : "DETACH") mode"
-        case Int32(32): // SPACE - toggle server selection
-            guard selectedIndex < relevantServers.count else { return }
-            let server = relevantServers[selectedIndex]
-            if selectedServers.contains(server.id) {
-                selectedServers.remove(server.id)
-                statusMessage = "Deselected server '\(server.name ?? "Unknown")'"
-            } else {
-                selectedServers.insert(server.id)
-                statusMessage = "Selected server '\(server.name ?? "Unknown")'"
-            }
-        case Int32(10): // ENTER - apply changes
-            needsRedraw = true
-            await uiHelpers.performEnhancedVolumeManagement()
-        case Int32(259): // KEY_UP
-            if selectedIndex > 0 {
-                selectedIndex -= 1
-                if selectedIndex < scrollOffset {
-                    scrollOffset = selectedIndex
-                }
-            }
-        case Int32(258): // KEY_DOWN
-            if selectedIndex < relevantServers.count - 1 {
-                selectedIndex += 1
-                let visibleRows = 20
-                if selectedIndex >= scrollOffset + visibleRows {
-                    scrollOffset = selectedIndex - visibleRows + 1
-                }
-            }
-        default:
-            // Handle search input
-            if ch >= 32 && ch < 127 {
-                let character = Character(UnicodeScalar(Int(ch))!)
-                if searchQuery == nil {
-                    searchQuery = String(character)
+        let _ = await formInputHandler.handleManagementInput(
+            ch,
+            screen: screen,
+            itemCount: relevantServers.count,
+            onToggle: {
+                guard self.selectedIndex < relevantServers.count else { return }
+                let server = relevantServers[self.selectedIndex]
+                if self.selectedServers.contains(server.id) {
+                    self.selectedServers.remove(server.id)
+                    self.statusMessage = "Deselected server '\(server.name ?? "Unknown")'"
                 } else {
-                    searchQuery! += String(character)
+                    self.selectedServers.insert(server.id)
+                    self.statusMessage = "Selected server '\(server.name ?? "Unknown")'"
                 }
-                selectedIndex = 0
-                scrollOffset = 0
-                await self.draw(screen: screen)
-            } else if ch == 127 || ch == 8 { // BACKSPACE
-                if searchQuery != nil && !searchQuery!.isEmpty {
-                    searchQuery!.removeLast()
-                    if searchQuery!.isEmpty {
-                        searchQuery = nil
-                    }
-                    selectedIndex = 0
-                    scrollOffset = 0
-                    await self.draw(screen: screen)
+            },
+            onEnter: {
+                self.needsRedraw = true
+                await self.uiHelpers.performEnhancedVolumeManagement()
+            },
+            additionalHandling: { ch in
+                // Handle TAB for mode switching
+                if ch == Int32(9) {
+                    self.attachmentMode = (self.attachmentMode == .attach) ? .detach : .attach
+                    self.selectedServers.removeAll()
+                    self.selectedIndex = 0
+                    self.scrollOffset = 0
+                    self.statusMessage = "Switched to \(self.attachmentMode == .attach ? "ATTACH" : "DETACH") mode"
+                    return true
                 }
+                return false
             }
-        }
+        )
     }
 }

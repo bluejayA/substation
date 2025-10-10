@@ -671,6 +671,8 @@ struct AdvancedSearchView {
                 showingCrossServiceResults = false
                 return true
             }
+            // ESC not handled locally - delegate back to TUI's navigation handling
+            // This allows NavigationInputHandler to handle ESC (e.g., exit multi-select, go back from detail views)
             return false
         }
 
@@ -693,22 +695,15 @@ struct AdvancedSearchView {
             }
             return false
 
-        default:
-            // Handle special shortcuts
-            if key >= 32 && key < 127 && inMainSearchMode {
-                let character = Character(UnicodeScalar(Int(key))!)
-                if !inputState.isActive && inputState.displayText.isEmpty {
-                    switch character {
-                    case "D": // SHIFT+D - detail (only if we have results)
-                        if !filteredResults.isEmpty || !searchResults.isEmpty {
-                            showingResultDetail = true
-                            return true
-                        }
-                    default:
-                        break
-                    }
+        case 68: // SHIFT+D - detail (only if we have results)
+            if inMainSearchMode && !inputState.isActive && inputState.displayText.isEmpty {
+                if !filteredResults.isEmpty || !searchResults.isEmpty {
+                    showingResultDetail = true
+                    return true
                 }
             }
+            return false
+        default:
             return false
         }
     }

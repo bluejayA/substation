@@ -212,8 +212,8 @@ struct VolumeManagementView {
         // Clamp highlighted index to valid range
         let safeHighlightedIndex = min(max(0, form.selectedResourceIndex), max(0, displayServers.count - 1))
 
-        // Determine multi-select based on operation
-        let multiSelect = form.selectedOperation == .attach && (volume.attachments?.isEmpty ?? true)
+        // Determine checkbox mode based on operation
+        let checkboxMode: FormSelectorCheckboxMode = (form.selectedOperation == .attach && (volume.attachments?.isEmpty ?? true)) ? .multiSelect : .basic
 
         // Show empty message if no servers to display
         if displayServers.isEmpty {
@@ -229,7 +229,7 @@ struct VolumeManagementView {
             items: displayServers,
             selectedItemIds: selectedServerIds,
             highlightedIndex: safeHighlightedIndex,
-            multiSelect: multiSelect,
+            checkboxMode: checkboxMode,
             scrollOffset: 0,
             searchQuery: nil,
             maxWidth: 80,

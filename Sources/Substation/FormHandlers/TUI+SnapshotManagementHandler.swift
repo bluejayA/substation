@@ -14,6 +14,11 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    var snapshotManagementNavigationContext: NavigationContext {
+        let fieldCount = snapshotManagementFormState.fields.count
+        return .form(fieldCount: fieldCount)
+    }
+
     internal func handleSnapshotManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Check if a field is currently active
         let isFieldActive = snapshotManagementFormState.isCurrentFieldActive()
@@ -25,18 +30,20 @@ extension TUI {
             formState: snapshotManagementFormState
         ))
 
+        // Try common navigation when NOT in field edit mode
+        if !isFieldActive {
+            if await handleCommonNavigation(ch, screen: screen, context: snapshotManagementNavigationContext) {
+                return
+            }
+        }
+
+        // Handle view-specific input
+        await handleSnapshotManagementSpecificInput(ch, screen: screen, isFieldActive: isFieldActive)
+    }
+
+    private func handleSnapshotManagementSpecificInput(_ ch: Int32, screen: OpaquePointer?, isFieldActive: Bool) async {
         switch ch {
         case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                snapshotManagementFormState.nextField()
-            }
-
-        case Int32(259): // UP - Navigate to previous field
-            if !isFieldActive {
-                snapshotManagementFormState.previousField()
-            }
-
-        case Int32(258): // DOWN - Navigate to next field
             if !isFieldActive {
                 snapshotManagementFormState.nextField()
             }

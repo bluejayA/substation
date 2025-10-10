@@ -1721,9 +1721,6 @@ private class PerformanceTuner {
     }
 
     private func applyReduceMemoryUsageOptimization() async {
-        // Clear all topology caches
-        await SubstationMemoryContainer.shared.topologyCache.clearAll()
-
         // Trigger memory manager cleanup
         await triggerMemoryCleanup()
 
@@ -1732,9 +1729,6 @@ private class PerformanceTuner {
     }
 
     private func clearNonEssentialCaches() async {
-        // Clear topology caches
-        await SubstationMemoryContainer.shared.topologyCache.clearAll()
-
         // Trigger memory pressure cleanup via notification
         NotificationCenter.default.post(
             name: NSNotification.Name("TriggerMemoryCleanup"),

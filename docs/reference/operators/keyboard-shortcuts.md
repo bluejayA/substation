@@ -18,7 +18,6 @@ Print this and tape it to your monitor (we won't judge).
 | `v` | Volumes | "Where did my data go?" (Cinder storage) |
 | `i` | Images | Finding that one CentOS 7 image from 2019 |
 | `f` | Flavors | Size matters. Choose wisely. |
-| `t` | Topology | Pretty network diagrams for presentations |
 | `h` | Health Dashboard | "Is it us or them?" (usually them) |
 | `u` | Subnets | CIDR math at 3 AM. Fun times. |
 | `p` | Ports | MAC address detective work |
@@ -77,6 +76,7 @@ Print this and tape it to your monitor (we won't judge).
 5. Press `Ctrl-X` or `Esc` to exit multi-select mode
 
 **Supported Views:**
+
 - Servers, Volumes, Networks, Subnets, Routers, Ports
 - Floating IPs, Security Groups, Server Groups, Key Pairs, Images
 
@@ -217,14 +217,6 @@ Print this and tape it to your monitor (we won't judge).
 | `Del` | Delete container/object | Must be empty for containers |
 | `U` | Upload object | File upload to container |
 | `D` | Download object | Save object to disk |
-
-### Topology View (`t`)
-
-| Key | Action | Notes |
-|-----|--------|-------|
-| `Tab` | Cycle display modes | Different visualization styles |
-| `W` | Export topology | Save diagram data |
-| `↑/↓/←/→` | Navigate diagram | Move around visualization |
 
 ### Health Dashboard (`h`)
 
@@ -415,11 +407,13 @@ Press `:` to enter command mode - inspired by vim. Command mode provides a power
 ### Command Mode Features
 
 **Tab Completion:**
+
 - Press `Tab` to auto-complete commands
 - Press `Tab` multiple times to cycle through matches
 - Works for both command names and cloud contexts
 
 **Command History:**
+
 - Press `↑` (Up arrow) to navigate to previous commands
 - Press `↓` (Down arrow) to navigate to next command
 - History persists between sessions (stored in `~/.config/substation/command_history`)
@@ -444,7 +438,6 @@ Press `:` to enter command mode - inspired by vim. Command mode provides a power
 | `:securitygroups` | `:e` | Navigate to security groups view |
 | `:servergroups` | `:g` | Navigate to server groups view |
 | `:keypairs` | `:k` | Navigate to key pairs view |
-| `:topology` | `:t` | Navigate to topology view |
 | `:search` | `:z` | Navigate to advanced search |
 | `:help` | `:?` | Show help |
 
@@ -475,7 +468,8 @@ Switch between OpenStack clouds defined in your `clouds.yaml`:
 ```
 
 **Tab Completion for Cloud Names:**
-- Type `:ctx ` (with space) and press `Tab` to see all available clouds
+
+- Type `:ctx` (with space) and press `Tab` to see all available clouds
 - Type `:ctx p` and press `Tab` to complete cloud names starting with 'p'
 - Press `Tab` multiple times to cycle through matching clouds
 

@@ -160,13 +160,15 @@ final class UIHelpers {
             let ch = SwiftTUI.getInput(WindowHandle(screen))
 
             switch ch {
-            case Int32(259): // KEY_UP
-                if serverSelectedIndex > 0 {
-                    serverSelectedIndex -= 1
-                }
-            case Int32(258): // KEY_DOWN
-                if serverSelectedIndex < cachedServers.count - 1 {
-                    serverSelectedIndex += 1
+            case Int32(259), Int32(258): // UP/DOWN - Navigate server list
+                if ch == Int32(259) {
+                    if serverSelectedIndex > 0 {
+                        serverSelectedIndex -= 1
+                    }
+                } else {
+                    if serverSelectedIndex < cachedServers.count - 1 {
+                        serverSelectedIndex += 1
+                    }
                 }
             case 10, 13: // Enter key
                 await tui.draw(screen: screen) // Redraw main interface
@@ -361,26 +363,34 @@ final class UIHelpers {
                 SwiftTUI.clear(WindowHandle(screen))
                 tui.forceRedraw()
                 return
-            case Int32(259), Int32(107): // UP or 'k' - Scroll up
-                verticalScrollOffset = max(0, verticalScrollOffset - 1)
-            case Int32(258), Int32(106): // DOWN or 'j' - Scroll down
-                verticalScrollOffset = min(max(0, totalLines - contentHeight), verticalScrollOffset + 1)
-            case Int32(260), Int32(104): // LEFT or 'h' - Scroll left
-                horizontalScrollOffset = max(0, horizontalScrollOffset - 5)
-            case Int32(261), Int32(108): // RIGHT or 'l' - Scroll right
-                let maxHorizontalScroll = max(0, maxLineWidth - contentWidth)
-                horizontalScrollOffset = min(maxHorizontalScroll, horizontalScrollOffset + 5)
-            case Int32(338): // PAGE_DOWN
-                verticalScrollOffset = min(max(0, totalLines - contentHeight), verticalScrollOffset + contentHeight)
-            case Int32(339): // PAGE_UP
-                verticalScrollOffset = max(0, verticalScrollOffset - contentHeight)
-            case Int32(262): // HOME
-                verticalScrollOffset = 0
-                horizontalScrollOffset = 0
-            case Int32(360): // END
-                verticalScrollOffset = max(0, totalLines - contentHeight)
-                let maxHorizontalScroll = max(0, maxLineWidth - contentWidth)
-                horizontalScrollOffset = maxHorizontalScroll
+            case Int32(259), Int32(258): // UP/DOWN - Scroll vertical
+                if ch == Int32(259) {
+                    verticalScrollOffset = max(0, verticalScrollOffset - 1)
+                } else {
+                    verticalScrollOffset = min(max(0, totalLines - contentHeight), verticalScrollOffset + 1)
+                }
+            case Int32(260), Int32(261): // LEFT/RIGHT - Scroll horizontal
+                if ch == Int32(260) {
+                    horizontalScrollOffset = max(0, horizontalScrollOffset - 5)
+                } else {
+                    let maxHorizontalScroll = max(0, maxLineWidth - contentWidth)
+                    horizontalScrollOffset = min(maxHorizontalScroll, horizontalScrollOffset + 5)
+                }
+            case Int32(338), Int32(339): // PAGE_DOWN/PAGE_UP
+                if ch == Int32(338) {
+                    verticalScrollOffset = min(max(0, totalLines - contentHeight), verticalScrollOffset + contentHeight)
+                } else {
+                    verticalScrollOffset = max(0, verticalScrollOffset - contentHeight)
+                }
+            case Int32(262), Int32(360): // HOME/END
+                if ch == Int32(262) {
+                    verticalScrollOffset = 0
+                    horizontalScrollOffset = 0
+                } else {
+                    verticalScrollOffset = max(0, totalLines - contentHeight)
+                    let maxHorizontalScroll = max(0, maxLineWidth - contentWidth)
+                    horizontalScrollOffset = maxHorizontalScroll
+                }
             default:
                 break
             }

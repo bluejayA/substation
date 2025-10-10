@@ -443,9 +443,6 @@ final class ContextSwitcher: @unchecked Sendable {
         // Clear search indexes
         await tui.memoryContainer.searchIndexCache.clearAll()
 
-        // Clear topology cache
-        tui.lastTopology = nil
-
         // Clear relationship cache
         await tui.memoryContainer.relationshipCache.clearAll()
 

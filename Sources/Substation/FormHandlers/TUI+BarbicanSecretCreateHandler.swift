@@ -14,6 +14,10 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    var barbicanSecretCreateNavigationContext: NavigationContext {
+        return .form(fieldCount: 8)
+    }
+
     internal func handleBarbicanSecretCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Handle FormSelector-based selection modes
         if barbicanSecretCreateForm.contentTypeSelectionMode {
@@ -31,15 +35,17 @@ extension TUI {
             case Int32(27): // ESC - Exit selection mode
                 barbicanSecretCreateForm.contentTypeSelectionMode = false
                 await self.draw(screen: screen)
-            case Int32(258): // DOWN
-                if barbicanSecretCreateForm.contentTypeSelectionIndex < contentTypes.count - 1 {
-                    barbicanSecretCreateForm.contentTypeSelectionIndex += 1
-                    await self.draw(screen: screen)
-                }
-            case Int32(259): // UP
-                if barbicanSecretCreateForm.contentTypeSelectionIndex > 0 {
-                    barbicanSecretCreateForm.contentTypeSelectionIndex -= 1
-                    await self.draw(screen: screen)
+            case Int32(258), Int32(259): // UP/DOWN - Navigate selection
+                if ch == Int32(258) {
+                    if barbicanSecretCreateForm.contentTypeSelectionIndex < contentTypes.count - 1 {
+                        barbicanSecretCreateForm.contentTypeSelectionIndex += 1
+                        await self.draw(screen: screen)
+                    }
+                } else {
+                    if barbicanSecretCreateForm.contentTypeSelectionIndex > 0 {
+                        barbicanSecretCreateForm.contentTypeSelectionIndex -= 1
+                        await self.draw(screen: screen)
+                    }
                 }
             default: break
             }
@@ -55,11 +61,15 @@ extension TUI {
                 }
             case Int32(10), Int32(13): barbicanSecretCreateForm.exitEncodingSelectionMode(); await self.draw(screen: screen)
             case Int32(27): barbicanSecretCreateForm.encodingSelectionMode = false; await self.draw(screen: screen)
-            case Int32(258): if barbicanSecretCreateForm.encodingSelectionIndex < encodings.count - 1 {
-                    barbicanSecretCreateForm.encodingSelectionIndex += 1; await self.draw(screen: screen)
-                }
-            case Int32(259): if barbicanSecretCreateForm.encodingSelectionIndex > 0 {
-                    barbicanSecretCreateForm.encodingSelectionIndex -= 1; await self.draw(screen: screen)
+            case Int32(258), Int32(259): // UP/DOWN - Navigate selection
+                if ch == Int32(258) {
+                    if barbicanSecretCreateForm.encodingSelectionIndex < encodings.count - 1 {
+                        barbicanSecretCreateForm.encodingSelectionIndex += 1; await self.draw(screen: screen)
+                    }
+                } else {
+                    if barbicanSecretCreateForm.encodingSelectionIndex > 0 {
+                        barbicanSecretCreateForm.encodingSelectionIndex -= 1; await self.draw(screen: screen)
+                    }
                 }
             default: break
             }
@@ -75,11 +85,15 @@ extension TUI {
                 }
             case Int32(10), Int32(13): barbicanSecretCreateForm.exitSecretTypeSelectionMode(); await self.draw(screen: screen)
             case Int32(27): barbicanSecretCreateForm.secretTypeSelectionMode = false; await self.draw(screen: screen)
-            case Int32(258): if barbicanSecretCreateForm.secretTypeSelectionIndex < secretTypes.count - 1 {
-                    barbicanSecretCreateForm.secretTypeSelectionIndex += 1; await self.draw(screen: screen)
-                }
-            case Int32(259): if barbicanSecretCreateForm.secretTypeSelectionIndex > 0 {
-                    barbicanSecretCreateForm.secretTypeSelectionIndex -= 1; await self.draw(screen: screen)
+            case Int32(258), Int32(259): // UP/DOWN - Navigate selection
+                if ch == Int32(258) {
+                    if barbicanSecretCreateForm.secretTypeSelectionIndex < secretTypes.count - 1 {
+                        barbicanSecretCreateForm.secretTypeSelectionIndex += 1; await self.draw(screen: screen)
+                    }
+                } else {
+                    if barbicanSecretCreateForm.secretTypeSelectionIndex > 0 {
+                        barbicanSecretCreateForm.secretTypeSelectionIndex -= 1; await self.draw(screen: screen)
+                    }
                 }
             default: break
             }
@@ -95,11 +109,15 @@ extension TUI {
                 }
             case Int32(10), Int32(13): barbicanSecretCreateForm.exitAlgorithmSelectionMode(); await self.draw(screen: screen)
             case Int32(27): barbicanSecretCreateForm.algorithmSelectionMode = false; await self.draw(screen: screen)
-            case Int32(258): if barbicanSecretCreateForm.algorithmSelectionIndex < algorithms.count - 1 {
-                    barbicanSecretCreateForm.algorithmSelectionIndex += 1; await self.draw(screen: screen)
-                }
-            case Int32(259): if barbicanSecretCreateForm.algorithmSelectionIndex > 0 {
-                    barbicanSecretCreateForm.algorithmSelectionIndex -= 1; await self.draw(screen: screen)
+            case Int32(258), Int32(259): // UP/DOWN - Navigate selection
+                if ch == Int32(258) {
+                    if barbicanSecretCreateForm.algorithmSelectionIndex < algorithms.count - 1 {
+                        barbicanSecretCreateForm.algorithmSelectionIndex += 1; await self.draw(screen: screen)
+                    }
+                } else {
+                    if barbicanSecretCreateForm.algorithmSelectionIndex > 0 {
+                        barbicanSecretCreateForm.algorithmSelectionIndex -= 1; await self.draw(screen: screen)
+                    }
                 }
             default: break
             }
@@ -115,11 +133,15 @@ extension TUI {
                 }
             case Int32(10), Int32(13): barbicanSecretCreateForm.exitModeSelectionMode(); await self.draw(screen: screen)
             case Int32(27): barbicanSecretCreateForm.modeSelectionMode = false; await self.draw(screen: screen)
-            case Int32(258): if barbicanSecretCreateForm.modeSelectionIndex < modes.count - 1 {
-                    barbicanSecretCreateForm.modeSelectionIndex += 1; await self.draw(screen: screen)
-                }
-            case Int32(259): if barbicanSecretCreateForm.modeSelectionIndex > 0 {
-                    barbicanSecretCreateForm.modeSelectionIndex -= 1; await self.draw(screen: screen)
+            case Int32(258), Int32(259): // UP/DOWN - Navigate selection
+                if ch == Int32(258) {
+                    if barbicanSecretCreateForm.modeSelectionIndex < modes.count - 1 {
+                        barbicanSecretCreateForm.modeSelectionIndex += 1; await self.draw(screen: screen)
+                    }
+                } else {
+                    if barbicanSecretCreateForm.modeSelectionIndex > 0 {
+                        barbicanSecretCreateForm.modeSelectionIndex -= 1; await self.draw(screen: screen)
+                    }
                 }
             default: break
             }
@@ -135,17 +157,36 @@ extension TUI {
                 }
             case Int32(10), Int32(13): barbicanSecretCreateForm.exitBitLengthSelectionMode(); await self.draw(screen: screen)
             case Int32(27): barbicanSecretCreateForm.bitLengthSelectionMode = false; await self.draw(screen: screen)
-            case Int32(258): if barbicanSecretCreateForm.bitLengthSelectionIndex < bitLengths.count - 1 {
-                    barbicanSecretCreateForm.bitLengthSelectionIndex += 1; await self.draw(screen: screen)
-                }
-            case Int32(259): if barbicanSecretCreateForm.bitLengthSelectionIndex > 0 {
-                    barbicanSecretCreateForm.bitLengthSelectionIndex -= 1; await self.draw(screen: screen)
+            case Int32(258), Int32(259): // UP/DOWN - Navigate selection
+                if ch == Int32(258) {
+                    if barbicanSecretCreateForm.bitLengthSelectionIndex < bitLengths.count - 1 {
+                        barbicanSecretCreateForm.bitLengthSelectionIndex += 1; await self.draw(screen: screen)
+                    }
+                } else {
+                    if barbicanSecretCreateForm.bitLengthSelectionIndex > 0 {
+                        barbicanSecretCreateForm.bitLengthSelectionIndex -= 1; await self.draw(screen: screen)
+                    }
                 }
             default: break
             }
             return
         }
 
+        // Check if we're in field edit mode
+        let isFieldActive = barbicanSecretCreateForm.fieldEditMode || barbicanSecretCreateForm.payloadEditMode
+
+        // Try common navigation when NOT in field edit mode
+        if !isFieldActive {
+            if await handleCommonNavigation(ch, screen: screen, context: barbicanSecretCreateNavigationContext) {
+                return
+            }
+        }
+
+        // Handle view-specific input
+        await handleBarbicanSecretCreateSpecificInput(ch, screen: screen)
+    }
+
+    private func handleBarbicanSecretCreateSpecificInput(_ ch: Int32, screen: OpaquePointer?) async {
         switch ch {
         case Int32(9): // TAB - Next field
             if !barbicanSecretCreateForm.fieldEditMode && !barbicanSecretCreateForm.payloadEditMode {
@@ -179,22 +220,6 @@ extension TUI {
                 case .expirationDate:
                     barbicanSecretCreateForm.enterSelectionMode()
                 }
-                await self.draw(screen: screen)
-            }
-        case Int32(259): // UP - Previous field or previous selection item
-            if barbicanSecretCreateForm.selectionMode {
-                barbicanSecretCreateForm.previousSelectionItem()
-                await self.draw(screen: screen)
-            } else if !barbicanSecretCreateForm.fieldEditMode && !barbicanSecretCreateForm.payloadEditMode {
-                barbicanSecretCreateForm.previousField()
-                await self.draw(screen: screen)
-            }
-        case Int32(258): // DOWN - Next field or next selection item
-            if barbicanSecretCreateForm.selectionMode {
-                barbicanSecretCreateForm.nextSelectionItem()
-                await self.draw(screen: screen)
-            } else if !barbicanSecretCreateForm.fieldEditMode && !barbicanSecretCreateForm.payloadEditMode {
-                barbicanSecretCreateForm.nextField()
                 await self.draw(screen: screen)
             }
         case Int32(32): // SPACEBAR - Enter selection mode or edit field

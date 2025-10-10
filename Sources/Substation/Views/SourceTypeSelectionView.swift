@@ -37,7 +37,7 @@ struct SourceTypeSelectionView {
             items: sourceTypes,
             selectedItemIds: selectedSourceTypeIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

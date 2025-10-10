@@ -1083,11 +1083,11 @@ Press [ESC] to close this window
         navigationState?.actualServiceCount = serviceStatus.count
 
         if serviceStatus.isEmpty {
-            components.append(Text("SERVICE STATUS (Updated: \(timestamp))").primary().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
+            components.append(Text("CLIENT SIDE SERVICE STATUS (Updated: \(timestamp))").primary().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
             components.append(Text("NO DATA - Service status unavailable").muted().padding(EdgeInsets(top: 2, leading: 2, bottom: 1, trailing: 0)))
             return
         } else {
-            components.append(Text("SERVICE STATUS (Updated: \(timestamp)) - \(serviceStatus.count) services").primary().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
+            components.append(Text("CLIENT SIDE SERVICE STATUS (Updated: \(timestamp)) - \(serviceStatus.count) services").primary().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
         }
 
         let startIndex = navigationState?.scrollOffset ?? 0

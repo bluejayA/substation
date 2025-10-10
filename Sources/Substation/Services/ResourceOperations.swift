@@ -1541,7 +1541,7 @@ final class ResourceOperations {
             statusMessage = "Port '\(portName)' created successfully"
 
             // Refresh port cache and return to list
-            tui.refreshAfterOperation()
+            await dataManager.refreshPortData()
             tui.changeView(to: .ports, resetSelection: false)
 
         } catch let error as OpenStackError {

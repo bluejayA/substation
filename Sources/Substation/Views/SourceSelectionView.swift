@@ -85,7 +85,7 @@ struct SourceSelectionView {
             items: bootableVolumes,
             selectedItemIds: selectedVolumeId != nil ? [selectedVolumeId!] : [],
             highlightedIndex: selectedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

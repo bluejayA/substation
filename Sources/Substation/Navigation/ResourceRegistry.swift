@@ -41,7 +41,6 @@ final class ResourceRegistry: @unchecked Sendable {
         .advancedSearch: ["search", "find", "z"],
         .healthDashboard: ["health", "healthdashboard", "h"],
         .help: ["help", "?"],
-        .topology: ["topology", "topo", "t"],
     ]
 
     // Reverse lookup cache for fast command resolution
