@@ -10,10 +10,11 @@ struct PortViews {
     @MainActor
     static func drawDetailedPortList(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                     width: Int32, height: Int32, cachedPorts: [Port],
+                                    cachedNetworks: [Network], cachedServers: [Server],
                                     searchQuery: String?, scrollOffset: Int, selectedIndex: Int,
                                     multiSelectMode: Bool = false, selectedItems: Set<String> = []) async {
 
-        let statusListView = createPortStatusListView()
+        let statusListView = createPortStatusListView(networks: cachedNetworks, servers: cachedServers)
         await statusListView.draw(
             screen: screen,
             startRow: startRow,
