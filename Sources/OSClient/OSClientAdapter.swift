@@ -211,22 +211,14 @@ extension OpenStackClient {
 
     // MARK: - Network Attachment Extensions
 
-    /// Attach port to server
-    public func attachPort(serverID: String, portID: String) async throws {
-        try await executeWithTokenRefresh {
-            let nova = await self.nova
-            let _ = try await nova.attachPortToServer(serverId: serverID, portId: portID)
-        }
-    }
-
     /// Attach network to server (creates new port and attaches it)
     public func attachNetwork(serverID: String, networkID: String) async throws {
         try await executeWithTokenRefresh {
             let neutron = await self.neutron
             let port = try await neutron.createPort(request: CreatePortRequest(
                 name: "auto-attachment-\(UUID().uuidString.prefix(8))",
-                networkId: networkID,
                 description: "Auto-created for network attachment",
+                networkId: networkID,
                 adminStateUp: true
             ))
 

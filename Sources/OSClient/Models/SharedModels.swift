@@ -181,6 +181,18 @@ public struct FlavorRef: Codable, Sendable, Hashable {
         case swap
     }
 
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        originalName = try container.decodeIfPresent(String.self, forKey: .originalName)
+        vcpus = try container.decodeIfPresent(Int.self, forKey: .vcpus)
+        ram = try container.decodeIfPresent(Int.self, forKey: .ram)
+        disk = try container.decodeIfPresent(Int.self, forKey: .disk)
+        ephemeral = try container.decodeIfPresent(Int.self, forKey: .ephemeral)
+        swap = try container.decodeIfPresent(Int.self, forKey: .swap)
+    }
+
     public init(id: String, name: String? = nil, originalName: String? = nil, vcpus: Int? = nil, ram: Int? = nil, disk: Int? = nil, ephemeral: Int? = nil, swap: Int? = nil) {
         self.id = id
         self.name = name

@@ -92,14 +92,71 @@ public struct Server: Codable, Sendable, ResourceIdentifiable, Timestamped {
         instanceName = try container.decodeIfPresent(String.self, forKey: .instanceName)
         hostStatus = try container.decodeIfPresent(String.self, forKey: .hostStatus)
 
-        // Handle flavor field - can be FlavorRef object or String ID
+        // Handle flavor field - OpenStack returns flavor in multiple formats:
+        // 1. Full FlavorRef with id (standard format with flavor links)
+        // 2. String ID only (minimal format)
+        // 3. Embedded flavor details with original_name but no id (Nova 2024.1+)
         if let flavorDict = try? container.decode(FlavorRef.self, forKey: .flavor) {
             flavor = flavorDict
         } else if let flavorId = try? container.decode(String.self, forKey: .flavor) {
             // Create a minimal FlavorRef with just the ID
             flavor = FlavorRef(id: flavorId)
         } else {
-            flavor = nil
+            // OpenStack Nova API can return embedded flavor details without an id field
+            // This is standard behavior when the API embeds full flavor specs in the server response
+            struct EmbeddedFlavor: Codable {
+                let originalName: String?
+                let name: String?
+                let vcpus: Int?
+                let ram: Int?
+                let disk: Int?
+                let ephemeral: Int?
+                let swap: Int?
+
+                enum CodingKeys: String, CodingKey {
+                    case originalName = "original_name"
+                    case name
+                    case vcpus
+                    case ram
+                    case disk
+                    case ephemeral
+                    case swap
+                }
+            }
+
+            if let embeddedFlavor = try? container.decode(EmbeddedFlavor.self, forKey: .flavor) {
+                // Use original_name as the identifier (standard OpenStack field)
+                if let originalName = embeddedFlavor.originalName {
+                    flavor = FlavorRef(
+                        id: originalName,
+                        name: embeddedFlavor.name,
+                        originalName: originalName,
+                        vcpus: embeddedFlavor.vcpus,
+                        ram: embeddedFlavor.ram,
+                        disk: embeddedFlavor.disk,
+                        ephemeral: embeddedFlavor.ephemeral,
+                        swap: embeddedFlavor.swap
+                    )
+                } else if let name = embeddedFlavor.name {
+                    flavor = FlavorRef(
+                        id: name,
+                        name: name,
+                        vcpus: embeddedFlavor.vcpus,
+                        ram: embeddedFlavor.ram,
+                        disk: embeddedFlavor.disk,
+                        ephemeral: embeddedFlavor.ephemeral,
+                        swap: embeddedFlavor.swap
+                    )
+                } else {
+                    flavor = nil
+                }
+            } else if let meta = try? container.decodeIfPresent([String: String].self, forKey: .metadata),
+                      let flavorId = meta["instance_type_id"] ?? meta["flavor_id"] {
+                // Fallback: extract flavor from metadata if available
+                flavor = FlavorRef(id: flavorId)
+            } else {
+                flavor = nil
+            }
         }
 
         // Handle image field - can be ImageRef object, String ID, or empty string for volume-backed
