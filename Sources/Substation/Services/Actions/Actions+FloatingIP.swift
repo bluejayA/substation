@@ -28,16 +28,21 @@ extension Actions {
 
         // Check if floating IP is already assigned
         if let _ = floatingIP.fixedIpAddress {
-            statusMessage = "Floating IP '\(floatingIPAddress)' is already assigned. Detach it first."
-            return
+            // Floating IP is attached - set mode to detach
+            selectedResource = floatingIP
+            attachmentMode = .detach
+            await loadAttachedServerForFloatingIP(floatingIP)
+            tui.changeView(to: .floatingIPServerManagement, resetSelection: false)
+            statusMessage = "Floating IP '\(floatingIPAddress)' is attached. Select to detach or press TAB to switch to attach mode."
+        } else {
+            // Floating IP is not attached - set mode to attach
+            selectedResource = floatingIP
+            attachmentMode = .attach
+            selectedServerId = nil
+            attachedServerId = nil  // Clear attached server ID for unattached floating IPs
+            tui.changeView(to: .floatingIPServerManagement, resetSelection: false)
+            statusMessage = "Select a server to attach floating IP '\(floatingIPAddress)'"
         }
-
-        // Switch to floating IP server management view
-        selectedResource = floatingIP
-        attachmentMode = .attach
-        selectedServerId = nil
-        tui.changeView(to: .floatingIPServerManagement, resetSelection: false)
-        statusMessage = "Select a server to assign floating IP '\(floatingIPAddress)'"
     }
 
     internal func loadAttachedServerForFloatingIP(_ floatingIP: FloatingIP) async {
@@ -51,6 +56,37 @@ extension Actions {
                     attachedServerId = serverId
                 }
             }
+        }
+    }
+
+    internal func manageFloatingIPPortAssignment(screen: OpaquePointer?) async {
+        guard currentView == .floatingIPs else { return }
+
+        let filteredFloatingIPs = FilterUtils.filterFloatingIPs(cachedFloatingIPs, query: searchQuery)
+        guard selectedIndex < filteredFloatingIPs.count else {
+            statusMessage = "No floating IP selected"
+            return
+        }
+
+        let floatingIP = filteredFloatingIPs[selectedIndex]
+        let floatingIPAddress = floatingIP.floatingIpAddress ?? floatingIP.id
+
+        // Check if floating IP is already attached to a port
+        if let portId = floatingIP.portId, !portId.isEmpty {
+            // Floating IP is attached - set mode to detach
+            attachmentMode = .detach
+            tui.attachedPortId = portId
+            tui.changeView(to: .floatingIPPortManagement, resetSelection: true)
+            selectedResource = floatingIP  // Set AFTER changeView to prevent it being cleared
+            statusMessage = "Floating IP '\(floatingIPAddress)' is attached. Select to detach or press TAB to switch to attach mode."
+        } else {
+            // Floating IP is not attached - set mode to attach
+            attachmentMode = .attach
+            tui.selectedPortId = nil
+            tui.attachedPortId = nil
+            tui.changeView(to: .floatingIPPortManagement, resetSelection: true)
+            selectedResource = floatingIP  // Set AFTER changeView to prevent it being cleared
+            statusMessage = "Select a port to attach floating IP '\(floatingIPAddress)'"
         }
     }
 }

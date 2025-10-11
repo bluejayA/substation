@@ -85,12 +85,23 @@ struct FilterUtils {
     }
 
     static func filterPorts(_ ports: [Port], query: String?) -> [Port] {
-        guard let query = query?.lowercased() else { return ports }
-        return ports.filter { port in
-            port.name?.lowercased().contains(query) == true ||
-            port.id.lowercased().contains(query) ||
-            port.networkId.lowercased().contains(query) ||
-            port.deviceId?.lowercased().contains(query) == true
+        let filtered: [Port]
+        if let query = query?.lowercased() {
+            filtered = ports.filter { port in
+                port.name?.lowercased().contains(query) == true ||
+                port.id.lowercased().contains(query) ||
+                port.networkId.lowercased().contains(query) ||
+                port.deviceId?.lowercased().contains(query) == true
+            }
+        } else {
+            filtered = ports
+        }
+
+        // Sort alphabetically by name (case-insensitive), with unnamed ports (using ID) at the end
+        return filtered.sorted { port1, port2 in
+            let name1 = port1.name?.lowercased() ?? "~\(port1.id)" // ~ sorts after letters
+            let name2 = port2.name?.lowercased() ?? "~\(port2.id)"
+            return name1 < name2
         }
     }
 

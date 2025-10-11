@@ -4,6 +4,70 @@ import SwiftTUI
 
 struct VolumeArchiveViews {
 
+    // MARK: - Modern Archive List View (Using StatusListView)
+
+    @MainActor
+    static func drawArchiveList(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        cachedVolumeSnapshots: [VolumeSnapshot],
+        cachedVolumeBackups: [VolumeBackup],
+        cachedImages: [Image],
+        searchQuery: String?,
+        scrollOffset: Int,
+        selectedIndex: Int,
+        multiSelectMode: Bool = false,
+        selectedItems: Set<String> = []
+    ) async {
+        var archiveItems: [VolumeArchiveItem] = []
+
+        for snapshot in cachedVolumeSnapshots {
+            archiveItems.append(VolumeArchiveItem(itemType: .volumeSnapshot(snapshot)))
+        }
+
+        for backup in cachedVolumeBackups {
+            archiveItems.append(VolumeArchiveItem(itemType: .volumeBackup(backup)))
+        }
+
+        let serverBackups = cachedImages.filter { image in
+            if let properties = image.properties,
+               let imageType = properties["image_type"],
+               imageType == "snapshot" {
+                return true
+            }
+            return false
+        }
+
+        for backup in serverBackups {
+            archiveItems.append(VolumeArchiveItem(itemType: .serverBackup(backup)))
+        }
+
+        archiveItems.sort { a, b in
+            guard let dateA = a.createdAt, let dateB = b.createdAt else {
+                return a.createdAt != nil
+            }
+            return dateA > dateB
+        }
+
+        let statusListView = createVolumeArchiveStatusListView()
+        await statusListView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            items: archiveItems,
+            searchQuery: searchQuery,
+            scrollOffset: scrollOffset,
+            selectedIndex: selectedIndex,
+            multiSelectMode: multiSelectMode,
+            selectedItems: selectedItems
+        )
+    }
+
     // MARK: - Unified Archive Item
 
     private enum ArchiveItem {

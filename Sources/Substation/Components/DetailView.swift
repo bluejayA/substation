@@ -22,15 +22,29 @@ enum DetailItem {
     case customComponent(any Component)
     case spacer
 
-    func toComponent(indent: String, separator: String) -> any Component {
+    func toComponent(indent: String, separator: String, maxLabelWidth: Int = 0) -> any Component {
         switch self {
         case .field(let label, let value, let style):
-            return Text(indent + label + separator + value).styled(style)
+            // Pad label to maxLabelWidth for alignment if specified
+            let paddedLabel: String
+            if maxLabelWidth > 0 && label.count < maxLabelWidth {
+                paddedLabel = label + String(repeating: " ", count: maxLabelWidth - label.count)
+            } else {
+                paddedLabel = label
+            }
+            return Text(indent + paddedLabel + separator + value).styled(style)
         case .customComponent(let component):
             return component
         case .spacer:
             return Text("")
         }
+    }
+
+    var label: String? {
+        if case .field(let label, _, _) = self {
+            return label
+        }
+        return nil
     }
 
     var isSpacerType: Bool {
@@ -118,16 +132,10 @@ struct DetailView {
             Self.lastScrollOffset = scrollOffset
         }
 
-        // Use cache key based on title to avoid rebuilding components
-        let cacheKey = title
+        // Build components fresh each time to ensure alignment is correct
+        // (Caching was causing alignment issues with dynamic content)
+        var newComponents: [any Component] = []
         let components: [any Component]
-
-        // Check if we can use cached components
-        if let cachedComponents = Self.componentCache[cacheKey] {
-            components = cachedComponents
-        } else {
-            // Build components only when not cached
-            var newComponents: [any Component] = []
 
             // Title
             newComponents.append(
@@ -141,12 +149,16 @@ struct DetailView {
                 let sectionTitle = Text(section.title).styled(section.titleStyle).bold()
                     .padding(Self.sectionTitlePadding)
 
+                // Calculate max label width for alignment in this section
+                let maxLabelWidth = section.items.compactMap { $0.label?.count }.max() ?? 0
+
                 // Build section items
                 var sectionComponents: [any Component] = []
                 for item in section.items {
                     let component = item.toComponent(
                         indent: Self.defaultInfoFieldIndent,
-                        separator: Self.defaultFieldValueSeparator
+                        separator: Self.defaultFieldValueSeparator,
+                        maxLabelWidth: maxLabelWidth
                     )
                     sectionComponents.append(component.padding(Self.sectionItemPadding))
                 }
@@ -170,10 +182,7 @@ struct DetailView {
                 )
             }
 
-            // Cache the built components
-            Self.componentCache[cacheKey] = newComponents
-            components = newComponents
-        }
+        components = newComponents
 
         // Apply scroll offset and limit visible components to screen height for performance
         // Only render what can actually be displayed to reduce CPU usage

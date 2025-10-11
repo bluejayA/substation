@@ -29,81 +29,58 @@ extension TUI {
             filteredServers = cachedServers
         }
 
-        // Filter servers based on current mode
+        // Floating IPs have a one-to-one relationship with servers
+        // Filter based on mode:
+        // - ATTACH: Show all servers EXCEPT the currently attached one
+        // - DETACH: Show ONLY the currently attached server (empty if unassigned)
         let relevantServers: [Server]
         switch attachmentMode {
         case .attach:
-            // Show servers that don't have the floating IP attached
-            relevantServers = filteredServers.filter { server in
-                attachedServerId != server.id
+            if let attachedId = attachedServerId {
+                relevantServers = filteredServers.filter { $0.id != attachedId }
+            } else {
+                relevantServers = filteredServers
             }
         case .detach:
-            // Show only the server that has the floating IP attached
             if let attachedId = attachedServerId {
                 relevantServers = filteredServers.filter { $0.id == attachedId }
             } else {
+                // No server attached - show empty list
                 relevantServers = []
             }
         }
 
-        switch ch {
-        case Int32(9): // TAB - toggle attachment mode
-            attachmentMode = (attachmentMode == .attach) ? .detach : .attach
-            selectedServerId = nil
-            selectedIndex = 0
-            scrollOffset = 0
-            statusMessage = "Switched to \(attachmentMode == .attach ? "ASSIGN" : "UNASSIGN") mode"
-        case Int32(32): // SPACE - toggle server selection
-            guard selectedIndex < relevantServers.count else { return }
-            let server = relevantServers[selectedIndex]
-            if selectedServerId == server.id {
-                selectedServerId = nil
-                statusMessage = "Deselected server '\(server.name ?? "Unknown")'"
-            } else {
-                selectedServerId = server.id
-                statusMessage = "Selected server '\(server.name ?? "Unknown")'"
-            }
-        case Int32(10): // ENTER - apply changes
-            needsRedraw = true
-            await uiHelpers.performFloatingIPServerManagement()
-        case Int32(259): // KEY_UP
-            if selectedIndex > 0 {
-                selectedIndex -= 1
-                if selectedIndex < scrollOffset {
-                    scrollOffset = selectedIndex
-                }
-            }
-        case Int32(258): // KEY_DOWN
-            if selectedIndex < relevantServers.count - 1 {
-                selectedIndex += 1
-                let visibleRows = 20
-                if selectedIndex >= scrollOffset + visibleRows {
-                    scrollOffset = selectedIndex - visibleRows + 1
-                }
-            }
-        default:
-            // Handle search input
-            if ch >= 32 && ch < 127 {
-                let character = Character(UnicodeScalar(Int(ch))!)
-                if searchQuery == nil {
-                    searchQuery = String(character)
+        let _ = await formInputHandler.handleManagementInput(
+            ch,
+            screen: screen,
+            itemCount: relevantServers.count,
+            onToggle: {
+                guard self.selectedIndex < relevantServers.count else { return }
+                let server = relevantServers[self.selectedIndex]
+                if self.selectedServerId == server.id {
+                    self.selectedServerId = nil
+                    self.statusMessage = "Deselected server '\(server.name ?? "Unknown")'"
                 } else {
-                    searchQuery! += String(character)
+                    self.selectedServerId = server.id
+                    self.statusMessage = "Selected server '\(server.name ?? "Unknown")'"
                 }
-                selectedIndex = 0
-                scrollOffset = 0
-                await self.draw(screen: screen)
-            } else if ch == 127 || ch == 8 { // BACKSPACE
-                if searchQuery != nil && !searchQuery!.isEmpty {
-                    searchQuery!.removeLast()
-                    if searchQuery!.isEmpty {
-                        searchQuery = nil
-                    }
-                    selectedIndex = 0
-                    scrollOffset = 0
-                    await self.draw(screen: screen)
+            },
+            onEnter: {
+                self.needsRedraw = true
+                await self.uiHelpers.performFloatingIPServerManagement()
+            },
+            additionalHandling: { ch in
+                // Handle TAB for mode switching
+                if ch == Int32(9) {
+                    self.attachmentMode = (self.attachmentMode == .attach) ? .detach : .attach
+                    self.selectedServerId = nil
+                    self.selectedIndex = 0
+                    self.scrollOffset = 0
+                    self.statusMessage = "Switched to \(self.attachmentMode == .attach ? "ASSIGN" : "UNASSIGN") mode"
+                    return true
                 }
+                return false
             }
-        }
+        )
     }
 }

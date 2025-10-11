@@ -15,7 +15,7 @@ struct ServerSelectionView {
         scrollOffset: Int,
         searchQuery: String?,
         title: String = "Select Servers",
-        multiSelect: Bool = true
+        checkboxMode: FormSelectorCheckboxMode = .multiSelect
     ) async {
         let surface = SwiftTUI.surface(from: screen)
 
@@ -44,7 +44,7 @@ struct ServerSelectionView {
             items: servers,
             selectedItemIds: selectedServerIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: multiSelect,
+            checkboxMode: checkboxMode,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

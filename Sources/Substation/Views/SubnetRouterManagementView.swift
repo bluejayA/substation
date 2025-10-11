@@ -35,7 +35,7 @@ struct SubnetRouterManagementView {
             scrollOffset: scrollOffset,
             searchQuery: searchQuery ?? "",
             title: title,
-            multiSelect: false
+            checkboxMode: .basic
         )
     }
 }

@@ -16,7 +16,7 @@ struct NetworkSelectionView {
         scrollOffset: Int,
         searchQuery: String?,
         title: String = "Select Network",
-        multiSelect: Bool = false
+        checkboxMode: FormSelectorCheckboxMode = .basic
     ) async {
         let surface = SwiftTUI.surface(from: screen)
 
@@ -44,7 +44,7 @@ struct NetworkSelectionView {
             items: networks,
             selectedItemIds: selectedNetworkIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: multiSelect,
+            checkboxMode: checkboxMode,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

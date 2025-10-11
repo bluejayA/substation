@@ -50,6 +50,8 @@ struct MiscViews {
             return "Help - Network Management"
         case .volumes:
             return "Help - Volume Management"
+        case .volumeArchives:
+            return "Help - Volume Archive Management"
         case .images:
             return "Help - Image Management"
         case .flavors:
@@ -68,15 +70,13 @@ struct MiscViews {
             return "Help - Security Group Management"
         case .serverGroups:
             return "Help - Server Group Management"
-        case .topology:
-            return "Help - Topology View"
         case .healthDashboard:
             return "Help - Health Dashboard"
         case .dashboard:
             return "Help - Main Dashboard"
         case .serverCreate, .networkCreate, .volumeCreate, .keyPairCreate, .subnetCreate, .portCreate, .routerCreate, .floatingIPCreate, .serverGroupCreate, .securityGroupCreate:
             return "Help - Resource Creation"
-        case .serverDetail, .networkDetail, .volumeDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .securityGroupDetail, .serverGroupDetail, .healthDashboardServiceDetail:
+        case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .securityGroupDetail, .serverGroupDetail, .healthDashboardServiceDetail, .barbicanSecretDetail, .barbicanContainerDetail:
             return "Help - Resource Details"
         case .serverSecurityGroups:
             return "Help - Security Group Management"
@@ -98,6 +98,14 @@ struct MiscViews {
             return "Help - Security Rule Management"
         case .advancedSearch:
             return "Help - Search"
+        case .barbican, .barbicanSecrets:
+            return "Help - Secret Management"
+        case .barbicanContainers:
+            return "Help - Secret Container Management"
+        case .barbicanSecretCreate:
+            return "Help - Secret Creation"
+        case .barbicanContainerCreate:
+            return "Help - Container Creation"
         default:
             return "Help - Keyboard Shortcuts"
         }
@@ -139,15 +147,13 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Server Management", [
-                    "C: Create new server",
-                    "S: Start server",
-                    "R: Restart server",
-                    "T: Stop server",
-                    "P: Create snapshot",
-                    "G: Manage security groups",
-                    "I: Manage network interfaces",
-                    "L: View server logs",
-                    "Z: Resize server",
+                    "SHIFT-C: Create new server",
+                    "SHIFT-S: Start server",
+                    "SHIFT-R: Restart server",
+                    "SHIFT-T: Stop server",
+                    "SHIFT-P: Create snapshot",
+                    "SHIFT-L: View server logs",
+                    "SHIFT-Z: Resize server",
                     "DELETE: Delete selected server",
                     "Server States: ACTIVE, SHUTOFF, ERROR, BUILD",
                 ]),
@@ -165,10 +171,9 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Volume Management", [
-                    "C: Create new volume",
-                    "A: Attach volume to server",
-                    "D: Detach volume from server",
-                    "P: Create volume snapshot",
+                    "SHIFT-C: Create new volume",
+                    "SHIFT-M: Manage volume attachments",
+                    "SHIFT-P: Create volume snapshot",
                     "DELETE: Delete selected volume",
                     "Volume States: Available, In-use, Creating, Deleting",
                 ]),
@@ -182,11 +187,31 @@ struct MiscViews {
                 generalActions
             ]
 
+        case .volumeArchives:
+            return [
+                generalNavigation,
+                ("Volume Archive Management", [
+                    "SPACE: View archive details",
+                    "DELETE: Delete selected archive",
+                    "Archives are backups of volumes",
+                    "Can be used to restore volumes",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected archives",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
+                generalActions
+            ]
+
         case .networks:
             return [
                 generalNavigation,
                 ("Network Management", [
-                    "C: Create new network",
+                    "SHIFT-C: Create new network",
+                    "SHIFT-M: Manage network interfaces attachments",
                     "DELETE: Delete selected network",
                     "Network States: ACTIVE, DOWN, BUILD, ERROR",
                 ]),
@@ -197,8 +222,8 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Security Group Management", [
-                    "C: Create new security group",
-                    "M: Manage security group rules",
+                    "SHIFT-C: Create new security group",
+                    "SHIFT-M: Manage security group rules",
                     "DELETE: Delete selected security group",
                     "Rules control network access to resources",
                 ]),
@@ -208,9 +233,6 @@ struct MiscViews {
         case .serverCreate, .networkCreate, .volumeCreate, .keyPairCreate, .subnetCreate, .portCreate, .routerCreate, .floatingIPCreate, .serverGroupCreate, .securityGroupCreate:
             return [
                 ("Form Navigation", [
-                    "TAB: Move to next field",
-                    "SHIFT+TAB: Move to previous field",
-                    "LEFT/RIGHT: Change dropdown selection",
                     "SPACE: Edit text fields",
                     "ENTER: Create resource",
                     "ESC: Cancel and return",
@@ -233,17 +255,6 @@ struct MiscViews {
                     "Displays unified health monitoring view",
                     "Auto-refresh keeps status current",
                     "Service status updates in real-time",
-                ]),
-                generalActions
-            ]
-
-        case .topology:
-            return [
-                generalNavigation,
-                ("Topology View", [
-                    "W: Export topology as ASCII diagram",
-                    "View shows resource relationships",
-                    "Network connections and dependencies",
                 ]),
                 generalActions
             ]
@@ -289,7 +300,7 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("SSH Key Pair Management", [
-                    "C: Create new key pair",
+                    "SHIFT-C: Create new key pair",
                     "DELETE: Delete selected key pair",
                     "Used for secure server access",
                     "Import existing or generate new keys",
@@ -301,7 +312,7 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Subnet Management", [
-                    "C: Create new subnet",
+                    "SHIFT-C: Create new subnet",
                     "DELETE: Delete selected subnet",
                     "Subnets define IP address ranges within networks",
                     "Configure DHCP and gateway settings",
@@ -313,7 +324,9 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Port Management", [
-                    "C: Create new port",
+                    "SHIFT-C: Create new port",
+                    "SHIFT-M: Manage server attachment",
+                    "SHIFT-E: Manage allowed address pairs",
                     "DELETE: Delete selected port",
                     "Ports connect resources to networks",
                     "Manage IP assignments and security groups",
@@ -325,7 +338,7 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Router Management", [
-                    "C: Create new router",
+                    "SHIFT-C: Create new router",
                     "DELETE: Delete selected router",
                     "Routers connect networks and provide internet access",
                     "Configure external gateways and routes",
@@ -337,9 +350,8 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Floating IP Management", [
-                    "C: Create new floating IP",
-                    "A: Attach to server",
-                    "D: Detach from server",
+                    "SHIFT-C: Create new floating IP",
+                    "SHIFT-M: Manage server attachment",
                     "DELETE: Release floating IP",
                     "Provides external network access for servers",
                 ]),
@@ -350,8 +362,7 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Server Group Management", [
-                    "C: Create new server group",
-                    "M: Manage group membership",
+                    "SHIFT-C: Create new server group",
                     "DELETE: Delete selected server group",
                     "Groups define server placement policies",
                     "Anti-affinity and affinity rules",
@@ -457,12 +468,89 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Security Group Rules", [
+                    "SHIFT-C: Create new rule",
+                    "SHIFT-E: Edit existing rule",
                     "TAB: Switch between rule management modes",
                     "SPACE: Toggle rule selection",
-                    "C: Create new rule",
-                    "E: Edit existing rule",
                     "DELETE: Delete selected rules",
                     "ENTER: Apply rule changes",
+                ]),
+                generalActions
+            ]
+
+        case .barbican, .barbicanSecrets:
+            return [
+                generalNavigation,
+                ("Secret Management", [
+                    "SHIFT-C: Create new secret",
+                    "SPACE: View secret details",
+                    "DELETE: Delete selected secret",
+                    "Secrets store sensitive data securely",
+                    "Supports passphrases, certificates, and keys",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected secrets",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
+                generalActions
+            ]
+
+        case .barbicanContainers:
+            return [
+                generalNavigation,
+                ("Secret Container Management", [
+                    "SHIFT-C: Create new container",
+                    "SPACE: View container details",
+                    "DELETE: Delete selected container",
+                    "Containers organize multiple secrets",
+                    "Used for certificate bundles and key pairs",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected containers",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
+                generalActions
+            ]
+
+        case .barbicanSecretCreate:
+            return [
+                ("Secret Creation Form", [
+                    "TAB: Move to next field",
+                    "SHIFT+TAB: Move to previous field",
+                    "UP/DOWN: Navigate fields",
+                    "SPACE: Edit text fields",
+                    "ENTER: Create secret",
+                    "ESC: Cancel and return",
+                ]),
+                ("Secret Types", [
+                    "Passphrase: Text passwords and credentials",
+                    "Certificate: TLS/SSL certificates",
+                    "Private Key: RSA/EC private keys",
+                    "Public Key: RSA/EC public keys",
+                    "Opaque: Generic binary data",
+                ]),
+                generalActions
+            ]
+
+        case .barbicanContainerCreate:
+            return [
+                ("Container Creation Form", [
+                    "TAB: Move to next field",
+                    "SHIFT+TAB: Move to previous field",
+                    "SPACE: Edit text fields and select secrets",
+                    "ENTER: Create container",
+                    "ESC: Cancel and return",
+                ]),
+                ("Container Types", [
+                    "Generic: General purpose container",
+                    "Certificate: For certificate bundles",
+                    "RSA: For RSA key pairs",
                 ]),
                 generalActions
             ]

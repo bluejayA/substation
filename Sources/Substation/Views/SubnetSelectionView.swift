@@ -47,7 +47,7 @@ struct SubnetSelectionView {
             items: subnets,
             selectedItemIds: selectedSubnetIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

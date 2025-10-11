@@ -67,7 +67,6 @@ Substation is tested and supported with:
 
 **Advanced Features:**
 
-- Network topology generation
 - Port binding information
 - DHCP configuration
 - External network management
@@ -686,7 +685,7 @@ graph LR
 
 ## Security Considerations
 
-### Token Management
+### Security Token Management
 
 - Tokens stored in memory only
 - Automatic token refresh before expiry

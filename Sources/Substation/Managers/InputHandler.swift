@@ -7,9 +7,11 @@ import CrossPlatformTimer
 @MainActor
 class InputHandler {
     private weak var tui: TUI?
+    private var navigationHandler: NavigationInputHandler?
 
     init(tui: TUI) {
         self.tui = tui
+        self.navigationHandler = NavigationInputHandler(tui: tui)
     }
 
     // MARK: - Main Input Router
@@ -59,6 +61,20 @@ class InputHandler {
             return
         }
 
+        // PortCreateForm uses FormBuilder which handles its own input state
+        // Delegate all input to port create handler when in port create view
+        if tui.currentView == .portCreate {
+            await tui.handlePortCreateInput(ch, screen: screen)
+            return
+        }
+
+        // SubnetCreateForm uses FormBuilder which handles its own input state
+        // Delegate all input to subnet create handler when in subnet create view
+        if tui.currentView == .subnetCreate {
+            await tui.handleSubnetCreateInput(ch, screen: screen)
+            return
+        }
+
         // If we're in security group create mode and editing a text field,
         // only allow ESC to exit edit mode, delegate everything else to security group create handler
         if tui.currentView == .securityGroupCreate && tui.securityGroupCreateForm.fieldEditMode {
@@ -69,32 +85,6 @@ class InputHandler {
             }
             // Delegate all other input to security group create handler
             await tui.handleSecurityGroupCreateInput(ch, screen: screen)
-            return
-        }
-
-        // If we're in subnet create mode and editing a text field,
-        // only allow ESC to exit edit mode, delegate everything else to subnet create handler
-        if tui.currentView == .subnetCreate && tui.subnetCreateForm.fieldEditMode {
-            if ch == Int32(27) { // ESC - Exit edit mode
-                Logger.shared.logUserAction("field_edit_exit", details: ["form": "subnetCreate"])
-                tui.subnetCreateForm.fieldEditMode = false
-                return
-            }
-            // Delegate all other input to subnet create handler
-            await tui.handleSubnetCreateInput(ch, screen: screen)
-            return
-        }
-
-        // If we're in port create mode and editing a text field,
-        // only allow ESC to exit edit mode, delegate everything else to port create handler
-        if tui.currentView == .portCreate && tui.portCreateForm.fieldEditMode {
-            if ch == Int32(27) { // ESC - Exit edit mode
-                Logger.shared.logUserAction("field_edit_exit", details: ["form": "portCreate"])
-                tui.portCreateForm.fieldEditMode = false
-                return
-            }
-            // Delegate all other input to port create handler
-            await tui.handlePortCreateInput(ch, screen: screen)
             return
         }
 
@@ -112,15 +102,9 @@ class InputHandler {
             return
         }
 
-        // If we're in server group create mode and editing a text field,
-        // only allow ESC to exit edit mode, delegate everything else to server group create handler
-        if tui.currentView == .serverGroupCreate && tui.serverGroupCreateForm.fieldEditMode {
-            if ch == Int32(27) { // ESC - Exit edit mode
-                Logger.shared.logUserAction("field_edit_exit", details: ["form": "serverGroupCreate"])
-                tui.serverGroupCreateForm.fieldEditMode = false
-                return
-            }
-            // Delegate all other input to server group create handler
+        // ServerGroupCreateForm uses FormBuilder which handles its own input state
+        // Delegate all input to server group create handler when in server group create view
+        if tui.currentView == .serverGroupCreate {
             await tui.handleServerGroupCreateInput(ch, screen: screen)
             return
         }
@@ -152,184 +136,83 @@ class InputHandler {
             // If not handled by health dashboard, allow global navigation to continue
         }
 
-        if tui.currentView == .serverSecurityGroups {
-            // Special handling for ESC in security group management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".serverSecurityGroups", to: ".servers")
-                tui.changeView(to: .servers, resetSelection: false)
-                return
+        // UNIVERSAL SEARCH: Handle / key for all views before specialized routing
+        if ch == Int32(47) { // / - search or filter
+            Logger.shared.logUserAction("search_filter_prompt", details: ["view": "\(tui.currentView)"])
+            if let input = ViewUtils.prompt("Search: ", screen: screen, screenRows: tui.screenRows), !input.isEmpty {
+                Logger.shared.logUserAction("search_applied", details: ["query": input, "view": "\(tui.currentView)"])
+                tui.searchQuery = input
+                tui.scrollOffset = 0
+                tui.selectedIndex = 0
+            } else {
+                Logger.shared.logUserAction("search_cleared", details: ["view": "\(tui.currentView)"])
+                tui.searchQuery = nil
             }
-            // Delegate all other input to security group handler
+            return
+        }
+
+        // Route to specialized view handlers
+        // ESC navigation is now handled by NavigationInputHandler via isDetailView check
+        switch tui.currentView {
+        case .serverSecurityGroups:
             await tui.handleSecurityGroupInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .securityGroupRuleManagement {
-            // Delegate all input to security group rule management handler
+        case .securityGroupRuleManagement:
             await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .serverResize {
-            // Special handling for ESC in server resize
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".serverResize", to: ".servers")
-                tui.changeView(to: .servers, resetSelection: false)
-                return
-            }
-            // Delegate all other input to server resize handler
+        case .serverResize:
             await tui.handleServerResizeInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .serverSnapshotManagement {
-            // Special handling for ESC in snapshot management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".serverSnapshotManagement", to: ".servers")
-                tui.changeView(to: .servers, resetSelection: false)
-                return
-            }
-            // Delegate all other input to snapshot management handler
+        case .serverSnapshotManagement:
             await tui.handleSnapshotManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .volumeSnapshotManagement {
-            // Special handling for ESC in volume snapshot management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".volumeSnapshotManagement", to: ".volumes")
-                tui.changeView(to: .volumes, resetSelection: false)
-                return
-            }
-            // Delegate all other input to volume snapshot management handler
+        case .volumeSnapshotManagement:
             await tui.handleVolumeSnapshotManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .volumeBackupManagement {
-            // Special handling for ESC in volume backup management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".volumeBackupManagement", to: ".volumes")
-                tui.changeView(to: .volumes, resetSelection: false)
-                return
-            }
-            // Delegate all other input to volume backup management handler
+        case .volumeBackupManagement:
             await tui.handleVolumeBackupManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .serverNetworkInterfaces {
-            // Special handling for ESC in network interface management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".serverNetworkInterfaces", to: ".servers")
-                tui.changeView(to: .servers, resetSelection: false)
-                return
-            }
-            // Delegate all other input to network interface handler
+        case .serverNetworkInterfaces:
             await tui.handleNetworkInterfaceInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .volumeManagement {
-            // Special handling for ESC in volume management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".volumeManagement", to: ".volumes")
-                tui.changeView(to: .volumes, resetSelection: false)
-                return
-            }
-            // Delegate to volume management handler
+        case .volumeManagement:
             await tui.handleVolumeManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .networkServerAttachment {
-            // Special handling for ESC in network server attachment
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".networkServerAttachment", to: ".networks")
-                tui.changeView(to: .networks, resetSelection: false)
-                return
-            }
-            // Delegate all other input to network server attachment handler
+        case .networkServerAttachment:
             await tui.handleNetworkServerAttachmentInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .securityGroupServerAttachment {
-            // Special handling for ESC in security group server attachment
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".securityGroupServerAttachment", to: ".securityGroups")
-                tui.changeView(to: .securityGroups, resetSelection: false)
-                return
-            }
-            // Delegate all other input to security group server attachment handler
+        case .securityGroupServerAttachment:
             await tui.handleSecurityGroupServerAttachmentInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .securityGroupServerManagement {
-            // Special handling for ESC in security group server management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".securityGroupServerManagement", to: ".securityGroups")
-                tui.changeView(to: .securityGroups, resetSelection: false)
-                return
-            }
-            // Delegate all other input to enhanced security group server management handler
+        case .securityGroupServerManagement:
             await tui.handleSecurityGroupServerManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .networkServerManagement {
-            // Special handling for ESC in network server management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".networkServerManagement", to: ".networks")
-                tui.changeView(to: .networks, resetSelection: false)
-                return
-            }
-            // Delegate all other input to enhanced network server management handler
+        case .networkServerManagement:
             await tui.handleNetworkServerManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .volumeServerManagement {
-            // Special handling for ESC in volume server management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".volumeServerManagement", to: ".volumes")
-                tui.changeView(to: .volumes, resetSelection: false)
-                return
-            }
-            // Delegate all other input to enhanced volume server management handler
+        case .volumeServerManagement:
             await tui.handleVolumeServerManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .floatingIPServerManagement {
-            // Special handling for ESC in floating IP server management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".floatingIPServerManagement", to: ".floatingIPs")
-                tui.changeView(to: .floatingIPs, resetSelection: false)
-                return
-            }
-            // Delegate all other input to floating IP server management handler
+        case .floatingIPServerManagement:
             await tui.handleFloatingIPServerManagementInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .flavorSelection {
-            // Delegate all input to flavor selection handler
+        case .floatingIPPortManagement:
+            await tui.handleFloatingIPPortManagementInput(ch, screen: screen)
+            return
+        case .portServerManagement:
+            await tui.handlePortServerManagementInput(ch, screen: screen)
+            return
+        case .portAllowedAddressPairManagement:
+            await tui.handleAllowedAddressPairManagementInput(ch, screen: screen)
+            return
+        case .flavorSelection:
             await tui.handleFlavorSelectionInput(ch, screen: screen)
             return
-        }
-
-        if tui.currentView == .subnetRouterManagement {
-            // Special handling for ESC in subnet router management
-            if ch == 27 { // ESC
-                Logger.shared.logNavigation(".subnetRouterManagement", to: ".subnets")
-                tui.changeView(to: .subnets, resetSelection: false)
-                return
-            }
-            // Delegate all other input to subnet router management handler
+        case .subnetRouterManagement:
             await tui.handleSubnetRouterManagementInput(ch, screen: screen)
             return
+        default:
+            break
         }
 
         await handleMainInput(ch, screen: screen)
@@ -621,15 +504,6 @@ class InputHandler {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".flavors")
                 tui.changeView(to: .flavors)
             }
-        case Int32(116): // t - Topology navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".topology", details: ["action": "exit_detail"])
-                tui.changeView(to: .topology, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".topology")
-                tui.changeView(to: .topology)
-            }
         case Int32(104): // h - Health Dashboard navigation
             if tui.currentView.isDetailView {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".healthDashboard", details: ["action": "exit_detail"])
@@ -674,10 +548,33 @@ class InputHandler {
                 ])
                 handleToggleMultiSelectMode()
             }
-        case Int32(77): // M - Manage security group rules
+        case Int32(77): // M - Manage things
             if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageSecurityGroupRules(screen: screen)
+            } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_floating_ip_server_assignment", details: ["selectedIndex": tui.selectedIndex])
+                await handleManageFloatingIPServerAssignment(screen: screen)
+            } else if tui.currentView == .ports && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_port_server_assignment", details: ["selectedIndex": tui.selectedIndex])
+                await handleManagePortServerAssignment(screen: screen)
+            } else if tui.currentView == .networks && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_network_to_server", details: ["selectedIndex": tui.selectedIndex])
+                await handleManageNetworkInterfaceAttachmentToServer(screen: screen)
+            } else if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_security_group", details: ["selectedIndex": tui.selectedIndex])
+                await handleAttachSecurityGroup(screen: screen)
+            } else if tui.currentView == .volumes && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_volume", details: ["selectedIndex": tui.selectedIndex])
+                await handleAttachVolume(screen: screen)
+            } else if tui.currentView == .subnets && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_subnet_router", details: ["selectedIndex": tui.selectedIndex])
+                await handleAttachSubnetRouter(screen: screen)
+            }
+        case Int32(69): // E - Manage allowed address pairs for ports (SHIFT-E)
+            if tui.currentView == .ports && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_port_allowed_address_pairs", details: ["selectedIndex": tui.selectedIndex])
+                await handleManagePortAllowedAddressPairs(screen: screen)
             }
         case Int32(109): // m - Volume Archives navigation
             if tui.currentView.isDetailView {
@@ -701,31 +598,16 @@ class InputHandler {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".advancedSearch")
                 tui.changeView(to: .advancedSearch)
             }
-        case Int32(9): // TAB - Cycle topology modes (only in topology view)
-            if tui.currentView == .topology {
-                Logger.shared.logUserAction("cycle_topology_mode", details: ["currentMode": "\(tui.currentTopologyMode)"])
-                tui.cycleTopologyMode()
+        case Int32(259), Int32(258), Int32(338), Int32(339), Int32(262), Int32(360), Int32(27): // Navigation keys
+            // Use centralized navigation handler for all basic navigation
+            if let navigationHandler = navigationHandler {
+                let handled = await navigationHandler.handleNavigationInput(ch, screen: screen)
+                if handled {
+                    return // Navigation was handled centrally
+                }
             }
-        case Int32(259): // KEY_UP
-            Logger.shared.logInfo("KEY_UP detected - currentView: \(tui.currentView), isDetailView: \(tui.currentView.isDetailView)")
-            if tui.currentView == .barbicanSecrets || tui.currentView == .barbican {
-                Logger.shared.logInfo("BARBICAN KEY_UP: About to call handleUpArrowKey(), secretsCount=\(tui.cachedSecrets.count), selectedIndex=\(tui.selectedIndex)")
-            }
-            Logger.shared.logUserAction("navigation_up", details: ["view": "\(tui.currentView)"])
-            await handleUpArrowKey()
-        case Int32(258): // KEY_DOWN
-            Logger.shared.logInfo("KEY_DOWN detected - currentView: \(tui.currentView), isDetailView: \(tui.currentView.isDetailView)")
-            if tui.currentView == .barbicanSecrets || tui.currentView == .barbican {
-                Logger.shared.logInfo("BARBICAN KEY_DOWN: About to call handleDownArrowKey(), secretsCount=\(tui.cachedSecrets.count), selectedIndex=\(tui.selectedIndex)")
-            }
-            Logger.shared.logUserAction("navigation_down", details: ["view": "\(tui.currentView)"])
-            await handleDownArrowKey()
-        case Int32(338): // PAGE_DOWN
-            Logger.shared.logUserAction("page_down", details: ["view": "\(tui.currentView)"])
-            await handlePageDownKey()
-        case Int32(339): // PAGE_UP
-            Logger.shared.logUserAction("page_up", details: ["view": "\(tui.currentView)"])
-            await handlePageUpKey()
+            // If not handled centrally, fall through to view-specific handling
+            break
         case Int32(32): // SPACEBAR - Toggle item selection in multi-select mode or show details
             if tui.multiSelectMode && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("toggle_multi_select_item", details: [
@@ -740,9 +622,6 @@ class InputHandler {
                 ])
                 tui.openDetailView()
             }
-        case Int32(27): // ESC - Back/clear search
-            Logger.shared.logUserAction("escape_key", details: ["view": "\(tui.currentView)"])
-            handleEscapeKey()
         case Int32(114): // r - Manual refresh
             Logger.shared.logUserAction("manual_refresh", details: ["view": "\(tui.currentView)"])
             await handleRefreshKey()
@@ -752,26 +631,11 @@ class InputHandler {
         case Int32(99): // c - purge cache
             Logger.shared.logUserAction("purge_cache")
             await handleCachePurge()
-        case Int32(47): // / - search or filter
-            Logger.shared.logUserAction("search_filter_prompt", details: ["view": "\(tui.currentView)"])
-            if let input = ViewUtils.prompt("Search: ", screen: screen, screenRows: tui.screenRows), !input.isEmpty {
-                Logger.shared.logUserAction("search_applied", details: ["query": input, "view": "\(tui.currentView)"])
-                tui.searchQuery = input
-                tui.scrollOffset = 0
-                tui.selectedIndex = 0
-            } else {
-                Logger.shared.logUserAction("search_cleared", details: ["view": "\(tui.currentView)"])
-                tui.searchQuery = nil
-            }
+        // NOTE: / key (Int32(47)) is now handled universally before specialized view routing
         // Secondary Commands (Uppercase) - Actions
         case Int32(67): // C - Create new resource
             Logger.shared.logUserAction("create_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
             await handleCreateResource()
-        case Int32(68): // D - Detach/Dissociate action
-            // Floating IP detach has been moved to the management interface (A key)
-            break
-        // G key removed - security groups moved to A key in security groups view
-        // I key removed - interfaces moved to A key in networks view
         case Int32(76): // L - View server logs
             if tui.currentView == .servers && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("view_server_logs", details: ["selectedIndex": tui.selectedIndex])
@@ -782,13 +646,16 @@ class InputHandler {
                 Logger.shared.logUserAction("create_volume_backup", details: ["selectedIndex": tui.selectedIndex])
                 await handleVolumeBackup(screen: screen)
             }
-        case Int32(80): // P - Create snapshot
+        case Int32(80): // P - Create snapshot or Manage floating IP port assignment
             if tui.currentView == .servers && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("create_snapshot", details: ["selectedIndex": tui.selectedIndex])
                 await handleCreateSnapshot(screen: screen)
             } else if tui.currentView == .volumes && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("create_volume_snapshot", details: ["selectedIndex": tui.selectedIndex])
                 await tui.resourceOperations.createVolumeSnapshot(screen: screen)
+            } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_floating_ip_port_assignment", details: ["selectedIndex": tui.selectedIndex])
+                await handleManageFloatingIPPortAssignment(screen: screen)
             }
         case Int32(82): // R - Restart server
             if tui.currentView == .servers && !tui.currentView.isDetailView {
@@ -817,36 +684,15 @@ class InputHandler {
                 tui.helpScrollOffset = 0 // Reset scroll when entering about
                 tui.changeView(to: .about)
             }
-        case Int32(87): // W - Export topology
-            Logger.shared.logUserAction("export_topology", details: ["view": "\(tui.currentView)"])
-            await handleTopologyExport()
         case Int32(127), Int32(330): // DELETE key - Delete resources
             Logger.shared.logUserAction("delete_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
             await handleDeleteKey(screen: screen)
         case Int32(90): // Z - Resize selected server
             Logger.shared.logUserAction("resize_server", details: ["selectedIndex": tui.selectedIndex])
             await handleResizeServer(screen: screen)
-        case Int32(65): // A - Context-sensitive: Attach security group to server OR network to server OR volume to server OR floating IP attach OR toggle auto-refresh interval
-            if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("attach_security_group", details: ["selectedIndex": tui.selectedIndex])
-                await handleAttachSecurityGroup(screen: screen)
-            } else if tui.currentView == .networks && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("attach_network_to_server", details: ["selectedIndex": tui.selectedIndex])
-                await handleAttachNetworkToServer(screen: screen)
-            } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_floating_ip_server_assignment", details: ["selectedIndex": tui.selectedIndex])
-                await handleManageFloatingIPServerAssignment(screen: screen)
-            } else if tui.currentView == .volumes && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("attach_volume", details: ["selectedIndex": tui.selectedIndex])
-                await handleAttachVolume(screen: screen)
-            } else if tui.currentView == .subnets && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("attach_subnet_router", details: ["selectedIndex": tui.selectedIndex])
-                await handleAttachSubnetRouter(screen: screen)
-            } else {
-                // Default to refresh interval cycling for dashboard and other views
-                Logger.shared.logUserAction("cycle_refresh_interval", details: ["currentInterval": tui.baseRefreshInterval])
-                tui.cycleRefreshInterval()
-            }
+        case Int32(65): // A - Default to refresh interval cycling for dashboard and other views
+            Logger.shared.logUserAction("cycle_refresh_interval", details: ["currentInterval": tui.baseRefreshInterval])
+            tui.cycleRefreshInterval()
         case Int32(82): // R - Context-sensitive: Routers navigation OR Restart server
             if tui.currentView == .servers && !tui.currentView.isDetailView {
                 // Use R for restart in servers view
@@ -873,208 +719,8 @@ class InputHandler {
     }
 
     // MARK: - Navigation Helper Methods
-    private func handleUpArrowKey() async {
-        guard let tui = tui else { return }
-
-        Logger.shared.logUserAction("up_arrow_navigation", details: [
-            "view": "\(tui.currentView)",
-            "before_selectedIndex": tui.selectedIndex,
-            "before_scrollOffset": tui.scrollOffset
-        ])
-
-        // Mark renderer for scroll optimization
-        tui.markScrollOperation()
-
-        if tui.currentView == .help || tui.currentView == .about {
-            tui.helpScrollOffset = max(tui.helpScrollOffset - 1, 0)
-        } else if tui.currentView == .dashboard {
-            tui.quotaScrollOffset = max(tui.quotaScrollOffset - 1, 0)
-        } else if tui.currentView.isDetailView {
-            tui.detailScrollOffset = max(tui.detailScrollOffset - 1, 0)
-        } else {
-            let oldIndex = tui.selectedIndex
-            let maxIndex = tui.getMaxSelectionIndex()
-            tui.selectedIndex = max(tui.selectedIndex - 1, 0)
-            // Adjust scroll if selection moves out of view
-            if tui.selectedIndex < tui.scrollOffset {
-                tui.scrollOffset = tui.selectedIndex
-            }
-
-            // Enhanced debugging for Barbican navigation
-            if tui.currentView == .barbicanSecrets || tui.currentView == .barbican {
-                Logger.shared.logInfo("Barbican UP navigation: oldIndex=\(oldIndex) newIndex=\(tui.selectedIndex) maxIndex=\(maxIndex) secretsCount=\(tui.cachedSecrets.count)")
-            }
-        }
-
-        Logger.shared.logUserAction("up_arrow_completed", details: [
-            "view": "\(tui.currentView)",
-            "after_selectedIndex": tui.selectedIndex,
-            "after_scrollOffset": tui.scrollOffset
-        ])
-    }
-
-    private func handleDownArrowKey() async {
-        Logger.shared.logInfo("handleDownArrowKey called - currentView: \((tui?.currentView)!), isDetailView: \((tui?.currentView.isDetailView)!)")
-        guard let tui = tui else { return }
-
-        Logger.shared.logUserAction("down_arrow_navigation", details: [
-            "view": "\(tui.currentView)",
-            "before_selectedIndex": tui.selectedIndex,
-            "before_scrollOffset": tui.scrollOffset
-        ])
-
-        // Mark renderer for scroll optimization
-        tui.markScrollOperation()
-
-        if tui.currentView == .help || tui.currentView == .about {
-            // Let the help view handle bounds checking internally
-            // We'll use a reasonable maximum to prevent infinite scrolling
-            tui.helpScrollOffset = min(tui.helpScrollOffset + 1, 50)
-        } else if tui.currentView == .dashboard {
-            // Calculate max quota scroll based on available quota data
-            let maxQuotaScroll = tui.calculateMaxQuotaScrollOffset()
-            tui.quotaScrollOffset = min(tui.quotaScrollOffset + 1, maxQuotaScroll)
-        } else if tui.currentView.isDetailView {
-            // Add proper bounds checking for detail view scrolling
-            let maxScroll = tui.calculateMaxDetailScrollOffset()
-            let oldOffset = tui.detailScrollOffset
-            tui.detailScrollOffset = min(tui.detailScrollOffset + 1, maxScroll)
-            Logger.shared.logInfo("DOWN arrow in detail view - oldOffset: \(oldOffset), newOffset: \(tui.detailScrollOffset), maxScroll: \(maxScroll), view: \(tui.currentView)")
-        } else {
-            let oldIndex = tui.selectedIndex
-            let maxIndex = tui.getMaxSelectionIndex()
-            tui.selectedIndex = min(tui.selectedIndex + 1, maxIndex)
-            // Adjust scroll to keep selection in view
-            let visibleItems = Int(tui.screenRows) - 10 // Must match StatusListView maxVisibleItems calculation
-            if tui.selectedIndex >= tui.scrollOffset + visibleItems {
-                tui.scrollOffset = tui.selectedIndex - visibleItems + 1
-            }
-
-            // Enhanced debugging for Barbican navigation
-            if tui.currentView == .barbicanSecrets || tui.currentView == .barbican {
-                Logger.shared.logInfo("Barbican DOWN navigation: oldIndex=\(oldIndex) newIndex=\(tui.selectedIndex) maxIndex=\(maxIndex) secretsCount=\(tui.cachedSecrets.count)")
-            }
-        }
-
-        Logger.shared.logUserAction("down_arrow_completed", details: [
-            "view": "\(tui.currentView)",
-            "after_selectedIndex": tui.selectedIndex,
-            "after_scrollOffset": tui.scrollOffset
-        ])
-    }
-
-    private func handlePageUpKey() async {
-        guard let tui = tui else { return }
-
-        Logger.shared.logUserAction("page_up_navigation", details: [
-            "view": "\(tui.currentView)",
-            "before_selectedIndex": tui.selectedIndex,
-            "before_scrollOffset": tui.scrollOffset
-        ])
-
-        // Mark renderer for scroll optimization
-        tui.markScrollOperation()
-
-        if tui.currentView == .help {
-            tui.helpScrollOffset = max(tui.helpScrollOffset - 10, 0)
-        } else if tui.currentView == .dashboard {
-            tui.quotaScrollOffset = max(tui.quotaScrollOffset - 10, 0)
-        } else if tui.currentView.isDetailView {
-            tui.detailScrollOffset = max(tui.detailScrollOffset - 10, 0)
-        } else {
-            // Page up by viewport size (approximately 15-20 items)
-            let pageSize = min(20, Int(tui.screenRows) - 8)
-            let newIndex = max(tui.selectedIndex - pageSize, 0)
-            tui.selectedIndex = newIndex
-
-            // Adjust scroll to keep selection in view
-            if tui.selectedIndex < tui.scrollOffset {
-                tui.scrollOffset = max(tui.selectedIndex - 5, 0) // Keep some context
-            }
-        }
-
-        Logger.shared.logUserAction("page_up_completed", details: [
-            "view": "\(tui.currentView)",
-            "after_selectedIndex": tui.selectedIndex,
-            "after_scrollOffset": tui.scrollOffset
-        ])
-    }
-
-    private func handlePageDownKey() async {
-        guard let tui = tui else { return }
-
-        Logger.shared.logUserAction("page_down_navigation", details: [
-            "view": "\(tui.currentView)",
-            "before_selectedIndex": tui.selectedIndex,
-            "before_scrollOffset": tui.scrollOffset
-        ])
-
-        // Mark renderer for scroll optimization
-        tui.markScrollOperation()
-
-        if tui.currentView == .help {
-            tui.helpScrollOffset = min(tui.helpScrollOffset + 10, 50)
-        } else if tui.currentView == .dashboard {
-            let maxQuotaScroll = tui.calculateMaxQuotaScrollOffset()
-            tui.quotaScrollOffset = min(tui.quotaScrollOffset + 10, maxQuotaScroll)
-        } else if tui.currentView.isDetailView {
-            let maxScroll = tui.calculateMaxDetailScrollOffset()
-            tui.detailScrollOffset = min(tui.detailScrollOffset + 10, maxScroll)
-        } else {
-            // Page down by viewport size (approximately 15-20 items)
-            let pageSize = min(20, Int(tui.screenRows) - 8)
-            let maxIndex = tui.getMaxSelectionIndex()
-            let newIndex = min(tui.selectedIndex + pageSize, maxIndex)
-            tui.selectedIndex = newIndex
-
-            // Adjust scroll to keep selection in view
-            let visibleItems = Int(tui.screenRows) - 8
-            if tui.selectedIndex >= tui.scrollOffset + visibleItems {
-                tui.scrollOffset = min(tui.selectedIndex - visibleItems + 6, maxIndex) // Keep some context
-            }
-        }
-
-        Logger.shared.logUserAction("page_down_completed", details: [
-            "view": "\(tui.currentView)",
-            "after_selectedIndex": tui.selectedIndex,
-            "after_scrollOffset": tui.scrollOffset
-        ])
-    }
-
-    private func handleEscapeKey() {
-        guard let tui = tui else { return }
-
-        Logger.shared.logUserAction("escape_key_handling", details: [
-            "view": "\(tui.currentView)",
-            "isDetailView": tui.currentView.isDetailView,
-            "hasSearchQuery": tui.searchQuery != nil,
-            "multiSelectMode": tui.multiSelectMode
-        ])
-
-        if tui.multiSelectMode {
-            Logger.shared.logUserAction("exit_multi_select_mode", details: ["selectedCount": tui.multiSelectedResourceIDs.count])
-            tui.multiSelectMode = false
-            tui.multiSelectedResourceIDs.removeAll()
-            tui.statusMessage = "Exited multi-select mode"
-        } else if tui.currentView == .help {
-            Logger.shared.logNavigation(".help", to: "\(tui.previousView)")
-            tui.changeView(to: tui.previousView, resetSelection: false)
-        } else if tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: "\(tui.currentView.parentView)", details: ["action": "escape_detail"])
-
-            // Special handling for health dashboard service detail - return to SERVICE STATUS section
-            if tui.currentView == .healthDashboardServiceDetail {
-                tui.healthDashboardNavState.currentSection = .services
-                Logger.shared.logUserAction("health_dashboard_return_to_services", details: ["from": "service_detail"])
-            }
-
-            tui.changeView(to: tui.currentView.parentView, resetSelection: false)
-            tui.selectedResource = nil
-        } else if tui.searchQuery != nil {
-            Logger.shared.logUserAction("search_cleared_via_escape", details: ["previousQuery": tui.searchQuery ?? ""])
-            tui.searchQuery = nil
-        }
-    }
+    // NOTE: Basic navigation (UP/DOWN/PAGE UP/PAGE DOWN/HOME/END/ESC) is now handled by NavigationInputHandler
+    // View-specific navigation overrides should be handled in individual view handlers when needed
 
     private func handleAutoRefreshToggle() {
         guard let tui = tui else { return }
@@ -1245,33 +891,24 @@ class InputHandler {
         Logger.shared.logUserAction("refresh_initiated", details: ["view": "\(tui.currentView)"])
         let startTime = Date()
 
-        if tui.currentView == .topology {
-            // Fast topology-only refresh for topology view
-            let refreshStart = Date()
-            await tui.refreshTopology()
-            let refreshDuration = Date().timeIntervalSince(refreshStart)
-            Logger.shared.logPerformance("topology_refresh", duration: refreshDuration)
-            tui.lastRefresh = Date()
-        } else {
-            // Full data refresh for other views
-            let refreshStart = Date()
-            await tui.dataManager.refreshAllData()
-            let refreshDuration = Date().timeIntervalSince(refreshStart)
-            Logger.shared.logPerformance("full_data_refresh", duration: refreshDuration)
-            tui.lastRefresh = Date()
+        // Full data refresh
+        let refreshStart = Date()
+        await tui.dataManager.refreshAllData()
+        let refreshDuration = Date().timeIntervalSince(refreshStart)
+        Logger.shared.logPerformance("full_data_refresh", duration: refreshDuration)
+        tui.lastRefresh = Date()
 
-            // Request refresh for health dashboard if on that view
-            if tui.currentView == .healthDashboard {
-                tui.healthDashboardNavState.requestRefresh()
-            }
-
-            tui.statusMessage = "Data refreshed"
+        // Request refresh for health dashboard if on that view
+        if tui.currentView == .healthDashboard {
+            tui.healthDashboardNavState.requestRefresh()
         }
+
+        tui.statusMessage = "Data refreshed"
 
         let duration = Date().timeIntervalSince(startTime)
         Logger.shared.logPerformance("refresh_completed", duration: duration, context: [
             "view": "\(tui.currentView)",
-            "refreshType": tui.currentView == .topology ? "topology_only" : "full_data"
+            "refreshType": "full_data"
         ])
     }
 
@@ -1286,24 +923,6 @@ class InputHandler {
 
         let duration = Date().timeIntervalSince(startTime)
         Logger.shared.logPerformance("cache_purge_and_refresh", duration: duration)
-    }
-
-    private func handleTopologyExport() async {
-        guard let tui = tui else { return }
-
-        Logger.shared.logUserAction("topology_export_requested", details: [
-            "view": "\(tui.currentView)",
-            "hasTopology": tui.lastTopology != nil
-        ])
-
-        if tui.currentView == .topology && tui.lastTopology != nil {
-            let exportStart = Date()
-            await tui.exportTopology()
-            let exportDuration = Date().timeIntervalSince(exportStart)
-            Logger.shared.logPerformance("topology_export", duration: exportDuration)
-        } else {
-            Logger.shared.logWarning("Topology export skipped - not in topology view or no topology data")
-        }
     }
 
     // MARK: - Multi-Select Helper Methods
@@ -1373,6 +992,12 @@ class InputHandler {
         case .images:
             guard tui.selectedIndex < tui.cachedImages.count else { return "" }
             return tui.cachedImages[tui.selectedIndex].id
+        case .volumeArchives:
+            guard tui.selectedIndex < tui.cachedVolumeBackups.count else { return "" }
+            return tui.cachedVolumeBackups[tui.selectedIndex].id
+        case .barbicanSecrets, .barbican:
+            guard tui.selectedIndex < tui.cachedSecrets.count else { return "" }
+            return tui.cachedSecrets[tui.selectedIndex].secretRef ?? ""
         default:
             return ""
         }
@@ -1465,7 +1090,7 @@ class InputHandler {
         }
     }
 
-    private func handleAttachNetworkToServer(screen: OpaquePointer?) async {
+    private func handleManageNetworkInterfaceAttachmentToServer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
         if tui.currentView == .networks && !tui.currentView.isDetailView {
@@ -1519,31 +1144,6 @@ class InputHandler {
         // Handle security group creation form navigation
         if tui.currentView == .securityGroupCreate {
             await tui.handleSecurityGroupCreateInput(ch, screen: screen)
-        }
-
-        // Handle subnet creation form navigation
-        if tui.currentView == .subnetCreate {
-            await tui.handleSubnetCreateInput(ch, screen: screen)
-        }
-
-        // Handle port creation form navigation
-        if tui.currentView == .portCreate {
-            await tui.handlePortCreateInput(ch, screen: screen)
-        }
-
-        // Handle floating IP creation form navigation
-        if tui.currentView == .floatingIPCreate {
-            await tui.handleFloatingIPCreateInput(ch, screen: screen)
-        }
-
-        // Handle router creation form navigation
-        if tui.currentView == .routerCreate {
-            await handleRouterCreateInput(ch, screen: screen)
-        }
-
-        // Handle server group creation form navigation
-        if tui.currentView == .serverGroupCreate {
-            await handleServerGroupCreateInput(ch, screen: screen)
         }
 
         // Handle server group management form navigation
@@ -1644,12 +1244,77 @@ class InputHandler {
         }
     }
 
+    private func handleManageFloatingIPPortAssignment(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
+            await tui.actions.manageFloatingIPPortAssignment(screen: screen)
+        }
+    }
+
+    private func handleManagePortServerAssignment(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .ports && !tui.currentView.isDetailView {
+            await tui.actions.managePortServerAssignment(screen: screen)
+        }
+    }
+
+    private func handleManagePortAllowedAddressPairs(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .ports && !tui.currentView.isDetailView {
+            await tui.actions.managePortAllowedAddressPairs(screen: screen)
+        }
+    }
+
     private func handleAttachSubnetRouter(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
         if tui.currentView == .subnets && !tui.currentView.isDetailView {
             await tui.actions.manageSubnetRouterAttachment(screen: screen)
         }
+    }
+
+    private func handleSimpleBulkDelete(resourceIDs: [String], screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        let itemCount = resourceIDs.count
+        var successCount = 0
+        var failCount = 0
+
+        for (index, resourceID) in resourceIDs.enumerated() {
+            tui.statusMessage = "Deleting \(index + 1)/\(itemCount)..."
+
+            do {
+                switch tui.currentView {
+                case .volumeArchives:
+                    try await tui.client.deleteVolumeBackup(backupId: resourceID)
+                case .barbicanSecrets, .barbican:
+                    try await tui.client.barbican.deleteSecret(id: resourceID)
+                case .flavors:
+                    // Flavors don't support deletion (managed by cloud admin)
+                    tui.statusMessage = "Flavors cannot be deleted"
+                    return
+                default:
+                    break
+                }
+                successCount += 1
+            } catch {
+                failCount += 1
+                Logger.shared.logError("Failed to delete resource \(resourceID): \(error)")
+            }
+        }
+
+        if failCount == 0 {
+            tui.statusMessage = "Successfully deleted \(successCount) items"
+        } else {
+            tui.statusMessage = "Deleted \(successCount) items (\(failCount) failed)"
+        }
+
+        tui.multiSelectMode = false
+        tui.multiSelectedResourceIDs.removeAll()
+        await tui.dataManager.refreshAllData()
     }
 
     private func handleBulkDelete(screen: OpaquePointer?) async {
@@ -1705,6 +1370,14 @@ class InputHandler {
             batchOperation = .keyPairBulkDelete(keyPairNames: Array(tui.multiSelectedResourceIDs))
         case .images:
             batchOperation = .imageBulkDelete(imageIDs: Array(tui.multiSelectedResourceIDs))
+        case .volumeArchives, .barbicanSecrets, .barbican:
+            // These resources don't have BatchOperation support yet, handle them directly
+            await handleSimpleBulkDelete(resourceIDs: Array(tui.multiSelectedResourceIDs), screen: screen)
+            return
+        case .flavors:
+            // Flavors don't support deletion
+            tui.statusMessage = "Bulk operations not supported for flavors (cloud admin only)"
+            return
         default:
             tui.statusMessage = "Bulk operations not supported for \(resourceType)"
             return

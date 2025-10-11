@@ -4,6 +4,7 @@ import FoundationNetworking
 #endif
 import OSClient
 import MemoryKit
+import SwiftTUI
 
 // MARK: - Substation Logger Implementations
 
@@ -454,11 +455,52 @@ struct Substation {
             Logger.shared.logInfo("  - projectDomainName: \(config.projectDomainName)")
             Logger.shared.logInfo("Connecting to OpenStack cloud '\(selectedCloud)'")
 
+            // Initialize terminal early to show loading screen during connection
+            Logger.shared.logDebug("Initializing terminal for early loading screen")
+            let initResult = SwiftTUI.initializeTerminalSession()
+            guard initResult.success, let screen = initResult.screen else {
+                let errorMsg = "Failed to initialize terminal session"
+                Logger.shared.logError(errorMsg)
+                printError(errorMsg)
+                exit(1)
+            }
+
+            defer {
+                SwiftTUI.cleanupTerminal()
+            }
+
+            let screenRows = initResult.rows
+            let screenCols = initResult.cols
+
+            // Show loading screen immediately
+            await LoadingView.drawLoadingScreen(
+                screen: screen.pointer,
+                startRow: 0,
+                startCol: 0,
+                width: screenCols,
+                height: screenRows,
+                progressStep: 0,
+                statusMessage: "Connecting to OpenStack cloud..."
+            )
+            SwiftTUI.batchedRefresh(screen)
+
             let connectionStart = Date().timeIntervalSinceReferenceDate
             var client = try await OSClient.connect(config: config, credentials: credentials, logger: LoggerBridge())
             let connectionDuration = Date().timeIntervalSinceReferenceDate - connectionStart
             Logger.shared.logPerformance("OpenStack client connection", duration: connectionDuration)
             Logger.shared.logInfo("Successfully connected to OpenStack cloud")
+
+            // Update loading screen after connection
+            await LoadingView.drawLoadingScreen(
+                screen: screen.pointer,
+                startRow: 0,
+                startCol: 0,
+                width: screenCols,
+                height: screenRows,
+                progressStep: 1,
+                statusMessage: "Authenticating..."
+            )
+            SwiftTUI.batchedRefresh(screen)
 
             // Auto-detect region if not specified in configuration
             if needsRegionDetection {
@@ -473,6 +515,18 @@ struct Substation {
                     // If we got a region (will be non-nil or will have thrown), reconnect
                     if let region = detectedRegion {
                         Logger.shared.logInfo("Detected region: \(region)")
+
+                        // Show loading screen during reconnect
+                        await LoadingView.drawLoadingScreen(
+                            screen: screen.pointer,
+                            startRow: 0,
+                            startCol: 0,
+                            width: screenCols,
+                            height: screenRows,
+                            progressStep: 2,
+                            statusMessage: "Reconnecting with detected region..."
+                        )
+                        SwiftTUI.batchedRefresh(screen)
 
                         // Reconnect with the detected region
                         let reconnectConfig = OpenStackConfig(
@@ -492,7 +546,7 @@ struct Substation {
             }
 
             Logger.shared.logDebug("Initializing TUI")
-            let tui = try await TUI(client: client, debugMode: debugMode, sharedLogger: sharedLogger)
+            let tui = try await TUI(client: client, debugMode: debugMode, sharedLogger: sharedLogger, existingScreen: screen.pointer)
             Logger.shared.logInfo("TUI initialized, starting main loop")
             await tui.run()
             Logger.shared.logInfo("TUI main loop exited")

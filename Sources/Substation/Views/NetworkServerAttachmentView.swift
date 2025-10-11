@@ -18,7 +18,7 @@ struct NetworkServerAttachmentView {
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             title: "Attach Network to Servers",
-            multiSelect: true
+            checkboxMode: .multiSelect
         )
     }
 }

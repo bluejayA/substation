@@ -42,7 +42,7 @@ struct PortSelectionView {
             items: ports,
             selectedItemIds: selectedPortIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

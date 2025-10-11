@@ -14,6 +14,11 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    var volumeBackupManagementNavigationContext: NavigationContext {
+        let fieldCount = volumeBackupManagementFormState.fields.count
+        return .form(fieldCount: fieldCount)
+    }
+
     internal func handleVolumeBackupManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Check if a field is currently active
         let isFieldActive = volumeBackupManagementFormState.isCurrentFieldActive()
@@ -25,18 +30,20 @@ extension TUI {
             formState: volumeBackupManagementFormState
         ), preservingStateFrom: volumeBackupManagementFormState)
 
+        // Try common navigation when NOT in field edit mode
+        if !isFieldActive {
+            if await handleCommonNavigation(ch, screen: screen, context: volumeBackupManagementNavigationContext) {
+                return
+            }
+        }
+
+        // Handle view-specific input
+        await handleVolumeBackupManagementSpecificInput(ch, screen: screen, isFieldActive: isFieldActive)
+    }
+
+    private func handleVolumeBackupManagementSpecificInput(_ ch: Int32, screen: OpaquePointer?, isFieldActive: Bool) async {
         switch ch {
         case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                volumeBackupManagementFormState.nextField()
-            }
-
-        case Int32(259): // UP - Navigate to previous field
-            if !isFieldActive {
-                volumeBackupManagementFormState.previousField()
-            }
-
-        case Int32(258): // DOWN - Navigate to next field
             if !isFieldActive {
                 volumeBackupManagementFormState.nextField()
             }

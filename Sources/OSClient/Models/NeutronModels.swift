@@ -298,7 +298,7 @@ public struct FixedIP: Codable, Sendable {
     }
 }
 
-public struct AddressPair: Codable, Sendable {
+public struct AddressPair: Codable, Sendable, Identifiable, Hashable, Equatable {
     public let ipAddress: String
     public let macAddress: String?
 
@@ -310,6 +310,19 @@ public struct AddressPair: Codable, Sendable {
     public init(ipAddress: String, macAddress: String? = nil) {
         self.ipAddress = ipAddress
         self.macAddress = macAddress
+    }
+
+    public var id: String {
+        "\(ipAddress)_\(macAddress ?? "nomac")"
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(ipAddress)
+        hasher.combine(macAddress)
+    }
+
+    public static func == (lhs: AddressPair, rhs: AddressPair) -> Bool {
+        lhs.ipAddress == rhs.ipAddress && lhs.macAddress == rhs.macAddress
     }
 }
 
@@ -791,6 +804,7 @@ public struct UpdatePortRequest: Codable, Sendable {
     public let deviceId: String?
     public let deviceOwner: String?
     public let securityGroups: [String]?
+    public let allowedAddressPairs: [AddressPair]?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -800,6 +814,27 @@ public struct UpdatePortRequest: Codable, Sendable {
         case deviceId = "device_id"
         case deviceOwner = "device_owner"
         case securityGroups = "security_groups"
+        case allowedAddressPairs = "allowed_address_pairs"
+    }
+
+    public init(
+        name: String? = nil,
+        description: String? = nil,
+        adminStateUp: Bool? = nil,
+        fixedIps: [FixedIP]? = nil,
+        deviceId: String? = nil,
+        deviceOwner: String? = nil,
+        securityGroups: [String]? = nil,
+        allowedAddressPairs: [AddressPair]? = nil
+    ) {
+        self.name = name
+        self.description = description
+        self.adminStateUp = adminStateUp
+        self.fixedIps = fixedIps
+        self.deviceId = deviceId
+        self.deviceOwner = deviceOwner
+        self.securityGroups = securityGroups
+        self.allowedAddressPairs = allowedAddressPairs
     }
 }
 

@@ -54,7 +54,7 @@ struct ImageSelectionView {
             items: sortedImages,
             selectedItemIds: selectedImageIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

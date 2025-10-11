@@ -339,24 +339,19 @@ Search across all OpenStack services:
 
 ### Investigate Network Issues
 
-1. **Check Network Topology:**
-   - Press `t` for topology
-   - Visualize network connections
-   - Identify routing issues
-
-2. **Verify Router Configuration:**
+1. **Verify Router Configuration:**
    - Press `r` for routers
    - Check router status
    - Verify gateway configuration
    - Check subnet attachments
 
-3. **Check Security Rules:**
+2. **Check Security Rules:**
    - Press `e` for security groups
    - Review applied groups
    - Check rule configurations
    - Verify protocol and port settings
 
-4. **Check Floating IP Associations:**
+3. **Check Floating IP Associations:**
    - Press `l` for floating IPs
    - Verify IP associations
    - Check router external gateway

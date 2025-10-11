@@ -18,7 +18,7 @@ struct VolumeServerAttachmentView {
             scrollOffset: scrollOffset,
             searchQuery: searchQuery ?? "",
             title: "Attach Volume to Servers",
-            multiSelect: true
+            checkboxMode: .multiSelect
         )
     }
 }

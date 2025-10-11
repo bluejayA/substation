@@ -30,6 +30,7 @@ final class TUI {
     // Enhanced data management
     internal lazy var dataManager: DataManager = DataManager(client: client, tui: self)
     internal lazy var inputHandler: InputHandler = InputHandler(tui: self)
+    internal lazy var formInputHandler: FormInputHandler = FormInputHandler(tui: self)
     internal lazy var resourceOperations: ResourceOperations = ResourceOperations(tui: self)
     internal lazy var actions: Actions = Actions(tui: self)
     internal lazy var uiHelpers: UIHelpers = UIHelpers(tui: self)
@@ -88,11 +89,12 @@ final class TUI {
     // Floating IP server management (single-select)
     internal var selectedServerId: String? = nil  // Selected server ID for floating IP management
     internal var attachedServerId: String? = nil  // Server ID that has the selected floating IP attached
+    // Floating IP port management (single-select)
+    internal var selectedPortId: String? = nil  // Selected port ID for floating IP management
+    internal var attachedPortId: String? = nil  // Port ID that has the selected floating IP attached
     // Subnet router management (single-select)
     internal var selectedRouterId: String? = nil  // Selected router ID for subnet management
     internal var attachedRouterIds: Set<String> = []  // Router IDs that have the selected subnet attached
-    internal var lastTopology: TopologyGraph?
-    internal var currentTopologyMode: TopologyViewMode = .topology
 
     // Search result navigation
     internal var searchSelectedResourceId: String? = nil  // Resource ID selected from search to view in detail
@@ -318,6 +320,9 @@ final class TUI {
     // Volume management form state
     internal var volumeManagementForm = VolumeManagementForm()
 
+    // Allowed address pair management form state
+    internal var allowedAddressPairForm: AllowedAddressPairManagementForm?
+
     // Volume snapshot list state
     internal var cachedVolumeSnapshots: [VolumeSnapshot] {
         get { resourceCache.volumeSnapshots }
@@ -366,16 +371,24 @@ final class TUI {
     // Resource resolver for name lookups
     internal var resourceResolver: ResourceResolver
 
+    // Existing screen from App.swift (if terminal was initialized early)
+    private var existingScreen: OpaquePointer?
+
     init(
         client: OSClient,
         debugMode: Bool = false,
         logger: any OSClientLogger = ConsoleLogger(),
-        sharedLogger: any MemoryKitLogger
+        sharedLogger: any MemoryKitLogger,
+        existingScreen: OpaquePointer? = nil
     ) async throws {
         Logger.shared.logDebug("TUI initialization started")
         self.client = client
         self.debugMode = debugMode
+        self.existingScreen = existingScreen
         Logger.shared.logDebug("Debug mode: \(debugMode)")
+        if existingScreen != nil {
+            Logger.shared.logDebug("Using existing screen from early initialization")
+        }
 
         // Initialize Substation Memory Container with MemoryKit integration
         Logger.shared.logDebug("Initializing memory container")
@@ -680,54 +693,51 @@ final class TUI {
         ])
     }
 
-    // Cycle through topology view modes
-    internal func cycleTopologyMode() {
-        let allModes: [TopologyViewMode] = [.topology, .logical, .physical, .security]
-
-        guard let currentIndex = allModes.firstIndex(of: currentTopologyMode) else {
-            currentTopologyMode = allModes[0]
-            statusMessage = "Topology mode: \(currentTopologyMode)"
-            return
-        }
-
-        let nextIndex = (currentIndex + 1) % allModes.count
-        currentTopologyMode = allModes[nextIndex]
-        statusMessage = "Topology mode: \(currentTopologyMode)"
-
-        Logger.shared.logUserAction("topology_mode_changed", details: [
-            "newMode": "\(currentTopologyMode)",
-            "availableModes": allModes.map { "\($0)" }
-        ])
-    }
-
     func run() async {
         Logger.shared.logInfo("TUI.run() started")
 
-        // Set TERM if not already set
-        // Initialize terminal using SwiftTUI abstractions
-        let initResult = SwiftTUI.initializeTerminalSession()
-        guard initResult.success, let screen = initResult.screen else {
-            let errorMsg = "Failed to initialize terminal session"
-            Logger.shared.logError(errorMsg)
-            print("ERROR: \(errorMsg)")
-            return
+        // Use existing screen if provided, otherwise initialize new one
+        let screen: WindowHandle
+        let shouldCleanup: Bool
+
+        if let existingScreen = self.existingScreen {
+            Logger.shared.logDebug("Using existing screen from early initialization")
+            screen = WindowHandle(existingScreen)
+            shouldCleanup = false // App.swift will handle cleanup
+
+            // Get current screen dimensions
+            screenRows = SwiftTUI.getMaxY(screen)
+            screenCols = SwiftTUI.getMaxX(screen)
+        } else {
+            // Initialize terminal using SwiftTUI abstractions
+            Logger.shared.logDebug("Initializing new terminal session")
+            let initResult = SwiftTUI.initializeTerminalSession()
+            guard initResult.success, let newScreen = initResult.screen else {
+                let errorMsg = "Failed to initialize terminal session"
+                Logger.shared.logError(errorMsg)
+                print("ERROR: \(errorMsg)")
+                return
+            }
+            screen = newScreen
+            shouldCleanup = true
+
+            // Get screen dimensions
+            screenRows = initResult.rows
+            screenCols = initResult.cols
+            Logger.shared.logDebug("Screen dimensions: \(screenCols)x\(screenRows)")
         }
-        Logger.shared.logDebug("Successfully initialized terminal session")
 
         defer {
-            SwiftTUI.cleanupTerminal()
-            Logger.shared.logDebug("Cleaned up terminal")
+            if shouldCleanup {
+                SwiftTUI.cleanupTerminal()
+                Logger.shared.logDebug("Cleaned up terminal")
+            }
         }
-
-        // Get screen dimensions
-        screenRows = initResult.rows
-        screenCols = initResult.cols
-        Logger.shared.logDebug("Screen dimensions: \(screenCols)x\(screenRows)")
 
         if screenRows < 20 || screenCols < 80 {
             let errorMsg = "Terminal too small: need 80x20, got \(screenCols)x\(screenRows)"
             Logger.shared.logError(errorMsg)
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftTUI.surface(from: screen.pointer)
             let errorBounds = Rect(x: 0, y: 0, width: screenCols, height: 1)
             await SwiftTUI.render(Text("Terminal too small. Need at least 80x20, got \(screenCols)x\(screenRows) - \(errorMsg)").error(), on: surface, in: errorBounds)
             SwiftTUI.batchedRefresh(screen)
@@ -737,9 +747,17 @@ final class TUI {
 
         Logger.shared.logInfo("Substation initialized successfully")
 
-        // Initial draw
-        Logger.shared.logDebug("Drawing initial screen")
-        await self.draw(screen: screen.pointer)
+        // Show loading screen immediately before any data operations (if not already shown)
+        if existingScreen == nil {
+            Logger.shared.logDebug("Rendering initial loading screen")
+            currentView = .loading
+            loadingProgress = 0
+            loadingMessage = "Initializing..."
+            await self.draw(screen: screen.pointer)
+        } else {
+            Logger.shared.logDebug("Skipping initial loading screen (already shown in App.swift)")
+            currentView = .loading
+        }
 
         // Initial data fetch with loading progression
         await performInitialDataLoadWithProgress(screen: screen.pointer)
@@ -934,50 +952,13 @@ final class TUI {
         ])
     }
 
-    // Synchronous input handling for instant UI response (no executor blocking)
-    internal func handleInputSync(_ ch: Int32, screen: OpaquePointer?) {
-        // Ignore input during loading screen
-        if currentView == .loading {
-            return
-        }
-
-        // Handle navigation keys synchronously for instant response
-        switch ch {
-        case 259: // KEY_UP
-            if selectedIndex > 0 {
-                selectedIndex -= 1
-            }
-        case 258: // KEY_DOWN
-            let maxIndex = getMaxIndexForCurrentView()
-            if selectedIndex < maxIndex - 1 {
-                selectedIndex += 1
-            }
-        case 339: // PAGE_UP
-            selectedIndex = max(0, selectedIndex - 10)
-        case 338: // PAGE_DOWN
-            let maxIndex = getMaxIndexForCurrentView()
-            selectedIndex = min(maxIndex - 1, selectedIndex + 10)
-        case 262: // HOME
-            selectedIndex = 0
-        case 360: // END
-            selectedIndex = max(0, getMaxIndexForCurrentView() - 1)
-        default:
-            break // Let async handler deal with other keys
-        }
-    }
-
-    // Async input handling for operations requiring I/O (runs in background)
-    internal func handleInputAsync(_ ch: Int32, screen: OpaquePointer?) async {
+    // Main async input handler - delegates to InputHandler which uses NavigationInputHandler for common keys
+    internal func handleInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Ignore input during loading screen
         if currentView == .loading {
             return
         }
         await inputHandler.handleInput(ch, screen: screen)
-    }
-
-    // Legacy async handler - keep for compatibility
-    internal func handleInput(_ ch: Int32, screen: OpaquePointer?) async {
-        await handleInputAsync(ch, screen: screen)
     }
 
     // Helper to get max index based on current view (simplified for sync performance)
@@ -1377,40 +1358,6 @@ final class TUI {
         renderOptimizer.markFullScreenDirty()
 
         Logger.shared.logInfo("Initial data load completed, transitioning to dashboard")
-    }
-
-    internal func refreshTopology() async {
-        Logger.shared.logDebug("Refreshing topology data")
-        statusMessage = "Refreshing topology..."
-        lastTopology = await TopologyGraphBuilder.build(client: client)
-        statusMessage = "Topology refreshed"
-        Logger.shared.logInfo("Topology refresh completed")
-    }
-
-
-    internal func exportTopology() async {
-        guard let topology = lastTopology else {
-            statusMessage = "No topology data to export"
-            return
-        }
-
-        do {
-            var content: [String] = []
-            content.append("OpenStack Topology Export")
-            content.append("Generated: \(Date())")
-            content.append("")
-            content.append("=== ASCII Diagram ===")
-            content.append(contentsOf: topology.asciiDiagram)
-            content.append("")
-            content.append("=== Detailed Lines ===")
-            content.append(contentsOf: topology.lines)
-
-            let fileContent = content.joined(separator: "\n")
-            try fileContent.write(toFile: "topology.txt", atomically: true, encoding: .utf8)
-            statusMessage = "Topology exported to topology.txt"
-        } catch {
-            statusMessage = "Failed to export topology: \(error.localizedDescription)"
-        }
     }
 
     // Colors are now managed semantically through SwiftTUI.drawStyledText(color: .semantic)

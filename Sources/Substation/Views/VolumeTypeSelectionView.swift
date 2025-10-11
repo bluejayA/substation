@@ -40,7 +40,7 @@ struct VolumeTypeSelectionView {
             items: volumeTypes,
             selectedItemIds: selectedVolumeTypeIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

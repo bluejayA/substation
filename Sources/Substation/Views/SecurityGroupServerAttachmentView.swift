@@ -18,7 +18,7 @@ struct SecurityGroupServerAttachmentView {
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             title: "Attach Security Group to Servers",
-            multiSelect: true
+            checkboxMode: .multiSelect
         )
     }
 }

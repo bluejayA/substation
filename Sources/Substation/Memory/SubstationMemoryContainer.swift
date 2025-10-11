@@ -30,7 +30,6 @@ final class SubstationMemoryContainer {
     private var _resourceCacheAdapter: ResourceCacheAdapter?
     private var _openStackResourceCache: OpenStackResourceCache?
     private var _searchIndexCache: SearchIndexCache?
-    private var _topologyCache: TopologyCache?
     private var _relationshipCache: RelationshipCache?
 
     // MARK: - Shared Logger
@@ -67,7 +66,6 @@ final class SubstationMemoryContainer {
         _resourceCacheAdapter = ResourceCacheAdapter(memoryManager: _memoryManager!)
         _openStackResourceCache = OpenStackResourceCache(memoryManager: _memoryManager!)
         _searchIndexCache = SearchIndexCache(memoryManager: _memoryManager!)
-        _topologyCache = TopologyCache(memoryManager: _memoryManager!)
         _relationshipCache = RelationshipCache(memoryManager: _memoryManager!)
 
         isInitialized = true
@@ -114,14 +112,6 @@ final class SubstationMemoryContainer {
         return cache
     }
 
-    /// Get the topology cache
-    var topologyCache: TopologyCache {
-        guard let cache = _topologyCache else {
-            logger.logError("SubstationMemoryContainer not initialized - call initialize() first", context: [:])
-            fatalError("SubstationMemoryContainer not initialized")
-        }
-        return cache
-    }
 
     /// Get the relationship cache
     var relationshipCache: RelationshipCache {
@@ -163,14 +153,12 @@ final class SubstationMemoryContainer {
         let cacheStats = await memoryManager.getCacheStatistics()
         let resourceStats = await resourceCacheAdapter.getStatistics()
         let searchStats = await searchIndexCache.getStatistics()
-        let topologyStats = await topologyCache.getStatistics()
         let relationshipStats = await relationshipCache.getStatistics()
 
         return SubstationPerformanceStatistics(
             systemHealth: cacheStats.systemHealth,
             resourceCacheStats: resourceStats,
             searchCacheStats: searchStats,
-            topologyStats: topologyStats,
             relationshipStats: relationshipStats,
             overallCacheStats: cacheStats
         )
@@ -183,7 +171,6 @@ public struct SubstationPerformanceStatistics: Sendable {
     public let systemHealth: SystemHealthReport
     public let resourceCacheStats: ResourceCacheStatistics
     public let searchCacheStats: SearchIndexCacheStatistics
-    public let topologyStats: TopologyCacheStatistics
     public let relationshipStats: RelationshipCacheStatistics
     public let overallCacheStats: SubstationCacheStatistics
 
@@ -193,7 +180,6 @@ public struct SubstationPerformanceStatistics: Sendable {
         System Health: \(systemHealth.overallHealth.description)
         \(resourceCacheStats.summary)
         \(searchCacheStats.summary)
-        \(topologyStats.summary)
         \(relationshipStats.summary)
         Overall Cache Performance:
         \(overallCacheStats.summary)
@@ -219,7 +205,6 @@ extension SubstationMemoryContainer {
         _resourceCacheAdapter = ResourceCacheAdapter(memoryManager: _memoryManager!)
         _openStackResourceCache = OpenStackResourceCache(memoryManager: _memoryManager!)
         _searchIndexCache = SearchIndexCache(memoryManager: _memoryManager!)
-        _topologyCache = TopologyCache(memoryManager: _memoryManager!)
         _relationshipCache = RelationshipCache(memoryManager: _memoryManager!)
 
         isInitialized = true
@@ -239,7 +224,6 @@ extension SubstationMemoryContainer {
             _resourceCacheAdapter = nil
             _openStackResourceCache = nil
             _searchIndexCache = nil
-            _topologyCache = nil
             _relationshipCache = nil
             isInitialized = false
             logger.logInfo("SubstationMemoryContainer shutdown completed", context: [:])

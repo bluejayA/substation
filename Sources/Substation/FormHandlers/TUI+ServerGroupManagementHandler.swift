@@ -14,14 +14,23 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    var serverGroupManagementNavigationContext: NavigationContext {
+        let serverCount = serverGroupManagementForm.availableServers.count
+        return .list(maxIndex: max(0, serverCount - 1))
+    }
+
     internal func handleServerGroupManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
+        // Try common navigation first
+        if await handleCommonNavigation(ch, screen: screen, context: serverGroupManagementNavigationContext) {
+            return
+        }
+
+        // Handle view-specific input
+        await handleServerGroupManagementSpecificInput(ch, screen: screen)
+    }
+
+    private func handleServerGroupManagementSpecificInput(_ ch: Int32, screen: OpaquePointer?) async {
         switch ch {
-        case Int32(259): // UP arrow - Previous server
-            serverGroupManagementForm.moveToPreviousServer()
-            await self.draw(screen: screen)
-        case Int32(258): // DOWN arrow - Next server
-            serverGroupManagementForm.moveToNextServer()
-            await self.draw(screen: screen)
         case Int32(10), Int32(13): // ENTER - Return to server groups view
             needsRedraw = true
             currentView = .serverGroups

@@ -125,7 +125,7 @@ struct FlavorSelectionView {
             items: flavors,
             selectedItemIds: selectedFlavorId != nil ? [selectedFlavorId!] : [],
             highlightedIndex: selectedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width) - 4,
@@ -164,7 +164,7 @@ struct FlavorSelectionView {
             items: categories,
             selectedItemIds: [],
             highlightedIndex: selectedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width) - 4,
@@ -215,7 +215,7 @@ struct FlavorSelectionView {
             items: category.flavors,
             selectedItemIds: selectedFlavorId != nil ? [selectedFlavorId!] : [],
             highlightedIndex: selectedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width) - 4,
@@ -440,8 +440,8 @@ struct FlavorSelectionState {
     var workloadType: WorkloadType = .balanced
 
     init(flavors: [Flavor]) {
-        self.manualState = FormSelectorState<Flavor>(items: flavors, multiSelect: false)
-        self.workloadState = FormSelectorState<Flavor>(items: [], multiSelect: false)
+        self.manualState = FormSelectorState<Flavor>(items: flavors, checkboxMode: .basic)
+        self.workloadState = FormSelectorState<Flavor>(items: [], checkboxMode: .basic)
     }
 
     mutating func switchMode() {

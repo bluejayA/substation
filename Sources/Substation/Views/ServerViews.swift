@@ -134,21 +134,36 @@ struct ServerViews {
         // Flavor Information with enhanced details
         if let flavor = server.flavor {
             let flavorName = resolveFlavorName(from: server.flavor, cachedFlavors: cachedFlavors)
-            hardwareItems.append(.field(label: "Flavor ID", value: flavor.id, style: .secondary))
-            hardwareItems.append(.field(label: "Flavor Name", value: flavorName, style: .secondary))
 
-            // Add detailed flavor specs if available in cache
-            if let cachedFlavor = cachedFlavors.first(where: { $0.id == flavor.id }) {
+            // Display flavor name prominently
+            hardwareItems.append(.field(label: "Flavor", value: flavorName, style: .primary))
+
+            // Try to get specs from embedded flavor data first (most accurate)
+            if let vcpus = flavor.vcpus, let ram = flavor.ram, let disk = flavor.disk {
+                // Use embedded FlavorRef specs from API response
+                hardwareItems.append(.field(label: "vCPUs", value: String(vcpus), style: .info))
+                hardwareItems.append(.field(label: "RAM", value: "\(ram) MB", style: .info))
+                hardwareItems.append(.field(label: "Root Disk", value: "\(disk) GB", style: .info))
+
+                if let ephemeral = flavor.ephemeral, ephemeral > 0 {
+                    hardwareItems.append(.field(label: "Ephemeral Disk", value: "\(ephemeral) GB", style: .info))
+                }
+
+                if let swap = flavor.swap, swap > 0 {
+                    hardwareItems.append(.field(label: "Swap", value: "\(swap) MB", style: .info))
+                }
+            } else if let cachedFlavor = findCachedFlavor(for: server.flavor, in: cachedFlavors) {
+                // Fall back to cached flavor if embedded specs not available
                 hardwareItems.append(.field(label: "vCPUs", value: String(cachedFlavor.vcpus), style: .info))
                 hardwareItems.append(.field(label: "RAM", value: "\(cachedFlavor.ram) MB", style: .info))
-                hardwareItems.append(.field(label: "Disk", value: "\(cachedFlavor.disk) GB", style: .info))
+                hardwareItems.append(.field(label: "Root Disk", value: "\(cachedFlavor.disk) GB", style: .info))
+
+                if let ephemeral = cachedFlavor.ephemeral, ephemeral > 0 {
+                    hardwareItems.append(.field(label: "Ephemeral Disk", value: "\(ephemeral) GB", style: .info))
+                }
 
                 if let swap = cachedFlavor.swap, swap > 0 {
                     hardwareItems.append(.field(label: "Swap", value: "\(swap) MB", style: .info))
-                }
-
-                if let ephemeral = cachedFlavor.ephemeral, ephemeral > 0 {
-                    hardwareItems.append(.field(label: "Ephemeral", value: "\(ephemeral) GB", style: .info))
                 }
             }
         }
@@ -167,9 +182,60 @@ struct ServerViews {
             sections.append(DetailSection(title: "Hardware Information", items: hardwareItems))
         }
 
+        // Flavor Metadata Section - Display additional flavor details from cached flavor
+        if let cachedFlavor = findCachedFlavor(for: server.flavor, in: cachedFlavors) {
+            var flavorMetadataItems: [DetailItem] = []
+
+            // Description
+            if let description = cachedFlavor.description, !description.isEmpty {
+                flavorMetadataItems.append(.field(label: "Description", value: description, style: .secondary))
+            }
+
+            // Network bandwidth factor
+            if let rxtxFactor = cachedFlavor.rxtxFactor, rxtxFactor != 1.0 {
+                flavorMetadataItems.append(.field(label: "Network Factor", value: String(format: "%.1fx", rxtxFactor), style: .info))
+            }
+
+            // Visibility
+            if let isPublic = cachedFlavor.isPublic {
+                flavorMetadataItems.append(.field(label: "Visibility", value: isPublic ? "Public" : "Private", style: .secondary))
+            }
+
+            // Status
+            if let disabled = cachedFlavor.disabled {
+                flavorMetadataItems.append(.field(label: "Status", value: disabled ? "Disabled" : "Active", style: disabled ? .error : .success))
+            }
+
+            if !flavorMetadataItems.isEmpty {
+                sections.append(DetailSection(title: "Flavor Metadata", items: flavorMetadataItems))
+            }
+        }
+
+        // Flavor Extra Specs Section - Display key-value extra specifications
+        if let cachedFlavor = findCachedFlavor(for: server.flavor, in: cachedFlavors),
+           let extraSpecs = cachedFlavor.extraSpecs, !extraSpecs.isEmpty {
+            var extraSpecItems: [DetailItem] = []
+
+            // Sort and display all extra specs
+            for (key, value) in extraSpecs.sorted(by: { $0.key < $1.key }) {
+                // Format the key for better readability
+                let formattedKey = key.replacingOccurrences(of: "_", with: " ")
+                    .replacingOccurrences(of: ":", with: " ")
+                    .capitalized
+                extraSpecItems.append(.field(label: formattedKey, value: value, style: .info))
+            }
+
+            if !extraSpecItems.isEmpty {
+                sections.append(DetailSection(
+                    title: "Flavor Extra Specifications",
+                    items: extraSpecItems,
+                    titleStyle: .accent
+                ))
+            }
+        }
+
         // Flavor Sizing Analysis Section
-        if let flavorId = server.flavor?.id,
-           let cachedFlavor = cachedFlavors.first(where: { $0.id == flavorId }) {
+        if let cachedFlavor = findCachedFlavor(for: server.flavor, in: cachedFlavors) {
             let sizingItems = analyzeFlavorSizing(flavor: cachedFlavor)
             if !sizingItems.isEmpty {
                 sections.append(DetailSection(
@@ -181,8 +247,7 @@ struct ServerViews {
         }
 
         // Performance Insights Section
-        if let flavorId = server.flavor?.id,
-           let cachedFlavor = cachedFlavors.first(where: { $0.id == flavorId }) {
+        if let cachedFlavor = findCachedFlavor(for: server.flavor, in: cachedFlavors) {
             let performanceItems = analyzePerformanceCharacteristics(flavor: cachedFlavor)
             if !performanceItems.isEmpty {
                 sections.append(DetailSection(
@@ -339,10 +404,45 @@ struct ServerViews {
 
     // MARK: - Helper Functions
 
-    static func resolveFlavorName(from flavor: Server.FlavorInfo?, cachedFlavors: [Flavor]) -> String {
-        guard let flavor = flavor else { return "Unknown" }
+    /// Find a cached flavor by matching either the UUID or the flavor name
+    /// Since OpenStack can return flavor.id as original_name, we need to match by name as well
+    static func findCachedFlavor(for serverFlavor: Server.FlavorInfo?, in cachedFlavors: [Flavor]) -> Flavor? {
+        guard let serverFlavor = serverFlavor else { return nil }
 
-        // First try original_name from the flavor ref (API format)
+        // First try direct ID match (UUID)
+        if let match = cachedFlavors.first(where: { $0.id == serverFlavor.id }) {
+            return match
+        }
+
+        // Try matching by original_name
+        if let originalName = serverFlavor.originalName {
+            if let match = cachedFlavors.first(where: { $0.name == originalName }) {
+                return match
+            }
+        }
+
+        // Try matching by name
+        if let name = serverFlavor.name {
+            if let match = cachedFlavors.first(where: { $0.name == name }) {
+                return match
+            }
+        }
+
+        // Try matching serverFlavor.id against cached flavor names
+        // (handles case where serverFlavor.id is actually the flavor name)
+        if let match = cachedFlavors.first(where: { $0.name == serverFlavor.id }) {
+            return match
+        }
+
+        return nil
+    }
+
+    static func resolveFlavorName(from flavor: Server.FlavorInfo?, cachedFlavors: [Flavor]) -> String {
+        guard let flavor = flavor else {
+            return ""
+        }
+
+        // First try original_name from the flavor ref (standard OpenStack field)
         if let originalName = flavor.originalName, !originalName.isEmpty {
             return originalName
         }
@@ -352,13 +452,14 @@ struct ServerViews {
             return name
         }
 
-        // Fall back to cached flavor lookup by ID
-        if let cachedFlavor = cachedFlavors.first(where: { $0.id == flavor.id }) {
-            return cachedFlavor.name ?? "Unknown Flavor"
+        // Fall back to cached flavor lookup (by ID or name)
+        if let cachedFlavor = findCachedFlavor(for: flavor, in: cachedFlavors),
+           let name = cachedFlavor.name, !name.isEmpty {
+            return name
         }
 
-        // Last resort: show ID
-        return flavor.id
+        // Last resort: return the raw flavor ID (truncated to 8 chars)
+        return String(flavor.id.prefix(8))
     }
 
     static func resolveImageName(from image: Server.ImageInfo?, cachedImages: [Image]) -> String {
@@ -772,7 +873,7 @@ struct ServerViews {
                 items: availableFlavors,
                 selectedItemIds: selectedIds,
                 highlightedIndex: safeHighlightedIndex,
-                multiSelect: false,
+                checkboxMode: .basic,
                 scrollOffset: 0,
                 searchQuery: nil,
                 maxWidth: Int(width) - 4,
@@ -815,7 +916,7 @@ struct ServerViews {
                 items: actions,
                 selectedItemIds: Set([selectedActionId]),
                 highlightedIndex: serverResizeForm.selectedAction == .confirmResize ? 0 : 1,
-                multiSelect: false,
+                checkboxMode: .basic,
                 scrollOffset: 0,
                 searchQuery: nil,
                 maxWidth: Int(width) - 4,

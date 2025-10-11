@@ -1123,6 +1123,10 @@ class DataManager {
         await fetchServers(priority: "on-demand")
     }
 
+    func refreshPortData() async {
+        await fetchPorts(priority: "on-demand")
+    }
+
     // Computed properties for easier access
     var availabilityZones: [String] {
         return tui?.cachedAvailabilityZones ?? []

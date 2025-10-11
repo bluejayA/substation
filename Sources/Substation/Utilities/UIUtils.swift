@@ -31,13 +31,11 @@ struct UIUtils {
         case .subnets:
             return "\(baseCommands) SPACE:details C:create A:attach DELETE:delete /:search ESC:back"
         case .ports:
-            return "\(baseCommands) SPACE:details C:create DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create M:manage P:allowed-address-pairs DELETE:delete /:search ESC:back"
         case .floatingIPs:
-            return "\(baseCommands) SPACE:details C:create A:manage DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create M:manage DELETE:delete /:search ESC:back"
         case .routers:
             return "\(baseCommands) SPACE:details C:create DELETE:delete /:search ESC:back"
-        case .topology:
-            return "\(baseCommands) W:export /:search ESC:back"
         case .healthDashboard:
             return "^c:quit UP/DOWN:navigate a:auto-refresh SPACE:service-details ESC:back ?:help"
         case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .floatingIPDetail, .routerDetail, .healthDashboardServiceDetail:
@@ -138,6 +136,12 @@ struct UIUtils {
             return "\(baseCommands) TAB:mode SPACE:select/deselect ENTER:apply ESC:back"
         case .floatingIPServerManagement:
             return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
+        case .floatingIPPortManagement:
+            return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
+        case .portServerManagement:
+            return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
+        case .portAllowedAddressPairManagement:
+            return "\(baseCommands) A:add D:delete SPACE:edit ENTER:save ESC:back"
         case .subnetRouterManagement:
             return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
         case .flavorSelection:
@@ -231,12 +235,35 @@ struct UIUtils {
             }
             return max(0, filteredSecrets.count - 1)
 
-        case .topology:
-            // For topology view, we don't support selection navigation
-            return 0
+        case .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement:
+            // Management views handle their own filtered server counts
+            let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+            return max(0, filteredServers.count - 1)
         default:
             // For detail views and others, no selection
             return 0
+        }
+    }
+}
+
+// MARK: - TUI Navigation Helpers
+
+@MainActor
+extension TUI {
+    /// Helper method to delegate navigation to NavigationInputHandler with a given context
+    /// Returns true if the input was handled by the navigation handler
+    func handleCommonNavigation(_ ch: Int32, screen: OpaquePointer?, context: NavigationContext) async -> Bool {
+        switch context {
+        case .list(let maxIndex):
+            return await NavigationInputHandler.handleListNavigation(ch, maxIndex: maxIndex, tui: self)
+        case .form(let fieldCount):
+            return await NavigationInputHandler.handleFormNavigation(ch, fieldCount: fieldCount, tui: self)
+        case .management(let itemCount):
+            return await NavigationInputHandler.handleManagementNavigation(ch, itemCount: itemCount, tui: self)
+        case .detail(let scrollable):
+            return await NavigationInputHandler.handleDetailNavigation(ch, scrollable: scrollable, tui: self)
+        case .custom:
+            return false
         }
     }
 }

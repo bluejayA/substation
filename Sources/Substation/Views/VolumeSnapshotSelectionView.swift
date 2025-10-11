@@ -47,7 +47,7 @@ struct VolumeSnapshotSelectionView {
             items: snapshots,
             selectedItemIds: selectedSnapshotIds,
             highlightedIndex: highlightedIndex,
-            multiSelect: false,
+            checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,
             maxWidth: Int(width),

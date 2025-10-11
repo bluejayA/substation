@@ -29,7 +29,7 @@ struct BarbicanContentTypeSelectionView {
         ]
         let selector = FormSelector(
             label: title, tabs: tabs, selectedTabIndex: 0, items: contentTypes,
-            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, multiSelect: false,
+            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, checkboxMode: .basic,
             scrollOffset: scrollOffset, searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width), maxHeight: Int(height), isActive: true
         )
@@ -67,7 +67,7 @@ struct BarbicanEncodingSelectionView {
         ]
         let selector = FormSelector(
             label: title, tabs: tabs, selectedTabIndex: 0, items: encodings,
-            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, multiSelect: false,
+            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, checkboxMode: .basic,
             scrollOffset: scrollOffset, searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width), maxHeight: Int(height), isActive: true
         )
@@ -105,7 +105,7 @@ struct BarbicanSecretTypeSelectionView {
         ]
         let selector = FormSelector(
             label: title, tabs: tabs, selectedTabIndex: 0, items: secretTypes,
-            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, multiSelect: false,
+            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, checkboxMode: .basic,
             scrollOffset: scrollOffset, searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width), maxHeight: Int(height), isActive: true
         )
@@ -143,7 +143,7 @@ struct BarbicanAlgorithmSelectionView {
         ]
         let selector = FormSelector(
             label: title, tabs: tabs, selectedTabIndex: 0, items: algorithms,
-            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, multiSelect: false,
+            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, checkboxMode: .basic,
             scrollOffset: scrollOffset, searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width), maxHeight: Int(height), isActive: true
         )
@@ -181,7 +181,7 @@ struct BarbicanModeSelectionView {
         ]
         let selector = FormSelector(
             label: title, tabs: tabs, selectedTabIndex: 0, items: modes,
-            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, multiSelect: false,
+            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, checkboxMode: .basic,
             scrollOffset: scrollOffset, searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width), maxHeight: Int(height), isActive: true
         )
@@ -219,7 +219,7 @@ struct BarbicanBitLengthSelectionView {
         ]
         let selector = FormSelector(
             label: title, tabs: tabs, selectedTabIndex: 0, items: bitLengths,
-            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, multiSelect: false,
+            selectedItemIds: selectedIds, highlightedIndex: highlightedIndex, checkboxMode: .basic,
             scrollOffset: scrollOffset, searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             maxWidth: Int(width), maxHeight: Int(height), isActive: true
         )
