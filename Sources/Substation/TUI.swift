@@ -364,6 +364,7 @@ final class TUI {
 
     // Barbican secret creation form state
     internal var barbicanSecretCreateForm = BarbicanSecretCreateForm()
+    internal var barbicanSecretCreateFormState: FormBuilderState = FormBuilderState(fields: [])
 
     // Debug mode flag
     private var debugMode: Bool = false

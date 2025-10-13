@@ -1,12 +1,13 @@
 import Foundation
 
 enum BarbicanSecretCreateField: CaseIterable {
-    case name, payload, payloadContentType, payloadContentEncoding, secretType, algorithm, bitLength, mode, expirationDate
+    case name, payload, payloadFilePath, payloadContentType, payloadContentEncoding, secretType, algorithm, bitLength, mode, expirationDate
 
     var title: String {
         switch self {
         case .name: return "Secret Name"
         case .payload: return "Secret Payload"
+        case .payloadFilePath: return "Or Load from File"
         case .payloadContentType: return "Payload Content Type"
         case .payloadContentEncoding: return "Payload Content Encoding"
         case .secretType: return "Secret Type"
@@ -73,9 +74,10 @@ enum SecretMode: String, CaseIterable {
     }
 }
 
-struct BarbicanSecretCreateForm {
+struct BarbicanSecretCreateForm: FormViewModel {
     var secretName: String = ""
     var payload: String = ""
+    var payloadFilePath: String = ""
     var payloadContentType: SecretPayloadContentType = .textPlain
     var payloadContentEncoding: SecretPayloadContentEncoding = .base64
     var secretType: SecretType = .opaque
@@ -94,35 +96,12 @@ struct BarbicanSecretCreateForm {
     var currentField: BarbicanSecretCreateField = .name
     var fieldEditMode: Bool = false
     var payloadEditMode: Bool = false // Special mode for multi-line payload editing
+
+    // Legacy modes - keeping for backward compatibility during transition
     var selectionMode: Bool = false // Special mode for selection windows (legacy)
     var selectionIndex: Int = 0 // Current selection index in selection mode
     var selectionConfirmed: Int? = nil // Index of item selected for confirmation
     var dateSelectionMode: Bool = false // Special mode for date selection
-
-    // FormSelector-based selection modes
-    var contentTypeSelectionMode: Bool = false
-    var contentTypeSelectionIndex: Int = 0
-    var selectedContentTypeID: String?
-
-    var encodingSelectionMode: Bool = false
-    var encodingSelectionIndex: Int = 0
-    var selectedEncodingID: String?
-
-    var secretTypeSelectionMode: Bool = false
-    var secretTypeSelectionIndex: Int = 0
-    var selectedSecretTypeID: String?
-
-    var algorithmSelectionMode: Bool = false
-    var algorithmSelectionIndex: Int = 0
-    var selectedAlgorithmID: String?
-
-    var modeSelectionMode: Bool = false
-    var modeSelectionIndex: Int = 0
-    var selectedModeID: String?
-
-    var bitLengthSelectionMode: Bool = false
-    var bitLengthSelectionIndex: Int = 0
-    var selectedBitLengthID: String?
 
     // Payload input buffering for performance
     var payloadBuffer: String = ""
@@ -136,6 +115,10 @@ struct BarbicanSecretCreateForm {
     private var cachedPayloadLines: [String] = []
     private var cachedPayloadVersion: String = "" // Track when cache is valid
     private var isLargeContent: Bool = false // Flag for content > 4096 chars
+
+    // Form state management
+    var errorMessage: String? = nil
+    var isLoading: Bool = false
 
     mutating func nextField() {
         let fields = BarbicanSecretCreateField.allCases
@@ -439,6 +422,65 @@ struct BarbicanSecretCreateForm {
         return errors
     }
 
+    // Validate file path
+    func validateFilePath() -> String? {
+        let trimmed = payloadFilePath.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Empty path is valid (file loading is optional)
+        if trimmed.isEmpty {
+            return nil
+        }
+
+        // Expand tilde
+        let expanded: String
+        if trimmed.hasPrefix("~") {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            expanded = trimmed.replacingOccurrences(of: "~", with: home, options: .anchored)
+        } else {
+            expanded = trimmed
+        }
+
+        // Check file exists
+        guard FileManager.default.fileExists(atPath: expanded) else {
+            return "File not found: \(expanded)"
+        }
+
+        return nil
+    }
+
+    // Load payload from file
+    mutating func loadPayloadFromFile() -> String? {
+        let trimmed = payloadFilePath.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmed.isEmpty else {
+            return "File path is empty"
+        }
+
+        // Expand tilde
+        let expanded: String
+        if trimmed.hasPrefix("~") {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            expanded = trimmed.replacingOccurrences(of: "~", with: home, options: .anchored)
+        } else {
+            expanded = trimmed
+        }
+
+        // Check file exists
+        guard FileManager.default.fileExists(atPath: expanded) else {
+            return "File not found: \(expanded)"
+        }
+
+        // Read file
+        do {
+            let contents = try String(contentsOfFile: expanded, encoding: .utf8)
+            payload = contents
+            invalidatePayloadCache()
+            return nil
+        } catch {
+            return "Error reading file: \(error.localizedDescription)"
+        }
+    }
+
     func getExpirationDate() -> Date? {
         guard hasExpiration else {
             return nil
@@ -592,77 +634,461 @@ struct BarbicanSecretCreateForm {
         isPasteMode = false
     }
 
-    // MARK: - FormSelector Helper Methods
+    // MARK: - FormViewModel Implementation
 
-    mutating func enterContentTypeSelectionMode() {
-        contentTypeSelectionMode = true
-    }
-
-    mutating func exitContentTypeSelectionMode() {
-        contentTypeSelectionMode = false
-        if let selectedID = selectedContentTypeID,
-           let selectedType = SecretPayloadContentType.allCases.first(where: { $0.rawValue == selectedID }) {
-            payloadContentType = selectedType
+    func getFieldConfigurations() -> [FormFieldConfiguration] {
+        return BarbicanSecretCreateField.allCases.map { field in
+            getFieldConfiguration(for: field)
         }
     }
 
-    mutating func enterEncodingSelectionMode() {
-        encodingSelectionMode = true
+    func getValidationState() -> FormValidationState {
+        let errors = validate()
+        return FormValidationState(isValid: errors.isEmpty, errors: errors)
     }
 
-    mutating func exitEncodingSelectionMode() {
-        encodingSelectionMode = false
-        if let selectedID = selectedEncodingID,
-           let selectedEncoding = SecretPayloadContentEncoding.allCases.first(where: { $0.rawValue == selectedID }) {
-            payloadContentEncoding = selectedEncoding
+    func getFormTitle() -> String {
+        return "Create New Secret"
+    }
+
+    func getNavigationHelp() -> String {
+        if fieldEditMode && currentField == .name {
+            return "ESC: Exit editing | Type to enter name"
+        } else if payloadEditMode {
+            return "ESC: Save and return to form | Type to enter payload"
+        } else {
+            return "TAB/UP/DOWN: Navigate fields | SPACE: Edit/Select | ENTER: Create | ESC: Cancel"
         }
     }
 
-    mutating func enterSecretTypeSelectionMode() {
-        secretTypeSelectionMode = true
+    func isInSpecialMode() -> Bool {
+        return fieldEditMode || payloadEditMode || dateSelectionMode || selectionMode
     }
 
-    mutating func exitSecretTypeSelectionMode() {
-        secretTypeSelectionMode = false
-        if let selectedID = selectedSecretTypeID,
-           let selectedType = SecretType.allCases.first(where: { $0.rawValue == selectedID }) {
-            secretType = selectedType
+    private func getFieldConfiguration(for field: BarbicanSecretCreateField) -> FormFieldConfiguration {
+        let isSelected = (currentField == field)
+        let isActive = isSelected && (fieldEditMode || payloadEditMode)
+
+        switch field {
+        case .name:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: true,
+                isSelected: isSelected,
+                isActive: isActive,
+                placeholder: "Press SPACE to edit...",
+                value: secretName.isEmpty ? nil : secretName,
+                maxWidth: 50,
+                fieldType: .text
+            )
+
+        case .payload:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: true,
+                isSelected: isSelected,
+                isActive: payloadEditMode,
+                placeholder: "Press SPACE to edit payload...",
+                value: payload.isEmpty ? nil : getPayloadPreview(),
+                maxWidth: 60,
+                fieldType: .text
+            )
+
+        case .payloadFilePath:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: isActive,
+                placeholder: "Enter file path (e.g. ~/secret.txt)",
+                value: payloadFilePath.isEmpty ? nil : payloadFilePath,
+                maxWidth: 60,
+                fieldType: .text
+            )
+
+        case .payloadContentType:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: false,
+                value: payloadContentType.title,
+                fieldType: .enumeration
+            )
+
+        case .payloadContentEncoding:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: false,
+                value: payloadContentEncoding.title,
+                fieldType: .enumeration
+            )
+
+        case .secretType:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: false,
+                value: secretType.title,
+                fieldType: .enumeration
+            )
+
+        case .algorithm:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: false,
+                value: algorithm.title,
+                fieldType: .enumeration
+            )
+
+        case .bitLength:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: false,
+                value: "\(bitLength) bits",
+                fieldType: .enumeration
+            )
+
+        case .mode:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: false,
+                value: mode.title,
+                fieldType: .enumeration
+            )
+
+        case .expirationDate:
+            return FormFieldConfiguration(
+                title: field.title,
+                isRequired: false,
+                isSelected: isSelected,
+                isActive: dateSelectionMode,
+                value: hasExpiration ? "Set Custom Date" : "No Expiration",
+                fieldType: .enumeration
+            )
         }
     }
 
-    mutating func enterAlgorithmSelectionMode() {
-        algorithmSelectionMode = true
-    }
+    // MARK: - FormBuilder Integration
 
-    mutating func exitAlgorithmSelectionMode() {
-        algorithmSelectionMode = false
-        if let selectedID = selectedAlgorithmID,
-           let selectedAlgorithm = SecretAlgorithm.allCases.first(where: { $0.rawValue == selectedID }) {
-            algorithm = selectedAlgorithm
+    func buildFields(
+        selectedFieldId: String?,
+        activeFieldId: String?,
+        formState: FormBuilderState
+    ) -> [FormField] {
+        var fields: [FormField] = []
+
+        // Secret Name Field
+        let nameFieldId = BarbicanSecretCreateFieldId.name.rawValue
+        fields.append(.text(FormFieldText(
+            id: nameFieldId,
+            label: BarbicanSecretCreateField.name.title,
+            value: secretName,
+            placeholder: "Enter secret name",
+            isRequired: true,
+            isVisible: true,
+            isSelected: selectedFieldId == nameFieldId,
+            isActive: activeFieldId == nameFieldId,
+            cursorPosition: formState.textFieldStates[nameFieldId]?.cursorPosition,
+            validationError: nil,
+            maxWidth: 50,
+            maxLength: 255
+        )))
+
+        // Payload Field (Special handling for multi-line editing)
+        let payloadFieldId = BarbicanSecretCreateFieldId.payload.rawValue
+        fields.append(.text(FormFieldText(
+            id: payloadFieldId,
+            label: BarbicanSecretCreateField.payload.title,
+            value: getPayloadPreview(),
+            placeholder: "Press SPACE to edit payload...",
+            isRequired: true,
+            isVisible: true,
+            isSelected: selectedFieldId == payloadFieldId,
+            isActive: activeFieldId == payloadFieldId,
+            cursorPosition: nil,
+            validationError: nil,
+            maxWidth: 60,
+            maxLength: nil
+        )))
+
+        // Payload File Path (Text)
+        let filePathFieldId = BarbicanSecretCreateFieldId.payloadFilePath.rawValue
+        fields.append(.text(FormFieldText(
+            id: filePathFieldId,
+            label: BarbicanSecretCreateField.payloadFilePath.title,
+            value: payloadFilePath,
+            placeholder: "Enter file path (e.g. ~/secret.txt)",
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == filePathFieldId,
+            isActive: activeFieldId == filePathFieldId,
+            cursorPosition: formState.textFieldStates[filePathFieldId]?.cursorPosition,
+            validationError: validateFilePath(),
+            maxWidth: 60,
+            maxLength: nil
+        )))
+
+        // Payload Content Type (Selector)
+        let contentTypeFieldId = BarbicanSecretCreateFieldId.payloadContentType.rawValue
+        let contentTypeItems = SecretPayloadContentType.allCases.map { $0 as any FormSelectorItem }
+        fields.append(.selector(FormFieldSelector(
+            id: contentTypeFieldId,
+            label: BarbicanSecretCreateField.payloadContentType.title,
+            items: contentTypeItems,
+            selectedItemId: payloadContentType.rawValue,
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == contentTypeFieldId,
+            isActive: activeFieldId == contentTypeFieldId,
+            validationError: nil,
+            columns: [
+                FormSelectorItemColumn(header: "CONTENT TYPE", width: 30) { item in
+                    (item as? SecretPayloadContentType)?.title ?? ""
+                }
+            ],
+            searchQuery: formState.selectorStates[contentTypeFieldId]?.searchQuery,
+            highlightedIndex: formState.selectorStates[contentTypeFieldId]?.highlightedIndex ?? 0,
+            scrollOffset: formState.selectorStates[contentTypeFieldId]?.scrollOffset ?? 0
+        )))
+
+        // Payload Content Encoding (Selector)
+        let encodingFieldId = BarbicanSecretCreateFieldId.payloadContentEncoding.rawValue
+        let encodingItems = SecretPayloadContentEncoding.allCases.map { $0 as any FormSelectorItem }
+        fields.append(.selector(FormFieldSelector(
+            id: encodingFieldId,
+            label: BarbicanSecretCreateField.payloadContentEncoding.title,
+            items: encodingItems,
+            selectedItemId: payloadContentEncoding.rawValue,
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == encodingFieldId,
+            isActive: activeFieldId == encodingFieldId,
+            validationError: nil,
+            columns: [
+                FormSelectorItemColumn(header: "ENCODING", width: 20) { item in
+                    (item as? SecretPayloadContentEncoding)?.title ?? ""
+                }
+            ],
+            searchQuery: formState.selectorStates[encodingFieldId]?.searchQuery,
+            highlightedIndex: formState.selectorStates[encodingFieldId]?.highlightedIndex ?? 0,
+            scrollOffset: formState.selectorStates[encodingFieldId]?.scrollOffset ?? 0
+        )))
+
+        // Secret Type (Selector)
+        let secretTypeFieldId = BarbicanSecretCreateFieldId.secretType.rawValue
+        let secretTypeItems = SecretType.allCases.map { $0 as any FormSelectorItem }
+        fields.append(.selector(FormFieldSelector(
+            id: secretTypeFieldId,
+            label: BarbicanSecretCreateField.secretType.title,
+            items: secretTypeItems,
+            selectedItemId: secretType.rawValue,
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == secretTypeFieldId,
+            isActive: activeFieldId == secretTypeFieldId,
+            validationError: nil,
+            columns: [
+                FormSelectorItemColumn(header: "SECRET TYPE", width: 20) { item in
+                    (item as? SecretType)?.title ?? ""
+                }
+            ],
+            searchQuery: formState.selectorStates[secretTypeFieldId]?.searchQuery,
+            highlightedIndex: formState.selectorStates[secretTypeFieldId]?.highlightedIndex ?? 0,
+            scrollOffset: formState.selectorStates[secretTypeFieldId]?.scrollOffset ?? 0
+        )))
+
+        // Algorithm (Selector)
+        let algorithmFieldId = BarbicanSecretCreateFieldId.algorithm.rawValue
+        let algorithmItems = SecretAlgorithm.allCases.map { $0 as any FormSelectorItem }
+        fields.append(.selector(FormFieldSelector(
+            id: algorithmFieldId,
+            label: BarbicanSecretCreateField.algorithm.title,
+            items: algorithmItems,
+            selectedItemId: algorithm.rawValue,
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == algorithmFieldId,
+            isActive: activeFieldId == algorithmFieldId,
+            validationError: nil,
+            columns: [
+                FormSelectorItemColumn(header: "ALGORITHM", width: 20) { item in
+                    (item as? SecretAlgorithm)?.title ?? ""
+                }
+            ],
+            searchQuery: formState.selectorStates[algorithmFieldId]?.searchQuery,
+            highlightedIndex: formState.selectorStates[algorithmFieldId]?.highlightedIndex ?? 0,
+            scrollOffset: formState.selectorStates[algorithmFieldId]?.scrollOffset ?? 0
+        )))
+
+        // Bit Length (Selector)
+        let bitLengthFieldId = BarbicanSecretCreateFieldId.bitLength.rawValue
+        let bitLengthItems = BitLengthOption.commonBitLengths.map { $0 as any FormSelectorItem }
+        fields.append(.selector(FormFieldSelector(
+            id: bitLengthFieldId,
+            label: BarbicanSecretCreateField.bitLength.title,
+            items: bitLengthItems,
+            selectedItemId: "\(bitLength)",
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == bitLengthFieldId,
+            isActive: activeFieldId == bitLengthFieldId,
+            validationError: nil,
+            columns: [
+                FormSelectorItemColumn(header: "BIT LENGTH", width: 20) { item in
+                    (item as? BitLengthOption)?.id ?? ""
+                }
+            ],
+            searchQuery: formState.selectorStates[bitLengthFieldId]?.searchQuery,
+            highlightedIndex: formState.selectorStates[bitLengthFieldId]?.highlightedIndex ?? 0,
+            scrollOffset: formState.selectorStates[bitLengthFieldId]?.scrollOffset ?? 0
+        )))
+
+        // Mode (Selector)
+        let modeFieldId = BarbicanSecretCreateFieldId.mode.rawValue
+        let modeItems = SecretMode.allCases.map { $0 as any FormSelectorItem }
+        fields.append(.selector(FormFieldSelector(
+            id: modeFieldId,
+            label: BarbicanSecretCreateField.mode.title,
+            items: modeItems,
+            selectedItemId: mode.rawValue,
+            isRequired: false,
+            isVisible: true,
+            isSelected: selectedFieldId == modeFieldId,
+            isActive: activeFieldId == modeFieldId,
+            validationError: nil,
+            columns: [
+                FormSelectorItemColumn(header: "MODE", width: 20) { item in
+                    (item as? SecretMode)?.title ?? ""
+                }
+            ],
+            searchQuery: formState.selectorStates[modeFieldId]?.searchQuery,
+            highlightedIndex: formState.selectorStates[modeFieldId]?.highlightedIndex ?? 0,
+            scrollOffset: formState.selectorStates[modeFieldId]?.scrollOffset ?? 0
+        )))
+
+        // Expiration Date (Info field - special handling needed)
+        let expirationFieldId = BarbicanSecretCreateFieldId.expirationDate.rawValue
+        fields.append(.info(FormFieldInfo(
+            id: expirationFieldId,
+            label: BarbicanSecretCreateField.expirationDate.title,
+            value: hasExpiration ? "Set Custom Date" : "No Expiration",
+            isVisible: true,
+            isSelected: selectedFieldId == expirationFieldId,
+            style: .info
+        )))
+
+        return fields
+    }
+}
+
+// MARK: - Field Identifiers
+
+enum BarbicanSecretCreateFieldId: String {
+    case name = "secret-name"
+    case payload = "secret-payload"
+    case payloadFilePath = "payload-file-path"
+    case payloadContentType = "payload-content-type"
+    case payloadContentEncoding = "payload-content-encoding"
+    case secretType = "secret-type"
+    case algorithm = "algorithm"
+    case bitLength = "bit-length"
+    case mode = "mode"
+    case expirationDate = "expiration-date"
+}
+
+// MARK: - BarbicanSecretCreateForm FormState Integration
+
+extension BarbicanSecretCreateForm {
+    mutating func updateFromFormState(_ formState: FormBuilderState) {
+        // Update form data from FormBuilderState
+        let fields = formState.fields
+
+        for field in fields {
+            switch field {
+            case .text(let textField):
+                if textField.id == BarbicanSecretCreateFieldId.name.rawValue {
+                    self.secretName = textField.value
+                } else if textField.id == BarbicanSecretCreateFieldId.payload.rawValue {
+                    // Payload has special handling - don't overwrite from form state
+                    // It's managed separately through payloadEditMode
+                } else if textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
+                    self.payloadFilePath = textField.value
+                }
+            case .selector(let selectorField):
+                if selectorField.id == BarbicanSecretCreateFieldId.payloadContentType.rawValue {
+                    if let selectedId = selectorField.selectedItemId,
+                       let contentType = SecretPayloadContentType(rawValue: selectedId) {
+                        self.payloadContentType = contentType
+                    }
+                } else if selectorField.id == BarbicanSecretCreateFieldId.payloadContentEncoding.rawValue {
+                    if let selectedId = selectorField.selectedItemId,
+                       let encoding = SecretPayloadContentEncoding(rawValue: selectedId) {
+                        self.payloadContentEncoding = encoding
+                    }
+                } else if selectorField.id == BarbicanSecretCreateFieldId.secretType.rawValue {
+                    if let selectedId = selectorField.selectedItemId,
+                       let type = SecretType(rawValue: selectedId) {
+                        self.secretType = type
+                    }
+                } else if selectorField.id == BarbicanSecretCreateFieldId.algorithm.rawValue {
+                    if let selectedId = selectorField.selectedItemId,
+                       let alg = SecretAlgorithm(rawValue: selectedId) {
+                        self.algorithm = alg
+                    }
+                } else if selectorField.id == BarbicanSecretCreateFieldId.bitLength.rawValue {
+                    if let selectedId = selectorField.selectedItemId,
+                       let length = Int(selectedId) {
+                        self.bitLength = length
+                    }
+                } else if selectorField.id == BarbicanSecretCreateFieldId.mode.rawValue {
+                    if let selectedId = selectorField.selectedItemId,
+                       let m = SecretMode(rawValue: selectedId) {
+                        self.mode = m
+                    }
+                }
+            default:
+                break
+            }
         }
-    }
 
-    mutating func enterModeSelectionMode() {
-        modeSelectionMode = true
-    }
-
-    mutating func exitModeSelectionMode() {
-        modeSelectionMode = false
-        if let selectedID = selectedModeID,
-           let selectedMode = SecretMode.allCases.first(where: { $0.rawValue == selectedID }) {
-            mode = selectedMode
+        // Update navigation state
+        if let currentFieldId = formState.getCurrentFieldId() {
+            // Map field ID back to BarbicanSecretCreateField enum
+            switch currentFieldId {
+            case BarbicanSecretCreateFieldId.name.rawValue:
+                self.currentField = .name
+            case BarbicanSecretCreateFieldId.payload.rawValue:
+                self.currentField = .payload
+            case BarbicanSecretCreateFieldId.payloadContentType.rawValue:
+                self.currentField = .payloadContentType
+            case BarbicanSecretCreateFieldId.payloadContentEncoding.rawValue:
+                self.currentField = .payloadContentEncoding
+            case BarbicanSecretCreateFieldId.secretType.rawValue:
+                self.currentField = .secretType
+            case BarbicanSecretCreateFieldId.algorithm.rawValue:
+                self.currentField = .algorithm
+            case BarbicanSecretCreateFieldId.bitLength.rawValue:
+                self.currentField = .bitLength
+            case BarbicanSecretCreateFieldId.mode.rawValue:
+                self.currentField = .mode
+            case BarbicanSecretCreateFieldId.expirationDate.rawValue:
+                self.currentField = .expirationDate
+            default:
+                break
+            }
         }
-    }
 
-    mutating func enterBitLengthSelectionMode() {
-        bitLengthSelectionMode = true
-    }
-
-    mutating func exitBitLengthSelectionMode() {
-        bitLengthSelectionMode = false
-        if let selectedID = selectedBitLengthID,
-           let selectedValue = Int(selectedID) {
-            bitLength = selectedValue
-        }
+        // Update edit mode based on active field
+        self.fieldEditMode = formState.isCurrentFieldActive()
     }
 }

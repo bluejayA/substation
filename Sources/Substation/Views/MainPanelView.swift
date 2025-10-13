@@ -505,8 +505,7 @@ struct MainPanelView {
                 await BarbicanViews.drawBarbicanContainerDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, container: container)
             }
         case .barbicanSecretCreate:
-            let validationErrors = tui.barbicanSecretCreateForm.validate()
-            await BarbicanViews.drawBarbicanSecretCreateForm(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, form: tui.barbicanSecretCreateForm, validationErrors: validationErrors)
+            await BarbicanViews.drawBarbicanSecretCreateForm(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, form: tui.barbicanSecretCreateForm, formState: tui.barbicanSecretCreateFormState)
         case .barbicanContainerCreate:
             await MiscViews.drawSimpleCenteredMessage(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, message: "Create Container - Coming Soon")
 

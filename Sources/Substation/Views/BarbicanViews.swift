@@ -318,8 +318,9 @@ struct BarbicanViews {
         width: Int32,
         height: Int32,
         form: BarbicanSecretCreateForm,
-        validationErrors: [String] = []
+        formState: FormBuilderState
     ) async {
+        // Defensive bounds checking to prevent crashes on small terminals
         guard width > 20 && height > 10 else {
             let surface = SwiftTUI.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
@@ -327,241 +328,98 @@ struct BarbicanViews {
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        components.append(Text("Create New Secret").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
-
-        // Handle special payload editing mode
+        // Handle special payload editing mode (full-screen editor)
         if form.payloadEditMode {
             await drawPayloadEditor(screen: screen, startRow: startRow, startCol: startCol,
                                   width: width, height: height, form: form)
             return
         }
 
-        // Handle FormSelector-based selection modes
-        if form.contentTypeSelectionMode {
-            let contentTypes = SecretPayloadContentType.wrappedAllCases
-            let selectedIds: Set<String> = form.selectedContentTypeID.map { Set([$0]) } ?? []
-            await BarbicanContentTypeSelectionView.drawContentTypeSelection(
-                screen: screen, startRow: startRow, startCol: startCol, width: width, height: height,
-                contentTypes: contentTypes, selectedIds: selectedIds,
-                highlightedIndex: form.contentTypeSelectionIndex, scrollOffset: 0, searchQuery: "",
-                title: "Select Payload Content Type"
-            )
-            return
-        }
-
-        if form.encodingSelectionMode {
-            let encodings = SecretPayloadContentEncoding.wrappedAllCases
-            let selectedIds: Set<String> = form.selectedEncodingID.map { Set([$0]) } ?? []
-            await BarbicanEncodingSelectionView.drawEncodingSelection(
-                screen: screen, startRow: startRow, startCol: startCol, width: width, height: height,
-                encodings: encodings, selectedIds: selectedIds,
-                highlightedIndex: form.encodingSelectionIndex, scrollOffset: 0, searchQuery: "",
-                title: "Select Payload Content Encoding"
-            )
-            return
-        }
-
-        if form.secretTypeSelectionMode {
-            let secretTypes = SecretType.wrappedAllCases
-            let selectedIds: Set<String> = form.selectedSecretTypeID.map { Set([$0]) } ?? []
-            await BarbicanSecretTypeSelectionView.drawSecretTypeSelection(
-                screen: screen, startRow: startRow, startCol: startCol, width: width, height: height,
-                secretTypes: secretTypes, selectedIds: selectedIds,
-                highlightedIndex: form.secretTypeSelectionIndex, scrollOffset: 0, searchQuery: "",
-                title: "Select Secret Type"
-            )
-            return
-        }
-
-        if form.algorithmSelectionMode {
-            let algorithms = SecretAlgorithm.wrappedAllCases
-            let selectedIds: Set<String> = form.selectedAlgorithmID.map { Set([$0]) } ?? []
-            await BarbicanAlgorithmSelectionView.drawAlgorithmSelection(
-                screen: screen, startRow: startRow, startCol: startCol, width: width, height: height,
-                algorithms: algorithms, selectedIds: selectedIds,
-                highlightedIndex: form.algorithmSelectionIndex, scrollOffset: 0, searchQuery: "",
-                title: "Select Algorithm"
-            )
-            return
-        }
-
-        if form.modeSelectionMode {
-            let modes = SecretMode.wrappedAllCases
-            let selectedIds: Set<String> = form.selectedModeID.map { Set([$0]) } ?? []
-            await BarbicanModeSelectionView.drawModeSelection(
-                screen: screen, startRow: startRow, startCol: startCol, width: width, height: height,
-                modes: modes, selectedIds: selectedIds,
-                highlightedIndex: form.modeSelectionIndex, scrollOffset: 0, searchQuery: "",
-                title: "Select Mode"
-            )
-            return
-        }
-
-        if form.bitLengthSelectionMode {
-            let bitLengths = BitLengthOption.commonBitLengths
-            let selectedIds: Set<String> = form.selectedBitLengthID.map { Set([$0]) } ?? []
-            await BarbicanBitLengthSelectionView.drawBitLengthSelection(
-                screen: screen, startRow: startRow, startCol: startCol, width: width, height: height,
-                bitLengths: bitLengths, selectedIds: selectedIds,
-                highlightedIndex: form.bitLengthSelectionIndex, scrollOffset: 0, searchQuery: "",
-                title: "Select Bit Length"
-            )
-            return
-        }
-
-        // Handle special selection mode (legacy)
-        if form.selectionMode {
-            await drawSelectionWindow(screen: screen, startRow: startRow, startCol: startCol,
-                                    width: width, height: height, form: form)
-            return
-        }
-
-        // Handle date selection mode
+        // Handle legacy date selection mode
         if form.dateSelectionMode {
             await drawDateSelectionWindow(screen: screen, startRow: startRow, startCol: startCol,
                                         width: width, height: height, form: form)
             return
         }
 
-        // Form fields
-        let fieldPadding = EdgeInsets(top: 0, leading: 4, bottom: 1, trailing: 0)
-
-        // Secret Name
-        let nameHighlight: TextStyle = form.currentField == .name ? (form.fieldEditMode ? .accent : .accent) : .secondary
-        let nameValue = form.fieldEditMode ? "\(form.secretName)_" : form.secretName.isEmpty ? "Press SPACE to edit..." : form.secretName
-        let namePrefix = form.currentField == .name ? ">> " : "   "
-        components.append(VStack(spacing: 0, children: [
-            Text("\(namePrefix)Secret Name: *").styled(nameHighlight),
-            Text("    \(nameValue)").styled(form.fieldEditMode ? .accent : .info)
-        ]).padding(fieldPadding))
-
-        // Secret Payload
-        let payloadHighlight: TextStyle = form.currentField == .payload ? .accent : .secondary
-        let payloadPrefix = form.currentField == .payload ? ">> " : "   "
-
-        // Show optimized view during input to improve performance
-        let payloadPreview: String
-        if form.isPasteMode {
-            let totalLength = form.payload.count + form.payloadBuffer.count
-            if totalLength > 4000 {
-                payloadPreview = "Large paste operation (\(totalLength) chars) - 4096-bit key detected?"
-            } else {
-                payloadPreview = "Pasting content... (\(totalLength) chars)"
-            }
-        } else if form.isBuffering && !form.payloadBuffer.isEmpty {
-            let totalLength = form.payload.count + form.payloadBuffer.count
-            payloadPreview = "Buffering input... (\(totalLength) characters)"
-        } else {
-            // Use the optimized preview method
-            payloadPreview = form.getPayloadPreview()
+        // Handle legacy selection mode
+        if form.selectionMode {
+            await drawSelectionWindow(screen: screen, startRow: startRow, startCol: startCol,
+                                    width: width, height: height, form: form)
+            return
         }
 
-        components.append(VStack(spacing: 0, children: [
-            Text("\(payloadPrefix)Secret Payload: *").styled(payloadHighlight),
-            Text("    \(payloadPreview)").styled(.info)
-        ]).padding(fieldPadding))
+        let surface = SwiftTUI.surface(from: screen)
 
-        // Payload Content Type
-        let contentTypeHighlight: TextStyle = form.currentField == .payloadContentType ? .accent : .secondary
-        let contentTypePrefix = form.currentField == .payloadContentType ? ">> " : "   "
-        components.append(VStack(spacing: 0, children: [
-            Text("\(contentTypePrefix)Payload Content Type:").styled(contentTypeHighlight),
-            Text("    \(form.payloadContentType.title) (Press SPACE to select)").styled(.info)
-        ]).padding(fieldPadding))
+        // Build form fields
+        let fields = form.buildFields(
+            selectedFieldId: formState.getCurrentFieldId(),
+            activeFieldId: formState.getActiveFieldId(),
+            formState: formState
+        )
 
-        // Payload Content Encoding
-        let encodingHighlight: TextStyle = form.currentField == .payloadContentEncoding ? .accent : .secondary
-        let encodingPrefix = form.currentField == .payloadContentEncoding ? ">> " : "   "
-        components.append(VStack(spacing: 0, children: [
-            Text("\(encodingPrefix)Payload Content Encoding:").styled(encodingHighlight),
-            Text("    \(form.payloadContentEncoding.title) (Press SPACE to select)").styled(.info)
-        ]).padding(fieldPadding))
-
-        // Secret Type
-        let secretTypeHighlight: TextStyle = form.currentField == .secretType ? .accent : .secondary
-        let secretTypePrefix = form.currentField == .secretType ? ">> " : "   "
-        components.append(VStack(spacing: 0, children: [
-            Text("\(secretTypePrefix)Secret Type:").styled(secretTypeHighlight),
-            Text("    \(form.secretType.title) (Press SPACE to select)").styled(.info)
-        ]).padding(fieldPadding))
-
-        // Algorithm
-        let algorithmHighlight: TextStyle = form.currentField == .algorithm ? .accent : .secondary
-        let algorithmPrefix = form.currentField == .algorithm ? ">> " : "   "
-        components.append(VStack(spacing: 0, children: [
-            Text("\(algorithmPrefix)Algorithm:").styled(algorithmHighlight),
-            Text("    \(form.algorithm.title) (Press SPACE to select)").styled(.info)
-        ]).padding(fieldPadding))
-
-        // Bit Length
-        let bitLengthHighlight: TextStyle = form.currentField == .bitLength ? .accent : .secondary
-        let bitLengthPrefix = form.currentField == .bitLength ? ">> " : "   "
-        components.append(VStack(spacing: 0, children: [
-            Text("\(bitLengthPrefix)Bit Length:").styled(bitLengthHighlight),
-            Text("    \(form.bitLength) bits (Press SPACE to select)").styled(.info)
-        ]).padding(fieldPadding))
-
-        // Mode
-        let modeHighlight: TextStyle = form.currentField == .mode ? .accent : .secondary
-        let modePrefix = form.currentField == .mode ? ">> " : "   "
-        components.append(VStack(spacing: 0, children: [
-            Text("\(modePrefix)Mode:").styled(modeHighlight),
-            Text("    \(form.mode.title) (Press SPACE to select)").styled(.info)
-        ]).padding(fieldPadding))
-
-        // Expiration Date field
-        let expirationHighlight: TextStyle = form.currentField == .expirationDate ? .accent : .secondary
-        let expirationPrefix = form.currentField == .expirationDate ? ">> " : "   "
-        let expirationValue = form.hasExpiration ? "Set Custom Date" : "No Expiration"
-        components.append(VStack(spacing: 0, children: [
-            Text("\(expirationPrefix)Expiration Date (Optional):").styled(expirationHighlight),
-            Text("    \(expirationValue) (Press SPACE to select)").styled(.info)
-        ]).padding(fieldPadding))
-
-        // Show date selection fields when custom date is enabled
-        if form.hasExpiration {
-            components.append(Text(""))
-            components.append(Text("   Date Components:").styled(.muted))
-
-            // Month
-            components.append(VStack(spacing: 0, children: [
-                Text("     Month: \(form.expirationMonth)").styled(.info),
-                Text("     Day: \(form.expirationDay)").styled(.info),
-                Text("     Year: \(form.expirationYear)").styled(.info),
-                Text("     Hour: \(form.expirationHour)").styled(.info),
-                Text("     Minute: \(form.expirationMinute)").styled(.info)
-            ]).padding(fieldPadding))
-        }
-
-        // Validation errors
-        if !validationErrors.isEmpty {
-            components.append(Text(""))
-            components.append(Text("Validation Errors:").error().bold())
-            for error in validationErrors {
-                components.append(Text("  - \(error)").error())
-            }
-        }
-
-        // Instructions
-        components.append(Text(""))
-        components.append(Text("Instructions:").primary().bold())
-        components.append(Text("  TAB/UP/DOWN: Navigate fields").muted())
-        components.append(Text("  SPACE: Edit text fields / Select from options").muted())
-        components.append(Text("  ENTER: Create secret").muted())
-        components.append(Text("  ESC: Cancel").muted())
+        // Create FormBuilder
+        let formBuilder = FormBuilder(
+            title: "Create New Secret",
+            fields: fields,
+            selectedFieldId: formState.getCurrentFieldId(),
+            validationErrors: form.validate(),
+            showValidationErrors: formState.showValidationErrors
+        )
 
         // Render the form
-        let formComponent = VStack(spacing: 1, children: components)
-            .padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 2))
-
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formComponent, on: surface, in: bounds)
+        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+
+        // If a selector field is active, render overlay using FormSelectorRenderer
+        if let currentField = formState.getCurrentField() {
+            switch currentField {
+            case .selector(let selectorField) where selectorField.isActive:
+                await renderSelectorOverlay(
+                    screen: screen,
+                    startRow: startRow,
+                    startCol: startCol,
+                    width: width,
+                    height: height,
+                    field: selectorField,
+                    selectorState: formState.selectorStates[selectorField.id] ?? FormSelectorFieldState(items: selectorField.items)
+                )
+            default:
+                break
+            }
+        }
+    }
+
+    // MARK: - Overlay Rendering
+
+    @MainActor
+    private static func renderSelectorOverlay(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        field: FormFieldSelector,
+        selectorState: FormSelectorFieldState
+    ) async {
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Use FormSelectorRenderer for standard selector rendering
+        if let selectorComponent = FormSelectorRenderer.renderSelector(
+            label: field.label,
+            items: field.items,
+            selectedItemId: field.selectedItemId,
+            highlightedIndex: selectorState.highlightedIndex,
+            scrollOffset: selectorState.scrollOffset,
+            searchQuery: selectorState.searchQuery.isEmpty ? nil : selectorState.searchQuery,
+            columns: field.columns,
+            maxHeight: Int(height)
+        ) {
+            let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+            surface.clear(rect: bounds)
+            await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+        }
     }
 
     @MainActor

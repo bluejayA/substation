@@ -114,25 +114,22 @@ extension TUI {
                         self.serverGroupCreateFormState.handleCharacterInput(" ")
                         self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
                         await self.draw(screen: screen)
-                    case .selector(let selectorField):
+                    case .selector:
                         // For selector, SPACE selects the highlighted item
-                        if var state = self.serverGroupCreateFormState.selectorStates[selectorField.id] {
-                            state.toggleSelection()
-                            self.serverGroupCreateFormState.selectorStates[selectorField.id] = state
-                            self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
+                        self.serverGroupCreateFormState.toggleCurrentField()
+                        self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
 
-                            // Deactivate the selector after selection
-                            self.serverGroupCreateFormState.deactivateCurrentField()
+                        // Deactivate the selector after selection
+                        self.serverGroupCreateFormState.deactivateCurrentField()
 
-                            // Rebuild fields
-                            self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                                selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                                activeFieldId: nil,
-                                formState: self.serverGroupCreateFormState
-                            ))
+                        // Rebuild fields
+                        self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
+                            selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
+                            activeFieldId: nil,
+                            formState: self.serverGroupCreateFormState
+                        ))
 
-                            await self.draw(screen: screen)
-                        }
+                        await self.draw(screen: screen)
                     default:
                         break
                     }
@@ -143,13 +140,9 @@ extension TUI {
             if isFieldActive {
                 // Deactivate field
                 if let currentField = self.serverGroupCreateFormState.getCurrentField() {
-                    if case .selector(let selectorField) = currentField {
+                    if case .selector = currentField {
                         // For selector, ENTER confirms selection
-                        if var state = self.serverGroupCreateFormState.selectorStates[selectorField.id] {
-                            state.toggleSelection()
-                            self.serverGroupCreateFormState.selectorStates[selectorField.id] = state
-                            self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-                        }
+                        self.serverGroupCreateFormState.toggleCurrentField()
                     }
                 }
 
