@@ -610,9 +610,9 @@ actor SearchIndex {
         let searchableText = buildSwiftContainerSearchText(container)
 
         let result = SearchResult(
-            resourceId: container.name,
+            resourceId: container.name ?? "",
             resourceType: .swiftContainer,
-            name: container.name,
+            name: container.name ?? "",
             description: nil,
             status: nil,
             createdAt: nil,
@@ -632,9 +632,9 @@ actor SearchIndex {
         let searchableText = buildSwiftObjectSearchText(object)
 
         let result = SearchResult(
-            resourceId: object.name,
+            resourceId: object.name ?? "",
             resourceType: .swiftObject,
-            name: object.name,
+            name: object.name ?? "",
             description: nil,
             status: nil,
             createdAt: nil,
@@ -861,7 +861,9 @@ actor SearchIndex {
     private func buildSwiftContainerSearchText(_ container: SwiftContainer) -> String {
         var components: [String] = []
 
-        components.append(container.name)
+        if let name = container.name {
+            components.append(name)
+        }
         components.append(String(container.count))
         components.append(String(container.bytes))
 
@@ -871,8 +873,12 @@ actor SearchIndex {
     private func buildSwiftObjectSearchText(_ object: SwiftObject) -> String {
         var components: [String] = []
 
-        components.append(object.name)
-        components.append(object.contentType)
+        if let name = object.name {
+            components.append(name)
+        }
+        if let contentType = object.contentType {
+            components.append(contentType)
+        }
         components.append(String(object.bytes))
 
         return components.joined(separator: " ")

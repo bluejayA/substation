@@ -46,6 +46,7 @@ public final class OpenStackClient: @unchecked Sendable {
     private var _keystone: KeystoneService?
     private var _barbican: BarbicanService?
     private var _glance: GlanceService?
+    private var _swift: SwiftService?
 
     // Data managers - lazy initialization
     private var _serverDataManager: ServerDataManager?
@@ -276,6 +277,18 @@ public final class OpenStackClient: @unchecked Sendable {
             }
             let service = GlanceService(core: core)
             _glance = service
+            return service
+        }
+    }
+
+    /// Access to Swift (Object Storage) service
+    public var swift: SwiftService {
+        get async {
+            if let existing = _swift {
+                return existing
+            }
+            let service = SwiftService(core: core)
+            _swift = service
             return service
         }
     }
@@ -744,6 +757,7 @@ public final class OpenStackClient: @unchecked Sendable {
         _keystone = nil
         _barbican = nil
         _glance = nil
+        _swift = nil
 
         // Clear data managers
         _serverDataManager = nil

@@ -26,6 +26,11 @@ public enum BatchOperationType: Sendable, Hashable {
     case serverGroupBulkDelete(serverGroupIDs: [String])
     case keyPairBulkDelete(keyPairNames: [String])
     case imageBulkDelete(imageIDs: [String])
+    case swiftContainerBulkCreate(configs: [SwiftContainerCreateConfig])
+    case swiftContainerBulkDelete(containerNames: [String])
+    case swiftObjectBulkUpload(operations: [SwiftObjectUploadOperation])
+    case swiftObjectBulkDownload(operations: [SwiftObjectDownloadOperation])
+    case swiftObjectBulkDelete(containerName: String, objectNames: [String])
 
     public var description: String {
         switch self {
@@ -71,6 +76,16 @@ public enum BatchOperationType: Sendable, Hashable {
             return "Bulk delete \(keyPairNames.count) key pairs"
         case .imageBulkDelete(let imageIDs):
             return "Bulk delete \(imageIDs.count) images"
+        case .swiftContainerBulkCreate(let configs):
+            return "Bulk create \(configs.count) Swift containers"
+        case .swiftContainerBulkDelete(let containerNames):
+            return "Bulk delete \(containerNames.count) Swift containers"
+        case .swiftObjectBulkUpload(let operations):
+            return "Bulk upload \(operations.count) Swift objects"
+        case .swiftObjectBulkDownload(let operations):
+            return "Bulk download \(operations.count) Swift objects"
+        case .swiftObjectBulkDelete(_, let objectNames):
+            return "Bulk delete \(objectNames.count) Swift objects"
         }
     }
 
@@ -118,6 +133,16 @@ public enum BatchOperationType: Sendable, Hashable {
             return max(1, keyPairNames.count / 30) // ~30 deletions per minute
         case .imageBulkDelete(let imageIDs):
             return max(1, imageIDs.count / 8) // ~8 deletions per minute (slower due to image size)
+        case .swiftContainerBulkCreate(let configs):
+            return max(1, configs.count / 20) // ~20 containers per minute
+        case .swiftContainerBulkDelete(let containerNames):
+            return max(1, containerNames.count / 15) // ~15 deletions per minute
+        case .swiftObjectBulkUpload(let operations):
+            return max(1, operations.count / 10) // ~10 uploads per minute (varies by size)
+        case .swiftObjectBulkDownload(let operations):
+            return max(1, operations.count / 15) // ~15 downloads per minute
+        case .swiftObjectBulkDelete(_, let objectNames):
+            return max(1, objectNames.count / 30) // ~30 deletions per minute
         }
     }
 }
@@ -375,6 +400,65 @@ public struct NetworkTopologyRouterConfig: Sendable, Hashable {
         self.name = name
         self.externalGatewayNetworkID = externalGatewayNetworkID
         self.adminStateUp = adminStateUp
+    }
+}
+
+// MARK: - Swift Object Storage Operation Configuration Types
+
+public struct SwiftContainerCreateConfig: Sendable, Hashable {
+    public let name: String
+    public let metadata: [String: String]
+    public let readACL: String?
+    public let writeACL: String?
+
+    public init(
+        name: String,
+        metadata: [String: String] = [:],
+        readACL: String? = nil,
+        writeACL: String? = nil
+    ) {
+        self.name = name
+        self.metadata = metadata
+        self.readACL = readACL
+        self.writeACL = writeACL
+    }
+}
+
+public struct SwiftObjectUploadOperation: Sendable, Hashable {
+    public let containerName: String
+    public let objectName: String
+    public let localPath: String
+    public let contentType: String?
+    public let metadata: [String: String]
+
+    public init(
+        containerName: String,
+        objectName: String,
+        localPath: String,
+        contentType: String? = nil,
+        metadata: [String: String] = [:]
+    ) {
+        self.containerName = containerName
+        self.objectName = objectName
+        self.localPath = localPath
+        self.contentType = contentType
+        self.metadata = metadata
+    }
+}
+
+public struct SwiftObjectDownloadOperation: Sendable, Hashable {
+    public let containerName: String
+    public let objectName: String
+    public let localPath: String
+
+    public init(
+        containerName: String,
+        objectName: String,
+        localPath: String
+    ) {
+        self.containerName = containerName
+        self.objectName = objectName
+        self.localPath = localPath
     }
 }
 

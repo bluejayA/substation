@@ -521,19 +521,19 @@ struct MainPanelView {
 
         // Swift views
         case .swift:
-            await SwiftViews.drawSwiftContainerList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, containers: tui.cachedSwiftContainers, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, filterCache: tui.resourceNameCache)
+            await SwiftViews.drawSwiftContainerList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, containers: tui.cachedSwiftContainers, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
         case .swiftContainerDetail:
             if let objects = tui.cachedSwiftObjects {
-                await SwiftViews.drawSwiftObjectList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, objects: objects, containerName: tui.selectedResource as? String ?? "Container", searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, filterCache: tui.resourceNameCache)
+                await SwiftViews.drawSwiftObjectList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, objects: objects, containerName: tui.selectedResource as? String ?? "Container", searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
             }
         case .swiftObjectDetail:
             if let object = tui.selectedResource as? SwiftObject {
-                await SwiftViews.drawSwiftObjectDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, object: object)
+                await SwiftViews.drawSwiftObjectDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, object: object, containerName: "Container", metadata: nil)
             }
         case .swiftContainerCreate:
-            await SwiftViews.drawSwiftContainerCreate(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight)
+            await SwiftViews.drawSwiftContainerCreate(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: FormBuilderState(fields: []))
         case .swiftUpload:
-            await SwiftViews.drawSwiftUpload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight)
+            await SwiftViews.drawSwiftUpload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: FormBuilderState(fields: []))
         case .networkServerAttachment:
             await NetworkServerAttachmentView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, servers: tui.cachedServers, selectedServers: tui.selectedServers, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
         case .securityGroupServerAttachment:
