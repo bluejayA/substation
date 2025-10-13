@@ -75,15 +75,9 @@ class InputHandler {
             return
         }
 
-        // If we're in security group create mode and editing a text field,
-        // only allow ESC to exit edit mode, delegate everything else to security group create handler
-        if tui.currentView == .securityGroupCreate && tui.securityGroupCreateForm.fieldEditMode {
-            if ch == Int32(27) { // ESC - Exit edit mode
-                Logger.shared.logUserAction("field_edit_exit", details: ["form": "securityGroupCreate"])
-                tui.securityGroupCreateForm.fieldEditMode = false
-                return
-            }
-            // Delegate all other input to security group create handler
+        // SecurityGroupCreateForm uses FormBuilder which handles its own input state
+        // Delegate all input to security group create handler when in security group create view
+        if tui.currentView == .securityGroupCreate {
             await tui.handleSecurityGroupCreateInput(ch, screen: screen)
             return
         }
@@ -875,6 +869,11 @@ class InputHandler {
             Logger.shared.logNavigation("\(tui.currentView)", to: ".barbicanSecretCreate")
             tui.changeView(to: .barbicanSecretCreate)
             tui.barbicanSecretCreateForm = BarbicanSecretCreateForm() // Reset form
+            tui.barbicanSecretCreateFormState = FormBuilderState(fields: tui.barbicanSecretCreateForm.buildFields(
+                selectedFieldId: BarbicanSecretCreateFieldId.name.rawValue,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            ))
         } else if tui.currentView == .octavia && !tui.currentView.isDetailView {
             Logger.shared.logNavigation("\(tui.currentView)", to: ".octaviaLoadBalancerCreate")
             tui.changeView(to: .octaviaLoadBalancerCreate)
@@ -1138,13 +1137,8 @@ class InputHandler {
     private func handleFormInputs(_ ch: Int32, screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        // NOTE: ServerCreate, KeyPairCreate, VolumeCreate, and NetworkCreate are handled earlier with early return
+        // NOTE: ServerCreate, KeyPairCreate, VolumeCreate, NetworkCreate, SecurityGroupCreate are handled earlier with early return
         // to prevent the main input handler from interfering with text input
-
-        // Handle security group creation form navigation
-        if tui.currentView == .securityGroupCreate {
-            await tui.handleSecurityGroupCreateInput(ch, screen: screen)
-        }
 
         // Handle server group management form navigation
         if tui.currentView == .serverGroupManagement {

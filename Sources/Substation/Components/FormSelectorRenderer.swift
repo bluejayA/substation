@@ -184,6 +184,83 @@ struct FormSelectorRenderer {
                 columns: columns,
                 maxHeight: maxHeight
             )
+        } else if let policies = items as? [ServerGroupPolicy] {
+            return renderServerGroupPolicySelector(
+                label: label,
+                items: policies,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
+        } else if let contentTypes = items as? [SecretPayloadContentType] {
+            return renderSecretPayloadContentTypeSelector(
+                label: label,
+                items: contentTypes,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
+        } else if let encodings = items as? [SecretPayloadContentEncoding] {
+            return renderSecretPayloadContentEncodingSelector(
+                label: label,
+                items: encodings,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
+        } else if let secretTypes = items as? [SecretType] {
+            return renderSecretTypeSelector(
+                label: label,
+                items: secretTypes,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
+        } else if let algorithms = items as? [SecretAlgorithm] {
+            return renderSecretAlgorithmSelector(
+                label: label,
+                items: algorithms,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
+        } else if let modes = items as? [SecretMode] {
+            return renderSecretModeSelector(
+                label: label,
+                items: modes,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
+        } else if let bitLengths = items as? [BitLengthOption] {
+            return renderBitLengthOptionSelector(
+                label: label,
+                items: bitLengths,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
         }
 
         // Default: return nil for unsupported types
@@ -948,6 +1025,248 @@ struct FormSelectorRenderer {
             selectedTabIndex: 0,
             items: items,
             selectedItemIds: selectedItemIds,
+            highlightedIndex: highlightedIndex,
+            checkboxMode: .basic,
+            scrollOffset: scrollOffset,
+            searchQuery: searchQuery,
+            maxHeight: maxHeight,
+            isActive: true
+        )
+
+        return selector.render()
+    }
+
+    // MARK: - Barbican Enum Renderers
+
+    private static func renderSecretPayloadContentTypeSelector(
+        label: String,
+        items: [SecretPayloadContentType],
+        selectedItemId: String?,
+        highlightedIndex: Int,
+        scrollOffset: Int,
+        searchQuery: String?,
+        columns: [FormSelectorItemColumn],
+        maxHeight: Int?
+    ) -> any Component {
+        let selectorColumns = columns.map { column in
+            FormSelectorColumn<SecretPayloadContentType>(
+                header: column.header,
+                width: column.width,
+                getValue: { column.getValue($0) }
+            )
+        }
+
+        let tab = FormSelectorTab<SecretPayloadContentType>(
+            title: "Content Types",
+            columns: selectorColumns
+        )
+
+        let selector = FormSelector<SecretPayloadContentType>(
+            label: label,
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: items,
+            selectedItemIds: selectedItemId.map { Set([$0]) } ?? [],
+            highlightedIndex: highlightedIndex,
+            checkboxMode: .basic,
+            scrollOffset: scrollOffset,
+            searchQuery: searchQuery,
+            maxHeight: maxHeight,
+            isActive: true
+        )
+
+        return selector.render()
+    }
+
+    private static func renderSecretPayloadContentEncodingSelector(
+        label: String,
+        items: [SecretPayloadContentEncoding],
+        selectedItemId: String?,
+        highlightedIndex: Int,
+        scrollOffset: Int,
+        searchQuery: String?,
+        columns: [FormSelectorItemColumn],
+        maxHeight: Int?
+    ) -> any Component {
+        let selectorColumns = columns.map { column in
+            FormSelectorColumn<SecretPayloadContentEncoding>(
+                header: column.header,
+                width: column.width,
+                getValue: { column.getValue($0) }
+            )
+        }
+
+        let tab = FormSelectorTab<SecretPayloadContentEncoding>(
+            title: "Encodings",
+            columns: selectorColumns
+        )
+
+        let selector = FormSelector<SecretPayloadContentEncoding>(
+            label: label,
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: items,
+            selectedItemIds: selectedItemId.map { Set([$0]) } ?? [],
+            highlightedIndex: highlightedIndex,
+            checkboxMode: .basic,
+            scrollOffset: scrollOffset,
+            searchQuery: searchQuery,
+            maxHeight: maxHeight,
+            isActive: true
+        )
+
+        return selector.render()
+    }
+
+    private static func renderSecretTypeSelector(
+        label: String,
+        items: [SecretType],
+        selectedItemId: String?,
+        highlightedIndex: Int,
+        scrollOffset: Int,
+        searchQuery: String?,
+        columns: [FormSelectorItemColumn],
+        maxHeight: Int?
+    ) -> any Component {
+        let selectorColumns = columns.map { column in
+            FormSelectorColumn<SecretType>(
+                header: column.header,
+                width: column.width,
+                getValue: { column.getValue($0) }
+            )
+        }
+
+        let tab = FormSelectorTab<SecretType>(
+            title: "Secret Types",
+            columns: selectorColumns
+        )
+
+        let selector = FormSelector<SecretType>(
+            label: label,
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: items,
+            selectedItemIds: selectedItemId.map { Set([$0]) } ?? [],
+            highlightedIndex: highlightedIndex,
+            checkboxMode: .basic,
+            scrollOffset: scrollOffset,
+            searchQuery: searchQuery,
+            maxHeight: maxHeight,
+            isActive: true
+        )
+
+        return selector.render()
+    }
+
+    private static func renderSecretAlgorithmSelector(
+        label: String,
+        items: [SecretAlgorithm],
+        selectedItemId: String?,
+        highlightedIndex: Int,
+        scrollOffset: Int,
+        searchQuery: String?,
+        columns: [FormSelectorItemColumn],
+        maxHeight: Int?
+    ) -> any Component {
+        let selectorColumns = columns.map { column in
+            FormSelectorColumn<SecretAlgorithm>(
+                header: column.header,
+                width: column.width,
+                getValue: { column.getValue($0) }
+            )
+        }
+
+        let tab = FormSelectorTab<SecretAlgorithm>(
+            title: "Algorithms",
+            columns: selectorColumns
+        )
+
+        let selector = FormSelector<SecretAlgorithm>(
+            label: label,
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: items,
+            selectedItemIds: selectedItemId.map { Set([$0]) } ?? [],
+            highlightedIndex: highlightedIndex,
+            checkboxMode: .basic,
+            scrollOffset: scrollOffset,
+            searchQuery: searchQuery,
+            maxHeight: maxHeight,
+            isActive: true
+        )
+
+        return selector.render()
+    }
+
+    private static func renderSecretModeSelector(
+        label: String,
+        items: [SecretMode],
+        selectedItemId: String?,
+        highlightedIndex: Int,
+        scrollOffset: Int,
+        searchQuery: String?,
+        columns: [FormSelectorItemColumn],
+        maxHeight: Int?
+    ) -> any Component {
+        let selectorColumns = columns.map { column in
+            FormSelectorColumn<SecretMode>(
+                header: column.header,
+                width: column.width,
+                getValue: { column.getValue($0) }
+            )
+        }
+
+        let tab = FormSelectorTab<SecretMode>(
+            title: "Modes",
+            columns: selectorColumns
+        )
+
+        let selector = FormSelector<SecretMode>(
+            label: label,
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: items,
+            selectedItemIds: selectedItemId.map { Set([$0]) } ?? [],
+            highlightedIndex: highlightedIndex,
+            checkboxMode: .basic,
+            scrollOffset: scrollOffset,
+            searchQuery: searchQuery,
+            maxHeight: maxHeight,
+            isActive: true
+        )
+
+        return selector.render()
+    }
+
+    private static func renderBitLengthOptionSelector(
+        label: String,
+        items: [BitLengthOption],
+        selectedItemId: String?,
+        highlightedIndex: Int,
+        scrollOffset: Int,
+        searchQuery: String?,
+        columns: [FormSelectorItemColumn],
+        maxHeight: Int?
+    ) -> any Component {
+        let selectorColumns = columns.map { column in
+            FormSelectorColumn<BitLengthOption>(
+                header: column.header,
+                width: column.width,
+                getValue: { column.getValue($0) }
+            )
+        }
+
+        let tab = FormSelectorTab<BitLengthOption>(
+            title: "Bit Lengths",
+            columns: selectorColumns
+        )
+
+        let selector = FormSelector<BitLengthOption>(
+            label: label,
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: items,
+            selectedItemIds: selectedItemId.map { Set([$0]) } ?? [],
             highlightedIndex: highlightedIndex,
             checkboxMode: .basic,
             scrollOffset: scrollOffset,

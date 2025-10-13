@@ -1,6 +1,23 @@
 import Foundation
 
-// Wrapper for SecretPayloadContentType
+// MARK: - SecretPayloadContentType Conformance
+
+extension SecretPayloadContentType: FormSelectableItem, FormSelectorItem {
+    public var id: String {
+        return self.rawValue
+    }
+
+    public var sortKey: String {
+        return self.title
+    }
+
+    public func matchesSearch(_ query: String) -> Bool {
+        return self.title.lowercased().contains(query.lowercased()) ||
+               self.rawValue.lowercased().contains(query.lowercased())
+    }
+}
+
+// Legacy wrapper for backward compatibility
 struct SecretPayloadContentTypeWrapper: FormSelectableItem {
     let type: SecretPayloadContentType
 
@@ -27,7 +44,24 @@ extension SecretPayloadContentType {
     }
 }
 
-// Wrapper for SecretPayloadContentEncoding
+// MARK: - SecretPayloadContentEncoding Conformance
+
+extension SecretPayloadContentEncoding: FormSelectableItem, FormSelectorItem {
+    public var id: String {
+        return self.rawValue
+    }
+
+    public var sortKey: String {
+        return self.title
+    }
+
+    public func matchesSearch(_ query: String) -> Bool {
+        return self.title.lowercased().contains(query.lowercased()) ||
+               self.rawValue.lowercased().contains(query.lowercased())
+    }
+}
+
+// Legacy wrapper for backward compatibility
 struct SecretPayloadContentEncodingWrapper: FormSelectableItem {
     let type: SecretPayloadContentEncoding
 
@@ -54,7 +88,24 @@ extension SecretPayloadContentEncoding {
     }
 }
 
-// Wrapper for SecretType
+// MARK: - SecretType Conformance
+
+extension SecretType: FormSelectableItem, FormSelectorItem {
+    public var id: String {
+        return self.rawValue
+    }
+
+    public var sortKey: String {
+        return self.title
+    }
+
+    public func matchesSearch(_ query: String) -> Bool {
+        return self.title.lowercased().contains(query.lowercased()) ||
+               self.rawValue.lowercased().contains(query.lowercased())
+    }
+}
+
+// Legacy wrapper for backward compatibility
 struct SecretTypeWrapper: FormSelectableItem {
     let type: SecretType
 
@@ -81,7 +132,24 @@ extension SecretType {
     }
 }
 
-// Wrapper for SecretAlgorithm
+// MARK: - SecretAlgorithm Conformance
+
+extension SecretAlgorithm: FormSelectableItem, FormSelectorItem {
+    public var id: String {
+        return self.rawValue
+    }
+
+    public var sortKey: String {
+        return self.title
+    }
+
+    public func matchesSearch(_ query: String) -> Bool {
+        return self.title.lowercased().contains(query.lowercased()) ||
+               self.rawValue.lowercased().contains(query.lowercased())
+    }
+}
+
+// Legacy wrapper for backward compatibility
 struct SecretAlgorithmWrapper: FormSelectableItem {
     let type: SecretAlgorithm
 
@@ -108,7 +176,24 @@ extension SecretAlgorithm {
     }
 }
 
-// Wrapper for SecretMode
+// MARK: - SecretMode Conformance
+
+extension SecretMode: FormSelectableItem, FormSelectorItem {
+    public var id: String {
+        return self.rawValue
+    }
+
+    public var sortKey: String {
+        return self.title
+    }
+
+    public func matchesSearch(_ query: String) -> Bool {
+        return self.title.lowercased().contains(query.lowercased()) ||
+               self.rawValue.lowercased().contains(query.lowercased())
+    }
+}
+
+// Legacy wrapper for backward compatibility
 struct SecretModeWrapper: FormSelectableItem {
     let type: SecretMode
 
@@ -135,8 +220,9 @@ extension SecretMode {
     }
 }
 
-// Wrapper for Bit Length (not an enum, but we'll create options)
-struct BitLengthOption: FormSelectableItem {
+// MARK: - BitLengthOption Conformance
+
+struct BitLengthOption: FormSelectableItem, FormSelectorItem {
     let value: Int
 
     var id: String {
@@ -158,6 +244,7 @@ struct BitLengthOption: FormSelectableItem {
         BitLengthOption(value: 512),
         BitLengthOption(value: 1024),
         BitLengthOption(value: 2048),
+        BitLengthOption(value: 3072),
         BitLengthOption(value: 4096)
     ]
 }
