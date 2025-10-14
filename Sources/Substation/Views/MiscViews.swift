@@ -114,8 +114,14 @@ struct MiscViews {
             return "Help - Object Details"
         case .swiftContainerCreate:
             return "Help - Create Storage Container"
-        case .swiftUpload:
-            return "Help - Upload Objects"
+        case .swiftObjectUpload:
+            return "Help - Upload Object"
+        case .swiftContainerDownload:
+            return "Help - Download Container"
+        case .swiftObjectDownload:
+            return "Help - Download Object"
+        case .swiftDirectoryDownload:
+            return "Help - Download Directory"
         default:
             return "Help - Keyboard Shortcuts"
         }
@@ -570,6 +576,9 @@ struct MiscViews {
                 generalNavigation,
                 ("Object Storage Container Management", [
                     "SHIFT-C: Create new container",
+                    "SHIFT-U: Upload objects to selected container",
+                    "SHIFT-D: Download all objects from selected container",
+                    "SHIFT-M: Set metadata and access policies",
                     "SPACE: Open container and view objects",
                     "DELETE: Delete selected container",
                     "Containers organize objects in storage",
@@ -589,12 +598,14 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Object Management", [
-                    "SHIFT-U: Upload objects to container",
-                    "SPACE: View object details",
+                    "SHIFT-D: Download selected object or directory",
+                    "SHIFT-M: Set metadata on selected object or directory",
+                    "SPACE: View object details or navigate into directory",
                     "DELETE: Delete selected object",
                     "ESC: Return to container list",
                     "Objects are files stored in the container",
-                    "Metadata and custom headers supported",
+                    "Directories allow bulk metadata operations",
+                    "Download directories preserves or flattens structure",
                 ]),
                 ("Multi-Select Mode (CTRL-X)", [
                     "CTRL-X: Toggle multi-select mode",
@@ -610,6 +621,7 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Object Details View", [
+                    "SHIFT-M: Set metadata on this object",
                     "View object metadata and properties",
                     "See file size, content type, and ETag",
                     "Last modified timestamp shown",
@@ -636,20 +648,146 @@ struct MiscViews {
                 generalActions
             ]
 
-        case .swiftUpload:
+        case .swiftObjectUpload:
             return [
                 ("Object Upload Form", [
                     "TAB: Move to next field",
-                    "SPACE: Edit text fields and select files",
-                    "ENTER: Upload objects to container",
+                    "SPACE: Edit text fields or toggle checkbox",
+                    "ENTER: Upload object(s) to container",
                     "ESC: Cancel and return",
                 ]),
-                ("Upload Options", [
+                ("Upload Modes", [
+                    "Single File: Enter path to a file",
+                    "Directory: Enter path to a directory",
+                    "Form fields adapt based on path type",
+                    "Progress shown during directory uploads",
+                ]),
+                ("Single File Options", [
                     "File Path: Local file to upload",
                     "Object Name: Optional name override",
                     "Content Type: MIME type (auto-detected)",
-                    "Metadata: Optional custom headers",
-                    "Large files segmented automatically",
+                    "Default object name uses filename",
+                ]),
+                ("Directory Upload Options", [
+                    "Directory Path: Local directory to upload",
+                    "Prefix: Optional prefix for all object names",
+                    "Recursive: Upload subdirectories (checkbox)",
+                    "Directory structure preserved in object names",
+                    "Hidden files (starting with .) are skipped",
+                    "Progress: Shows 'Uploading file X of Y'",
+                ]),
+                generalActions
+            ]
+
+        case .swiftContainerDownload:
+            return [
+                ("Container Download Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text fields or toggle checkboxes",
+                    "ENTER: Download all objects from container",
+                    "ESC: Cancel and return",
+                ]),
+                ("Download Options", [
+                    "Destination Path: Directory where objects will be saved",
+                    "Preserve Directory Structure: Maintains object paths with slashes",
+                    "Creates subdirectories automatically if needed",
+                    "Shows progress during multi-object download",
+                    "Reports success/failure counts at completion",
+                ]),
+                generalActions
+            ]
+
+        case .swiftObjectDownload:
+            return [
+                ("Object Download Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text field",
+                    "ENTER: Download single object",
+                    "ESC: Cancel and return",
+                ]),
+                ("Download Options", [
+                    "Destination Path: File path where object will be saved",
+                    "Default destination: ./{objectName}",
+                    "Validates parent directory exists and is writable",
+                    "Prompts for confirmation if file exists",
+                    "Downloads object data and writes to disk",
+                ]),
+                generalActions
+            ]
+
+        case .swiftDirectoryDownload:
+            return [
+                ("Directory Download Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text field or toggle checkbox",
+                    "ENTER: Download all objects in directory",
+                    "ESC: Cancel and return",
+                ]),
+                ("Download Options", [
+                    "Destination Path: Directory where objects will be saved",
+                    "Default destination: ./{directoryName}/",
+                    "Preserve Structure: Maintains subdirectory paths (checked)",
+                    "If unchecked, all files are flattened to root directory",
+                    "Shows progress: 'Downloading object X of Y'",
+                    "Reports success/failure counts at completion",
+                ]),
+                generalActions
+            ]
+
+        case .swiftContainerMetadata:
+            return [
+                ("Container Metadata Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text fields",
+                    "ENTER: Save metadata changes",
+                    "ESC: Cancel and return",
+                ]),
+                ("Metadata Options", [
+                    "Read ACL: Control who can read objects",
+                    "Write ACL: Control who can write objects",
+                    "ACL Examples:",
+                    "  .r:* - Public read access",
+                    "  .rlistings - Public listings",
+                    "  account:user - Specific user access",
+                    "Custom metadata displayed as read-only",
+                ]),
+                generalActions
+            ]
+
+        case .swiftObjectMetadata:
+            return [
+                ("Object Metadata Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text fields",
+                    "ENTER: Save metadata changes",
+                    "ESC: Cancel and return",
+                ]),
+                ("Metadata Options", [
+                    "Content-Type: MIME type of the object",
+                    "Common types: text/plain, image/jpeg, etc.",
+                    "Custom metadata displayed as read-only",
+                ]),
+                generalActions
+            ]
+
+        case .swiftDirectoryMetadata:
+            return [
+                ("Directory Metadata Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text / Toggle checkbox",
+                    "ENTER: Apply metadata to all objects",
+                    "ESC: Cancel and return",
+                ]),
+                ("Metadata Options", [
+                    "Content-Type: MIME type to apply to ALL objects",
+                    "Recursive: Include subdirectories",
+                    "Updates all objects in the directory",
+                    "Progress displayed during bulk update",
+                ]),
+                ("Warning", [
+                    "This operation updates MANY objects at once",
+                    "Cannot be undone",
+                    "Review directory path carefully before applying",
                 ]),
                 generalActions
             ]

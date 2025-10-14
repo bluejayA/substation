@@ -1667,6 +1667,49 @@ class DataManager {
             Logger.shared.logError("Failed to fetch Swift objects: \(error)")
         }
     }
+
+    // MARK: - Upload Coordination
+    // NOTE: Upload coordination functionality is not yet implemented.
+    // See ModelMemory/TODO.md for implementation plan.
+
+    // /// Enqueue a file upload to Swift object storage
+    // public func enqueueUpload(containerName: String, objectName: String, localPath: String) async -> UUID? {
+    //     // TODO: Implement upload coordination
+    //     Logger.shared.logError("DataManager - Upload coordination not yet implemented")
+    //     return nil
+    // }
+
+    // /// Get current upload status for all uploads
+    // public func getUploadStatus() async -> [UploadTaskProgress] {
+    //     // TODO: Implement upload status tracking
+    //     return []
+    // }
+
+    // /// Cancel a specific upload
+    // public func cancelUpload(id: UUID) async {
+    //     // TODO: Implement upload cancellation
+    // }
+
+    // /// Cancel all active and queued uploads
+    // public func cancelAllUploads() async {
+    //     // TODO: Implement cancel all uploads
+    // }
+
+    // /// Retry a failed upload
+    // public func retryFailedUpload(id: UUID) async {
+    //     // TODO: Implement upload retry
+    // }
+
+    // /// Clear completed uploads from status
+    // public func clearCompletedUploads() async {
+    //     // TODO: Implement clear completed uploads
+    // }
+
+    // /// Get upload counts by state
+    // public func getUploadCounts() async -> (active: Int, queued: Int, completed: Int, failed: Int) {
+    //     // TODO: Implement upload counts
+    //     return (0, 0, 0, 0)
+    // }
 }
 
 // MARK: - Service Health Status Model

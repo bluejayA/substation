@@ -72,6 +72,36 @@ class InputHandler {
             return
         }
 
+        // Swift directory metadata form
+        if tui.currentView == .swiftDirectoryMetadata {
+            await tui.handleSwiftDirectoryMetadataInput(ch, screen: screen)
+            return
+        }
+
+        // Swift object upload form
+        if tui.currentView == .swiftObjectUpload {
+            await tui.handleSwiftObjectUploadInput(ch, screen: screen)
+            return
+        }
+
+        // Swift container download form
+        if tui.currentView == .swiftContainerDownload {
+            await tui.handleSwiftContainerDownloadInput(ch, screen: screen)
+            return
+        }
+
+        // Swift object download form
+        if tui.currentView == .swiftObjectDownload {
+            await tui.handleSwiftObjectDownloadInput(ch, screen: screen)
+            return
+        }
+
+        // Swift directory download form
+        if tui.currentView == .swiftDirectoryDownload {
+            await tui.handleSwiftDirectoryDownloadInput(ch, screen: screen)
+            return
+        }
+
         // NetworkCreateForm uses FormBuilder which handles its own input state
         // Delegate all input to network create handler when in network create view
         if tui.currentView == .networkCreate {
@@ -565,8 +595,8 @@ class InputHandler {
                 Logger.shared.logUserAction("manage_container_metadata", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageContainerMetadata(screen: screen)
             } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_object_metadata", details: ["selectedIndex": tui.selectedIndex])
-                await handleManageObjectMetadata(screen: screen)
+                Logger.shared.logUserAction("manage_tree_item_metadata", details: ["selectedIndex": tui.selectedIndex])
+                await handleSwiftTreeItemMetadata(screen: screen)
             } else if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageSecurityGroupRules(screen: screen)
@@ -593,6 +623,27 @@ class InputHandler {
             if tui.currentView == .ports && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("manage_port_allowed_address_pairs", details: ["selectedIndex": tui.selectedIndex])
                 await handleManagePortAllowedAddressPairs(screen: screen)
+            }
+        case Int32(85): // U - Upload object to container (SHIFT-U)
+            if tui.currentView == .swift && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("upload_object_to_container", details: ["selectedIndex": tui.selectedIndex])
+                await handleUploadObjectToContainer(screen: screen)
+            } else if tui.currentView == .swiftContainerDetail {
+                // From container detail view (inside a container), also allow upload
+                Logger.shared.logUserAction("upload_object_to_container_from_detail", details: ["container": tui.swiftNavState.currentContainer ?? "unknown"])
+                await handleUploadObjectToContainer(screen: screen)
+            } else if tui.currentView == .uploadStatus {
+                // From upload status, go back to previous view
+                Logger.shared.logNavigation(".uploadStatus", to: "\(tui.previousView)")
+                tui.changeView(to: tui.previousView, resetSelection: false)
+            }
+        case Int32(68): // D - Download container or object (SHIFT-D)
+            if tui.currentView == .swift && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("download_container", details: ["selectedIndex": tui.selectedIndex])
+                await handleDownloadContainer(screen: screen)
+            } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("download_object", details: ["selectedIndex": tui.selectedIndex])
+                await handleDownloadObject(screen: screen)
             }
         case Int32(109): // m - Volume Archives navigation
             if tui.currentView.isDetailView {
@@ -634,11 +685,25 @@ class InputHandler {
                 ])
                 await handleMultiSelectToggle()
             } else if !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("open_detail_view", details: [
-                    "view": "\(tui.currentView)",
-                    "selectedIndex": tui.selectedIndex
-                ])
-                tui.openDetailView()
+                // Special handling for Swift hierarchical navigation
+                if tui.currentView == .swift {
+                    Logger.shared.logUserAction("swift_navigate_into_container", details: [
+                        "selectedIndex": tui.selectedIndex
+                    ])
+                    await handleSwiftContainerNavigation()
+                } else if tui.currentView == .swiftContainerDetail {
+                    Logger.shared.logUserAction("swift_navigate_into_item", details: [
+                        "selectedIndex": tui.selectedIndex,
+                        "currentPath": tui.swiftNavState.currentPathString
+                    ])
+                    await handleSwiftTreeItemNavigation()
+                } else {
+                    Logger.shared.logUserAction("open_detail_view", details: [
+                        "view": "\(tui.currentView)",
+                        "selectedIndex": tui.selectedIndex
+                    ])
+                    tui.openDetailView()
+                }
             }
         case Int32(114): // r - Manual refresh
             Logger.shared.logUserAction("manual_refresh", details: ["view": "\(tui.currentView)"])
@@ -646,9 +711,14 @@ class InputHandler {
         case Int32(97): // a - Toggle auto-refresh
             Logger.shared.logUserAction("toggle_auto_refresh", details: ["current": tui.autoRefresh])
             handleAutoRefreshToggle()
-        case Int32(99): // c - purge cache
-            Logger.shared.logUserAction("purge_cache")
-            await handleCachePurge()
+        case Int32(99): // c - purge cache or cancel upload
+            if tui.currentView == .uploadStatus {
+                // TODO: Cancel upload not yet implemented
+                tui.statusMessage = "Upload cancellation not yet implemented"
+            } else {
+                Logger.shared.logUserAction("purge_cache")
+                await handleCachePurge()
+            }
         // NOTE: / key (Int32(47)) is now handled universally before specialized view routing
         // Secondary Commands (Uppercase) - Actions
         case Int32(67): // C - Create new resource
@@ -1217,52 +1287,87 @@ class InputHandler {
         }
     }
 
-    private func handleManageObjectMetadata(screen: OpaquePointer?) async {
+    private func handleSwiftTreeItemMetadata(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
         if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
-            guard let container = tui.selectedResource as? SwiftContainer,
-                  let containerName = container.name else {
+            guard let containerName = tui.swiftNavState.currentContainer else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            guard let objects = tui.cachedSwiftObjects,
-                  tui.selectedIndex < objects.count else {
-                tui.statusMessage = "No object selected"
+            guard let allObjects = tui.cachedSwiftObjects else {
+                tui.statusMessage = "No objects loaded"
                 return
             }
 
-            let object = objects[tui.selectedIndex]
-            guard let objectName = object.name else {
-                tui.statusMessage = "Invalid object"
+            // Build tree from objects
+            let currentPath = tui.swiftNavState.currentPathString
+            let treeItems = SwiftTreeItem.buildTree(from: allObjects, currentPath: currentPath)
+
+            guard tui.selectedIndex < treeItems.count else {
+                tui.statusMessage = "No item selected"
                 return
             }
 
-            // Fetch current metadata
-            do {
-                let metadata = try await tui.client.swift.getObjectMetadata(
+            let selectedItem = treeItems[tui.selectedIndex]
+
+            switch selectedItem {
+            case .object(let object):
+                // Handle individual object metadata
+                guard let objectName = object.name else {
+                    tui.statusMessage = "Invalid object"
+                    return
+                }
+
+                // Fetch current metadata
+                do {
+                    let metadata = try await tui.client.swift.getObjectMetadata(
+                        containerName: containerName,
+                        objectName: objectName
+                    )
+
+                    // Initialize form with current metadata
+                    tui.swiftObjectMetadataForm = SwiftObjectMetadataForm()
+                    tui.swiftObjectMetadataForm.loadFromMetadata(containerName: containerName, metadata: metadata)
+
+                    // Initialize form state
+                    tui.swiftObjectMetadataFormState = FormBuilderState(
+                        fields: tui.swiftObjectMetadataForm.buildFields(
+                            selectedFieldId: "contentType",
+                            activeFieldId: nil,
+                            formState: FormBuilderState(fields: [])
+                        )
+                    )
+
+                    // Navigate to metadata form
+                    tui.changeView(to: .swiftObjectMetadata, resetSelection: false)
+                } catch {
+                    tui.statusMessage = "Failed to load metadata: \(error.localizedDescription)"
+                }
+
+            case .directory(let name, _, _):
+                // Handle directory metadata (bulk update)
+                let fullDirectoryPath = currentPath + name + "/"
+
+                // Initialize directory metadata form
+                tui.swiftDirectoryMetadataForm = SwiftDirectoryMetadataForm()
+                tui.swiftDirectoryMetadataForm.initializeForDirectory(
                     containerName: containerName,
-                    objectName: objectName
+                    directoryPath: fullDirectoryPath
                 )
 
-                // Initialize form with current metadata
-                tui.swiftObjectMetadataForm = SwiftObjectMetadataForm()
-                tui.swiftObjectMetadataForm.loadFromMetadata(containerName: containerName, metadata: metadata)
-
                 // Initialize form state
-                tui.swiftObjectMetadataFormState = FormBuilderState(
-                    fields: tui.swiftObjectMetadataForm.buildFields(
+                tui.swiftDirectoryMetadataFormState = FormBuilderState(
+                    fields: tui.swiftDirectoryMetadataForm.buildFields(
                         selectedFieldId: "contentType",
                         activeFieldId: nil,
                         formState: FormBuilderState(fields: [])
                     )
                 )
 
-                // Navigate to metadata form
-                tui.changeView(to: .swiftObjectMetadata, resetSelection: false)
-            } catch {
-                tui.statusMessage = "Failed to load metadata: \(error.localizedDescription)"
+                // Navigate to directory metadata form
+                tui.changeView(to: .swiftDirectoryMetadata, resetSelection: false)
             }
         }
     }
@@ -1401,6 +1506,177 @@ class InputHandler {
 
         if tui.currentView == .subnets && !tui.currentView.isDetailView {
             await tui.actions.manageSubnetRouterAttachment(screen: screen)
+        }
+    }
+
+    private func handleUploadObjectToContainer(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        let containerName: String
+
+        if tui.currentView == .swift && !tui.currentView.isDetailView {
+            // Called from container list - get selected container
+            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+
+            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            guard let name = container.name else {
+                tui.statusMessage = "Invalid container"
+                return
+            }
+            containerName = name
+
+        } else if tui.currentView == .swiftContainerDetail {
+            // Called from inside a container - use current container from navigation state
+            guard let currentContainer = tui.swiftNavState.currentContainer else {
+                tui.statusMessage = "No container context"
+                return
+            }
+            containerName = currentContainer
+
+        } else {
+            tui.statusMessage = "Upload not available from this view"
+            return
+        }
+
+        // Initialize upload form
+        tui.swiftObjectUploadForm = SwiftObjectUploadForm()
+        tui.swiftObjectUploadForm.containerName = containerName
+
+        // Initialize form state
+        tui.swiftObjectUploadFormState = FormBuilderState(
+            fields: tui.swiftObjectUploadForm.buildFields(
+                selectedFieldId: "filePath",
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            )
+        )
+
+        // Navigate to upload form
+        tui.changeView(to: .swiftObjectUpload, resetSelection: false)
+    }
+
+    private func handleDownloadContainer(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .swift && !tui.currentView.isDetailView {
+            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+
+            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            guard let containerName = container.name else {
+                tui.statusMessage = "Invalid container"
+                return
+            }
+
+            // Initialize download form
+            tui.swiftContainerDownloadForm = SwiftContainerDownloadForm()
+            tui.swiftContainerDownloadForm.containerName = containerName
+            tui.swiftContainerDownloadForm.destinationPath = "./\(containerName)/"
+
+            // Initialize form state
+            tui.swiftContainerDownloadFormState = FormBuilderState(
+                fields: tui.swiftContainerDownloadForm.buildFields(
+                    selectedFieldId: "destinationPath",
+                    activeFieldId: nil,
+                    formState: FormBuilderState(fields: [])
+                )
+            )
+
+            // Navigate to download form
+            tui.changeView(to: .swiftContainerDownload, resetSelection: false)
+        }
+    }
+
+    private func handleDownloadObject(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
+            guard let containerName = tui.swiftNavState.currentContainer else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+
+            guard let allObjects = tui.cachedSwiftObjects else {
+                tui.statusMessage = "No objects loaded"
+                return
+            }
+
+            // Build tree from objects
+            let currentPath = tui.swiftNavState.currentPathString
+            let treeItems = SwiftTreeItem.buildTree(from: allObjects, currentPath: currentPath)
+
+            // Apply search filter if present
+            let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery?.isEmpty ?? true ? nil : tui.searchQuery)
+
+            guard tui.selectedIndex < filteredItems.count else {
+                tui.statusMessage = "No item selected"
+                return
+            }
+
+            let selectedItem = filteredItems[tui.selectedIndex]
+
+            switch selectedItem {
+            case .object(let object):
+                // Download single object
+                guard let objectName = object.name else {
+                    tui.statusMessage = "Invalid object"
+                    return
+                }
+
+                // Extract just the filename from the full path
+                let fileName: String
+                if let lastSlash = objectName.lastIndex(of: "/") {
+                    fileName = String(objectName[objectName.index(after: lastSlash)...])
+                } else {
+                    fileName = objectName
+                }
+
+                // Initialize download form
+                tui.swiftObjectDownloadForm = SwiftObjectDownloadForm()
+                tui.swiftObjectDownloadForm.containerName = containerName
+                tui.swiftObjectDownloadForm.objectName = objectName
+                tui.swiftObjectDownloadForm.destinationPath = "./\(fileName)"
+
+                // Initialize form state
+                tui.swiftObjectDownloadFormState = FormBuilderState(
+                    fields: tui.swiftObjectDownloadForm.buildFields(
+                        selectedFieldId: "destinationPath",
+                        activeFieldId: nil,
+                        formState: FormBuilderState(fields: [])
+                    )
+                )
+
+                // Navigate to object download form
+                tui.changeView(to: .swiftObjectDownload, resetSelection: false)
+
+            case .directory(let directoryName, _, _):
+                // Download entire directory
+                let fullDirectoryPath = currentPath + directoryName + "/"
+
+                // Initialize directory download form
+                tui.swiftDirectoryDownloadForm = SwiftDirectoryDownloadForm()
+                tui.swiftDirectoryDownloadForm.containerName = containerName
+                tui.swiftDirectoryDownloadForm.directoryPath = fullDirectoryPath
+                tui.swiftDirectoryDownloadForm.destinationPath = "./\(directoryName)/"
+                tui.swiftDirectoryDownloadForm.preserveStructure = true
+
+                // Initialize form state
+                tui.swiftDirectoryDownloadFormState = FormBuilderState(
+                    fields: tui.swiftDirectoryDownloadForm.buildFields(
+                        selectedFieldId: "destinationPath",
+                        activeFieldId: nil,
+                        formState: FormBuilderState(fields: [])
+                    )
+                )
+
+                // Navigate to directory download form
+                tui.changeView(to: .swiftDirectoryDownload, resetSelection: false)
+            }
         }
     }
 
@@ -1706,6 +1982,85 @@ class InputHandler {
             // Filter out anything else that might be mouse-related
             // This includes unusual high character codes that aren't standard keyboard input
             return ch > 500 || (ch > 127 && ch < 258)
+        }
+    }
+
+    // MARK: - Swift Hierarchical Navigation Handlers
+
+    /// Handle SPACEBAR navigation when at container list level
+    private func handleSwiftContainerNavigation() async {
+        guard let tui = tui else { return }
+
+        guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+            tui.statusMessage = "No container selected"
+            return
+        }
+
+        let container = tui.cachedSwiftContainers[tui.selectedIndex]
+        guard let containerName = container.name else {
+            tui.statusMessage = "Invalid container"
+            return
+        }
+
+        Logger.shared.logInfo("Navigating into container: \(containerName)")
+
+        // Update navigation state
+        tui.swiftNavState.navigateIntoContainer(containerName)
+
+        // Change to container detail view
+        tui.changeView(to: .swiftContainerDetail, resetSelection: true)
+
+        // Load objects for this container
+        await tui.dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
+
+        Logger.shared.logInfo("Container navigation complete, showing \(tui.cachedSwiftObjects?.count ?? 0) objects")
+    }
+
+    /// Handle SPACEBAR navigation when in container detail view (tree items)
+    private func handleSwiftTreeItemNavigation() async {
+        guard let tui = tui else { return }
+
+        guard let objects = tui.cachedSwiftObjects else {
+            tui.statusMessage = "No objects loaded"
+            return
+        }
+
+        let currentPath = tui.swiftNavState.currentPathString
+
+        // Build tree structure
+        let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+
+        // Apply search filter if present
+        let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery?.isEmpty ?? true ? nil : tui.searchQuery)
+
+        guard tui.selectedIndex < filteredItems.count else {
+            tui.statusMessage = "No item selected"
+            return
+        }
+
+        let selectedItem = filteredItems[tui.selectedIndex]
+
+        switch selectedItem {
+        case .directory(let directoryName, _, _):
+            // Navigate into directory
+            Logger.shared.logInfo("Navigating into directory: \(directoryName)")
+            tui.swiftNavState.navigateIntoDirectory(directoryName)
+
+            // Reset selection to top
+            tui.selectedIndex = 0
+            tui.scrollOffset = 0
+
+            // Stay in the same view (swiftContainerDetail)
+            tui.markNeedsRedraw()
+
+            Logger.shared.logInfo("Directory navigation complete, new path: \(tui.swiftNavState.currentPathString)")
+
+        case .object(let object):
+            // Open object detail view
+            Logger.shared.logInfo("Opening object detail: \(object.name ?? "unknown")")
+            tui.selectedResource = object
+            tui.changeView(to: .swiftObjectDetail, resetSelection: false)
+            tui.detailScrollOffset = 0
         }
     }
 }

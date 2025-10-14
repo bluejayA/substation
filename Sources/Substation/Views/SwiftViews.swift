@@ -53,27 +53,37 @@ struct SwiftViews {
         height: Int32,
         objects: [SwiftObject],
         containerName: String,
+        currentPath: String,
         searchQuery: String,
         scrollOffset: Int,
         selectedIndex: Int,
+        navState: SwiftNavigationState,
         dataManager: DataManager? = nil,
         virtualScrollManager: VirtualScrollManager<SwiftObject>? = nil,
         multiSelectMode: Bool = false,
         selectedItems: Set<String> = []
     ) async {
-        let statusListView = createObjectStatusListView(containerName: containerName)
+        // Build tree structure from flat object list
+        let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+
+        // Apply search filter if present
+        let filteredItems = SwiftTreeItem.filterItems(treeItems, query: searchQuery.isEmpty ? nil : searchQuery)
+
+        Logger.shared.logDebug("Rendering Swift object list: \(filteredItems.count) items (from \(objects.count) objects)")
+
+        let statusListView = createTreeItemStatusListView(navState: navState)
         await statusListView.draw(
             screen: screen,
             startRow: startRow,
             startCol: startCol,
             width: width,
             height: height,
-            items: objects,
+            items: filteredItems,
             searchQuery: searchQuery.isEmpty ? nil : searchQuery,
             scrollOffset: scrollOffset,
             selectedIndex: selectedIndex,
             dataManager: dataManager,
-            virtualScrollManager: virtualScrollManager,
+            virtualScrollManager: nil, // Don't use virtual scroll manager for tree items
             multiSelectMode: multiSelectMode,
             selectedItems: selectedItems
         )
@@ -563,43 +573,58 @@ struct SwiftViews {
     }
 
     @MainActor
-    private static func createObjectStatusListView(containerName: String) -> StatusListView<SwiftObject> {
+    private static func createTreeItemStatusListView(navState: SwiftNavigationState) -> StatusListView<SwiftTreeItem> {
+        let title = navState.getTitle()
+
         let columns = [
-            StatusListColumn<SwiftObject>(
-                header: "Object Name",
+            StatusListColumn<SwiftTreeItem>(
+                header: "Name",
                 width: 50,
-                getValue: { $0.fileName }
+                getValue: { $0.displayName }
             ),
-            StatusListColumn<SwiftObject>(
+            StatusListColumn<SwiftTreeItem>(
                 header: "Size",
                 width: 15,
-                getValue: { $0.formattedSize },
+                getValue: { $0.sizeDisplay },
                 getStyle: { _ in .accent }
             ),
-            StatusListColumn<SwiftObject>(
-                header: "Content Type",
+            StatusListColumn<SwiftTreeItem>(
+                header: "Type",
                 width: 20,
-                getValue: { $0.contentType ?? "Unknown" },
-                getStyle: { _ in .secondary }
+                getValue: {
+                    switch $0 {
+                    case .directory(_, let count, _):
+                        return "Directory (\(count) items)"
+                    case .object(let obj):
+                        return obj.contentType ?? "Unknown"
+                    }
+                },
+                getStyle: { item in
+                    item.isDirectory ? .info : .secondary
+                }
             ),
-            StatusListColumn<SwiftObject>(
+            StatusListColumn<SwiftTreeItem>(
                 header: "Last Modified",
                 width: 20,
-                getValue: { object in
-                    object.lastModified?.formatted(date: .abbreviated, time: .shortened) ?? "N/A"
+                getValue: { item in
+                    if let date = item.lastModified {
+                        return date.formatted(date: .abbreviated, time: .shortened)
+                    } else {
+                        return "-"
+                    }
                 }
             )
         ]
 
         return StatusListView(
-            title: "Objects in Container: \(containerName)",
+            title: title,
             columns: columns,
-            getStatusIcon: { object in
-                object.isLargeObject ? "[L]" : "[O]"
+            getStatusIcon: { item in
+                item.statusIcon
             },
-            filterItems: { objects, query in
-                guard let query = query, !query.isEmpty else { return objects }
-                return objects.filter { $0.name?.localizedCaseInsensitiveContains(query) ?? false }
+            filterItems: { items, query in
+                guard let query = query, !query.isEmpty else { return items }
+                return SwiftTreeItem.filterItems(items, query: query)
             },
             getItemID: { $0.id }
         )
@@ -683,6 +708,222 @@ struct SwiftViews {
 
         // Add help text at the bottom
         let helpText = Text("TAB: Next Field | SPACE: Edit | ENTER: Save | ESC: Cancel").info()
+        let finalComponent = VStack(spacing: 0, children: [
+            formComponent,
+            helpText.padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+        ])
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+    }
+
+    // MARK: - Directory Metadata View
+
+    @MainActor
+    static func drawSwiftDirectoryMetadata(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        formBuilderState: FormBuilderState
+    ) async {
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Create FormBuilder instance
+        let formBuilder = FormBuilder(
+            title: "Set Directory Metadata",
+            fields: formBuilderState.fields,
+            selectedFieldId: formBuilderState.getCurrentFieldId(),
+            validationErrors: [],
+            showValidationErrors: false
+        )
+
+        // Render form
+        let formComponent = formBuilder.render()
+
+        // Add help text at the bottom
+        let helpText = Text("TAB: Next Field | SPACE: Edit/Toggle | ENTER: Apply to All | ESC: Cancel").info()
+        let finalComponent = VStack(spacing: 0, children: [
+            formComponent,
+            helpText.padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+        ])
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+    }
+
+    // MARK: - Object Upload View
+
+    @MainActor
+    static func drawSwiftObjectUpload(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        formBuilderState: FormBuilderState
+    ) async {
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Create FormBuilder instance
+        let formBuilder = FormBuilder(
+            title: "Upload Object to Container",
+            fields: formBuilderState.fields,
+            selectedFieldId: formBuilderState.getCurrentFieldId(),
+            validationErrors: [],
+            showValidationErrors: false
+        )
+
+        // Render form
+        let formComponent = formBuilder.render()
+
+        // Add help text at the bottom
+        let helpText = Text("TAB: Next Field | SPACE: Edit | ENTER: Upload | ESC: Cancel").info()
+        let finalComponent = VStack(spacing: 0, children: [
+            formComponent,
+            helpText.padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+        ])
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+    }
+
+    // MARK: - Object Download View
+
+    @MainActor
+    static func drawSwiftContainerDownload(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        formBuilderState: FormBuilderState
+    ) async {
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Create FormBuilder instance
+        let formBuilder = FormBuilder(
+            title: "Download Container",
+            fields: formBuilderState.fields,
+            selectedFieldId: formBuilderState.getCurrentFieldId(),
+            validationErrors: [],
+            showValidationErrors: false
+        )
+
+        // Render form
+        let formComponent = formBuilder.render()
+
+        // Add help text at the bottom
+        let helpText = Text("TAB: Next Field | SPACE: Edit | ENTER: Download | ESC: Cancel").info()
+        let finalComponent = VStack(spacing: 0, children: [
+            formComponent,
+            helpText.padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+        ])
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+    }
+
+    @MainActor
+    static func drawSwiftObjectDownload(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        formBuilderState: FormBuilderState
+    ) async {
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Create FormBuilder instance
+        let formBuilder = FormBuilder(
+            title: "Download Object",
+            fields: formBuilderState.fields,
+            selectedFieldId: formBuilderState.getCurrentFieldId(),
+            validationErrors: [],
+            showValidationErrors: false
+        )
+
+        // Render form
+        let formComponent = formBuilder.render()
+
+        // Add help text at the bottom
+        let helpText = Text("TAB: Next Field | SPACE: Edit | ENTER: Download | ESC: Cancel").info()
+        let finalComponent = VStack(spacing: 0, children: [
+            formComponent,
+            helpText.padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+        ])
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+    }
+
+    @MainActor
+    static func drawSwiftDirectoryDownload(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        formBuilderState: FormBuilderState
+    ) async {
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Create FormBuilder instance
+        let formBuilder = FormBuilder(
+            title: "Download Directory",
+            fields: formBuilderState.fields,
+            selectedFieldId: formBuilderState.getCurrentFieldId(),
+            validationErrors: [],
+            showValidationErrors: false
+        )
+
+        // Render form
+        let formComponent = formBuilder.render()
+
+        // Add help text at the bottom
+        let helpText = Text("TAB: Next Field | SPACE: Edit/Toggle | ENTER: Download | ESC: Cancel").info()
         let finalComponent = VStack(spacing: 0, children: [
             formComponent,
             helpText.padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))

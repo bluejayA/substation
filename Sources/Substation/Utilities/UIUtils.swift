@@ -103,7 +103,7 @@ struct UIUtils {
         case .octavia:
             return "\(baseCommands) SPACE:details C:create /:search ESC:back"
         case .swift:
-            return "\(baseCommands) SPACE:details C:create M:metadata DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create U:upload D:download M:metadata DELETE:delete /:search ESC:back"
         case .barbicanSecretDetail:
             return "\(baseCommands) ESC:back"
         case .barbicanContainerDetail:
@@ -111,7 +111,7 @@ struct UIUtils {
         case .octaviaLoadBalancerDetail:
             return "\(baseCommands) ESC:back"
         case .swiftContainerDetail:
-            return "\(baseCommands) M:metadata DELETE:delete ESC:back"
+            return "\(baseCommands) U:upload D:download M:metadata DELETE:delete ESC:back"
         case .swiftObjectDetail:
             return "\(baseCommands) ESC:back"
         case .barbicanSecretCreate:
@@ -126,8 +126,16 @@ struct UIUtils {
             return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
         case .swiftObjectMetadata:
             return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
-        case .swiftUpload:
-            return "\(baseCommands) TAB:navigate ENTER:upload ESC:cancel"
+        case .swiftDirectoryMetadata:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:apply-to-all ESC:cancel"
+        case .swiftObjectUpload:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:upload ESC:cancel"
+        case .swiftContainerDownload:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:download ESC:cancel"
+        case .swiftObjectDownload:
+            return "\(baseCommands) TAB:navigate SPACE:edit ENTER:download ESC:cancel"
+        case .swiftDirectoryDownload:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:download ESC:cancel"
         case .networkServerAttachment:
             return "\(baseCommands) SPACE:select/deselect ENTER:attach-to-selected ESC:back"
         case .securityGroupServerAttachment:
@@ -150,6 +158,8 @@ struct UIUtils {
             return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
         case .flavorSelection:
             return "\(baseCommands) TAB:switch-mode SPACE:select ENTER:confirm ESC:back"
+        case .uploadStatus:
+            return "\(baseCommands) c:cancel U:toggle-view ESC:back"
         }
     }
 
@@ -173,7 +183,8 @@ struct UIUtils {
         cachedSwiftContainers: [SwiftContainer] = [],
         cachedSwiftObjects: [SwiftObject]? = nil,
         searchQuery: String?,
-        resourceResolver: ResourceResolver
+        resourceResolver: ResourceResolver,
+        swiftNavState: SwiftNavigationState? = nil
     ) -> Int {
         switch view {
         case .loading:
@@ -255,15 +266,17 @@ struct UIUtils {
             }
             return max(0, filteredContainers.count - 1)
         case .swiftContainerDetail:
-            // Swift object list view
+            // Swift object list view with hierarchical navigation
             guard let objects = cachedSwiftObjects else { return 0 }
-            let filteredObjects: [SwiftObject]
-            if let query = searchQuery, !query.isEmpty {
-                filteredObjects = objects.filter { $0.name?.localizedCaseInsensitiveContains(query) ?? false }
-            } else {
-                filteredObjects = objects
-            }
-            return max(0, filteredObjects.count - 1)
+
+            // Build tree structure from flat objects
+            let currentPath = swiftNavState?.currentPathString ?? ""
+            let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+
+            // Apply search filter if present
+            let filteredItems = SwiftTreeItem.filterItems(treeItems, query: searchQuery?.isEmpty ?? true ? nil : searchQuery)
+
+            return max(0, filteredItems.count - 1)
         default:
             // For detail views and others, no selection
             return 0

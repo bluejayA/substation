@@ -37,6 +37,12 @@ struct StatusBarView {
             statusComponents.append("CMD")
         }
 
+        // TODO: Add upload status when upload coordination is implemented
+        // let uploadCounts = await tui.dataManager.getUploadCounts()
+        // if uploadCounts.active > 0 || uploadCounts.queued > 0 {
+        //     statusComponents.append("Uploads: \(uploadCounts.active) active, \(uploadCounts.queued) queued")
+        // }
+
         // Check for active progress indicators
         let activeOperations = tui.progressIndicator.activeOperations
         if !activeOperations.isEmpty {

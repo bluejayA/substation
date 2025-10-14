@@ -112,6 +112,9 @@ final class TUI {
     // Health Dashboard navigation state
     internal lazy var healthDashboardNavState: HealthDashboardView.NavigationState = HealthDashboardView.NavigationState()
 
+    // Swift navigation state for hierarchical object storage browsing
+    internal lazy var swiftNavState: SwiftNavigationState = SwiftNavigationState()
+
     // Telemetry actor for health monitoring
     internal func getTelemetryActor() async -> TelemetryActor? {
         return await client.telemetryActor
@@ -241,15 +244,15 @@ final class TUI {
     }
     internal var cachedSwiftObjects: [SwiftObject]? {
         get {
-            guard let container = selectedResource as? SwiftContainer,
-                  let containerName = container.name else {
+            // Use navigation state instead of selectedResource to avoid race conditions
+            guard let containerName = swiftNavState.currentContainer else {
                 return nil
             }
             return resourceCache.getSwiftObjects(forContainer: containerName)
         }
         set {
-            guard let container = selectedResource as? SwiftContainer,
-                  let containerName = container.name,
+            // Use navigation state instead of selectedResource
+            guard let containerName = swiftNavState.currentContainer,
                   let objects = newValue else {
                 return
             }
@@ -391,8 +394,23 @@ final class TUI {
     internal var swiftObjectMetadataForm = SwiftObjectMetadataForm()
     internal var swiftObjectMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
 
+    // Swift directory metadata form state
+    internal var swiftDirectoryMetadataForm = SwiftDirectoryMetadataForm()
+    internal var swiftDirectoryMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
+
     // Swift object upload form state
-    internal var swiftUploadFormState: FormBuilderState = FormBuilderState(fields: [])
+    internal var swiftObjectUploadForm = SwiftObjectUploadForm()
+    internal var swiftObjectUploadFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container download form state
+    internal var swiftContainerDownloadForm = SwiftContainerDownloadForm()
+    internal var swiftContainerDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift object download form state
+    internal var swiftObjectDownloadForm = SwiftObjectDownloadForm()
+    internal var swiftObjectDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
+    internal var swiftDirectoryDownloadForm = SwiftDirectoryDownloadForm()
+    internal var swiftDirectoryDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
 
     // Debug mode flag
     private var debugMode: Bool = false
@@ -1049,7 +1067,8 @@ final class TUI {
             cachedSwiftContainers: cachedSwiftContainers,
             cachedSwiftObjects: cachedSwiftObjects,
             searchQuery: searchQuery,
-            resourceResolver: resourceResolver
+            resourceResolver: resourceResolver,
+            swiftNavState: swiftNavState
         )
     }
 
@@ -1196,8 +1215,8 @@ final class TUI {
                     await dataManager.refreshImageData()
                 }
             case .swiftContainerDetail:
-                // Load objects for the selected container
-                if let container = selectedResource as? SwiftContainer, let containerName = container.name {
+                // Load objects for the selected container using navigation state
+                if let containerName = swiftNavState.currentContainer {
                     Logger.shared.logInfo("Loading Swift objects for container: \(containerName)")
                     await dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
                 }

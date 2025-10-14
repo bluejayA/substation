@@ -13,7 +13,9 @@ enum ViewMode: CaseIterable {
     case barbicanSecretDetail, barbicanContainerDetail, octaviaLoadBalancerDetail, swiftContainerDetail, swiftObjectDetail
     case serverCreate, serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement, subnetCreate, volumeCreate, portCreate, routerCreate, floatingIPCreate, keyPairs, keyPairDetail, keyPairCreate, help, about, serverSecurityGroups, serverNetworkInterfaces, serverGroupManagement, volumeManagement, floatingIPServerSelect, serverSnapshotManagement, serverResize, volumeSnapshotManagement, volumeBackupManagement, networkServerAttachment, securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement, volumeServerManagement, floatingIPServerManagement, floatingIPPortManagement, portServerManagement, portAllowedAddressPairManagement, subnetRouterManagement, flavorSelection
     // OpenStack Services Create Forms
-    case barbicanSecretCreate, barbicanContainerCreate, octaviaLoadBalancerCreate, swiftContainerCreate, swiftUpload, swiftContainerMetadata, swiftObjectMetadata
+    case barbicanSecretCreate, barbicanContainerCreate, octaviaLoadBalancerCreate, swiftContainerCreate, swiftObjectUpload, swiftContainerDownload, swiftObjectDownload, swiftDirectoryDownload, swiftContainerMetadata, swiftObjectMetadata, swiftDirectoryMetadata
+    // Upload Management
+    case uploadStatus
 
     var title: String {
         switch self {
@@ -82,9 +84,13 @@ enum ViewMode: CaseIterable {
             case .barbicanContainerCreate: return "Create Container"
             case .octaviaLoadBalancerCreate: return "Create Load Balancer"
             case .swiftContainerCreate: return "Create Container"
-            case .swiftUpload: return "Upload Objects"
+            case .swiftObjectUpload: return "Upload Object"
+            case .swiftContainerDownload: return "Download Container"
+            case .swiftObjectDownload: return "Download Object"
+            case .swiftDirectoryDownload: return "Download Directory"
             case .swiftContainerMetadata: return "Set Container Metadata"
             case .swiftObjectMetadata: return "Set Object Metadata"
+            case .swiftDirectoryMetadata: return "Set Directory Metadata"
             case .help: return "Help"
             case .about: return "About"
             case .networkServerAttachment: return "Attach Network to Servers"
@@ -98,6 +104,7 @@ enum ViewMode: CaseIterable {
             case .portAllowedAddressPairManagement: return "Manage Allowed Address Pairs"
             case .subnetRouterManagement: return "Manage Subnet Router Attachment"
             case .flavorSelection: return "Select Server Flavor"
+            case .uploadStatus: return "Upload Status"
         }
     }
 
@@ -162,9 +169,13 @@ enum ViewMode: CaseIterable {
         case .barbicanContainerCreate: return ""
         case .octaviaLoadBalancerCreate: return ""
         case .swiftContainerCreate: return ""
-        case .swiftUpload: return ""
+        case .swiftObjectUpload: return ""
+        case .swiftContainerDownload: return ""
+        case .swiftObjectDownload: return ""
+        case .swiftDirectoryDownload: return ""
         case .swiftContainerMetadata: return ""
         case .swiftObjectMetadata: return ""
+        case .swiftDirectoryMetadata: return ""
         case .help: return "[?]"
         case .about: return "[@]"
         case .serverSecurityGroups: return ""
@@ -187,6 +198,7 @@ enum ViewMode: CaseIterable {
         case .portAllowedAddressPairManagement: return ""
         case .subnetRouterManagement: return ""
         case .flavorSelection: return ""
+        case .uploadStatus: return ""
         }
     }
 
@@ -198,7 +210,7 @@ enum ViewMode: CaseIterable {
         case .barbicanSecretDetail, .barbicanContainerDetail, .octaviaLoadBalancerDetail, .swiftObjectDetail:
             return true
         // OpenStack Services Create Forms
-        case .barbicanSecretCreate, .barbicanContainerCreate, .octaviaLoadBalancerCreate, .swiftContainerCreate, .swiftUpload, .swiftContainerMetadata, .swiftObjectMetadata:
+        case .barbicanSecretCreate, .barbicanContainerCreate, .octaviaLoadBalancerCreate, .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload, .swiftObjectDownload, .swiftDirectoryDownload, .swiftContainerMetadata, .swiftObjectMetadata, .swiftDirectoryMetadata:
             return true
         default:
             return false
@@ -267,9 +279,13 @@ enum ViewMode: CaseIterable {
         case .swiftContainerDetail: return .swift
         case .swiftObjectDetail: return .swiftContainerDetail
         case .swiftContainerCreate: return .swift
-        case .swiftUpload: return .swiftContainerDetail
+        case .swiftObjectUpload: return .swift
+        case .swiftContainerDownload: return .swift
+        case .swiftObjectDownload: return .swiftContainerDetail
+        case .swiftDirectoryDownload: return .swiftContainerDetail
         case .swiftContainerMetadata: return .swift
         case .swiftObjectMetadata: return .swiftContainerDetail
+        case .swiftDirectoryMetadata: return .swiftContainerDetail
         case .networkServerAttachment: return .networks
         case .securityGroupServerAttachment: return .securityGroups
         case .securityGroupServerManagement: return .securityGroups
@@ -281,6 +297,7 @@ enum ViewMode: CaseIterable {
         case .portAllowedAddressPairManagement: return .ports
         case .subnetRouterManagement: return .subnets
         case .flavorSelection: return .serverCreate
+        case .uploadStatus: return .swift
         default: return self
         }
     }
@@ -529,9 +546,25 @@ struct MainPanelView {
         case .swift:
             await SwiftViews.drawSwiftContainerList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, containers: tui.cachedSwiftContainers, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
         case .swiftContainerDetail:
-            if let objects = tui.cachedSwiftObjects {
-                let containerName = (tui.selectedResource as? SwiftContainer)?.name ?? "Container"
-                await SwiftViews.drawSwiftObjectList(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, objects: objects, containerName: containerName, searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode, selectedItems: tui.multiSelectedResourceIDs)
+            if let objects = tui.cachedSwiftObjects,
+               let containerName = tui.swiftNavState.currentContainer {
+                let currentPath = tui.swiftNavState.currentPathString
+                await SwiftViews.drawSwiftObjectList(
+                    screen: screen,
+                    startRow: mainStartRow,
+                    startCol: mainStartCol,
+                    width: mainWidth,
+                    height: mainHeight,
+                    objects: objects,
+                    containerName: containerName,
+                    currentPath: currentPath,
+                    searchQuery: tui.searchQuery ?? "",
+                    scrollOffset: tui.scrollOffset,
+                    selectedIndex: tui.selectedIndex,
+                    navState: tui.swiftNavState,
+                    multiSelectMode: tui.multiSelectMode,
+                    selectedItems: tui.multiSelectedResourceIDs
+                )
             }
         case .swiftObjectDetail:
             if let object = tui.selectedResource as? SwiftObject {
@@ -543,8 +576,19 @@ struct MainPanelView {
             await SwiftViews.drawSwiftContainerMetadata(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftContainerMetadataFormState)
         case .swiftObjectMetadata:
             await SwiftViews.drawSwiftObjectMetadata(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftObjectMetadataFormState)
-        case .swiftUpload:
-            await SwiftViews.drawSwiftUpload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftUploadFormState)
+        case .swiftDirectoryMetadata:
+            await SwiftViews.drawSwiftDirectoryMetadata(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftDirectoryMetadataFormState)
+        case .swiftObjectUpload:
+            await SwiftViews.drawSwiftObjectUpload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftObjectUploadFormState)
+        case .swiftContainerDownload:
+            await SwiftViews.drawSwiftContainerDownload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftContainerDownloadFormState)
+        case .swiftObjectDownload:
+            await SwiftViews.drawSwiftObjectDownload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftObjectDownloadFormState)
+        case .swiftDirectoryDownload:
+            await SwiftViews.drawSwiftDirectoryDownload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftDirectoryDownloadFormState)
+        case .uploadStatus:
+            // TODO: Upload status view not yet implemented
+            mvwaddstr(screen, Int32(mainStartRow + mainHeight / 2), Int32(mainStartCol + mainWidth / 2 - 15), "Upload Status - Not Yet Implemented")
         case .networkServerAttachment:
             await NetworkServerAttachmentView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, servers: tui.cachedServers, selectedServers: tui.selectedServers, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
         case .securityGroupServerAttachment:
