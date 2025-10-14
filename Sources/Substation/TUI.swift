@@ -240,8 +240,21 @@ final class TUI {
         set { Task { await resourceCache.setSwiftContainers(newValue) } }
     }
     internal var cachedSwiftObjects: [SwiftObject]? {
-        get { resourceCache.swiftObjects }
-        set { Task { await resourceCache.setSwiftObjects(newValue) } }
+        get {
+            guard let container = selectedResource as? SwiftContainer,
+                  let containerName = container.name else {
+                return nil
+            }
+            return resourceCache.getSwiftObjects(forContainer: containerName)
+        }
+        set {
+            guard let container = selectedResource as? SwiftContainer,
+                  let containerName = container.name,
+                  let objects = newValue else {
+                return
+            }
+            Task { await resourceCache.setSwiftObjects(objects, forContainer: containerName) }
+        }
     }
 
     // Cached flavor recommendations for all workload types
@@ -365,6 +378,21 @@ final class TUI {
     // Barbican secret creation form state
     internal var barbicanSecretCreateForm = BarbicanSecretCreateForm()
     internal var barbicanSecretCreateFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container creation form state
+    internal var swiftContainerCreateForm = SwiftContainerCreateForm()
+    internal var swiftContainerCreateFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container metadata form state
+    internal var swiftContainerMetadataForm = SwiftContainerMetadataForm()
+    internal var swiftContainerMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift object metadata form state
+    internal var swiftObjectMetadataForm = SwiftObjectMetadataForm()
+    internal var swiftObjectMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift object upload form state
+    internal var swiftUploadFormState: FormBuilderState = FormBuilderState(fields: [])
 
     // Debug mode flag
     private var debugMode: Bool = false
@@ -978,6 +1006,8 @@ final class TUI {
         case .subnets: return cachedSubnets.count
         case .serverGroups: return cachedServerGroups.count
         case .barbicanSecrets: return cachedSecrets.count
+        case .swift: return cachedSwiftContainers.count
+        case .swiftContainerDetail: return cachedSwiftObjects?.count ?? 0
         default: return 0
         }
     }
@@ -1016,6 +1046,8 @@ final class TUI {
             cachedSecrets: cachedSecrets,
             cachedVolumeSnapshots: cachedVolumeSnapshots,
             cachedVolumeBackups: cachedVolumeBackups,
+            cachedSwiftContainers: cachedSwiftContainers,
+            cachedSwiftObjects: cachedSwiftObjects,
             searchQuery: searchQuery,
             resourceResolver: resourceResolver
         )
@@ -1163,6 +1195,12 @@ final class TUI {
                     Logger.shared.logInfo("Loading images data on view change")
                     await dataManager.refreshImageData()
                 }
+            case .swiftContainerDetail:
+                // Load objects for the selected container
+                if let container = selectedResource as? SwiftContainer, let containerName = container.name {
+                    Logger.shared.logInfo("Loading Swift objects for container: \(containerName)")
+                    await dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
+                }
             default:
                 break
             }
@@ -1290,6 +1328,24 @@ final class TUI {
 
             filteredResources = archives
             targetDetailView = .volumeArchiveDetail
+        case .swift:
+            // Filter Swift containers based on search query
+            let filteredContainers = searchQuery?.isEmpty ?? true ? cachedSwiftContainers : cachedSwiftContainers.filter { container in
+                container.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
+            }
+            filteredResources = filteredContainers
+            targetDetailView = .swiftContainerDetail
+        case .swiftContainerDetail:
+            // When in container detail view, navigating opens object detail
+            if let objects = cachedSwiftObjects {
+                let filteredObjects = searchQuery?.isEmpty ?? true ? objects : objects.filter { object in
+                    object.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
+                }
+                filteredResources = filteredObjects
+                targetDetailView = .swiftObjectDetail
+            } else {
+                return
+            }
         default:
             return // No detail view available for this view type
         }

@@ -294,6 +294,29 @@ final class NavigationInputHandler {
             return true
         }
 
+        // Priority 3.5: Return from sub-list views (like Swift container objects)
+        if tui.currentView == .swiftContainerDetail {
+            Logger.shared.logNavigation("\(tui.currentView)", to: "\(tui.currentView.parentView)", details: ["action": "escape_sublist"])
+
+            // Restore selection to the container that was opened
+            if let container = tui.selectedResource as? SwiftContainer,
+               let containerName = container.name,
+               let index = tui.cachedSwiftContainers.firstIndex(where: { $0.name == containerName }) {
+                tui.selectedIndex = index
+                // Ensure the selected item is visible in the viewport
+                let visibleItems = Int(tui.screenRows) - 10
+                if index < tui.scrollOffset {
+                    tui.scrollOffset = index
+                } else if index >= tui.scrollOffset + visibleItems {
+                    tui.scrollOffset = max(0, index - visibleItems + 1)
+                }
+            }
+
+            tui.changeView(to: tui.currentView.parentView, resetSelection: false)
+            tui.selectedResource = nil
+            return true
+        }
+
         // Priority 4: Clear search query
         if tui.searchQuery != nil {
             Logger.shared.logUserAction("search_cleared_via_escape", details: ["previousQuery": tui.searchQuery ?? ""])
@@ -468,6 +491,29 @@ final class NavigationInputHandler {
             if tui.currentView == .healthDashboardServiceDetail {
                 tui.healthDashboardNavState.currentSection = .services
                 Logger.shared.logUserAction("health_dashboard_return_to_services", details: ["from": "service_detail"])
+            }
+
+            tui.changeView(to: tui.currentView.parentView, resetSelection: false)
+            tui.selectedResource = nil
+            return true
+        }
+
+        // Priority 3.5: Return from sub-list views (like Swift container objects)
+        if tui.currentView == .swiftContainerDetail {
+            Logger.shared.logNavigation("\(tui.currentView)", to: "\(tui.currentView.parentView)", details: ["action": "escape_sublist"])
+
+            // Restore selection to the container that was opened
+            if let container = tui.selectedResource as? SwiftContainer,
+               let containerName = container.name,
+               let index = tui.cachedSwiftContainers.firstIndex(where: { $0.name == containerName }) {
+                tui.selectedIndex = index
+                // Ensure the selected item is visible in the viewport
+                let visibleItems = Int(tui.screenRows) - 10
+                if index < tui.scrollOffset {
+                    tui.scrollOffset = index
+                } else if index >= tui.scrollOffset + visibleItems {
+                    tui.scrollOffset = max(0, index - visibleItems + 1)
+                }
             }
 
             tui.changeView(to: tui.currentView.parentView, resetSelection: false)

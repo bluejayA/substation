@@ -36,7 +36,7 @@ final class OpenStackResourceCache {
     private var syncBarbicanContainers: [BarbicanContainer] = []
     private var syncLoadBalancers: [LoadBalancer] = []
     private var syncSwiftContainers: [SwiftContainer] = []
-    private var syncSwiftObjects: [SwiftObject]? = nil
+    private var syncSwiftObjectsByContainer: [String: [SwiftObject]] = [:]
     private var syncVolumeSnapshots: [VolumeSnapshot] = []
     private var syncVolumeBackups: [VolumeBackup] = []
 
@@ -78,7 +78,7 @@ final class OpenStackResourceCache {
     var barbicanContainers: [BarbicanContainer] { syncBarbicanContainers }
     var loadBalancers: [LoadBalancer] { syncLoadBalancers }
     var swiftContainers: [SwiftContainer] { syncSwiftContainers }
-    var swiftObjects: [SwiftObject]? { syncSwiftObjects }
+    var swiftObjectsByContainer: [String: [SwiftObject]] { syncSwiftObjectsByContainer }
     var volumeSnapshots: [VolumeSnapshot] { syncVolumeSnapshots }
     var volumeBackups: [VolumeBackup] { syncVolumeBackups }
 
@@ -209,12 +209,13 @@ final class OpenStackResourceCache {
         Logger.shared.logDebug("OpenStackResourceCache cached \(containers.count) Swift containers")
     }
 
-    func setSwiftObjects(_ objects: [SwiftObject]?) async {
-        syncSwiftObjects = objects
-        if let objects = objects {
-            
-            Logger.shared.logDebug("OpenStackResourceCache cached \(objects.count) Swift objects")
-        }
+    func setSwiftObjects(_ objects: [SwiftObject], forContainer containerName: String) async {
+        syncSwiftObjectsByContainer[containerName] = objects
+        Logger.shared.logDebug("OpenStackResourceCache cached \(objects.count) Swift objects for container '\(containerName)'")
+    }
+
+    func getSwiftObjects(forContainer containerName: String) -> [SwiftObject]? {
+        return syncSwiftObjectsByContainer[containerName]
     }
 
     func setVolumeSnapshots(_ snapshots: [VolumeSnapshot]) async {
@@ -278,7 +279,7 @@ final class OpenStackResourceCache {
         syncBarbicanContainers.removeAll()
         syncLoadBalancers.removeAll()
         syncSwiftContainers.removeAll()
-        syncSwiftObjects = nil
+        syncSwiftObjectsByContainer.removeAll()
         syncVolumeSnapshots.removeAll()
         syncVolumeBackups.removeAll()
         syncComputeQuotas = nil

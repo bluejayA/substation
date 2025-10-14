@@ -103,7 +103,7 @@ struct UIUtils {
         case .octavia:
             return "\(baseCommands) SPACE:details C:create /:search ESC:back"
         case .swift:
-            return "\(baseCommands) SPACE:details C:create /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create M:metadata DELETE:delete /:search ESC:back"
         case .barbicanSecretDetail:
             return "\(baseCommands) ESC:back"
         case .barbicanContainerDetail:
@@ -111,7 +111,7 @@ struct UIUtils {
         case .octaviaLoadBalancerDetail:
             return "\(baseCommands) ESC:back"
         case .swiftContainerDetail:
-            return "\(baseCommands) ESC:back"
+            return "\(baseCommands) M:metadata DELETE:delete ESC:back"
         case .swiftObjectDetail:
             return "\(baseCommands) ESC:back"
         case .barbicanSecretCreate:
@@ -122,6 +122,10 @@ struct UIUtils {
             return "\(baseCommands) TAB:navigate ENTER:create ESC:cancel"
         case .swiftContainerCreate:
             return "\(baseCommands) TAB:navigate ENTER:create ESC:cancel"
+        case .swiftContainerMetadata:
+            return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
+        case .swiftObjectMetadata:
+            return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
         case .swiftUpload:
             return "\(baseCommands) TAB:navigate ENTER:upload ESC:cancel"
         case .networkServerAttachment:
@@ -166,6 +170,8 @@ struct UIUtils {
         cachedSecrets: [Secret] = [],
         cachedVolumeSnapshots: [VolumeSnapshot] = [],
         cachedVolumeBackups: [VolumeBackup] = [],
+        cachedSwiftContainers: [SwiftContainer] = [],
+        cachedSwiftObjects: [SwiftObject]? = nil,
         searchQuery: String?,
         resourceResolver: ResourceResolver
     ) -> Int {
@@ -239,6 +245,25 @@ struct UIUtils {
             // Management views handle their own filtered server counts
             let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
             return max(0, filteredServers.count - 1)
+        case .swift:
+            // Swift container list view
+            let filteredContainers: [SwiftContainer]
+            if let query = searchQuery, !query.isEmpty {
+                filteredContainers = cachedSwiftContainers.filter { $0.name?.localizedCaseInsensitiveContains(query) ?? false }
+            } else {
+                filteredContainers = cachedSwiftContainers
+            }
+            return max(0, filteredContainers.count - 1)
+        case .swiftContainerDetail:
+            // Swift object list view
+            guard let objects = cachedSwiftObjects else { return 0 }
+            let filteredObjects: [SwiftObject]
+            if let query = searchQuery, !query.isEmpty {
+                filteredObjects = objects.filter { $0.name?.localizedCaseInsensitiveContains(query) ?? false }
+            } else {
+                filteredObjects = objects
+            }
+            return max(0, filteredObjects.count - 1)
         default:
             // For detail views and others, no selection
             return 0

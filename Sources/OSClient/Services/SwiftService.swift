@@ -31,7 +31,7 @@ public actor SwiftService: OpenStackService {
         }
 
         let queryString = queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
-        let path = queryString.isEmpty ? "" : "?\(queryString)"
+        let path = queryString.isEmpty ? "/" : "/?\(queryString)"
 
         let response: [SwiftContainer] = try await core.request(
             service: serviceName,

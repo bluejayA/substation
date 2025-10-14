@@ -106,6 +106,16 @@ struct MiscViews {
             return "Help - Secret Creation"
         case .barbicanContainerCreate:
             return "Help - Container Creation"
+        case .swift:
+            return "Help - Object Storage Management"
+        case .swiftContainerDetail:
+            return "Help - Object Storage Container Contents"
+        case .swiftObjectDetail:
+            return "Help - Object Details"
+        case .swiftContainerCreate:
+            return "Help - Create Storage Container"
+        case .swiftUpload:
+            return "Help - Upload Objects"
         default:
             return "Help - Keyboard Shortcuts"
         }
@@ -555,6 +565,95 @@ struct MiscViews {
                 generalActions
             ]
 
+        case .swift:
+            return [
+                generalNavigation,
+                ("Object Storage Container Management", [
+                    "SHIFT-C: Create new container",
+                    "SPACE: Open container and view objects",
+                    "DELETE: Delete selected container",
+                    "Containers organize objects in storage",
+                    "Set metadata and access policies per container",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected containers",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
+                generalActions
+            ]
+
+        case .swiftContainerDetail:
+            return [
+                generalNavigation,
+                ("Object Management", [
+                    "SHIFT-U: Upload objects to container",
+                    "SPACE: View object details",
+                    "DELETE: Delete selected object",
+                    "ESC: Return to container list",
+                    "Objects are files stored in the container",
+                    "Metadata and custom headers supported",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected objects",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
+                generalActions
+            ]
+
+        case .swiftObjectDetail:
+            return [
+                generalNavigation,
+                ("Object Details View", [
+                    "View object metadata and properties",
+                    "See file size, content type, and ETag",
+                    "Last modified timestamp shown",
+                    "ESC: Return to object list",
+                ]),
+                generalActions
+            ]
+
+        case .swiftContainerCreate:
+            return [
+                ("Container Creation Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text fields",
+                    "ENTER: Create container",
+                    "ESC: Cancel and return",
+                    "Container names must be unique",
+                ]),
+                ("Container Options", [
+                    "Name: Required, unique identifier",
+                    "Metadata: Optional key-value pairs",
+                    "Read ACL: Control read access",
+                    "Write ACL: Control write access",
+                ]),
+                generalActions
+            ]
+
+        case .swiftUpload:
+            return [
+                ("Object Upload Form", [
+                    "TAB: Move to next field",
+                    "SPACE: Edit text fields and select files",
+                    "ENTER: Upload objects to container",
+                    "ESC: Cancel and return",
+                ]),
+                ("Upload Options", [
+                    "File Path: Local file to upload",
+                    "Object Name: Optional name override",
+                    "Content Type: MIME type (auto-detected)",
+                    "Metadata: Optional custom headers",
+                    "Large files segmented automatically",
+                ]),
+                generalActions
+            ]
+
         default:
             // General help for all other views
             return [
@@ -575,6 +674,7 @@ struct MiscViews {
                     "v: Volumes view",
                     "i: Images view",
                     "f: Flavors view",
+                    "j: Object Storage view",
                     "t: Topology view",
                     "z: Search view",
                 ]),
@@ -591,6 +691,7 @@ struct MiscViews {
                     ":securitygroups, :sec, :e - Navigate to Security Groups",
                     ":servergroups, :sg, :g - Navigate to Server Groups",
                     ":keypairs, :keys, :k - Navigate to Key Pairs",
+                    ":swift, :object, :obj, :j - Navigate to Object Storage",
                     ":topology, :topo, :t - Navigate to Topology",
                     ":search, :find, :z - Navigate to Search",
                     ":dashboard, :dash, :d - Navigate to Dashboard",

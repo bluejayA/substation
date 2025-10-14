@@ -2235,4 +2235,153 @@ final class ResourceOperations {
         }
     }
 
+    // MARK: - Swift Object Storage Operations
+
+    internal func deleteSwiftContainer(screen: OpaquePointer?) async {
+        guard currentView == .swift else { return }
+
+        let filteredContainers = searchQuery?.isEmpty ?? true ? tui.cachedSwiftContainers : tui.cachedSwiftContainers.filter { container in
+            container.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
+        }
+
+        guard selectedIndex < filteredContainers.count else {
+            statusMessage = "No container selected"
+            return
+        }
+
+        let container = filteredContainers[selectedIndex]
+        guard let containerName = container.name else {
+            statusMessage = "Container has no name"
+            return
+        }
+
+        // Check if container has objects
+        let objectCount = container.count
+        let hasObjects = objectCount > 0
+
+        // Show appropriate confirmation based on whether container has objects
+        let confirmed: Bool
+        if hasObjects {
+            confirmed = await ConfirmationModal.show(
+                title: "Delete Container with Objects",
+                message: "Delete '\(containerName)' and all its contents?",
+                details: [
+                    "This container contains \(objectCount) object(s)",
+                    "All objects will be deleted first",
+                    "Then the container will be deleted",
+                    "This action cannot be undone"
+                ],
+                screen: screen,
+                screenRows: screenRows,
+                screenCols: screenCols
+            )
+        } else {
+            confirmed = await ViewUtils.confirmDelete(containerName, screen: screen, screenRows: screenRows, screenCols: screenCols)
+        }
+
+        guard confirmed else {
+            statusMessage = "Container deletion cancelled"
+            return
+        }
+
+        do {
+            // If container has objects, delete them first
+            if hasObjects {
+                statusMessage = "Fetching objects in container '\(containerName)'..."
+                let objects = try await client.swift.listObjects(containerName: containerName)
+
+                statusMessage = "Deleting \(objects.count) object(s) from '\(containerName)'..."
+                var deletedCount = 0
+                var failedCount = 0
+
+                for object in objects {
+                    guard let objectName = object.name else { continue }
+                    do {
+                        try await client.swift.deleteObject(containerName: containerName, objectName: objectName)
+                        deletedCount += 1
+                        if deletedCount % 10 == 0 {
+                            statusMessage = "Deleted \(deletedCount)/\(objects.count) objects..."
+                        }
+                    } catch {
+                        failedCount += 1
+                        Logger.shared.logError("Failed to delete object '\(objectName)': \(error)")
+                    }
+                }
+
+                if failedCount > 0 {
+                    statusMessage = "Deleted \(deletedCount) objects (\(failedCount) failed). Attempting container deletion..."
+                } else {
+                    statusMessage = "All objects deleted. Deleting container '\(containerName)'..."
+                }
+            }
+
+            // Now delete the container
+            try await client.swift.deleteContainer(containerName: containerName)
+
+            if let index = tui.cachedSwiftContainers.firstIndex(where: { $0.name == containerName }) {
+                tui.cachedSwiftContainers.remove(at: index)
+            }
+
+            let newMaxIndex = max(0, filteredContainers.count - 2)
+            selectedIndex = min(selectedIndex, newMaxIndex)
+
+            if hasObjects {
+                statusMessage = "Container '\(containerName)' and all objects deleted successfully"
+            } else {
+                statusMessage = "Container '\(containerName)' deleted successfully"
+            }
+            tui.refreshAfterOperation()
+        } catch {
+            statusMessage = "Failed to delete container '\(containerName)': \(error.localizedDescription)"
+        }
+    }
+
+    internal func deleteSwiftObject(screen: OpaquePointer?) async {
+        guard currentView == .swiftContainerDetail else { return }
+        guard let container = selectedResource as? SwiftContainer, let containerName = container.name else {
+            statusMessage = "No container selected"
+            return
+        }
+        guard let objects = tui.cachedSwiftObjects else {
+            statusMessage = "No objects loaded"
+            return
+        }
+
+        let filteredObjects = searchQuery?.isEmpty ?? true ? objects : objects.filter { object in
+            object.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
+        }
+
+        guard selectedIndex < filteredObjects.count else {
+            statusMessage = "No object selected"
+            return
+        }
+
+        let object = filteredObjects[selectedIndex]
+        guard let objectName = object.name else {
+            statusMessage = "Object has no name"
+            return
+        }
+
+        guard await ViewUtils.confirmDelete(objectName, screen: screen, screenRows: screenRows, screenCols: screenCols) else {
+            statusMessage = "Object deletion cancelled"
+            return
+        }
+
+        do {
+            try await client.swift.deleteObject(containerName: containerName, objectName: objectName)
+
+            if let index = tui.cachedSwiftObjects?.firstIndex(where: { $0.name == objectName }) {
+                tui.cachedSwiftObjects?.remove(at: index)
+            }
+
+            let newMaxIndex = max(0, filteredObjects.count - 2)
+            selectedIndex = min(selectedIndex, newMaxIndex)
+
+            statusMessage = "Object '\(objectName)' deleted successfully"
+            tui.refreshAfterOperation()
+        } catch {
+            statusMessage = "Failed to delete object '\(objectName)': \(error.localizedDescription)"
+        }
+    }
+
 }

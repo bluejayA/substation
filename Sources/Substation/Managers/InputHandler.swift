@@ -54,6 +54,24 @@ class InputHandler {
             return
         }
 
+        // Swift container create form
+        if tui.currentView == .swiftContainerCreate {
+            await tui.handleSwiftContainerCreateInput(ch, screen: screen)
+            return
+        }
+
+        // Swift container metadata form
+        if tui.currentView == .swiftContainerMetadata {
+            await tui.handleSwiftContainerMetadataInput(ch, screen: screen)
+            return
+        }
+
+        // Swift object metadata form
+        if tui.currentView == .swiftObjectMetadata {
+            await tui.handleSwiftObjectMetadataInput(ch, screen: screen)
+            return
+        }
+
         // NetworkCreateForm uses FormBuilder which handles its own input state
         // Delegate all input to network create handler when in network create view
         if tui.currentView == .networkCreate {
@@ -543,7 +561,13 @@ class InputHandler {
                 handleToggleMultiSelectMode()
             }
         case Int32(77): // M - Manage things
-            if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
+            if tui.currentView == .swift && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_container_metadata", details: ["selectedIndex": tui.selectedIndex])
+                await handleManageContainerMetadata(screen: screen)
+            } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_object_metadata", details: ["selectedIndex": tui.selectedIndex])
+                await handleManageObjectMetadata(screen: screen)
+            } else if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageSecurityGroupRules(screen: screen)
             } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
@@ -670,13 +694,13 @@ class InputHandler {
             if tui.currentView != .help {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".help")
                 tui.helpScrollOffset = 0 // Reset scroll when entering help
-                tui.changeView(to: .help)
+                tui.changeView(to: .help, resetSelection: false)
             }
         case Int32(64): // @ - Show about page
             if tui.currentView != .about {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".about")
                 tui.helpScrollOffset = 0 // Reset scroll when entering about
-                tui.changeView(to: .about)
+                tui.changeView(to: .about, resetSelection: false)
             }
         case Int32(127), Int32(330): // DELETE key - Delete resources
             Logger.shared.logUserAction("delete_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
@@ -880,6 +904,16 @@ class InputHandler {
         } else if tui.currentView == .swift && !tui.currentView.isDetailView {
             Logger.shared.logNavigation("\(tui.currentView)", to: ".swiftContainerCreate")
             tui.changeView(to: .swiftContainerCreate)
+
+            // Initialize Swift container create form
+            tui.swiftContainerCreateForm = SwiftContainerCreateForm()
+            tui.swiftContainerCreateFormState = FormBuilderState(
+                fields: tui.swiftContainerCreateForm.buildFields(
+                    selectedFieldId: "containerName",
+                    activeFieldId: nil,
+                    formState: FormBuilderState(fields: [])
+                )
+            )
         }
     }
 
@@ -997,6 +1031,12 @@ class InputHandler {
         case .barbicanSecrets, .barbican:
             guard tui.selectedIndex < tui.cachedSecrets.count else { return "" }
             return tui.cachedSecrets[tui.selectedIndex].secretRef ?? ""
+        case .swift:
+            guard tui.selectedIndex < tui.cachedSwiftContainers.count else { return "" }
+            return tui.cachedSwiftContainers[tui.selectedIndex].id
+        case .swiftContainerDetail:
+            guard let objects = tui.cachedSwiftObjects, tui.selectedIndex < objects.count else { return "" }
+            return objects[tui.selectedIndex].id
         default:
             return ""
         }
@@ -1038,6 +1078,10 @@ class InputHandler {
             await tui.resourceOperations.deleteSecret(screen: screen)
         } else if tui.currentView == .volumeArchives && !tui.currentView.isDetailView {
             await tui.actions.deleteVolumeArchive(screen: screen)
+        } else if tui.currentView == .swift && !tui.currentView.isDetailView {
+            await tui.resourceOperations.deleteSwiftContainer(screen: screen)
+        } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
+            await tui.resourceOperations.deleteSwiftObject(screen: screen)
         }
     }
 
@@ -1130,6 +1174,96 @@ class InputHandler {
 
         if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
             await tui.actions.manageSecurityGroupRules(screen: screen)
+        }
+    }
+
+    private func handleManageContainerMetadata(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .swift && !tui.currentView.isDetailView {
+            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+
+            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            guard let containerName = container.name else {
+                tui.statusMessage = "Invalid container"
+                return
+            }
+
+            // Fetch current metadata
+            do {
+                let metadata = try await tui.client.swift.getContainerMetadata(containerName: containerName)
+
+                // Initialize form with current metadata
+                tui.swiftContainerMetadataForm = SwiftContainerMetadataForm()
+                tui.swiftContainerMetadataForm.loadFromMetadata(metadata)
+
+                // Initialize form state
+                tui.swiftContainerMetadataFormState = FormBuilderState(
+                    fields: tui.swiftContainerMetadataForm.buildFields(
+                        selectedFieldId: "readACL",
+                        activeFieldId: nil,
+                        formState: FormBuilderState(fields: [])
+                    )
+                )
+
+                // Navigate to metadata form
+                tui.changeView(to: .swiftContainerMetadata, resetSelection: false)
+            } catch {
+                tui.statusMessage = "Failed to load metadata: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func handleManageObjectMetadata(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
+            guard let container = tui.selectedResource as? SwiftContainer,
+                  let containerName = container.name else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+
+            guard let objects = tui.cachedSwiftObjects,
+                  tui.selectedIndex < objects.count else {
+                tui.statusMessage = "No object selected"
+                return
+            }
+
+            let object = objects[tui.selectedIndex]
+            guard let objectName = object.name else {
+                tui.statusMessage = "Invalid object"
+                return
+            }
+
+            // Fetch current metadata
+            do {
+                let metadata = try await tui.client.swift.getObjectMetadata(
+                    containerName: containerName,
+                    objectName: objectName
+                )
+
+                // Initialize form with current metadata
+                tui.swiftObjectMetadataForm = SwiftObjectMetadataForm()
+                tui.swiftObjectMetadataForm.loadFromMetadata(containerName: containerName, metadata: metadata)
+
+                // Initialize form state
+                tui.swiftObjectMetadataFormState = FormBuilderState(
+                    fields: tui.swiftObjectMetadataForm.buildFields(
+                        selectedFieldId: "contentType",
+                        activeFieldId: nil,
+                        formState: FormBuilderState(fields: [])
+                    )
+                )
+
+                // Navigate to metadata form
+                tui.changeView(to: .swiftObjectMetadata, resetSelection: false)
+            } catch {
+                tui.statusMessage = "Failed to load metadata: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -1286,6 +1420,14 @@ class InputHandler {
                     try await tui.client.deleteVolumeBackup(backupId: resourceID)
                 case .barbicanSecrets, .barbican:
                     try await tui.client.barbican.deleteSecret(id: resourceID)
+                case .swift:
+                    try await tui.client.swift.deleteContainer(containerName: resourceID)
+                case .swiftContainerDetail:
+                    guard let container = tui.selectedResource as? SwiftContainer, let containerName = container.name else {
+                        tui.statusMessage = "No container selected"
+                        return
+                    }
+                    try await tui.client.swift.deleteObject(containerName: containerName, objectName: resourceID)
                 case .flavors:
                     // Flavors don't support deletion (managed by cloud admin)
                     tui.statusMessage = "Flavors cannot be deleted"
@@ -1364,7 +1506,7 @@ class InputHandler {
             batchOperation = .keyPairBulkDelete(keyPairNames: Array(tui.multiSelectedResourceIDs))
         case .images:
             batchOperation = .imageBulkDelete(imageIDs: Array(tui.multiSelectedResourceIDs))
-        case .volumeArchives, .barbicanSecrets, .barbican:
+        case .volumeArchives, .barbicanSecrets, .barbican, .swift, .swiftContainerDetail:
             // These resources don't have BatchOperation support yet, handle them directly
             await handleSimpleBulkDelete(resourceIDs: Array(tui.multiSelectedResourceIDs), screen: screen)
             return

@@ -75,10 +75,7 @@ public struct SwiftContainer: Codable, Sendable, ResourceIdentifiable, Identifia
     }
 
     public var formattedSize: String {
-        return formatBytes(bytes)
-    }
-
-    private func formatBytes(_ bytes: Int) -> String {
+        // Use simple formatting inline since ByteFormatter is in Substation module
         let kb = 1024.0
         let mb = kb * 1024.0
         let gb = mb * 1024.0
@@ -183,15 +180,7 @@ public struct SwiftObject: Codable, Sendable, ResourceIdentifiable, Identifiable
     }
 
     public var formattedSize: String {
-        return formatBytes(bytes)
-    }
-
-    public var isLargeObject: Bool {
-        // Objects larger than 5GB are considered large objects in Swift
-        return bytes > 5 * 1024 * 1024 * 1024
-    }
-
-    private func formatBytes(_ bytes: Int) -> String {
+        // Use simple formatting inline since ByteFormatter is in Substation module
         let kb = 1024.0
         let mb = kb * 1024.0
         let gb = mb * 1024.0
@@ -210,6 +199,11 @@ public struct SwiftObject: Codable, Sendable, ResourceIdentifiable, Identifiable
         } else {
             return "\(bytes) B"
         }
+    }
+
+    public var isLargeObject: Bool {
+        // Objects larger than 5GB are considered large objects in Swift
+        return bytes > 5 * 1024 * 1024 * 1024
     }
 }
 
@@ -502,16 +496,13 @@ public struct SwiftAccountInfo: Sendable {
     }
 
     public var formattedSize: String {
-        return formatBytes(bytesUsed)
-    }
-
-    private func formatBytes(_ bytes: Int) -> String {
+        // Use simple formatting inline since ByteFormatter is in Substation module
         let kb = 1024.0
         let mb = kb * 1024.0
         let gb = mb * 1024.0
         let tb = gb * 1024.0
 
-        let size = Double(bytes)
+        let size = Double(bytesUsed)
 
         if size >= tb {
             return String(format: "%.2f TB", size / tb)
@@ -522,7 +513,7 @@ public struct SwiftAccountInfo: Sendable {
         } else if size >= kb {
             return String(format: "%.2f KB", size / kb)
         } else {
-            return "\(bytes) B"
+            return "\(bytesUsed) B"
         }
     }
 }

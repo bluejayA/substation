@@ -132,6 +132,9 @@ nav:
       - StatusListView Guide: reference/developers/statuslistview-guide.md
       - DetailView Guide: reference/developers/detailview-guide.md
       - Testing Guide: reference/developers/testing.md
-    - OpenStack Integration: reference/openstack/index.md
+      - OpenStack Swift: reference/developers/os-swift.md
+    - OpenStack Integration:
+      - Overview: reference/openstack/index.md
+      - Swift: reference/openstack/os-swift.md
     - FAQ: reference/faq.md
     - Troubleshooting: troubleshooting/index.md

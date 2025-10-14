@@ -215,7 +215,8 @@ class DataManager {
             { [weak self] in await self?.fetchAvailabilityZones(priority: "secondary") },
             { [weak self] in await self?.fetchSecrets(priority: "secondary") },
             { [weak self] in await self?.refreshFloatingIPs(priority: "secondary") },
-            { [weak self] in await self?.fetchImages(priority: "secondary") }
+            { [weak self] in await self?.fetchImages(priority: "secondary") },
+            { [weak self] in await self?.fetchSwiftContainers(priority: "secondary") }
         ]
 
         await runWithLimitedConcurrency(tasks, maxConcurrent: 5, delayBetweenTasks: SystemCapabilities.optimalTaskDelay())
@@ -1600,6 +1601,70 @@ class DataManager {
         } catch {
             Logger.shared.logDebug("DataManager - Health check failed for \(serviceName): \(error)")
             return false
+        }
+    }
+
+    // MARK: - Swift Object Storage
+
+    private func fetchSwiftContainers(priority: String) async {
+        guard let tui = tui else { return }
+
+        Logger.shared.logDebug("DataManager - Fetching Swift containers (\(priority) priority)...")
+
+        do {
+            let apiStart = Date().timeIntervalSinceReferenceDate
+            let containers = try await client.swift.listContainers()
+            let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
+            Logger.shared.logDebug("DataManager - Fetched \(containers.count) Swift containers in \(String(format: "%.2f", apiDuration))s")
+            await MainActor.run {
+                tui.cachedSwiftContainers = containers
+            }
+        } catch let error as OpenStackError {
+            switch error {
+            case .httpError(403, _):
+                Logger.shared.logDebug("Swift container access requires permissions (HTTP 403)")
+            case .httpError(404, _):
+                Logger.shared.logDebug("Swift service not available (HTTP 404)")
+            case .endpointNotFound:
+                Logger.shared.logDebug("Swift service endpoint not found - service may not be deployed")
+            default:
+                Logger.shared.logError("Failed to fetch Swift containers: \(error)")
+            }
+        } catch {
+            Logger.shared.logError("Failed to fetch Swift containers: \(error)")
+        }
+    }
+
+    public func fetchSwiftObjects(containerName: String, priority: String, forceRefresh: Bool = false) async {
+        guard let tui = tui else { return }
+
+        // Check if objects are already cached (unless forceRefresh is true)
+        if !forceRefresh {
+            if let cachedObjects = tui.resourceCache.getSwiftObjects(forContainer: containerName) {
+                Logger.shared.logDebug("DataManager - Using cached Swift objects for container '\(containerName)' (\(cachedObjects.count) objects)")
+                return
+            }
+        }
+
+        Logger.shared.logDebug("DataManager - Fetching Swift objects for container '\(containerName)' (\(priority) priority)...")
+
+        do {
+            let apiStart = Date().timeIntervalSinceReferenceDate
+            let objects = try await client.swift.listObjects(containerName: containerName)
+            let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
+            Logger.shared.logDebug("DataManager - Fetched \(objects.count) Swift objects in \(String(format: "%.2f", apiDuration))s")
+            await tui.resourceCache.setSwiftObjects(objects, forContainer: containerName)
+        } catch let error as OpenStackError {
+            switch error {
+            case .httpError(403, _):
+                Logger.shared.logDebug("Swift object access requires permissions (HTTP 403)")
+            case .httpError(404, _):
+                Logger.shared.logDebug("Swift container not found (HTTP 404)")
+            default:
+                Logger.shared.logError("Failed to fetch Swift objects: \(error)")
+            }
+        } catch {
+            Logger.shared.logError("Failed to fetch Swift objects: \(error)")
         }
     }
 }
