@@ -50,6 +50,8 @@ public actor OpenStackCacheManager {
         case keypairList = "keypair_list"
         case serverGroup = "server_group"
         case serverGroupList = "server_group_list"
+        case objectStorage = "object_storage"
+        case objectStorageList = "object_storage_list"
         case authentication = "auth_token"
         case serviceEndpoints = "service_endpoints"
         case quotas = "quotas"
@@ -61,16 +63,14 @@ public actor OpenStackCacheManager {
                 return 3600.0 // 1 hour for auth tokens
             case .serviceEndpoints, .quotas:
                 return 1800.0 // 30 minutes for semi-static data
-            case .flavor, .flavorList, .image, .imageList, .volumeType, .volumeTypeList:
+            case .flavor, .flavorList, .volumeType, .volumeTypeList:
                 return 900.0 // 15 minutes for relatively static resources
-            case .keypair, .keypairList, .serverGroup, .serverGroupList:
-                return 600.0 // 10 minutes for moderately static resources
-            case .network, .networkList, .subnet, .subnetList, .router, .routerList, .securityGroup, .securityGroupList:
-                return 300.0 // 5 minutes for network topology
+            case .keypair, .keypairList, .serverGroup, .serverGroupList, .image, .imageList, .network, .networkList, .subnet, .subnetList, .router, .routerList, .securityGroup, .securityGroupList:
+                return 300.0 // 5 minutes for moderately static resources
+            case .volumeSnapshot, .volumeSnapshotList, .objectStorage, .objectStorageList:
+                return 180.0 // 3 minutes for snapshots and object storage
             case .server, .serverDetail, .serverList, .port, .portList, .volume, .volumeList, .floatingIP, .floatingIPList:
                 return 120.0 // 2 minutes for frequently changing resources
-            case .volumeSnapshot, .volumeSnapshotList:
-                return 180.0 // 3 minutes for snapshots
             }
         }
 
@@ -125,7 +125,7 @@ public actor OpenStackCacheManager {
             return .high
         case .network, .subnet, .port, .router, .securityGroup, .image, .flavor:
             return .normal
-        case .serverList, .networkList, .volumeList, .quotas, .volumeSnapshot:
+        case .serverList, .networkList, .volumeList, .quotas, .volumeSnapshot, .objectStorage, .objectStorageList:
             return .low
         default:
             return .normal

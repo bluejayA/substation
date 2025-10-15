@@ -66,9 +66,7 @@ struct DashboardView {
         let surface = SwiftTUI.surface(from: screen)
 
         // Status indicators with real timestamp
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH:mm:ss"
-        let currentTime = dateFormatter.string(from: Date())
+        let currentTime = Date().timeOnlyFormatted()
         let statusText = "  [*] Last check: \(currentTime)"
         let statusBounds = Rect(x: startCol, y: startRow, width: width, height: 1)
         await SwiftTUI.render(Text(statusText.padding(toLength: Int(width), withPad: " ", startingAt: 0)).primary(), on: surface, in: statusBounds)

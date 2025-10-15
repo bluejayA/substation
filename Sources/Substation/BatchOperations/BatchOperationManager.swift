@@ -224,6 +224,61 @@ actor BatchOperationManager {
                 errors.append("No volume detachment operations provided")
             }
 
+        case .swiftContainerBulkCreate(let configs):
+            if configs.isEmpty {
+                errors.append("No Swift container configurations provided")
+            }
+            for (index, config) in configs.enumerated() {
+                if config.name.isEmpty {
+                    errors.append("Container \(index): Name is required")
+                }
+            }
+
+        case .swiftContainerBulkDelete(let containerNames):
+            if containerNames.isEmpty {
+                errors.append("No container names provided for deletion")
+            }
+
+        case .swiftObjectBulkUpload(let operations):
+            if operations.isEmpty {
+                errors.append("No upload operations provided")
+            }
+            for (index, op) in operations.enumerated() {
+                if op.objectName.isEmpty {
+                    errors.append("Upload \(index): Object name is required")
+                }
+                if op.localPath.isEmpty {
+                    errors.append("Upload \(index): Local path is required")
+                }
+                if op.containerName.isEmpty {
+                    errors.append("Upload \(index): Container name is required")
+                }
+            }
+
+        case .swiftObjectBulkDownload(let operations):
+            if operations.isEmpty {
+                errors.append("No download operations provided")
+            }
+            for (index, op) in operations.enumerated() {
+                if op.objectName.isEmpty {
+                    errors.append("Download \(index): Object name is required")
+                }
+                if op.containerName.isEmpty {
+                    errors.append("Download \(index): Container name is required")
+                }
+                if op.localPath.isEmpty {
+                    errors.append("Download \(index): Destination path is required")
+                }
+            }
+
+        case .swiftObjectBulkDelete(let containerName, let objectNames):
+            if containerName.isEmpty {
+                errors.append("Container name is required for bulk delete")
+            }
+            if objectNames.isEmpty {
+                errors.append("No objects specified for deletion")
+            }
+
         default:
             // Add validation for other operation types as needed
             break
@@ -432,6 +487,24 @@ actor BatchOperationManager {
 
             case (.image, .delete):
                 try await executeImageDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.swiftContainer, .create):
+                resourceID = try await executeSwiftContainerCreate(operation, execution: execution)
+
+            case (.swiftContainer, .delete):
+                try await executeSwiftContainerDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.swiftObject, .upload):
+                resourceID = try await executeSwiftObjectUpload(operation, execution: execution)
+
+            case (.swiftObject, .download):
+                try await executeSwiftObjectDownload(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.swiftObject, .delete):
+                try await executeSwiftObjectDelete(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
 
             default:
@@ -750,6 +823,87 @@ actor BatchOperationManager {
         execution: BatchOperationExecution
     ) async throws {
         try await client.deleteImage(id: operation.resourceIdentifier)
+    }
+
+    // MARK: - Swift Object Storage Executors
+
+    private func executeSwiftContainerCreate(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws -> String {
+        guard case .swiftContainerBulkCreate(let configs) = execution.type,
+              let config = configs.first(where: { $0.name == operation.resourceIdentifier }) else {
+            throw BatchOperationError.executionFailed("Swift container configuration not found")
+        }
+
+        let request = CreateSwiftContainerRequest(
+            name: config.name,
+            metadata: config.metadata,
+            readACL: config.readACL,
+            writeACL: config.writeACL
+        )
+
+        try await client.swift.createContainer(request: request)
+        return config.name
+    }
+
+    private func executeSwiftContainerDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        try await client.swift.deleteContainer(containerName: operation.resourceIdentifier)
+    }
+
+    private func executeSwiftObjectUpload(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws -> String {
+        guard case .swiftObjectBulkUpload(let operations) = execution.type,
+              let uploadOp = operations.first(where: { $0.objectName == operation.resourceIdentifier }) else {
+            throw BatchOperationError.executionFailed("Swift upload operation not found")
+        }
+
+        // Read file data
+        let fileURL = URL(fileURLWithPath: uploadOp.localPath)
+        let data = try Data(contentsOf: fileURL)
+
+        let request = UploadSwiftObjectRequest(
+            containerName: uploadOp.containerName,
+            objectName: uploadOp.objectName,
+            data: data,
+            contentType: uploadOp.contentType,
+            metadata: uploadOp.metadata
+        )
+
+        try await client.swift.uploadObject(request: request)
+        return uploadOp.objectName
+    }
+
+    private func executeSwiftObjectDownload(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        guard case .swiftObjectBulkDownload(let operations) = execution.type,
+              let downloadOp = operations.first(where: { $0.objectName == operation.resourceIdentifier }) else {
+            throw BatchOperationError.executionFailed("Swift download operation not found")
+        }
+
+        let data = try await client.swift.downloadObject(containerName: downloadOp.containerName, objectName: downloadOp.objectName)
+
+        // Write to destination
+        let fileURL = URL(fileURLWithPath: downloadOp.localPath)
+        try data.write(to: fileURL)
+    }
+
+    private func executeSwiftObjectDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        guard case .swiftObjectBulkDelete(let containerName, _) = execution.type else {
+            throw BatchOperationError.executionFailed("Swift delete operation not found")
+        }
+
+        try await client.swift.deleteObject(containerName: containerName, objectName: operation.resourceIdentifier)
     }
 
     // MARK: - Helper Methods

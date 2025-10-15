@@ -20,6 +20,8 @@ actor ResourceDependencyResolver {
         case serverGroup
         case keyPair
         case image
+        case swiftContainer
+        case swiftObject
         case flavor
 
         /// Resources that must exist before this resource can be created
@@ -49,6 +51,10 @@ actor ResourceDependencyResolver {
                 return []
             case .flavor:
                 return []
+            case .swiftContainer:
+                return []
+            case .swiftObject:
+                return [.swiftContainer]
             }
         }
 
@@ -82,6 +88,10 @@ actor ResourceDependencyResolver {
                 return 8 // Server groups can be deleted late
             case .keyPair, .image, .flavor:
                 return 9 // System resources last
+            case .swiftObject:
+                return 2 // Delete objects before containers
+            case .swiftContainer:
+                return 8 // Delete containers late (after objects)
             }
         }
     }
@@ -186,6 +196,8 @@ actor ResourceDependencyResolver {
         case update
         case attach
         case detach
+        case upload
+        case download
 
         public var estimatedDurationSeconds: TimeInterval {
             switch self {
@@ -199,6 +211,10 @@ actor ResourceDependencyResolver {
                 return 25.0 // Attachments take time
             case .detach:
                 return 10.0 // Detachments are fast
+            case .upload:
+                return 45.0 // Uploads can take longer depending on size
+            case .download:
+                return 40.0 // Downloads similar to uploads
             }
         }
     }
@@ -365,6 +381,21 @@ actor ResourceDependencyResolver {
 
         case .imageBulkDelete(let imageIDs):
             operations = await buildImageDeleteOperations(imageIDs)
+
+        case .swiftContainerBulkCreate(let configs):
+            operations = await buildSwiftContainerCreateOperations(configs)
+
+        case .swiftContainerBulkDelete(let containerNames):
+            operations = await buildSwiftContainerDeleteOperations(containerNames)
+
+        case .swiftObjectBulkUpload(let uploadOps):
+            operations = await buildSwiftObjectUploadOperations(uploadOps)
+
+        case .swiftObjectBulkDownload(let downloadOps):
+            operations = await buildSwiftObjectDownloadOperations(downloadOps)
+
+        case .swiftObjectBulkDelete(let containerName, let objectNames):
+            operations = await buildSwiftObjectDeleteOperations(containerName: containerName, objectNames: objectNames)
         }
 
         return operations
@@ -896,6 +927,73 @@ actor ResourceDependencyResolver {
                 resourceIdentifier: imageID,
                 dependencies: [],
                 estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    // MARK: - Swift Object Storage Operations
+
+    private func buildSwiftContainerCreateOperations(_ configs: [SwiftContainerCreateConfig]) async -> [PlannedOperation] {
+        return configs.enumerated().map { (index, config) in
+            PlannedOperation(
+                id: "swift-container-create-\(index)",
+                type: .swiftContainer,
+                action: .create,
+                resourceIdentifier: config.name,
+                dependencies: [],
+                estimatedDuration: 2.0
+            )
+        }
+    }
+
+    private func buildSwiftContainerDeleteOperations(_ containerNames: [String]) async -> [PlannedOperation] {
+        return containerNames.enumerated().map { (index, name) in
+            PlannedOperation(
+                id: "swift-container-delete-\(index)",
+                type: .swiftContainer,
+                action: .delete,
+                resourceIdentifier: name,
+                dependencies: [],
+                estimatedDuration: 3.0
+            )
+        }
+    }
+
+    private func buildSwiftObjectUploadOperations(_ operations: [SwiftObjectUploadOperation]) async -> [PlannedOperation] {
+        return operations.enumerated().map { (index, op) in
+            PlannedOperation(
+                id: "swift-object-upload-\(index)",
+                type: .swiftObject,
+                action: .create,
+                resourceIdentifier: "\(op.containerName)/\(op.objectName)",
+                dependencies: [],
+                estimatedDuration: 5.0
+            )
+        }
+    }
+
+    private func buildSwiftObjectDownloadOperations(_ operations: [SwiftObjectDownloadOperation]) async -> [PlannedOperation] {
+        return operations.enumerated().map { (index, op) in
+            PlannedOperation(
+                id: "swift-object-download-\(index)",
+                type: .swiftObject,
+                action: .update, // Using update as closest match for download action
+                resourceIdentifier: "\(op.containerName)/\(op.objectName)",
+                dependencies: [],
+                estimatedDuration: 4.0
+            )
+        }
+    }
+
+    private func buildSwiftObjectDeleteOperations(containerName: String, objectNames: [String]) async -> [PlannedOperation] {
+        return objectNames.enumerated().map { (index, name) in
+            PlannedOperation(
+                id: "swift-object-delete-\(index)",
+                type: .swiftObject,
+                action: .delete,
+                resourceIdentifier: "\(containerName)/\(name)",
+                dependencies: [],
+                estimatedDuration: 2.0
             )
         }
     }

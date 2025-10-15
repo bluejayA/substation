@@ -53,7 +53,7 @@ struct VolumeSnapshotManagementForm {
             "source_volume_id": volume.id,
             "source_volume_name": volumeName,
             "snapshot_created_by": "substation",
-            "snapshot_created_at": ISO8601DateFormatter().string(from: Date())
+            "snapshot_created_at": Date().iso8601Formatted()
         ]
 
         if !snapshotDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

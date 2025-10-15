@@ -882,6 +882,55 @@ public actor OpenStackClientCore {
         return try await performRawRequest(request: request, expected: expected)
     }
 
+    public func requestWithHeaders(
+        service: String,
+        method: String,
+        path: String,
+        body: Data? = nil,
+        headers: [String: String]? = nil,
+        expected: Int
+    ) async throws -> (data: Data, headers: [String: String]) {
+        let token = try await ensureAuthenticated()
+
+        guard let baseURL = serviceCatalog[service] else {
+            throw OpenStackError.endpointNotFound(service: service)
+        }
+
+        let url: URL
+        if path.contains("?") {
+            let pathParts = path.split(separator: "?", maxSplits: 1)
+            let pathComponent = String(pathParts[0])
+            let queryString = pathParts.count > 1 ? String(pathParts[1]) : ""
+            var components = URLComponents(url: baseURL.appendingPathComponent(pathComponent), resolvingAgainstBaseURL: false)!
+            components.percentEncodedQuery = queryString
+            url = components.url!
+        } else {
+            url = baseURL.appendingPathComponent(path)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue(token, forHTTPHeaderField: "X-Auth-Token")
+
+        // Get optimal microversion headers for this service
+        let microversionHeaders = await microversionManager.getVersionHeaders(for: service)
+        for (key, value) in microversionHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        // Add custom headers (these can override microversion headers if needed)
+        if let headers = headers {
+            for (key, value) in headers {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
+        }
+
+        if let body = body {
+            request.httpBody = body
+        }
+
+        return try await performRawRequestWithHeaders(request: request, expected: expected)
+    }
+
     /// Get endpoint URL for a service
     public func getEndpoint(for service: String) async throws -> String {
         guard let baseURL = serviceCatalog[service] else {
@@ -964,6 +1013,19 @@ public actor OpenStackClientCore {
             } catch {
                 lastError = error
 
+                // Don't retry on certain client errors (4xx) that won't be fixed by retrying
+                // 404 Not Found: Resource doesn't exist, won't change on retry
+                // 400 Bad Request: Malformed request, won't change on retry
+                // 409 Conflict: Resource state conflict, won't change on retry
+                // But DO retry: 401 (token expiration), 403 (may be transient), 429 (rate limit)
+                let nonRetriableClientErrors: Set<Int> = [400, 404, 409]
+                if let httpError = error as? OpenStackError,
+                   case .httpError(let statusCode, _) = httpError,
+                   nonRetriableClientErrors.contains(statusCode) {
+                    // Client error that shouldn't be retried - throw immediately
+                    throw error
+                }
+
                 if attempt < config.retryPolicy.maxAttempts {
                     let delay = config.retryPolicy.delay(for: attempt)
                     logger.logInfo("Retrying request due to error", context: [
@@ -1037,6 +1099,113 @@ public actor OpenStackClientCore {
 
             } catch {
                 lastError = error
+
+                // Don't retry on certain client errors (4xx) that won't be fixed by retrying
+                // 404 Not Found: Resource doesn't exist, won't change on retry
+                // 400 Bad Request: Malformed request, won't change on retry
+                // 409 Conflict: Resource state conflict, won't change on retry
+                // But DO retry: 401 (token expiration), 403 (may be transient), 429 (rate limit)
+                let nonRetriableClientErrors: Set<Int> = [400, 404, 409]
+                if let httpError = error as? OpenStackError,
+                   case .httpError(let statusCode, _) = httpError,
+                   nonRetriableClientErrors.contains(statusCode) {
+                    // Client error that shouldn't be retried - throw immediately
+                    throw error
+                }
+
+                if attempt < config.retryPolicy.maxAttempts {
+                    let delay = config.retryPolicy.delay(for: attempt)
+                    logger.logInfo("Retrying request due to error", context: [
+                        "attempt": attempt,
+                        "error": error.localizedDescription,
+                        "delay": delay
+                    ])
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    continue
+                }
+
+                throw OpenStackError.networkError(error)
+            }
+        }
+
+        throw lastError ?? OpenStackError.unexpectedResponse
+    }
+
+    private func performRawRequestWithHeaders(request: URLRequest, expected: Int) async throws -> (data: Data, headers: [String: String]) {
+        var lastError: (any Error)?
+
+        for attempt in 1...config.retryPolicy.maxAttempts {
+            let startTime = Date()
+
+            do {
+                // Check if task was cancelled before making request
+                try Task.checkCancellation()
+
+                let (data, response) = try await urlSession.data(for: request)
+                let duration = Date().timeIntervalSince(startTime)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw OpenStackError.unexpectedResponse
+                }
+
+                logger.logAPICall(
+                    request.httpMethod ?? "GET",
+                    url: request.url?.absoluteString ?? "",
+                    statusCode: httpResponse.statusCode,
+                    duration: duration
+                )
+
+                if httpResponse.statusCode == expected {
+                    // Extract all HTTP headers
+                    var headers: [String: String] = [:]
+                    for (key, value) in httpResponse.allHeaderFields {
+                        if let keyString = key as? String, let valueString = value as? String {
+                            headers[keyString] = valueString
+                        }
+                    }
+                    return (data, headers)
+                }
+
+                if config.retryPolicy.retryStatusCodes.contains(httpResponse.statusCode) && attempt < config.retryPolicy.maxAttempts {
+                    let delay = config.retryPolicy.delay(for: attempt)
+                    logger.logInfo("Retrying request", context: [
+                        "attempt": attempt,
+                        "statusCode": httpResponse.statusCode,
+                        "delay": delay
+                    ])
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    continue
+                }
+
+                // Log error response body for debugging and extract error message
+                var errorMessage: String? = nil
+                if let errorBody = String(data: data, encoding: .utf8) {
+                    logger.logDebug("API Error Response", context: [
+                        "statusCode": httpResponse.statusCode,
+                        "body": errorBody
+                    ])
+
+                    // Try to parse OpenStack error response
+                    errorMessage = parseOpenStackError(from: data)
+                }
+
+                throw OpenStackError.httpError(httpResponse.statusCode, errorMessage)
+
+            } catch {
+                lastError = error
+
+                // Don't retry on certain client errors (4xx) that won't be fixed by retrying
+                // 404 Not Found: Resource doesn't exist, won't change on retry
+                // 400 Bad Request: Malformed request, won't change on retry
+                // 409 Conflict: Resource state conflict, won't change on retry
+                // But DO retry: 401 (token expiration), 403 (may be transient), 429 (rate limit)
+                let nonRetriableClientErrors: Set<Int> = [400, 404, 409]
+                if let httpError = error as? OpenStackError,
+                   case .httpError(let statusCode, _) = httpError,
+                   nonRetriableClientErrors.contains(statusCode) {
+                    // Client error that shouldn't be retried - throw immediately
+                    throw error
+                }
 
                 if attempt < config.retryPolicy.maxAttempts {
                     let delay = config.retryPolicy.delay(for: attempt)

@@ -221,16 +221,12 @@ struct SubnetViews {
         }
 
         // Timestamps Section
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-
         var timestampItems: [DetailItem?] = []
         if let created = subnet.createdAt {
-            timestampItems.append(.field(label: "Created", value: formatter.string(from: created), style: .secondary))
+            timestampItems.append(.field(label: "Created", value: created.mediumFormatted(), style: .secondary))
         }
         if let updated = subnet.updatedAt {
-            timestampItems.append(.field(label: "Updated", value: formatter.string(from: updated), style: .secondary))
+            timestampItems.append(.field(label: "Updated", value: updated.mediumFormatted(), style: .secondary))
         }
 
         if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {

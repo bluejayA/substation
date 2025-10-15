@@ -148,10 +148,6 @@ struct BarbicanViews {
 
         // Expiration Information Section - Enhanced!
         if let expiration = secret.expiration {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-
             let now = Date()
             let isExpired = expiration < now
             let timeInterval = expiration.timeIntervalSince(now)
@@ -160,7 +156,7 @@ struct BarbicanViews {
 
             if isExpired {
                 expirationItems.append(.field(label: "Status", value: "EXPIRED", style: .error))
-                expirationItems.append(.field(label: "Expired At", value: formatter.string(from: expiration), style: .error))
+                expirationItems.append(.field(label: "Expired At", value: expiration.mediumFormatted(), style: .error))
 
                 // Calculate how long ago it expired
                 let daysExpired = Int(-timeInterval / 86400)
@@ -169,7 +165,7 @@ struct BarbicanViews {
                 }
             } else {
                 expirationItems.append(.field(label: "Status", value: "Active", style: .success))
-                expirationItems.append(.field(label: "Expires At", value: formatter.string(from: expiration), style: .secondary))
+                expirationItems.append(.field(label: "Expires At", value: expiration.mediumFormatted(), style: .secondary))
 
                 // Calculate time until expiration
                 let daysUntilExpiration = Int(timeInterval / 86400)
@@ -194,16 +190,12 @@ struct BarbicanViews {
         }
 
         // Timestamps Section
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-
         var timestampItems: [DetailItem?] = []
         if let created = secret.created {
-            timestampItems.append(.field(label: "Created", value: formatter.string(from: created), style: .secondary))
+            timestampItems.append(.field(label: "Created", value: created.mediumFormatted(), style: .secondary))
         }
         if let updated = secret.updated {
-            timestampItems.append(.field(label: "Updated", value: formatter.string(from: updated), style: .secondary))
+            timestampItems.append(.field(label: "Updated", value: updated.mediumFormatted(), style: .secondary))
         }
 
         if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
@@ -651,10 +643,7 @@ struct BarbicanViews {
 
         let currentDate = form.getExpirationDate()
         if let date = currentDate {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            components.append(Text("Preview: \(formatter.string(from: date))").success())
+            components.append(Text("Preview: \(date.mediumFormatted())").success())
         } else {
             components.append(Text("Invalid date combination").error())
         }

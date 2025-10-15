@@ -115,7 +115,8 @@ struct SidebarView {
         case .serverCreate, .serverGroupCreate, .networkCreate, .securityGroupCreate,
              .subnetCreate, .volumeCreate, .portCreate, .routerCreate, .floatingIPCreate,
              .keyPairCreate, .barbicanSecretCreate, .barbicanContainerCreate,
-             .octaviaLoadBalancerCreate, .swiftContainerCreate, .swiftUpload:
+             .octaviaLoadBalancerCreate, .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload,
+             .swiftObjectDownload, .swiftContainerMetadata, .swiftObjectMetadata:
             return false
         case .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement,
              .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement,

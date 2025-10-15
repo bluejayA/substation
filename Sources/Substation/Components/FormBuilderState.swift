@@ -657,6 +657,10 @@ struct FormBuilderState {
         return nil
     }
 
+    func getCheckboxValue(_ fieldId: String) -> Bool? {
+        return checkboxStates[fieldId]?.isChecked
+    }
+
     func getSelectedOptionId(_ fieldId: String) -> String? {
         guard let field = fields.first(where: { $0.id == fieldId }) else { return nil }
         if case .select(let selectField) = field {

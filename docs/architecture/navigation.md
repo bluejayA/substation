@@ -866,5 +866,4 @@ func rankedMatches(for query: String, limit: Int? = 10) -> [...] {
 
 ## References
 
-- [SwiftTUI Documentation](https://github.com/rensbreur/SwiftTUI)
 - [Swift 6.1 Documentation](https://swift.org/documentation/)

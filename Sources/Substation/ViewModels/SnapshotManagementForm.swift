@@ -53,7 +53,7 @@ struct SnapshotManagementForm {
             "source_server_id": server.id,
             "source_server_name": serverName,
             "snapshot_created_by": "substation",
-            "snapshot_created_at": ISO8601DateFormatter().string(from: Date())
+            "snapshot_created_at": Date().iso8601Formatted()
         ]
 
         if !snapshotDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

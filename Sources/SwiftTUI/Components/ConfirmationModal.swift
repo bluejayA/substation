@@ -36,7 +36,7 @@ public struct ConfirmationModal {
 
         // Calculate modal dimensions based on content
         let modalWidth: Int32 = min(60, screenCols - 4)
-        let baseHeight: Int32 = 7
+        let baseHeight: Int32 = 8  // Increased for better spacing
         let detailsHeight = min(Int32(details.count), 10)
         let modalHeight = baseHeight + detailsHeight
         let modalX = (screenCols - modalWidth) / 2
@@ -55,10 +55,10 @@ public struct ConfirmationModal {
 
         // Draw message (word-wrapped if needed)
         var currentY = modalY + 3
-        let messageMaxWidth = Int(modalWidth - 4)
+        let messageMaxWidth = Int(modalWidth - 6)  // More padding for message
         let wrappedLines = wordWrap(message, maxWidth: messageMaxWidth)
         for (index, line) in wrappedLines.prefix(2).enumerated() {
-            let lineX = modalX + 2
+            let lineX = modalX + 3  // More left padding
             let lineY = currentY + Int32(index)
             await surface.draw(at: Position(x: lineX, y: lineY), text: line, style: .primary)
         }
@@ -67,10 +67,11 @@ public struct ConfirmationModal {
         // Draw details if provided
         if !details.isEmpty {
             currentY += 1
+            let detailMaxWidth = Int(modalWidth - 10)  // Account for "  - " prefix and padding
             for (index, detail) in details.prefix(10).enumerated() {
-                let lineX = modalX + 2
+                let lineX = modalX + 3  // More left padding
                 let lineY = currentY + Int32(index)
-                let truncatedDetail = truncateString(detail, maxWidth: messageMaxWidth)
+                let truncatedDetail = truncateString(detail, maxWidth: detailMaxWidth)
                 await surface.draw(at: Position(x: lineX, y: lineY), text: "  - \(truncatedDetail)", style: .secondary)
             }
             currentY += Int32(min(details.count, 10))

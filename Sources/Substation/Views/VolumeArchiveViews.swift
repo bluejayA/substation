@@ -305,9 +305,7 @@ struct VolumeArchiveViews {
         // Created date (formatted)
         let createdText: String
         if let created = archive.createdAt {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm"
-            createdText = formatter.string(from: created)
+            createdText = created.compactFormatted()
         } else {
             createdText = "N/A"
         }

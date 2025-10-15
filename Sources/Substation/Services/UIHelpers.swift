@@ -956,6 +956,114 @@ final class UIHelpers {
         }
     }
 
+    internal func showConsoleDialog(console: RemoteConsole, serverName: String, screen: OpaquePointer?) async {
+        // Disable nodelay for dialog interaction
+        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        defer {
+            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+        }
+
+        // Calculate main panel dimensions (matching MainPanelView layout)
+        let sidebarWidth: Int32 = 20
+        let mainStartCol: Int32 = sidebarWidth > 0 ? sidebarWidth + 1 : 0
+        let mainWidth = max(10, screenCols - mainStartCol - 1)
+        let mainStartRow: Int32 = 2
+        let bottomReserved: Int32 = 3
+        let mainHeight = max(5, screenRows - mainStartRow - bottomReserved)
+
+        while true {
+            // Draw the full UI to maintain context
+            await tui.draw(screen: screen)
+
+            // Draw console information in main panel area
+            var row: Int32 = mainStartRow
+
+            let title = "Server Console: \(serverName)"
+            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: title, color: .accent)
+            row += 2
+
+            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Protocol: \(console.protocol)", color: .info)
+            row += 1
+
+            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Type: \(console.type)", color: .info)
+            row += 2
+
+            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Console URL:", color: .accent)
+            row += 1
+
+            // Word wrap the URL to fit in main panel
+            let url = console.url
+            let contentWidth = Int(mainWidth - 2)
+            let urlLines = wrapText(url, maxWidth: contentWidth)
+            for line in urlLines {
+                if row < mainStartRow + mainHeight - 3 {
+                    SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: line, color: .success)
+                    row += 1
+                }
+            }
+
+            // Draw help text at bottom of main panel
+            row = mainStartRow + mainHeight - 2
+            let helpText: String
+            if console.type.lowercased() == "novnc" {
+                helpText = "Press O to open in browser, ESC to close"
+            } else {
+                helpText = "Press ESC to close"
+            }
+            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: helpText, color: .warning)
+
+            SwiftTUI.batchedRefresh(WindowHandle(screen))
+
+            let ch = SwiftTUI.getInput(WindowHandle(screen))
+
+            switch ch {
+            case Int32(27): // ESC - Close dialog
+                return
+            case Int32(79), Int32(111): // 'O' or 'o' - Open in browser
+                if console.type.lowercased() == "novnc" {
+                    await openURLInBrowser(console.url)
+                    tui.statusMessage = "Opening console in default browser..."
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    private func wrapText(_ text: String, maxWidth: Int) -> [String] {
+        var lines: [String] = []
+        var currentLine = ""
+
+        for char in text {
+            if currentLine.count >= maxWidth {
+                lines.append(currentLine)
+                currentLine = String(char)
+            } else {
+                currentLine.append(char)
+            }
+        }
+
+        if !currentLine.isEmpty {
+            lines.append(currentLine)
+        }
+
+        return lines
+    }
+
+    private func openURLInBrowser(_ url: String) async {
+        #if os(macOS)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [url]
+        try? process.run()
+        #elseif os(Linux)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xdg-open")
+        process.arguments = [url]
+        try? process.run()
+        #endif
+    }
+
     internal func performSubnetRouterManagement() async {
         guard let selectedId = selectedRouterId else {
             statusMessage = "No router selected for subnet \(attachmentMode == .attach ? "attachment" : "detachment")"

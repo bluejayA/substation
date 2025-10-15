@@ -23,6 +23,12 @@ public actor MicroversionManager {
 
     /// Get the optimal microversion headers for a service
     public func getVersionHeaders(for service: String) async -> [String: String] {
+        // Skip microversion detection for object-store (Swift)
+        // Swift does not use microversions
+        if service == "object-store" {
+            return [:]
+        }
+
         // Try to get cached version info first
         if let versionInfo = detectedVersions[service] {
             return versionInfo.headers
@@ -86,8 +92,26 @@ public actor MicroversionManager {
             throw OpenStackError.invalidURL(baseURL)
         }
 
-        // Most OpenStack services expose version info at the root endpoint
-        let versionURL = url.appendingPathComponent("/")
+        // For version discovery, we need to query the root of the service
+        // Strip the version path and project ID from the URL to get the service root
+        // E.g., http://example.com:8776/v3/abc123 -> http://example.com:8776/
+        var pathComponents = url.pathComponents.filter { $0 != "/" }
+
+        // Remove version components (v1, v2, v3, etc.) and anything after them
+        if let versionIndex = pathComponents.firstIndex(where: { $0.starts(with: "v") && $0.dropFirst().first?.isNumber == true }) {
+            pathComponents = Array(pathComponents.prefix(upTo: versionIndex))
+        }
+
+        // Reconstruct URL with scheme, host, port, and cleaned path
+        var components = URLComponents()
+        components.scheme = url.scheme
+        components.host = url.host
+        components.port = url.port
+        components.path = "/" + pathComponents.joined(separator: "/")
+
+        guard let versionURL = components.url else {
+            throw OpenStackError.invalidURL(baseURL)
+        }
 
         var request = URLRequest(url: versionURL)
         request.httpMethod = "GET"

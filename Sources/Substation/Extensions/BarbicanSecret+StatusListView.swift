@@ -43,10 +43,7 @@ extension BarbicanViews {
                     width: 16,
                     getValue: { secret in
                         if let created = secret.created {
-                            let formatter = DateFormatter()
-                            formatter.dateStyle = .short
-                            formatter.timeStyle = .short
-                            return formatter.string(from: created)
+                            return created.shortFormatted()
                         }
                         return "Unknown"
                     }
@@ -56,10 +53,7 @@ extension BarbicanViews {
                     width: 16,
                     getValue: { secret in
                         if let expiration = secret.expiration {
-                            let formatter = DateFormatter()
-                            formatter.dateStyle = .short
-                            formatter.timeStyle = .short
-                            return formatter.string(from: expiration)
+                            return expiration.shortFormatted()
                         }
                         return "Never"
                     },

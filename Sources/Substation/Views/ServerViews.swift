@@ -350,22 +350,18 @@ struct ServerViews {
         }
 
         // Timestamps Section
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-
         var timestampItems: [DetailItem?] = []
         if let created = server.createdAt {
-            timestampItems.append(.field(label: "Created", value: formatter.string(from: created), style: .secondary))
+            timestampItems.append(.field(label: "Created", value: created.mediumFormatted(), style: .secondary))
         }
         if let updated = server.updatedAt {
-            timestampItems.append(.field(label: "Updated", value: formatter.string(from: updated), style: .secondary))
+            timestampItems.append(.field(label: "Updated", value: updated.mediumFormatted(), style: .secondary))
         }
         if let launched = server.launchedAt {
-            timestampItems.append(.field(label: "Launched At", value: formatter.string(from: launched), style: .secondary))
+            timestampItems.append(.field(label: "Launched At", value: launched.mediumFormatted(), style: .secondary))
         }
         if let terminated = server.terminatedAt {
-            timestampItems.append(.field(label: "Terminated At", value: formatter.string(from: terminated), style: .secondary))
+            timestampItems.append(.field(label: "Terminated At", value: terminated.mediumFormatted(), style: .secondary))
         }
 
         if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
@@ -378,7 +374,7 @@ struct ServerViews {
             faultItems.append(.field(label: "Code", value: String(fault.code), style: .error))
             faultItems.append(.field(label: "Message", value: fault.message, style: .error))
             if let created = fault.created {
-                faultItems.append(.field(label: "Created", value: formatter.string(from: created), style: .error))
+                faultItems.append(.field(label: "Created", value: created.mediumFormatted(), style: .error))
             }
             sections.append(DetailSection(title: "Fault Information", items: faultItems, titleStyle: .error))
         }
@@ -1012,5 +1008,53 @@ struct ServerViews {
         case scrollDown
         case nextPage
         case previousPage
+    }
+
+    // MARK: - Server Console View
+
+    @MainActor
+    static func drawServerConsole(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                 width: Int32, height: Int32, console: RemoteConsole,
+                                 serverName: String, scrollOffset: Int = 0) async {
+
+        var sections: [DetailSection] = []
+
+        // Console Information Section
+        var consoleItems: [DetailItem] = []
+        consoleItems.append(.field(label: "Server", value: serverName, style: .accent))
+        consoleItems.append(.field(label: "Protocol", value: console.protocol, style: .info))
+        consoleItems.append(.field(label: "Type", value: console.type, style: .info))
+
+        sections.append(DetailSection(title: "Console Information", items: consoleItems))
+
+        // Console URL Section
+        var urlItems: [DetailItem] = []
+        urlItems.append(.field(label: "URL", value: console.url, style: .success))
+
+        sections.append(DetailSection(title: "Console URL", items: urlItems))
+
+        // Instructions Section
+        var instructionItems: [DetailItem] = []
+        if console.type.lowercased() == "novnc" {
+            instructionItems.append(.field(label: "", value: "Press 'SHIFT-O' again to open the console-URL in your default web browser."))
+            instructionItems.append(.spacer)
+            instructionItems.append(.field(label: "", value: "The URL contains an authentication token that expires after a period of time."))
+        } else {
+            instructionItems.append(.field(label: "", value: "Copy the URL above to access the console."))
+            instructionItems.append(.spacer)
+            instructionItems.append(.field(label: "", value: "The URL contains an authentication token that expires after a period of time."))
+        }
+
+        sections.append(DetailSection(title: "Instructions", items: instructionItems))
+
+        // Render detail view
+        let detailView = DetailView(title: "", sections: sections)
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
     }
 }

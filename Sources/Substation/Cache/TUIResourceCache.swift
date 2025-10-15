@@ -109,9 +109,16 @@ final class TUIResourceCache {
         set { Task { await resourceCache.setSwiftContainers(newValue) } }
     }
 
-    var swiftObjects: [SwiftObject]? {
-        get { resourceCache.swiftObjects }
-        set { Task { await resourceCache.setSwiftObjects(newValue) } }
+    var swiftObjectsByContainer: [String: [SwiftObject]] {
+        return resourceCache.swiftObjectsByContainer
+    }
+
+    func getSwiftObjects(forContainer containerName: String) -> [SwiftObject]? {
+        return resourceCache.getSwiftObjects(forContainer: containerName)
+    }
+
+    func setSwiftObjects(_ objects: [SwiftObject], forContainer containerName: String) async {
+        await resourceCache.setSwiftObjects(objects, forContainer: containerName)
     }
 
     var volumeSnapshots: [VolumeSnapshot] {

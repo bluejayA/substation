@@ -80,6 +80,7 @@ final class TUI {
     internal var quotaScrollOffset = 0   // For scrolling within quota panel on dashboard
     internal var selectedIndex = 0  // Currently selected item in lists
     internal var selectedResource: Any? = nil  // The selected resource for detail view
+    internal var previousSelectedResourceName: String? = nil  // Name of the resource before transitioning to a sub-view
     internal var selectedServers: Set<String> = Set<String>()  // Selected server IDs for network attachment
     internal var attachedServerIds: Set<String> = Set<String>()  // Server IDs that have the selected resource attached
     internal var attachmentMode: AttachmentMode = .attach  // Current attachment mode (attach/detach)
@@ -111,6 +112,20 @@ final class TUI {
 
     // Health Dashboard navigation state
     internal lazy var healthDashboardNavState: HealthDashboardView.NavigationState = HealthDashboardView.NavigationState()
+
+    // Swift navigation state for hierarchical object storage browsing
+    internal lazy var swiftNavState: SwiftNavigationState = SwiftNavigationState()
+
+    // Background operations tracking
+    internal lazy var swiftBackgroundOps: SwiftBackgroundOperationsManager = SwiftBackgroundOperationsManager()
+
+    // Active upload tracking (for status bar display)
+    internal var activeUploadMessage: String? = nil
+    internal var activeUploadTask: Task<Void, Never>? = nil
+
+    // Active download tracking (for status bar display)
+    internal var activeDownloadMessage: String? = nil
+    internal var activeDownloadTask: Task<Void, Never>? = nil
 
     // Telemetry actor for health monitoring
     internal func getTelemetryActor() async -> TelemetryActor? {
@@ -240,8 +255,21 @@ final class TUI {
         set { Task { await resourceCache.setSwiftContainers(newValue) } }
     }
     internal var cachedSwiftObjects: [SwiftObject]? {
-        get { resourceCache.swiftObjects }
-        set { Task { await resourceCache.setSwiftObjects(newValue) } }
+        get {
+            // Use navigation state instead of selectedResource to avoid race conditions
+            guard let containerName = swiftNavState.currentContainer else {
+                return nil
+            }
+            return resourceCache.getSwiftObjects(forContainer: containerName)
+        }
+        set {
+            // Use navigation state instead of selectedResource
+            guard let containerName = swiftNavState.currentContainer,
+                  let objects = newValue else {
+                return
+            }
+            Task { await resourceCache.setSwiftObjects(objects, forContainer: containerName) }
+        }
     }
 
     // Cached flavor recommendations for all workload types
@@ -365,6 +393,40 @@ final class TUI {
     // Barbican secret creation form state
     internal var barbicanSecretCreateForm = BarbicanSecretCreateForm()
     internal var barbicanSecretCreateFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container creation form state
+    internal var swiftContainerCreateForm = SwiftContainerCreateForm()
+    internal var swiftContainerCreateFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container metadata form state
+    internal var swiftContainerMetadataForm = SwiftContainerMetadataForm()
+    internal var swiftContainerMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container web access form state
+    internal var swiftContainerWebAccessForm = SwiftContainerWebAccessForm()
+    internal var swiftContainerWebAccessFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift object metadata form state
+    internal var swiftObjectMetadataForm = SwiftObjectMetadataForm()
+    internal var swiftObjectMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift directory metadata form state
+    internal var swiftDirectoryMetadataForm = SwiftDirectoryMetadataForm()
+    internal var swiftDirectoryMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift object upload form state
+    internal var swiftObjectUploadForm = SwiftObjectUploadForm()
+    internal var swiftObjectUploadFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container download form state
+    internal var swiftContainerDownloadForm = SwiftContainerDownloadForm()
+    internal var swiftContainerDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift object download form state
+    internal var swiftObjectDownloadForm = SwiftObjectDownloadForm()
+    internal var swiftObjectDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
+    internal var swiftDirectoryDownloadForm = SwiftDirectoryDownloadForm()
+    internal var swiftDirectoryDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
 
     // Debug mode flag
     private var debugMode: Bool = false
@@ -978,6 +1040,8 @@ final class TUI {
         case .subnets: return cachedSubnets.count
         case .serverGroups: return cachedServerGroups.count
         case .barbicanSecrets: return cachedSecrets.count
+        case .swift: return cachedSwiftContainers.count
+        case .swiftContainerDetail: return cachedSwiftObjects?.count ?? 0
         default: return 0
         }
     }
@@ -1016,8 +1080,11 @@ final class TUI {
             cachedSecrets: cachedSecrets,
             cachedVolumeSnapshots: cachedVolumeSnapshots,
             cachedVolumeBackups: cachedVolumeBackups,
+            cachedSwiftContainers: cachedSwiftContainers,
+            cachedSwiftObjects: cachedSwiftObjects,
             searchQuery: searchQuery,
-            resourceResolver: resourceResolver
+            resourceResolver: resourceResolver,
+            swiftNavState: swiftNavState
         )
     }
 
@@ -1163,6 +1230,12 @@ final class TUI {
                     Logger.shared.logInfo("Loading images data on view change")
                     await dataManager.refreshImageData()
                 }
+            case .swiftContainerDetail:
+                // Load objects for the selected container using navigation state
+                if let containerName = swiftNavState.currentContainer {
+                    Logger.shared.logInfo("Loading Swift objects for container: \(containerName)")
+                    await dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
+                }
             default:
                 break
             }
@@ -1290,6 +1363,24 @@ final class TUI {
 
             filteredResources = archives
             targetDetailView = .volumeArchiveDetail
+        case .swift:
+            // Filter Swift containers based on search query
+            let filteredContainers = searchQuery?.isEmpty ?? true ? cachedSwiftContainers : cachedSwiftContainers.filter { container in
+                container.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
+            }
+            filteredResources = filteredContainers
+            targetDetailView = .swiftContainerDetail
+        case .swiftContainerDetail:
+            // When in container detail view, navigating opens object detail
+            if let objects = cachedSwiftObjects {
+                let filteredObjects = searchQuery?.isEmpty ?? true ? objects : objects.filter { object in
+                    object.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
+                }
+                filteredResources = filteredObjects
+                targetDetailView = .swiftObjectDetail
+            } else {
+                return
+            }
         default:
             return // No detail view available for this view type
         }
@@ -1446,6 +1537,16 @@ final class TUI {
         // Handle scroll optimization if available
         if let scrollOpt = renderPlan.scrollOptimization {
             Logger.shared.logDebug("Applied scroll optimization: rows \(scrollOpt.startRow)-\(scrollOpt.endRow)")
+        }
+
+        // Render modal overlay if active
+        if let modal = userFeedback.currentModal {
+            let start = Date()
+            let surface = SwiftTUI.surface(from: screen)
+            let modalBounds = Rect(x: 0, y: 0, width: screenCols, height: screenRows)
+            let modalComponent = ModalView(modal: modal)
+            await SwiftTUI.render(modalComponent, on: surface, in: modalBounds)
+            componentTimings["modal"] = Date().timeIntervalSince(start)
         }
 
         // Batched refresh: updates virtual screen then flushes once (reduces syscalls)

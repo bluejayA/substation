@@ -721,6 +721,48 @@ public struct GetConsoleOutputDetails: Codable, Sendable {
     }
 }
 
+public struct RemoteConsoleRequest: Codable, Sendable {
+    public let remoteConsole: RemoteConsoleDetails
+
+    enum CodingKeys: String, CodingKey {
+        case remoteConsole = "remote_console"
+    }
+
+    public init(protocol: String, type: String) {
+        self.remoteConsole = RemoteConsoleDetails(protocol: `protocol`, type: type)
+    }
+}
+
+public struct RemoteConsoleDetails: Codable, Sendable {
+    public let `protocol`: String
+    public let type: String
+
+    public init(protocol: String, type: String) {
+        self.`protocol` = `protocol`
+        self.type = type
+    }
+}
+
+public struct RemoteConsoleResponse: Codable, Sendable {
+    public let remoteConsole: RemoteConsole
+
+    enum CodingKeys: String, CodingKey {
+        case remoteConsole = "remote_console"
+    }
+}
+
+public struct RemoteConsole: Codable, Sendable {
+    public let `protocol`: String
+    public let type: String
+    public let url: String
+
+    public init(protocol: String, type: String, url: String) {
+        self.`protocol` = `protocol`
+        self.type = type
+        self.url = url
+    }
+}
+
 public struct CreateKeyPairRequest: Codable, Sendable {
     public let name: String
     public let publicKey: String?

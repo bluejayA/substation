@@ -37,6 +37,12 @@ struct StatusBarView {
             statusComponents.append("CMD")
         }
 
+        // TODO: Add upload status when upload coordination is implemented
+        // let uploadCounts = await tui.dataManager.getUploadCounts()
+        // if uploadCounts.active > 0 || uploadCounts.queued > 0 {
+        //     statusComponents.append("Uploads: \(uploadCounts.active) active, \(uploadCounts.queued) queued")
+        // }
+
         // Check for active progress indicators
         let activeOperations = tui.progressIndicator.activeOperations
         if !activeOperations.isEmpty {
@@ -56,6 +62,18 @@ struct StatusBarView {
                 let fullStatus = buildFullStatus(components: statusComponents, mainText: loadingText)
                 return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
             }
+        }
+
+        // Show active upload message if present
+        if let uploadMsg = tui.activeUploadMessage {
+            let fullStatus = buildFullStatus(components: statusComponents, mainText: uploadMsg)
+            return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
+        }
+
+        // Show active download message if present
+        if let downloadMsg = tui.activeDownloadMessage {
+            let fullStatus = buildFullStatus(components: statusComponents, mainText: downloadMsg)
+            return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
         }
 
         // Show regular status message or ready state

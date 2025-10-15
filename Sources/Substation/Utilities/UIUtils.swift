@@ -15,7 +15,7 @@ struct UIUtils {
         case .dashboard:
             return "\(dashboardCommands)"
         case .servers:
-            return "\(baseCommands) SPACE:details C:create P:snapshot R:restart Z:resize S:start T:stop L:logs DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create P:snapshot R:restart Z:resize S:start T:stop L:logs O:console DELETE:delete /:search ESC:back"
         case .networks:
             return "\(baseCommands) SPACE:details C:create A:attach/detach DELETE:delete /:search ESC:back"
         case .volumes:
@@ -40,6 +40,8 @@ struct UIUtils {
             return "^c:quit UP/DOWN:navigate a:auto-refresh SPACE:service-details ESC:back ?:help"
         case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .floatingIPDetail, .routerDetail, .healthDashboardServiceDetail:
             return "\(baseCommands) ESC:back"
+        case .serverConsole:
+            return "\(baseCommands) O:open-browser ESC:back"
         case .serverResize:
             return "\(baseCommands) ENTER:select ESC:back"
         case .serverCreate:
@@ -103,7 +105,7 @@ struct UIUtils {
         case .octavia:
             return "\(baseCommands) SPACE:details C:create /:search ESC:back"
         case .swift:
-            return "\(baseCommands) SPACE:details C:create /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create U:upload D:download M:metadata W:web-access DELETE:delete /:search ESC:back"
         case .barbicanSecretDetail:
             return "\(baseCommands) ESC:back"
         case .barbicanContainerDetail:
@@ -111,9 +113,11 @@ struct UIUtils {
         case .octaviaLoadBalancerDetail:
             return "\(baseCommands) ESC:back"
         case .swiftContainerDetail:
-            return "\(baseCommands) ESC:back"
+            return "\(baseCommands) U:upload D:download M:metadata DELETE:delete ESC:back"
         case .swiftObjectDetail:
             return "\(baseCommands) ESC:back"
+        case .swiftBackgroundOperationDetail:
+            return "\(baseCommands) UP/DOWN:scroll DELETE:cancel ESC:back"
         case .barbicanSecretCreate:
             return "\(baseCommands) TAB/UP/DOWN:navigate ENTER:create ESC:cancel"
         case .barbicanContainerCreate:
@@ -122,8 +126,22 @@ struct UIUtils {
             return "\(baseCommands) TAB:navigate ENTER:create ESC:cancel"
         case .swiftContainerCreate:
             return "\(baseCommands) TAB:navigate ENTER:create ESC:cancel"
-        case .swiftUpload:
-            return "\(baseCommands) TAB:navigate ENTER:upload ESC:cancel"
+        case .swiftContainerMetadata:
+            return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
+        case .swiftContainerWebAccess:
+            return "\(baseCommands) TAB:navigate SPACE:toggle ENTER:confirm ESC:cancel"
+        case .swiftObjectMetadata:
+            return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
+        case .swiftDirectoryMetadata:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:apply-to-all ESC:cancel"
+        case .swiftObjectUpload:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:upload ESC:cancel"
+        case .swiftContainerDownload:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:download ESC:cancel"
+        case .swiftObjectDownload:
+            return "\(baseCommands) TAB:navigate SPACE:edit ENTER:download ESC:cancel"
+        case .swiftDirectoryDownload:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:download ESC:cancel"
         case .networkServerAttachment:
             return "\(baseCommands) SPACE:select/deselect ENTER:attach-to-selected ESC:back"
         case .securityGroupServerAttachment:
@@ -146,6 +164,8 @@ struct UIUtils {
             return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
         case .flavorSelection:
             return "\(baseCommands) TAB:switch-mode SPACE:select ENTER:confirm ESC:back"
+        case .swiftBackgroundOperations:
+            return "\(baseCommands) DELETE:cancel C:clear-completed ESC:back"
         }
     }
 
@@ -166,8 +186,11 @@ struct UIUtils {
         cachedSecrets: [Secret] = [],
         cachedVolumeSnapshots: [VolumeSnapshot] = [],
         cachedVolumeBackups: [VolumeBackup] = [],
+        cachedSwiftContainers: [SwiftContainer] = [],
+        cachedSwiftObjects: [SwiftObject]? = nil,
         searchQuery: String?,
-        resourceResolver: ResourceResolver
+        resourceResolver: ResourceResolver,
+        swiftNavState: SwiftNavigationState? = nil
     ) -> Int {
         switch view {
         case .loading:
@@ -216,6 +239,8 @@ struct UIUtils {
             return max(0, ResourceFilters.filterFlavors(cachedFlavors, query: searchQuery).count - 1)
         case .keyPairs:
             return max(0, ResourceFilters.filterKeyPairs(cachedKeyPairs, query: searchQuery).count - 1)
+        case .swiftBackgroundOperations:
+            return 0 // Updated dynamically in draw call
         case .subnets:
             return max(0, FilterUtils.filterSubnets(cachedSubnets, query: searchQuery).count - 1)
         case .ports:
@@ -239,6 +264,27 @@ struct UIUtils {
             // Management views handle their own filtered server counts
             let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
             return max(0, filteredServers.count - 1)
+        case .swift:
+            // Swift container list view
+            let filteredContainers: [SwiftContainer]
+            if let query = searchQuery, !query.isEmpty {
+                filteredContainers = cachedSwiftContainers.filter { $0.name?.localizedCaseInsensitiveContains(query) ?? false }
+            } else {
+                filteredContainers = cachedSwiftContainers
+            }
+            return max(0, filteredContainers.count - 1)
+        case .swiftContainerDetail:
+            // Swift object list view with hierarchical navigation
+            guard let objects = cachedSwiftObjects else { return 0 }
+
+            // Build tree structure from flat objects
+            let currentPath = swiftNavState?.currentPathString ?? ""
+            let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+
+            // Apply search filter if present
+            let filteredItems = SwiftTreeItem.filterItems(treeItems, query: searchQuery?.isEmpty ?? true ? nil : searchQuery)
+
+            return max(0, filteredItems.count - 1)
         default:
             // For detail views and others, no selection
             return 0
