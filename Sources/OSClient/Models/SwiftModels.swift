@@ -231,13 +231,19 @@ public struct CreateSwiftContainerRequest: Sendable {
 public struct UpdateSwiftContainerMetadataRequest: Sendable {
     public let metadata: [String: String]
     public let removeMetadataKeys: [String]
+    public let readACL: String?
+    public let writeACL: String?
 
     public init(
         metadata: [String: String] = [:],
-        removeMetadataKeys: [String] = []
+        removeMetadataKeys: [String] = [],
+        readACL: String? = nil,
+        writeACL: String? = nil
     ) {
         self.metadata = metadata
         self.removeMetadataKeys = removeMetadataKeys
+        self.readACL = readACL
+        self.writeACL = writeACL
     }
 }
 

@@ -52,6 +52,7 @@ Substation is a comprehensive terminal user interface for OpenStack that provide
 - **[Architecture](architecture/index.md)** - System design and patterns
 - **[Performance](performance/index.md)** - Optimization and benchmarks
 - **[Security](concepts/security.md)** - Protection and best practices
+- **[Object Storage](concepts/object-storage.md)** - Swift integration, ETAG optimization, and best practices
 
 ## What You Get
 
@@ -60,6 +61,7 @@ Substation is a comprehensive terminal user interface for OpenStack that provide
 - **Compute (Nova)**: Servers, flavors, keypairs, server groups
 - **Networking (Neutron)**: Networks, subnets, routers, security groups, floating IPs
 - **Storage (Cinder)**: Volumes, snapshots, backups
+- **Object Storage (Swift)**: Containers, objects, bulk transfers with ETAG optimization
 - **Images (Glance)**: OS images and snapshots
 - **Secrets (Barbican)**: Secure credential storage
 

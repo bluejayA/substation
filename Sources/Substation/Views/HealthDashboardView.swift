@@ -430,7 +430,7 @@ struct HealthDashboardView {
         Status: \(healthStatus)
         Response Time: \(responseTimeDisplay) (\(responseTimeColor))
         Health Check: \(status.isHealthy ? "PASSING" : "FAILING")
-        Last Updated: \(DateFormatter.timeOnly.string(from: Date()))
+        Last Updated: \(Date().timeOnlyFormatted())
         \(endpointInfo)
         Connection: \(status.isHealthy ? "Stable" : "Unstable")
         """
@@ -536,7 +536,7 @@ PERFORMANCE METRICS:
 Response Time: \(responseTimeDisplay) (\(responseTimeColor))
 Health Check: \(status.isHealthy ? "PASSING" : "FAILING")
 Connection Status: \(status.isHealthy ? "Stable" : "Unstable")
-Last Updated: \(DateFormatter.timeOnly.string(from: Date()))
+Last Updated: \(Date().timeOnlyFormatted())
 
 \(endpointInfo)
 
@@ -616,7 +616,7 @@ Press [ESC] to close this window
         }
 
         // Header with timestamp
-        let timestamp = DateFormatter.timeOnly.string(from: Date())
+        let timestamp = Date().timeOnlyFormatted()
         let headerText = "SYSTEM HEALTH DASHBOARD - Updated: \(timestamp)"
         components.append(Text(headerText).emphasis().bold().padding(EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0)))
 
@@ -627,7 +627,7 @@ Press [ESC] to close this window
         components.append(Text("").padding(EdgeInsets(top: 0, leading: 0, bottom: 1, trailing: 0))) // Spacer
 
         // Performance Metrics Section - DEBUG VERSION (WORKING)
-        let timestamp2 = DateFormatter.timeOnly.string(from: Date())
+        let timestamp2 = Date().timeOnlyFormatted()
         components.append(Text("RESOURCE OVERVIEW (Updated: \(timestamp2))").primary().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
 
         // Test accessing dataManager and tui safely
@@ -782,7 +782,7 @@ Press [ESC] to close this window
         components.append(Text("BASIC INFORMATION").primary().bold().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
         components.append(Text("Service Name: \(service.name)").secondary().padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0)))
         components.append(Text("Service Type: \(service.type)").secondary().padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 0)))
-        components.append(Text("Last Updated: \(DateFormatter.timeOnly.string(from: service.lastUpdated))").secondary().padding(EdgeInsets(top: 0, leading: 2, bottom: 1, trailing: 0)))
+        components.append(Text("Last Updated: \(service.lastUpdated.timeOnlyFormatted())").secondary().padding(EdgeInsets(top: 0, leading: 2, bottom: 1, trailing: 0)))
 
         // Health status information
         components.append(Text("HEALTH STATUS").primary().bold().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
@@ -890,7 +890,7 @@ Press [ESC] to close this window
         width: Int32
     ) async {
         // Overall Health Score Section with visual indicator
-        let timestamp = DateFormatter.timeOnly.string(from: Date())
+        let timestamp = Date().timeOnlyFormatted()
         components.append(Text("OVERALL SYSTEM HEALTH (Updated: \(timestamp))").primary().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
 
         let overallScoreText = String(format: "Score: %.1f/100", healthScore.overall)
@@ -909,7 +909,7 @@ Press [ESC] to close this window
         width: Int32,
         navigationState: NavigationState?
     ) async {
-        let timestamp = DateFormatter.timeOnly.string(from: Date())
+        let timestamp = Date().timeOnlyFormatted()
 
         // Update the actual alert count in navigation state
         navigationState?.actualAlertCount = alerts.count
@@ -956,7 +956,7 @@ Press [ESC] to close this window
         navigationState: NavigationState?,
         dataManager: DataManager? = nil
     ) async {
-        let timestamp = DateFormatter.timeOnly.string(from: Date())
+        let timestamp = Date().timeOnlyFormatted()
 
         components.append(Text("RESOURCE OVERVIEW (Updated: \(timestamp))").primary().padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)))
 
@@ -1075,7 +1075,7 @@ Press [ESC] to close this window
             navigationState?.cachedServiceStatus = serviceStatus
         }
 
-        let timestamp = DateFormatter.timeOnly.string(from: Date())
+        let timestamp = Date().timeOnlyFormatted()
 
         Logger.shared.logDebug("HealthDashboardView - Retrieved \(serviceStatus.count) services for display")
 

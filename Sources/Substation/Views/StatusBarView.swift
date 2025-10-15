@@ -64,6 +64,18 @@ struct StatusBarView {
             }
         }
 
+        // Show active upload message if present
+        if let uploadMsg = tui.activeUploadMessage {
+            let fullStatus = buildFullStatus(components: statusComponents, mainText: uploadMsg)
+            return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
+        }
+
+        // Show active download message if present
+        if let downloadMsg = tui.activeDownloadMessage {
+            let fullStatus = buildFullStatus(components: statusComponents, mainText: downloadMsg)
+            return ViewUtils.truncateStatusText(fullStatus, maxWidth: maxWidth)
+        }
+
         // Show regular status message or ready state
         if let status = tui.statusMessage {
             let fullStatus = buildFullStatus(components: statusComponents, mainText: status)

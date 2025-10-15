@@ -15,7 +15,7 @@ struct UIUtils {
         case .dashboard:
             return "\(dashboardCommands)"
         case .servers:
-            return "\(baseCommands) SPACE:details C:create P:snapshot R:restart Z:resize S:start T:stop L:logs DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create P:snapshot R:restart Z:resize S:start T:stop L:logs O:console DELETE:delete /:search ESC:back"
         case .networks:
             return "\(baseCommands) SPACE:details C:create A:attach/detach DELETE:delete /:search ESC:back"
         case .volumes:
@@ -40,6 +40,8 @@ struct UIUtils {
             return "^c:quit UP/DOWN:navigate a:auto-refresh SPACE:service-details ESC:back ?:help"
         case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .floatingIPDetail, .routerDetail, .healthDashboardServiceDetail:
             return "\(baseCommands) ESC:back"
+        case .serverConsole:
+            return "\(baseCommands) O:open-browser ESC:back"
         case .serverResize:
             return "\(baseCommands) ENTER:select ESC:back"
         case .serverCreate:
@@ -103,7 +105,7 @@ struct UIUtils {
         case .octavia:
             return "\(baseCommands) SPACE:details C:create /:search ESC:back"
         case .swift:
-            return "\(baseCommands) SPACE:details C:create U:upload D:download M:metadata DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create U:upload D:download M:metadata W:web-access DELETE:delete /:search ESC:back"
         case .barbicanSecretDetail:
             return "\(baseCommands) ESC:back"
         case .barbicanContainerDetail:
@@ -114,6 +116,8 @@ struct UIUtils {
             return "\(baseCommands) U:upload D:download M:metadata DELETE:delete ESC:back"
         case .swiftObjectDetail:
             return "\(baseCommands) ESC:back"
+        case .swiftBackgroundOperationDetail:
+            return "\(baseCommands) UP/DOWN:scroll DELETE:cancel ESC:back"
         case .barbicanSecretCreate:
             return "\(baseCommands) TAB/UP/DOWN:navigate ENTER:create ESC:cancel"
         case .barbicanContainerCreate:
@@ -124,6 +128,8 @@ struct UIUtils {
             return "\(baseCommands) TAB:navigate ENTER:create ESC:cancel"
         case .swiftContainerMetadata:
             return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
+        case .swiftContainerWebAccess:
+            return "\(baseCommands) TAB:navigate SPACE:toggle ENTER:confirm ESC:cancel"
         case .swiftObjectMetadata:
             return "\(baseCommands) TAB:navigate SPACE:edit ENTER:save ESC:cancel"
         case .swiftDirectoryMetadata:
@@ -158,8 +164,8 @@ struct UIUtils {
             return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
         case .flavorSelection:
             return "\(baseCommands) TAB:switch-mode SPACE:select ENTER:confirm ESC:back"
-        case .uploadStatus:
-            return "\(baseCommands) c:cancel U:toggle-view ESC:back"
+        case .swiftBackgroundOperations:
+            return "\(baseCommands) DELETE:cancel C:clear-completed ESC:back"
         }
     }
 
@@ -233,6 +239,8 @@ struct UIUtils {
             return max(0, ResourceFilters.filterFlavors(cachedFlavors, query: searchQuery).count - 1)
         case .keyPairs:
             return max(0, ResourceFilters.filterKeyPairs(cachedKeyPairs, query: searchQuery).count - 1)
+        case .swiftBackgroundOperations:
+            return 0 // Updated dynamically in draw call
         case .subnets:
             return max(0, FilterUtils.filterSubnets(cachedSubnets, query: searchQuery).count - 1)
         case .ports:

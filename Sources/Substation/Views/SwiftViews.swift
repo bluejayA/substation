@@ -674,6 +674,50 @@ struct SwiftViews {
         await SwiftTUI.render(finalComponent, on: surface, in: bounds)
     }
 
+    // MARK: - Container Web Access View
+
+    @MainActor
+    static func drawSwiftContainerWebAccess(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        formBuilderState: FormBuilderState
+    ) async {
+        guard width > 10 && height > 10 else {
+            let surface = SwiftTUI.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let surface = SwiftTUI.surface(from: screen)
+
+        // Create FormBuilder instance
+        let formBuilder = FormBuilder(
+            title: "Manage Web Access",
+            fields: formBuilderState.fields,
+            selectedFieldId: formBuilderState.getCurrentFieldId(),
+            validationErrors: [],
+            showValidationErrors: false
+        )
+
+        // Render form
+        let formComponent = formBuilder.render()
+
+        // Add help text at the bottom
+        let helpText = Text("TAB: Next Field | SPACE: Toggle | ENTER: Confirm | ESC: Cancel").info()
+        let finalComponent = VStack(spacing: 0, children: [
+            formComponent,
+            helpText.padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+        ])
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+    }
+
     // MARK: - Object Metadata View
 
     @MainActor

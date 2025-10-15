@@ -169,6 +169,7 @@ struct MiscViews {
                     "SHIFT-T: Stop server",
                     "SHIFT-P: Create snapshot",
                     "SHIFT-L: View server logs",
+                    "SHIFT-O: View server console (opens noVNC in browser)",
                     "SHIFT-Z: Resize server",
                     "DELETE: Delete selected server",
                     "Server States: ACTIVE, SHUTOFF, ERROR, BUILD",
@@ -579,10 +580,9 @@ struct MiscViews {
                     "SHIFT-U: Upload objects to selected container",
                     "SHIFT-D: Download all objects from selected container",
                     "SHIFT-M: Set metadata and access policies",
+                    "SHIFT-W: Enable/disable static website hosting",
                     "SPACE: Open container and view objects",
                     "DELETE: Delete selected container",
-                    "Containers organize objects in storage",
-                    "Set metadata and access policies per container",
                 ]),
                 ("Multi-Select Mode (CTRL-X)", [
                     "CTRL-X: Toggle multi-select mode",
@@ -598,14 +598,12 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Object Management", [
+                    "SHIFT-U: Upload objects within the container",
                     "SHIFT-D: Download selected object or directory",
                     "SHIFT-M: Set metadata on selected object or directory",
                     "SPACE: View object details or navigate into directory",
                     "DELETE: Delete selected object",
                     "ESC: Return to container list",
-                    "Objects are files stored in the container",
-                    "Directories allow bulk metadata operations",
-                    "Download directories preserves or flattens structure",
                 ]),
                 ("Multi-Select Mode (CTRL-X)", [
                     "CTRL-X: Toggle multi-select mode",
@@ -958,7 +956,7 @@ struct MiscViews {
         let version = getGitVersion()
 
         // Get dynamic build date - current compilation time
-        let buildDate = ISO8601DateFormatter().string(from: Date())
+        let buildDate = Date().iso8601Formatted()
 
         // Get configuration
         #if DEBUG

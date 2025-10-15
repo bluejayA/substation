@@ -58,7 +58,18 @@ extension TUI {
 
                 // Check if file already exists and confirm overwrite
                 if swiftObjectDownloadForm.fileExists() {
-                    let confirmed = await confirmObjectOverwrite(screen: screen)
+                    let confirmed = await ConfirmationModal.show(
+                        title: "Overwrite Existing File",
+                        message: "The target file already exists. Do you want to overwrite it?",
+                        details: [
+                            "File: \(swiftObjectDownloadForm.getFinalDestinationPath())",
+                            "This action will replace the existing file"
+                        ],
+                        screen: screen,
+                        screenRows: screenRows,
+                        screenCols: screenCols
+                    )
+
                     if !confirmed {
                         statusMessage = "Download cancelled"
                         await self.draw(screen: screen)
@@ -92,8 +103,8 @@ extension TUI {
                 swiftObjectDownloadForm.updateFromFormState(swiftObjectDownloadFormState)
                 await self.draw(screen: screen)
             } else {
-                // Cancel and return to object list
-                self.changeView(to: .swiftContainerDetail, resetSelection: false)
+                // Cancel and return to container list
+                self.changeView(to: .swift, resetSelection: false)
             }
 
         case Int32(8), Int32(127), Int32(263): // BACKSPACE
@@ -127,54 +138,62 @@ extension TUI {
         )
     }
 
-    private func confirmObjectOverwrite(screen: OpaquePointer?) async -> Bool {
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
-        defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
-        }
-
-        let surface = SwiftTUI.surface(from: screen)
-        let promptLine = screenRows - 2
-        let promptBounds = Rect(x: 0, y: promptLine, width: screenCols, height: 1)
-
-        // Display confirmation prompt
-        let promptText = " File exists. Overwrite? Press Y to confirm, any other key to cancel: "
-        let promptComponent = Text(promptText).warning()
-
-        surface.clear(rect: promptBounds)
-        await SwiftTUI.render(promptComponent, on: surface, in: promptBounds)
-
-        let ch = SwiftTUI.getInput(WindowHandle(screen))
-
-        // Clear prompt
-        surface.clear(rect: promptBounds)
-
-        // Only Y (both uppercase and lowercase) confirms overwrite
-        return ch == Int32(89) || ch == Int32(121) // 'Y' or 'y'
-    }
 
     private func submitSwiftObjectDownload(screen: OpaquePointer?) async {
         let destinationPath = swiftObjectDownloadForm.getFinalDestinationPath()
         let containerName = swiftObjectDownloadForm.containerName
         let objectName = swiftObjectDownloadForm.objectName
 
-        statusMessage = "Downloading object '\(objectName)'..."
+        statusMessage = "Checking object '\(objectName)'..."
         await self.draw(screen: screen)
 
         do {
+            // Get object metadata to check ETAG
+            let metadata = try await client.swift.getObjectMetadata(containerName: containerName, objectName: objectName)
+
+            // Check if file already exists locally with same content
+            let fileURL = URL(fileURLWithPath: destinationPath)
+            if FileManager.default.fileExists(atPath: destinationPath), let remoteEtag = metadata.etag {
+                do {
+                    let matches = try await FileHashUtility.localFileMatchesRemote(
+                        localFileURL: fileURL,
+                        remoteEtag: remoteEtag
+                    )
+
+                    if matches {
+                        // File is identical - skip download
+                        statusMessage = "Object '\(objectName)' already exists with same content (skipped)"
+                        changeView(to: .swift, resetSelection: false)
+                        await self.draw(screen: screen)
+                        return
+                    }
+                } catch {
+                    // Error checking local file - proceed with download
+                }
+            }
+
             // Download object data
+            statusMessage = "Downloading object '\(objectName)'..."
+            await self.draw(screen: screen)
+
             let data = try await client.swift.downloadObject(containerName: containerName, objectName: objectName)
 
             // Write file
-            let fileURL = URL(fileURLWithPath: destinationPath)
             try data.write(to: fileURL)
 
-            // Return to object list with success message
+            // Return to container list with success message
             statusMessage = "Successfully downloaded object '\(objectName)' to '\(destinationPath)'"
-            changeView(to: .swiftContainerDetail, resetSelection: false)
+            changeView(to: .swift, resetSelection: false)
             await self.draw(screen: screen)
         } catch {
-            statusMessage = "Failed to download object: \(error.localizedDescription)"
+            // Categorize error
+            let transferError = TransferError.from(
+                error: error,
+                context: "download",
+                objectName: objectName
+            )
+
+            statusMessage = "Failed to download object: \(transferError.userFacingMessage)"
             await self.draw(screen: screen)
         }
     }

@@ -2284,61 +2284,34 @@ final class ResourceOperations {
             return
         }
 
-        do {
-            // If container has objects, delete them first
-            if hasObjects {
-                statusMessage = "Fetching objects in container '\(containerName)'..."
-                let objects = try await client.swift.listObjects(containerName: containerName)
+        // Create background operation
+        let operation = SwiftBackgroundOperation(
+            type: .delete,
+            containerName: containerName,
+            objectName: nil,
+            localPath: "",
+            totalBytes: 0
+        )
+        tui.swiftBackgroundOps.addOperation(operation)
+        operation.status = .queued
 
-                statusMessage = "Deleting \(objects.count) object(s) from '\(containerName)'..."
-                var deletedCount = 0
-                var failedCount = 0
-
-                for object in objects {
-                    guard let objectName = object.name else { continue }
-                    do {
-                        try await client.swift.deleteObject(containerName: containerName, objectName: objectName)
-                        deletedCount += 1
-                        if deletedCount % 10 == 0 {
-                            statusMessage = "Deleted \(deletedCount)/\(objects.count) objects..."
-                        }
-                    } catch {
-                        failedCount += 1
-                        Logger.shared.logError("Failed to delete object '\(objectName)': \(error)")
-                    }
-                }
-
-                if failedCount > 0 {
-                    statusMessage = "Deleted \(deletedCount) objects (\(failedCount) failed). Attempting container deletion..."
-                } else {
-                    statusMessage = "All objects deleted. Deleting container '\(containerName)'..."
-                }
-            }
-
-            // Now delete the container
-            try await client.swift.deleteContainer(containerName: containerName)
-
-            if let index = tui.cachedSwiftContainers.firstIndex(where: { $0.name == containerName }) {
-                tui.cachedSwiftContainers.remove(at: index)
-            }
-
-            let newMaxIndex = max(0, filteredContainers.count - 2)
-            selectedIndex = min(selectedIndex, newMaxIndex)
-
-            if hasObjects {
-                statusMessage = "Container '\(containerName)' and all objects deleted successfully"
-            } else {
-                statusMessage = "Container '\(containerName)' deleted successfully"
-            }
-            tui.refreshAfterOperation()
-        } catch {
-            statusMessage = "Failed to delete container '\(containerName)': \(error.localizedDescription)"
+        // Start background deletion task
+        let deleteTask = Task { @MainActor in
+            await deleteContainerInBackground(containerName: containerName, hasObjects: hasObjects, objectCount: objectCount, operation: operation)
         }
+        operation.task = deleteTask
+
+        statusMessage = "Container deletion started in background: \(containerName)"
+        Logger.shared.logUserAction("container_delete_started", details: [
+            "containerName": containerName,
+            "hasObjects": hasObjects,
+            "objectCount": objectCount
+        ])
     }
 
     internal func deleteSwiftObject(screen: OpaquePointer?) async {
         guard currentView == .swiftContainerDetail else { return }
-        guard let container = selectedResource as? SwiftContainer, let containerName = container.name else {
+        guard let containerName = tui.swiftNavState.currentContainer else {
             statusMessage = "No container selected"
             return
         }
@@ -2347,41 +2320,362 @@ final class ResourceOperations {
             return
         }
 
-        let filteredObjects = searchQuery?.isEmpty ?? true ? objects : objects.filter { object in
-            object.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
-        }
+        // Build tree items to determine if we're deleting a directory or object
+        let currentPath = tui.swiftNavState.currentPathString
+        let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+        let filteredItems = SwiftTreeItem.filterItems(treeItems, query: searchQuery)
 
-        guard selectedIndex < filteredObjects.count else {
-            statusMessage = "No object selected"
+        guard selectedIndex < filteredItems.count else {
+            statusMessage = "No item selected"
             return
         }
 
-        let object = filteredObjects[selectedIndex]
-        guard let objectName = object.name else {
-            statusMessage = "Object has no name"
-            return
-        }
+        let selectedItem = filteredItems[selectedIndex]
 
-        guard await ViewUtils.confirmDelete(objectName, screen: screen, screenRows: screenRows, screenCols: screenCols) else {
-            statusMessage = "Object deletion cancelled"
-            return
-        }
+        // Check if this is a directory or an object
+        switch selectedItem {
+        case .directory(let dirName, _, _):
+            // Deleting a directory - need to delete all objects with this prefix
+            let directoryPath = currentPath + dirName + "/"
+            let objectsInDirectory = SwiftTreeItem.getObjectsInDirectory(
+                directoryPath: directoryPath,
+                allObjects: objects,
+                recursive: true
+            )
 
-        do {
-            try await client.swift.deleteObject(containerName: containerName, objectName: objectName)
-
-            if let index = tui.cachedSwiftObjects?.firstIndex(where: { $0.name == objectName }) {
-                tui.cachedSwiftObjects?.remove(at: index)
+            guard !objectsInDirectory.isEmpty else {
+                statusMessage = "Directory is empty"
+                return
             }
 
-            let newMaxIndex = max(0, filteredObjects.count - 2)
-            selectedIndex = min(selectedIndex, newMaxIndex)
+            // Confirm directory deletion
+            let confirmed = await ConfirmationModal.show(
+                title: "Delete Directory",
+                message: "Delete '\(dirName)' and all its contents?",
+                details: [
+                    "This directory contains \(objectsInDirectory.count) object(s)",
+                    "All objects will be deleted",
+                    "This action cannot be undone"
+                ],
+                screen: screen,
+                screenRows: screenRows,
+                screenCols: screenCols
+            )
 
-            statusMessage = "Object '\(objectName)' deleted successfully"
-            tui.refreshAfterOperation()
-        } catch {
-            statusMessage = "Failed to delete object '\(objectName)': \(error.localizedDescription)"
+            guard confirmed else {
+                statusMessage = "Directory deletion cancelled"
+                return
+            }
+
+            // Create background operation for directory deletion
+            let operation = SwiftBackgroundOperation(
+                type: .delete,
+                containerName: containerName,
+                objectName: dirName,
+                localPath: directoryPath,
+                totalBytes: Int64(objectsInDirectory.count)
+            )
+            tui.swiftBackgroundOps.addOperation(operation)
+            operation.status = .queued
+
+            // Start background deletion task
+            let deleteTask = Task { @MainActor in
+                await deleteDirectoryInBackground(
+                    containerName: containerName,
+                    directoryPath: directoryPath,
+                    objects: objectsInDirectory,
+                    operation: operation
+                )
+            }
+            operation.task = deleteTask
+
+            statusMessage = "Directory deletion started in background: \(dirName)"
+            Logger.shared.logUserAction("directory_delete_started", details: [
+                "containerName": containerName,
+                "directory": dirName,
+                "objectCount": objectsInDirectory.count
+            ])
+
+        case .object(let swiftObject):
+            // Deleting a single object
+            guard let objectName = swiftObject.name else {
+                statusMessage = "Object has no name"
+                return
+            }
+
+            guard await ViewUtils.confirmDelete(objectName, screen: screen, screenRows: screenRows, screenCols: screenCols) else {
+                statusMessage = "Object deletion cancelled"
+                return
+            }
+
+            // Create background operation for single object deletion
+            let operation = SwiftBackgroundOperation(
+                type: .delete,
+                containerName: containerName,
+                objectName: objectName,
+                localPath: "",
+                totalBytes: 1
+            )
+            tui.swiftBackgroundOps.addOperation(operation)
+            operation.status = .queued
+
+            // Start background deletion task
+            let deleteTask = Task { @MainActor in
+                await deleteSingleObjectInBackground(
+                    containerName: containerName,
+                    objectName: objectName,
+                    operation: operation
+                )
+            }
+            operation.task = deleteTask
+
+            statusMessage = "Object deletion started in background: \(objectName)"
+            Logger.shared.logUserAction("object_delete_started", details: [
+                "containerName": containerName,
+                "objectName": objectName
+            ])
         }
+    }
+
+    private func deleteContainerInBackground(containerName: String, hasObjects: Bool, objectCount: Int, operation: SwiftBackgroundOperation) async {
+        operation.status = .running
+
+        do {
+            // If container has objects, delete them first
+            if hasObjects {
+                // Fetch objects
+                let objects = try await client.swift.listObjects(containerName: containerName)
+                let totalObjects = objects.count
+
+                // Update operation total
+                operation.totalBytes = Int64(totalObjects)
+
+                var deletedCount = 0
+                var failedCount = 0
+
+                // Use TaskGroup for concurrent object deletion
+                await withTaskGroup(of: (success: Bool, objectName: String).self) { group in
+                    let maxConcurrentDeletes = 10
+                    var objectIterator = objects.makeIterator()
+                    var activeDeletes = 0
+
+                    // Start initial batch
+                    while activeDeletes < maxConcurrentDeletes, let object = objectIterator.next() {
+                        guard let objectName = object.name else { continue }
+                        group.addTask {
+                            do {
+                                try Task.checkCancellation()
+                                try await self.client.swift.deleteObject(containerName: containerName, objectName: objectName)
+                                return (success: true, objectName: objectName)
+                            } catch is CancellationError {
+                                return (success: false, objectName: objectName)
+                            } catch {
+                                Logger.shared.logError("Failed to delete object '\(objectName)': \(error)")
+                                return (success: false, objectName: objectName)
+                            }
+                        }
+                        activeDeletes += 1
+                    }
+
+                    // Process results and start new deletes
+                    while let result = await group.next() {
+                        // Check for cancellation
+                        if operation.status == .cancelled {
+                            group.cancelAll()
+                            statusMessage = "Container deletion cancelled"
+                            return
+                        }
+
+                        if result.success {
+                            deletedCount += 1
+                        } else {
+                            failedCount += 1
+                        }
+
+                        // Update progress
+                        operation.progress = Double(deletedCount + failedCount) / Double(totalObjects)
+                        operation.bytesTransferred = Int64(deletedCount + failedCount)
+                        tui.markNeedsRedraw()
+
+                        // Start next delete if available
+                        if let object = objectIterator.next() {
+                            guard let objectName = object.name else { continue }
+                            group.addTask {
+                                do {
+                                    try Task.checkCancellation()
+                                    try await self.client.swift.deleteObject(containerName: containerName, objectName: objectName)
+                                    return (success: true, objectName: objectName)
+                                } catch is CancellationError {
+                                    return (success: false, objectName: objectName)
+                                } catch {
+                                    Logger.shared.logError("Failed to delete object '\(objectName)': \(error)")
+                                    return (success: false, objectName: objectName)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if failedCount > 0 {
+                    Logger.shared.logWarning("Deleted \(deletedCount) objects, \(failedCount) failed")
+                }
+            }
+
+            // Check for cancellation before deleting container
+            if operation.status == .cancelled {
+                statusMessage = "Container deletion cancelled"
+                return
+            }
+
+            // Now delete the container
+            try await client.swift.deleteContainer(containerName: containerName)
+
+            // Mark operation as completed
+            operation.markCompleted()
+            operation.progress = 1.0
+            statusMessage = "Container '\(containerName)' deleted successfully"
+            tui.markNeedsRedraw()
+
+            // Refresh container cache from server
+            let containers = try await client.swift.listContainers()
+            tui.cachedSwiftContainers = containers
+
+            Logger.shared.logUserAction("container_deleted", details: [
+                "containerName": containerName,
+                "objectsDeleted": operation.bytesTransferred
+            ])
+        } catch {
+            operation.markFailed(error: error.localizedDescription)
+            statusMessage = "Failed to delete container '\(containerName)': \(error.localizedDescription)"
+            tui.markNeedsRedraw()
+            Logger.shared.logError("Container deletion failed: \(error)")
+        }
+    }
+
+    private func deleteSingleObjectInBackground(containerName: String, objectName: String, operation: SwiftBackgroundOperation) async {
+        operation.status = .running
+
+        do {
+            // Check for cancellation
+            if operation.status == .cancelled {
+                statusMessage = "Object deletion cancelled"
+                return
+            }
+
+            try await client.swift.deleteObject(containerName: containerName, objectName: objectName)
+
+            // Mark operation as completed
+            operation.markCompleted()
+            operation.progress = 1.0
+            statusMessage = "Object '\(objectName)' deleted successfully"
+            tui.markNeedsRedraw()
+
+            // Refresh object cache from server
+            await dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
+
+            Logger.shared.logUserAction("object_deleted", details: [
+                "containerName": containerName,
+                "objectName": objectName
+            ])
+        } catch {
+            operation.markFailed(error: error.localizedDescription)
+            statusMessage = "Failed to delete object '\(objectName)': \(error.localizedDescription)"
+            tui.markNeedsRedraw()
+            Logger.shared.logError("Object deletion failed: \(error)")
+        }
+    }
+
+    private func deleteDirectoryInBackground(containerName: String, directoryPath: String, objects: [SwiftObject], operation: SwiftBackgroundOperation) async {
+        operation.status = .running
+
+        let totalObjects = objects.count
+        var deletedCount = 0
+        var failedCount = 0
+
+        // Use TaskGroup for concurrent object deletion
+            await withTaskGroup(of: (success: Bool, objectName: String).self) { group in
+                let maxConcurrentDeletes = 10
+                var objectIterator = objects.makeIterator()
+                var activeDeletes = 0
+
+                // Start initial batch
+                while activeDeletes < maxConcurrentDeletes, let object = objectIterator.next() {
+                    guard let objectName = object.name else { continue }
+                    group.addTask {
+                        do {
+                            try Task.checkCancellation()
+                            try await self.client.swift.deleteObject(containerName: containerName, objectName: objectName)
+                            return (success: true, objectName: objectName)
+                        } catch is CancellationError {
+                            return (success: false, objectName: objectName)
+                        } catch {
+                            Logger.shared.logError("Failed to delete object '\(objectName)': \(error)")
+                            return (success: false, objectName: objectName)
+                        }
+                    }
+                    activeDeletes += 1
+                }
+
+                // Process results and start new deletes
+                while let result = await group.next() {
+                    // Check for cancellation
+                    if operation.status == .cancelled {
+                        group.cancelAll()
+                        statusMessage = "Directory deletion cancelled"
+                        return
+                    }
+
+                    if result.success {
+                        deletedCount += 1
+                    } else {
+                        failedCount += 1
+                    }
+
+                    // Update progress
+                    operation.progress = Double(deletedCount + failedCount) / Double(totalObjects)
+                    operation.bytesTransferred = Int64(deletedCount + failedCount)
+                    tui.markNeedsRedraw()
+
+                    // Start next delete if available
+                    if let object = objectIterator.next() {
+                        guard let objectName = object.name else { continue }
+                        group.addTask {
+                            do {
+                                try Task.checkCancellation()
+                                try await self.client.swift.deleteObject(containerName: containerName, objectName: objectName)
+                                return (success: true, objectName: objectName)
+                            } catch is CancellationError {
+                                return (success: false, objectName: objectName)
+                            } catch {
+                                Logger.shared.logError("Failed to delete object '\(objectName)': \(error)")
+                                return (success: false, objectName: objectName)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Mark operation as completed
+            operation.markCompleted()
+            operation.progress = 1.0
+
+            if failedCount > 0 {
+                statusMessage = "Directory deleted with \(deletedCount) objects (\(failedCount) failed)"
+            } else {
+                statusMessage = "Directory deleted successfully (\(deletedCount) objects)"
+            }
+
+            tui.markNeedsRedraw()
+
+            // Refresh object cache from server
+            await dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
+
+            Logger.shared.logUserAction("directory_deleted", details: [
+                "containerName": containerName,
+                "directoryPath": directoryPath,
+                "objectsDeleted": deletedCount,
+                "objectsFailed": failedCount
+            ])
     }
 
 }

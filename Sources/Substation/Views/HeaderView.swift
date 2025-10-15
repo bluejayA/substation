@@ -8,9 +8,7 @@ struct HeaderView {
     static func draw(screen: OpaquePointer?, client: OSClient, screenCols: Int32) async {
         let surface = SwiftTUI.surface(from: screen)
 
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HH:mm:ss"
-        let timeStr = timeFormatter.string(from: Date())
+        let timeStr = DateFormatter.timeOnly.string(from: Date())
         let headerLeft = "* SUBSTATION - The operator's control panel"
         let region = await client.region
         let project = await client.project

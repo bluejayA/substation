@@ -101,18 +101,21 @@ nav:
     - Caching System: concepts/caching.md
     - Search Engine: concepts/search.md
     - Security: concepts/security.md
+    - Object Storage: concepts/object-storage.md
 
   - Architecture:
     - Overview: architecture/index.md
     - System Architecture: architecture/overview.md
     - Components: architecture/components.md
     - Technology Stack: architecture/technology-stack.md
+    - Object Storage: architecture/object-storage.md
 
   - Performance:
     - Overview: performance/index.md
     - Performance Details: performance/overview.md
     - Benchmarks: performance/benchmarks.md
     - Tuning: performance/tuning.md
+    - Object Storage: performance/object-storage.md
     - Troubleshooting: performance/troubleshooting.md
 
   - Reference:
@@ -132,7 +135,6 @@ nav:
       - StatusListView Guide: reference/developers/statuslistview-guide.md
       - DetailView Guide: reference/developers/detailview-guide.md
       - Testing Guide: reference/developers/testing.md
-      - OpenStack Swift: reference/developers/os-swift.md
     - OpenStack Integration:
       - Overview: reference/openstack/index.md
       - Swift: reference/openstack/os-swift.md

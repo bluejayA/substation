@@ -50,9 +50,7 @@ extension VolumeArchiveViews {
                     width: 16,
                     getValue: { item in
                         if let created = item.createdAt {
-                            let formatter = DateFormatter()
-                            formatter.dateFormat = "yyyy-MM-dd HH:mm"
-                            return formatter.string(from: created)
+                            return created.compactFormatted()
                         }
                         return "N/A"
                     }

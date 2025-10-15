@@ -309,6 +309,22 @@ public actor NovaService: OpenStackService {
         return response.output
     }
 
+    /// Get remote console URL for server
+    public func getRemoteConsole(id: String, protocol: String = "vnc", type: String = "novnc") async throws -> RemoteConsole {
+        let request = RemoteConsoleRequest(protocol: `protocol`, type: type)
+
+        let requestData = try SharedResources.jsonEncoder.encode(request)
+        let response: RemoteConsoleResponse = try await core.request(
+            service: serviceName,
+            method: "POST",
+            path: "/servers/\(id)/remote-consoles",
+            body: requestData,
+            headers: ["OpenStack-API-Version": "compute 2.6"],
+            expected: 200
+        )
+        return response.remoteConsole
+    }
+
     // MARK: - Flavor Operations
 
     /// List available flavors with extended caching

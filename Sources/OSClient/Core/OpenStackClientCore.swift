@@ -1013,6 +1013,19 @@ public actor OpenStackClientCore {
             } catch {
                 lastError = error
 
+                // Don't retry on certain client errors (4xx) that won't be fixed by retrying
+                // 404 Not Found: Resource doesn't exist, won't change on retry
+                // 400 Bad Request: Malformed request, won't change on retry
+                // 409 Conflict: Resource state conflict, won't change on retry
+                // But DO retry: 401 (token expiration), 403 (may be transient), 429 (rate limit)
+                let nonRetriableClientErrors: Set<Int> = [400, 404, 409]
+                if let httpError = error as? OpenStackError,
+                   case .httpError(let statusCode, _) = httpError,
+                   nonRetriableClientErrors.contains(statusCode) {
+                    // Client error that shouldn't be retried - throw immediately
+                    throw error
+                }
+
                 if attempt < config.retryPolicy.maxAttempts {
                     let delay = config.retryPolicy.delay(for: attempt)
                     logger.logInfo("Retrying request due to error", context: [
@@ -1086,6 +1099,19 @@ public actor OpenStackClientCore {
 
             } catch {
                 lastError = error
+
+                // Don't retry on certain client errors (4xx) that won't be fixed by retrying
+                // 404 Not Found: Resource doesn't exist, won't change on retry
+                // 400 Bad Request: Malformed request, won't change on retry
+                // 409 Conflict: Resource state conflict, won't change on retry
+                // But DO retry: 401 (token expiration), 403 (may be transient), 429 (rate limit)
+                let nonRetriableClientErrors: Set<Int> = [400, 404, 409]
+                if let httpError = error as? OpenStackError,
+                   case .httpError(let statusCode, _) = httpError,
+                   nonRetriableClientErrors.contains(statusCode) {
+                    // Client error that shouldn't be retried - throw immediately
+                    throw error
+                }
 
                 if attempt < config.retryPolicy.maxAttempts {
                     let delay = config.retryPolicy.delay(for: attempt)
@@ -1167,6 +1193,19 @@ public actor OpenStackClientCore {
 
             } catch {
                 lastError = error
+
+                // Don't retry on certain client errors (4xx) that won't be fixed by retrying
+                // 404 Not Found: Resource doesn't exist, won't change on retry
+                // 400 Bad Request: Malformed request, won't change on retry
+                // 409 Conflict: Resource state conflict, won't change on retry
+                // But DO retry: 401 (token expiration), 403 (may be transient), 429 (rate limit)
+                let nonRetriableClientErrors: Set<Int> = [400, 404, 409]
+                if let httpError = error as? OpenStackError,
+                   case .httpError(let statusCode, _) = httpError,
+                   nonRetriableClientErrors.contains(statusCode) {
+                    // Client error that shouldn't be retried - throw immediately
+                    throw error
+                }
 
                 if attempt < config.retryPolicy.maxAttempts {
                     let delay = config.retryPolicy.delay(for: attempt)

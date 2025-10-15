@@ -135,9 +135,7 @@ public struct SearchFilter: Codable, Sendable, Identifiable, Equatable {
         case .status(let statuses):
             return "Status: \(statuses.joined(separator: ", "))"
         case .dateRange(let from, let to):
-            let formatter = DateFormatter()
-            formatter.dateStyle = .short
-            return "Date: \(formatter.string(from: from)) - \(formatter.string(from: to))"
+            return "Date: \(from.shortFormatted()) - \(to.shortFormatted())"
         case .ipAddress(let pattern):
             return "IP: \(pattern)"
         case .metadata(let key, let value, let op):

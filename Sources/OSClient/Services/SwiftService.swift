@@ -127,6 +127,14 @@ public actor SwiftService: OpenStackService {
             headers["X-Remove-Container-Meta-\(key)"] = "x"
         }
 
+        // Update ACLs if provided
+        if let readACL = request.readACL {
+            headers["X-Container-Read"] = readACL
+        }
+        if let writeACL = request.writeACL {
+            headers["X-Container-Write"] = writeACL
+        }
+
         try await core.requestVoid(
             service: serviceName,
             method: "POST",
@@ -179,10 +187,17 @@ public actor SwiftService: OpenStackService {
     }
 
     /// Get object metadata
+    /// - Throws: OpenStackError.httpError(404) if object does not exist
     public func getObjectMetadata(containerName: String, objectName: String) async throws -> SwiftObjectMetadataResponse {
-        let encodedContainer = containerName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? containerName
-        let encodedObject = objectName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? objectName
-        let path = "/\(encodedContainer)/\(encodedObject)"
+        // Decode object name if it's already encoded (Swift API sometimes returns encoded names)
+        let decodedObject = objectName.removingPercentEncoding ?? objectName
+
+        // Manually encode the object name, preserving forward slashes
+        var allowedChars = CharacterSet.urlPathAllowed
+        allowedChars.insert(charactersIn: "/")
+        let encodedObject = decodedObject.addingPercentEncoding(withAllowedCharacters: allowedChars) ?? decodedObject
+
+        let path = "/\(containerName)/\(encodedObject)"
 
         let (_, headers) = try await core.requestWithHeaders(
             service: serviceName,
@@ -230,9 +245,15 @@ public actor SwiftService: OpenStackService {
 
     /// Upload an object to a container
     public func uploadObject(request: UploadSwiftObjectRequest) async throws {
-        let encodedContainer = request.containerName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? request.containerName
-        let encodedObject = request.objectName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? request.objectName
-        let path = "/\(encodedContainer)/\(encodedObject)"
+        // Decode object name if it's already encoded
+        let decodedObject = request.objectName.removingPercentEncoding ?? request.objectName
+
+        // Manually encode the object name, preserving forward slashes
+        var allowedChars = CharacterSet.urlPathAllowed
+        allowedChars.insert(charactersIn: "/")
+        let encodedObject = decodedObject.addingPercentEncoding(withAllowedCharacters: allowedChars) ?? decodedObject
+
+        let path = "/\(request.containerName)/\(encodedObject)"
 
         var headers: [String: String] = [:]
 
@@ -277,9 +298,15 @@ public actor SwiftService: OpenStackService {
 
     /// Download an object from a container
     public func downloadObject(containerName: String, objectName: String) async throws -> Data {
-        let encodedContainer = containerName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? containerName
-        let encodedObject = objectName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? objectName
-        let path = "/\(encodedContainer)/\(encodedObject)"
+        // Decode object name if it's already encoded (Swift API sometimes returns encoded names)
+        let decodedObject = objectName.removingPercentEncoding ?? objectName
+
+        // Manually encode the object name, preserving forward slashes
+        var allowedChars = CharacterSet.urlPathAllowed
+        allowedChars.insert(charactersIn: "/")
+        let encodedObject = decodedObject.addingPercentEncoding(withAllowedCharacters: allowedChars) ?? decodedObject
+
+        let path = "/\(containerName)/\(encodedObject)"
 
         let responseData = try await core.requestRaw(
             service: serviceName,
@@ -325,9 +352,15 @@ public actor SwiftService: OpenStackService {
 
     /// Update object metadata
     public func updateObjectMetadata(containerName: String, objectName: String, request: UpdateSwiftObjectMetadataRequest) async throws {
-        let encodedContainer = containerName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? containerName
-        let encodedObject = objectName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? objectName
-        let path = "/\(encodedContainer)/\(encodedObject)"
+        // Decode object name if it's already encoded (Swift API sometimes returns encoded names)
+        let decodedObject = objectName.removingPercentEncoding ?? objectName
+
+        // Manually encode the object name, preserving forward slashes
+        var allowedChars = CharacterSet.urlPathAllowed
+        allowedChars.insert(charactersIn: "/")
+        let encodedObject = decodedObject.addingPercentEncoding(withAllowedCharacters: allowedChars) ?? decodedObject
+
+        let path = "/\(containerName)/\(encodedObject)"
 
         var headers: [String: String] = [:]
 
@@ -356,9 +389,16 @@ public actor SwiftService: OpenStackService {
 
     /// Delete an object
     public func deleteObject(containerName: String, objectName: String) async throws {
-        let encodedContainer = containerName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? containerName
-        let encodedObject = objectName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? objectName
-        let path = "/\(encodedContainer)/\(encodedObject)"
+        // Decode object name if it's already encoded (Swift API sometimes returns encoded names)
+        let decodedObject = objectName.removingPercentEncoding ?? objectName
+
+        // Manually encode the object name, preserving forward slashes
+        // We need to encode spaces and special chars but NOT slashes (which are part of the object name)
+        var allowedChars = CharacterSet.urlPathAllowed
+        allowedChars.insert(charactersIn: "/")
+        let encodedObject = decodedObject.addingPercentEncoding(withAllowedCharacters: allowedChars) ?? decodedObject
+
+        let path = "/\(containerName)/\(encodedObject)"
 
         try await core.requestVoid(
             service: serviceName,
@@ -575,9 +615,15 @@ public actor SwiftService: OpenStackService {
             headers["X-Object-Meta-\(key)"] = value
         }
 
-        let encodedContainer = containerName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? containerName
-        let encodedObject = objectName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? objectName
-        let path = "/\(encodedContainer)/\(encodedObject)"
+        // Decode object name if it's already encoded (Swift API sometimes returns encoded names)
+        let decodedObject = objectName.removingPercentEncoding ?? objectName
+
+        // Manually encode the object name, preserving forward slashes
+        var allowedChars = CharacterSet.urlPathAllowed
+        allowedChars.insert(charactersIn: "/")
+        let encodedObject = decodedObject.addingPercentEncoding(withAllowedCharacters: allowedChars) ?? decodedObject
+
+        let path = "/\(containerName)/\(encodedObject)"
 
         try await core.requestVoid(
             service: serviceName,

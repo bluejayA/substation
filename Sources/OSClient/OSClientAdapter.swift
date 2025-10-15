@@ -277,6 +277,14 @@ extension OpenStackClient {
         }
     }
 
+    /// Get remote console URL for a server
+    public func getRemoteConsole(serverID: String, protocol: String = "vnc", type: String = "novnc") async throws -> RemoteConsole {
+        return try await executeWithTokenRefresh {
+            let nova = await self.nova
+            return try await nova.getRemoteConsole(id: serverID, protocol: `protocol`, type: type)
+        }
+    }
+
     // MARK: - Port Management
 
     /// Attach port to server

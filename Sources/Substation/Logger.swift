@@ -29,12 +29,8 @@ public final class Logger: Sendable {
 
     private let state = LockedState<LoggerState>(LoggerState())
     private let queue = DispatchQueue(label: "com.substation.logger", qos: .utility)
-    private let dateFormatter: DateFormatter
 
     private init() {
-        dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        dateFormatter.timeZone = TimeZone.current
     }
 
     /// Configure the logger with debug mode and set up log file
@@ -205,7 +201,7 @@ public final class Logger: Sendable {
             return
         }
 
-        let timestamp = dateFormatter.string(from: Date())
+        let timestamp = Date().loggingFormatted()
 
         // Build log entry with optional context
         var logEntry = "[\(timestamp)] [\(level)] \(message)"

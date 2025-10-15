@@ -80,6 +80,7 @@ final class TUI {
     internal var quotaScrollOffset = 0   // For scrolling within quota panel on dashboard
     internal var selectedIndex = 0  // Currently selected item in lists
     internal var selectedResource: Any? = nil  // The selected resource for detail view
+    internal var previousSelectedResourceName: String? = nil  // Name of the resource before transitioning to a sub-view
     internal var selectedServers: Set<String> = Set<String>()  // Selected server IDs for network attachment
     internal var attachedServerIds: Set<String> = Set<String>()  // Server IDs that have the selected resource attached
     internal var attachmentMode: AttachmentMode = .attach  // Current attachment mode (attach/detach)
@@ -114,6 +115,17 @@ final class TUI {
 
     // Swift navigation state for hierarchical object storage browsing
     internal lazy var swiftNavState: SwiftNavigationState = SwiftNavigationState()
+
+    // Background operations tracking
+    internal lazy var swiftBackgroundOps: SwiftBackgroundOperationsManager = SwiftBackgroundOperationsManager()
+
+    // Active upload tracking (for status bar display)
+    internal var activeUploadMessage: String? = nil
+    internal var activeUploadTask: Task<Void, Never>? = nil
+
+    // Active download tracking (for status bar display)
+    internal var activeDownloadMessage: String? = nil
+    internal var activeDownloadTask: Task<Void, Never>? = nil
 
     // Telemetry actor for health monitoring
     internal func getTelemetryActor() async -> TelemetryActor? {
@@ -389,6 +401,10 @@ final class TUI {
     // Swift container metadata form state
     internal var swiftContainerMetadataForm = SwiftContainerMetadataForm()
     internal var swiftContainerMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // Swift container web access form state
+    internal var swiftContainerWebAccessForm = SwiftContainerWebAccessForm()
+    internal var swiftContainerWebAccessFormState: FormBuilderState = FormBuilderState(fields: [])
 
     // Swift object metadata form state
     internal var swiftObjectMetadataForm = SwiftObjectMetadataForm()
@@ -1521,6 +1537,16 @@ final class TUI {
         // Handle scroll optimization if available
         if let scrollOpt = renderPlan.scrollOptimization {
             Logger.shared.logDebug("Applied scroll optimization: rows \(scrollOpt.startRow)-\(scrollOpt.endRow)")
+        }
+
+        // Render modal overlay if active
+        if let modal = userFeedback.currentModal {
+            let start = Date()
+            let surface = SwiftTUI.surface(from: screen)
+            let modalBounds = Rect(x: 0, y: 0, width: screenCols, height: screenRows)
+            let modalComponent = ModalView(modal: modal)
+            await SwiftTUI.render(modalComponent, on: surface, in: modalBounds)
+            componentTimings["modal"] = Date().timeIntervalSince(start)
         }
 
         // Batched refresh: updates virtual screen then flushes once (reduces syscalls)

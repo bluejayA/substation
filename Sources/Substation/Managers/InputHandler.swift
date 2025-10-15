@@ -33,6 +33,12 @@ class InputHandler {
             "fieldEditMode": tui.securityGroupCreateForm.fieldEditMode || tui.subnetCreateForm.fieldEditMode || tui.barbicanSecretCreateForm.fieldEditMode
         ])
 
+        // Handle modal input if a modal is active
+        if tui.userFeedback.currentModal != nil {
+            await handleModalInput(ch, screen: screen)
+            return
+        }
+
         // ServerCreateForm uses FormBuilder which handles its own input state
         // Delegate all input to server create handler when in server create view
         if tui.currentView == .serverCreate {
@@ -63,6 +69,12 @@ class InputHandler {
         // Swift container metadata form
         if tui.currentView == .swiftContainerMetadata {
             await tui.handleSwiftContainerMetadataInput(ch, screen: screen)
+            return
+        }
+
+        // Swift container web access form
+        if tui.currentView == .swiftContainerWebAccess {
+            await tui.handleSwiftContainerWebAccessInput(ch, screen: screen)
             return
         }
 
@@ -582,6 +594,15 @@ class InputHandler {
                 Logger.shared.logNavigation("\(tui.currentView)", to: ".swift")
                 tui.changeView(to: .swift)
             }
+        case Int32(116): // t - Background Operations navigation
+            if tui.currentView.isDetailView {
+                Logger.shared.logNavigation("\(tui.currentView)", to: ".swiftBackgroundOperations", details: ["action": "exit_detail"])
+                tui.changeView(to: .swiftBackgroundOperations, resetSelection: false)
+                tui.selectedResource = nil
+            } else {
+                Logger.shared.logNavigation("\(tui.currentView)", to: ".swiftBackgroundOperations")
+                tui.changeView(to: .swiftBackgroundOperations)
+            }
         case Int32(24): // CTRL-X - Toggle multi-select mode
             if !tui.currentView.isDetailView && tui.currentView.supportsMultiSelect {
                 Logger.shared.logUserAction("toggle_multi_select_mode", details: [
@@ -589,6 +610,11 @@ class InputHandler {
                     "wasEnabled": tui.multiSelectMode
                 ])
                 handleToggleMultiSelectMode()
+            }
+        case Int32(87): // W - Web Access
+            if tui.currentView == .swift && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_container_web_access", details: ["selectedIndex": tui.selectedIndex])
+                await handleManageContainerWebAccess(screen: screen)
             }
         case Int32(77): // M - Manage things
             if tui.currentView == .swift && !tui.currentView.isDetailView {
@@ -632,10 +658,6 @@ class InputHandler {
                 // From container detail view (inside a container), also allow upload
                 Logger.shared.logUserAction("upload_object_to_container_from_detail", details: ["container": tui.swiftNavState.currentContainer ?? "unknown"])
                 await handleUploadObjectToContainer(screen: screen)
-            } else if tui.currentView == .uploadStatus {
-                // From upload status, go back to previous view
-                Logger.shared.logNavigation(".uploadStatus", to: "\(tui.previousView)")
-                tui.changeView(to: tui.previousView, resetSelection: false)
             }
         case Int32(68): // D - Download container or object (SHIFT-D)
             if tui.currentView == .swift && !tui.currentView.isDetailView {
@@ -670,7 +692,15 @@ class InputHandler {
         case Int32(259), Int32(258), Int32(338), Int32(339), Int32(262), Int32(360), Int32(27): // Navigation keys
             // Use centralized navigation handler for all basic navigation
             if let navigationHandler = navigationHandler {
-                let handled = await navigationHandler.handleNavigationInput(ch, screen: screen)
+                // For swiftBackgroundOperations, pass the actual count of operations
+                let maxIndex: Int?
+                if tui.currentView == .swiftBackgroundOperations {
+                    maxIndex = max(0, tui.swiftBackgroundOps.getAllOperations().count - 1)
+                } else {
+                    maxIndex = nil
+                }
+
+                let handled = await navigationHandler.handleNavigationInput(ch, screen: screen, maxIndex: maxIndex)
                 if handled {
                     return // Navigation was handled centrally
                 }
@@ -697,6 +727,11 @@ class InputHandler {
                         "currentPath": tui.swiftNavState.currentPathString
                     ])
                     await handleSwiftTreeItemNavigation()
+                } else if tui.currentView == .swiftBackgroundOperations {
+                    Logger.shared.logUserAction("open_operation_detail", details: [
+                        "selectedIndex": tui.selectedIndex
+                    ])
+                    await handleOpenOperationDetail()
                 } else {
                     Logger.shared.logUserAction("open_detail_view", details: [
                         "view": "\(tui.currentView)",
@@ -712,22 +747,29 @@ class InputHandler {
             Logger.shared.logUserAction("toggle_auto_refresh", details: ["current": tui.autoRefresh])
             handleAutoRefreshToggle()
         case Int32(99): // c - purge cache or cancel upload
-            if tui.currentView == .uploadStatus {
-                // TODO: Cancel upload not yet implemented
-                tui.statusMessage = "Upload cancellation not yet implemented"
-            } else {
-                Logger.shared.logUserAction("purge_cache")
-                await handleCachePurge()
-            }
+            Logger.shared.logUserAction("purge_cache")
+            await handleCachePurge()
         // NOTE: / key (Int32(47)) is now handled universally before specialized view routing
         // Secondary Commands (Uppercase) - Actions
-        case Int32(67): // C - Create new resource
-            Logger.shared.logUserAction("create_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
-            await handleCreateResource()
+        case Int32(67): // C - Create new resource or Clear completed operations
+            if tui.currentView == .swiftBackgroundOperations {
+                await handleClearCompletedOperations(screen: screen)
+            } else {
+                Logger.shared.logUserAction("create_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
+                await handleCreateResource()
+            }
         case Int32(76): // L - View server logs
             if tui.currentView == .servers && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("view_server_logs", details: ["selectedIndex": tui.selectedIndex])
                 await handleViewServerLogs(screen: screen)
+            }
+        case Int32(79): // O - View server console or open console in browser
+            if tui.currentView == .servers && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("view_server_console", details: ["selectedIndex": tui.selectedIndex])
+                await handleViewServerConsole(screen: screen)
+            } else if tui.currentView == .serverConsole {
+                Logger.shared.logUserAction("open_console_in_browser")
+                await handleOpenConsoleInBrowser()
             }
         case Int32(66): // B - Create backup (volume)
             if tui.currentView == .volumes && !tui.currentView.isDetailView {
@@ -1105,8 +1147,14 @@ class InputHandler {
             guard tui.selectedIndex < tui.cachedSwiftContainers.count else { return "" }
             return tui.cachedSwiftContainers[tui.selectedIndex].id
         case .swiftContainerDetail:
-            guard let objects = tui.cachedSwiftObjects, tui.selectedIndex < objects.count else { return "" }
-            return objects[tui.selectedIndex].id
+            guard let objects = tui.cachedSwiftObjects else { return "" }
+            // Build tree structure to match what's displayed
+            let currentPath = tui.swiftNavState.currentPathString
+            let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+            // Apply search filter if present
+            let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery?.isEmpty ?? true ? nil : tui.searchQuery)
+            guard tui.selectedIndex < filteredItems.count else { return "" }
+            return filteredItems[tui.selectedIndex].id
         default:
             return ""
         }
@@ -1152,6 +1200,8 @@ class InputHandler {
             await tui.resourceOperations.deleteSwiftContainer(screen: screen)
         } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
             await tui.resourceOperations.deleteSwiftObject(screen: screen)
+        } else if tui.currentView == .swiftBackgroundOperations && !tui.currentView.isDetailView {
+            await handleCancelBackgroundOperation(screen: screen)
         }
     }
 
@@ -1177,6 +1227,41 @@ class InputHandler {
         if tui.currentView == .servers && !tui.currentView.isDetailView {
             await tui.actions.viewServerLogs(screen: screen)
         }
+    }
+
+    private func handleViewServerConsole(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .servers && !tui.currentView.isDetailView {
+            await tui.actions.viewServerConsole(screen: screen)
+        }
+    }
+
+    private func handleOpenConsoleInBrowser() async {
+        guard let tui = tui else { return }
+
+        if let console = tui.selectedResource as? RemoteConsole {
+            if console.type.lowercased() == "novnc" {
+                await openURLInBrowser(console.url)
+                tui.statusMessage = "Opening console in default browser..."
+            } else {
+                tui.statusMessage = "Browser opening only supported for noVNC consoles"
+            }
+        }
+    }
+
+    private func openURLInBrowser(_ url: String) async {
+        #if os(macOS)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [url]
+        try? process.run()
+        #elseif os(Linux)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xdg-open")
+        process.arguments = [url]
+        try? process.run()
+        #endif
     }
 
     private func handleStartServer(screen: OpaquePointer?) async {
@@ -1368,6 +1453,54 @@ class InputHandler {
 
                 // Navigate to directory metadata form
                 tui.changeView(to: .swiftDirectoryMetadata, resetSelection: false)
+            }
+        }
+    }
+
+    private func handleManageContainerWebAccess(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        if tui.currentView == .swift && !tui.currentView.isDetailView {
+            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+
+            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            guard let containerName = container.name else {
+                tui.statusMessage = "Invalid container"
+                return
+            }
+
+            // Fetch current metadata to check web access status
+            do {
+                let metadata = try await tui.client.swift.getContainerMetadata(containerName: containerName)
+
+                // Get Swift storage URL
+                let swiftEndpoint: String
+                do {
+                    swiftEndpoint = try await tui.client.coreClient.getEndpoint(for: "object-store")
+                } catch {
+                    tui.statusMessage = "Could not determine Swift endpoint"
+                    return
+                }
+
+                // Load form with metadata and endpoint (container name is stored in the form)
+                tui.swiftContainerWebAccessForm.loadFromMetadata(metadata, swiftEndpoint: swiftEndpoint)
+
+                // Initialize form state
+                tui.swiftContainerWebAccessFormState = FormBuilderState(
+                    fields: tui.swiftContainerWebAccessForm.buildFields(
+                        selectedFieldId: "webAccessEnabled",
+                        activeFieldId: nil,
+                        formState: FormBuilderState(fields: [])
+                    )
+                )
+
+                // Navigate to web access form
+                tui.changeView(to: .swiftContainerWebAccess, resetSelection: false)
+            } catch {
+                tui.statusMessage = "Failed to load web access form: \(error.localizedDescription)"
             }
         }
     }
@@ -2061,6 +2194,136 @@ class InputHandler {
             tui.selectedResource = object
             tui.changeView(to: .swiftObjectDetail, resetSelection: false)
             tui.detailScrollOffset = 0
+        }
+    }
+
+    // MARK: - Swift Background Operations Helpers
+
+    private func handleOpenOperationDetail() async {
+        guard let tui = tui else { return }
+
+        let operations = tui.swiftBackgroundOps.getAllOperations()
+        guard tui.selectedIndex < operations.count else {
+            tui.statusMessage = "No operation selected"
+            return
+        }
+
+        let operation = operations[tui.selectedIndex]
+        tui.selectedResource = operation
+        tui.changeView(to: .swiftBackgroundOperationDetail, resetSelection: false)
+        tui.detailScrollOffset = 0
+    }
+
+    private func handleCancelBackgroundOperation(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        let operations = tui.swiftBackgroundOps.getAllOperations()
+        guard tui.selectedIndex < operations.count else {
+            tui.statusMessage = "No operation selected"
+            await tui.draw(screen: screen)
+            return
+        }
+
+        let operation = operations[tui.selectedIndex]
+
+        // Only allow cancelling active operations
+        guard operation.status.isActive else {
+            tui.statusMessage = "Can only cancel running or queued operations"
+            await tui.draw(screen: screen)
+            return
+        }
+
+        // Confirm cancellation
+        let operationDesc = operation.displayName
+        let confirmed = await ViewUtils.confirmOperation(
+            title: "Cancel Operation",
+            message: "Cancel '\(operationDesc)'?",
+            details: [
+                "Type: \(operation.type.displayName)",
+                "Status: \(operation.status.displayName)",
+                "Progress: \(operation.progressPercentage)%"
+            ],
+            screen: screen,
+            screenRows: tui.screenRows,
+            screenCols: tui.screenCols
+        )
+
+        guard confirmed else {
+            tui.statusMessage = "Cancellation aborted"
+            await tui.draw(screen: screen)
+            return
+        }
+
+        // Cancel the operation
+        operation.cancel()
+        tui.statusMessage = "Operation cancelled: \(operation.displayName)"
+        Logger.shared.logUserAction("cancel_background_operation", details: [
+            "operationId": operation.id.uuidString,
+            "type": "\(operation.type)",
+            "objectName": operation.objectName ?? "unknown"
+        ])
+        await tui.draw(screen: screen)
+    }
+
+    private func handleClearCompletedOperations(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        let completedCount = tui.swiftBackgroundOps.completedCount
+        guard completedCount > 0 else {
+            tui.statusMessage = "No completed operations to clear"
+            await tui.draw(screen: screen)
+            return
+        }
+
+        tui.swiftBackgroundOps.clearCompleted()
+        tui.statusMessage = "Cleared \(completedCount) completed operation(s)"
+        Logger.shared.logUserAction("clear_completed_operations", details: ["count": completedCount])
+
+        // Reset selection if needed
+        let remainingOps = tui.swiftBackgroundOps.getAllOperations()
+        if tui.selectedIndex >= remainingOps.count {
+            tui.selectedIndex = max(0, remainingOps.count - 1)
+        }
+
+        await tui.draw(screen: screen)
+    }
+
+    // MARK: - Modal Input Handler
+    private func handleModalInput(_ ch: Int32, screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+        guard let modal = tui.userFeedback.currentModal else { return }
+
+        switch modal.type {
+        case .confirmation(_, _, _, _, _, let onConfirm, let onCancel):
+            switch ch {
+            case Int32(10), Int32(13): // ENTER - confirm
+                onConfirm()
+                await tui.draw(screen: screen)
+
+            case Int32(27): // ESC - cancel
+                onCancel()
+                await tui.draw(screen: screen)
+
+            case Int32(121), Int32(89): // 'y' or 'Y' - confirm
+                onConfirm()
+                await tui.draw(screen: screen)
+
+            case Int32(110), Int32(78): // 'n' or 'N' - cancel
+                onCancel()
+                await tui.draw(screen: screen)
+
+            default:
+                // Ignore other input for confirmation modals
+                break
+            }
+
+        case .input, .selection, .progress:
+            // TODO: Implement input handling for other modal types
+            // For now, ESC cancels any modal
+            if ch == Int32(27) {
+                tui.userFeedback.dismissModal()
+                await tui.draw(screen: screen)
+            }
         }
     }
 }

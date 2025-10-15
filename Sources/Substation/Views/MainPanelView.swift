@@ -7,15 +7,13 @@ enum ViewMode: CaseIterable {
     case loading, dashboard, servers, serverGroups, networks, securityGroups, volumes, volumeArchives, images, flavors, advancedSearch, healthDashboard
     case subnets, ports, routers, floatingIPs
     // OpenStack Services
-    case barbican, barbicanSecrets, barbicanContainers, octavia, swift
-    case serverDetail, serverGroupDetail, networkDetail, securityGroupDetail, volumeDetail, volumeArchiveDetail, imageDetail, flavorDetail, subnetDetail, portDetail, routerDetail, floatingIPDetail, healthDashboardServiceDetail
+    case barbican, barbicanSecrets, barbicanContainers, octavia, swift, swiftBackgroundOperations
+    case serverDetail, serverConsole, serverGroupDetail, networkDetail, securityGroupDetail, volumeDetail, volumeArchiveDetail, imageDetail, flavorDetail, subnetDetail, portDetail, routerDetail, floatingIPDetail, healthDashboardServiceDetail
     // OpenStack Services Details
-    case barbicanSecretDetail, barbicanContainerDetail, octaviaLoadBalancerDetail, swiftContainerDetail, swiftObjectDetail
+    case barbicanSecretDetail, barbicanContainerDetail, octaviaLoadBalancerDetail, swiftContainerDetail, swiftObjectDetail, swiftBackgroundOperationDetail
     case serverCreate, serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement, subnetCreate, volumeCreate, portCreate, routerCreate, floatingIPCreate, keyPairs, keyPairDetail, keyPairCreate, help, about, serverSecurityGroups, serverNetworkInterfaces, serverGroupManagement, volumeManagement, floatingIPServerSelect, serverSnapshotManagement, serverResize, volumeSnapshotManagement, volumeBackupManagement, networkServerAttachment, securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement, volumeServerManagement, floatingIPServerManagement, floatingIPPortManagement, portServerManagement, portAllowedAddressPairManagement, subnetRouterManagement, flavorSelection
     // OpenStack Services Create Forms
-    case barbicanSecretCreate, barbicanContainerCreate, octaviaLoadBalancerCreate, swiftContainerCreate, swiftObjectUpload, swiftContainerDownload, swiftObjectDownload, swiftDirectoryDownload, swiftContainerMetadata, swiftObjectMetadata, swiftDirectoryMetadata
-    // Upload Management
-    case uploadStatus
+    case barbicanSecretCreate, barbicanContainerCreate, octaviaLoadBalancerCreate, swiftContainerCreate, swiftObjectUpload, swiftContainerDownload, swiftObjectDownload, swiftDirectoryDownload, swiftContainerMetadata, swiftObjectMetadata, swiftDirectoryMetadata, swiftContainerWebAccess
 
     var title: String {
         switch self {
@@ -23,6 +21,7 @@ enum ViewMode: CaseIterable {
             case .dashboard: return "Dashboard"
             case .servers: return "Servers"
             case .serverDetail: return "Server Details"
+            case .serverConsole: return "Server Console"
             case .serverCreate: return "Create Server"
             case .serverSnapshotManagement: return "Create Server Snapshot"
             case .serverResize: return "Resize Server"
@@ -91,6 +90,7 @@ enum ViewMode: CaseIterable {
             case .swiftContainerMetadata: return "Set Container Metadata"
             case .swiftObjectMetadata: return "Set Object Metadata"
             case .swiftDirectoryMetadata: return "Set Directory Metadata"
+            case .swiftContainerWebAccess: return "Manage Web Access"
             case .help: return "Help"
             case .about: return "About"
             case .networkServerAttachment: return "Attach Network to Servers"
@@ -104,7 +104,8 @@ enum ViewMode: CaseIterable {
             case .portAllowedAddressPairManagement: return "Manage Allowed Address Pairs"
             case .subnetRouterManagement: return "Manage Subnet Router Attachment"
             case .flavorSelection: return "Select Server Flavor"
-            case .uploadStatus: return "Upload Status"
+            case .swiftBackgroundOperations: return "Operations"
+            case .swiftBackgroundOperationDetail: return "Operation Details"
         }
     }
 
@@ -127,6 +128,7 @@ enum ViewMode: CaseIterable {
         case .routers: return "[r]"
         case .floatingIPs: return "[l]"
         case .serverDetail: return ""
+        case .serverConsole: return ""
         case .serverGroupDetail: return ""
         case .networkDetail: return ""
         case .securityGroupDetail: return ""
@@ -158,12 +160,14 @@ enum ViewMode: CaseIterable {
         case .barbicanContainers: return ""
         case .octavia: return "[o]"
         case .swift: return "[j]"
+        case .swiftBackgroundOperations: return "[t]"
         // OpenStack Services Details
         case .barbicanSecretDetail: return ""
         case .barbicanContainerDetail: return ""
         case .octaviaLoadBalancerDetail: return ""
         case .swiftContainerDetail: return ""
         case .swiftObjectDetail: return ""
+        case .swiftBackgroundOperationDetail: return ""
         // OpenStack Services Create Forms
         case .barbicanSecretCreate: return ""
         case .barbicanContainerCreate: return ""
@@ -176,6 +180,7 @@ enum ViewMode: CaseIterable {
         case .swiftContainerMetadata: return ""
         case .swiftObjectMetadata: return ""
         case .swiftDirectoryMetadata: return ""
+        case .swiftContainerWebAccess: return ""
         case .help: return "[?]"
         case .about: return "[@]"
         case .serverSecurityGroups: return ""
@@ -198,16 +203,15 @@ enum ViewMode: CaseIterable {
         case .portAllowedAddressPairManagement: return ""
         case .subnetRouterManagement: return ""
         case .flavorSelection: return ""
-        case .uploadStatus: return ""
         }
     }
 
     var isDetailView: Bool {
         switch self {
-        case .serverDetail, .serverGroupDetail, .networkDetail, .securityGroupDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .healthDashboardServiceDetail, .serverCreate, .serverGroupCreate, .networkCreate, .securityGroupCreate, .securityGroupRuleManagement, .subnetCreate, .volumeCreate, .portCreate, .routerCreate, .floatingIPCreate, .keyPairDetail, .keyPairCreate, .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement, .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement, .serverResize, .volumeSnapshotManagement, .volumeBackupManagement, .networkServerAttachment, .securityGroupServerAttachment, .securityGroupServerManagement, .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement, .floatingIPPortManagement, .portServerManagement, .portAllowedAddressPairManagement, .subnetRouterManagement:
+        case .serverDetail, .serverConsole, .serverGroupDetail, .networkDetail, .securityGroupDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .healthDashboardServiceDetail, .serverCreate, .serverGroupCreate, .networkCreate, .securityGroupCreate, .securityGroupRuleManagement, .subnetCreate, .volumeCreate, .portCreate, .routerCreate, .floatingIPCreate, .keyPairDetail, .keyPairCreate, .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement, .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement, .serverResize, .volumeSnapshotManagement, .volumeBackupManagement, .networkServerAttachment, .securityGroupServerAttachment, .securityGroupServerManagement, .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement, .floatingIPPortManagement, .portServerManagement, .portAllowedAddressPairManagement, .subnetRouterManagement:
             return true
         // OpenStack Services Detail Views
-        case .barbicanSecretDetail, .barbicanContainerDetail, .octaviaLoadBalancerDetail, .swiftObjectDetail:
+        case .barbicanSecretDetail, .barbicanContainerDetail, .octaviaLoadBalancerDetail, .swiftObjectDetail, .swiftBackgroundOperationDetail:
             return true
         // OpenStack Services Create Forms
         case .barbicanSecretCreate, .barbicanContainerCreate, .octaviaLoadBalancerCreate, .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload, .swiftObjectDownload, .swiftDirectoryDownload, .swiftContainerMetadata, .swiftObjectMetadata, .swiftDirectoryMetadata:
@@ -234,6 +238,7 @@ enum ViewMode: CaseIterable {
     var parentView: ViewMode {
         switch self {
         case .serverDetail: return .servers
+        case .serverConsole: return .servers
         case .serverGroupDetail: return .serverGroups
         case .networkDetail: return .networks
         case .securityGroupDetail: return .securityGroups
@@ -278,6 +283,7 @@ enum ViewMode: CaseIterable {
         case .octaviaLoadBalancerCreate: return .octavia
         case .swiftContainerDetail: return .swift
         case .swiftObjectDetail: return .swiftContainerDetail
+        case .swiftBackgroundOperationDetail: return .swiftBackgroundOperations
         case .swiftContainerCreate: return .swift
         case .swiftObjectUpload: return .swift
         case .swiftContainerDownload: return .swift
@@ -286,6 +292,7 @@ enum ViewMode: CaseIterable {
         case .swiftContainerMetadata: return .swift
         case .swiftObjectMetadata: return .swiftContainerDetail
         case .swiftDirectoryMetadata: return .swiftContainerDetail
+        case .swiftContainerWebAccess: return .swift
         case .networkServerAttachment: return .networks
         case .securityGroupServerAttachment: return .securityGroups
         case .securityGroupServerManagement: return .securityGroups
@@ -297,7 +304,6 @@ enum ViewMode: CaseIterable {
         case .portAllowedAddressPairManagement: return .ports
         case .subnetRouterManagement: return .subnets
         case .flavorSelection: return .serverCreate
-        case .uploadStatus: return .swift
         default: return self
         }
     }
@@ -362,6 +368,11 @@ struct MainPanelView {
         case .serverDetail:
             if let server = tui.selectedResource as? Server {
                 await ServerViews.drawServerDetail(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, server: server, cachedVolumes: tui.cachedVolumes, cachedFlavors: tui.cachedFlavors, cachedImages: tui.cachedImages, scrollOffset: tui.detailScrollOffset)
+            }
+        case .serverConsole:
+            if let console = tui.selectedResource as? RemoteConsole {
+                let serverName = tui.previousSelectedResourceName ?? "Unknown Server"
+                await ServerViews.drawServerConsole(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, console: console, serverName: serverName, scrollOffset: tui.detailScrollOffset)
             }
         case .serverGroupDetail:
             if let serverGroup = tui.selectedResource as? ServerGroup {
@@ -576,6 +587,8 @@ struct MainPanelView {
             await SwiftViews.drawSwiftContainerMetadata(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftContainerMetadataFormState)
         case .swiftObjectMetadata:
             await SwiftViews.drawSwiftObjectMetadata(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftObjectMetadataFormState)
+        case .swiftContainerWebAccess:
+            await SwiftViews.drawSwiftContainerWebAccess(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftContainerWebAccessFormState)
         case .swiftDirectoryMetadata:
             await SwiftViews.drawSwiftDirectoryMetadata(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftDirectoryMetadataFormState)
         case .swiftObjectUpload:
@@ -586,9 +599,13 @@ struct MainPanelView {
             await SwiftViews.drawSwiftObjectDownload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftObjectDownloadFormState)
         case .swiftDirectoryDownload:
             await SwiftViews.drawSwiftDirectoryDownload(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, formBuilderState: tui.swiftDirectoryDownloadFormState)
-        case .uploadStatus:
-            // TODO: Upload status view not yet implemented
-            mvwaddstr(screen, Int32(mainStartRow + mainHeight / 2), Int32(mainStartCol + mainWidth / 2 - 15), "Upload Status - Not Yet Implemented")
+        case .swiftBackgroundOperations:
+            let operations = tui.swiftBackgroundOps.getAllOperations()
+            await SwiftBackgroundOperationsView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, operations: operations, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
+        case .swiftBackgroundOperationDetail:
+            if let operation = tui.selectedResource as? SwiftBackgroundOperation {
+                await SwiftBackgroundOperationDetailView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, operation: operation, scrollOffset: tui.detailScrollOffset)
+            }
         case .networkServerAttachment:
             await NetworkServerAttachmentView.draw(screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth, height: mainHeight, servers: tui.cachedServers, selectedServers: tui.selectedServers, searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
         case .securityGroupServerAttachment:

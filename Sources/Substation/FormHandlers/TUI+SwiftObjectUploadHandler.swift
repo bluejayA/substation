@@ -87,8 +87,8 @@ extension TUI {
                 swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
                 await self.draw(screen: screen)
             } else {
-                // Cancel and return to object list
-                self.changeView(to: .swiftContainerDetail, resetSelection: false)
+                // Cancel and return to container list
+                self.changeView(to: .swift, resetSelection: false)
             }
 
         case Int32(8), Int32(127), Int32(263): // BACKSPACE
@@ -126,33 +126,122 @@ extension TUI {
         let filePath = swiftObjectUploadForm.filePath.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         let containerName = swiftObjectUploadForm.containerName
 
+        // Change view immediately to return to container list
+        changeView(to: .swift, resetSelection: false)
+        await self.draw(screen: screen)
+
         // Check if path is a directory
         if swiftObjectUploadForm.isDirectory() {
-            await uploadDirectory(path: filePath, containerName: containerName, screen: screen)
+            startUploadDirectory(path: filePath, containerName: containerName, screen: screen)
         } else {
-            await uploadFile(path: filePath, containerName: containerName, screen: screen)
+            startUploadFile(path: filePath, containerName: containerName, screen: screen)
         }
     }
 
-    private func uploadFile(path: String, containerName: String, screen: OpaquePointer?) async {
+    private func startUploadFile(path: String, containerName: String, screen: OpaquePointer?) {
+        // Cancel any existing upload
+        activeUploadTask?.cancel()
+
         let objectName = swiftObjectUploadForm.getFinalObjectName()
 
-        // Change view to show object list during upload
-        changeView(to: .swiftContainerDetail, resetSelection: false)
-        await self.draw(screen: screen)
+        // Create operation tracker BEFORE starting the task so it shows up immediately
+        let operation = SwiftBackgroundOperation(
+            type: .upload,
+            containerName: containerName,
+            objectName: objectName,
+            localPath: path,
+            totalBytes: 0 // Will be updated when file is read
+        )
+        swiftBackgroundOps.addOperation(operation)
+        operation.status = .queued
+
+        // Start background upload task
+        activeUploadTask = Task { @MainActor in
+            await uploadFileInBackground(path: path, containerName: containerName, operation: operation, screen: screen)
+            self.activeUploadTask = nil
+            self.activeUploadMessage = nil
+        }
+
+        // Store task reference for cancellation
+        operation.task = activeUploadTask
+    }
+
+    private func startUploadDirectory(path: String, containerName: String, screen: OpaquePointer?) {
+        // Cancel any existing upload
+        activeUploadTask?.cancel()
+
+        // Create operation tracker BEFORE starting the task so it shows up immediately
+        let operation = SwiftBackgroundOperation(
+            type: .upload,
+            containerName: containerName,
+            objectName: nil, // Directory upload - will show path
+            localPath: path,
+            totalBytes: 0 // Will be updated when directory is scanned
+        )
+        swiftBackgroundOps.addOperation(operation)
+        operation.status = .queued
+
+        // Start background upload task
+        activeUploadTask = Task { @MainActor in
+            await uploadDirectoryInBackground(path: path, containerName: containerName, operation: operation, screen: screen)
+            self.activeUploadTask = nil
+            self.activeUploadMessage = nil
+        }
+
+        // Store task reference for cancellation
+        operation.task = activeUploadTask
+    }
+
+    private func uploadFileInBackground(path: String, containerName: String, operation: SwiftBackgroundOperation, screen: OpaquePointer?) async {
+        let objectName = operation.objectName ?? ""
 
         do {
             // Read file data
             let fileURL = URL(fileURLWithPath: path)
+
+            // Get file size information first
+            let fileAttributes = try FileManager.default.attributesOfItem(atPath: path)
+            let fileSize = (fileAttributes[.size] as? Int64) ?? 0
+            let fileSizeFormatted = SwiftStorageHelpers.formatFileSize(fileSize)
+
+            // Update operation with actual file size
+            operation.totalBytes = fileSize
+            operation.status = .running
+
+            // Check if object already exists with same content
+            activeUploadMessage = "Checking if '\(objectName)' already exists..."
+            do {
+                let metadata = try await client.swift.getObjectMetadata(containerName: containerName, objectName: objectName)
+
+                // Object exists - check if ETAGs match
+                if let remoteEtag = metadata.etag {
+                    let matches = try await FileHashUtility.localFileMatchesRemote(
+                        localFileURL: fileURL,
+                        remoteEtag: remoteEtag
+                    )
+
+                    if matches {
+                        // File is identical - skip upload
+                        operation.filesSkipped = 1
+                        operation.markCompleted()
+                        operation.progress = 1.0
+                        operation.bytesTransferred = fileSize
+
+                        activeUploadMessage = nil
+                        statusMessage = "Object '\(objectName)' already up to date (skipped)"
+                        return
+                    }
+                }
+            } catch {
+                // Object doesn't exist or HEAD failed - proceed with upload
+                // This is not an error condition
+            }
+
+            // Show initial status in background
+            activeUploadMessage = "Uploading '\(objectName)' (\(fileSizeFormatted))..."
+
+            // Read file data for upload
             let data = try Data(contentsOf: fileURL)
-
-            // Get file size information
-            let fileSize = data.count
-            let fileSizeMB = Double(fileSize) / (1024 * 1024)
-
-            // Show initial status
-            statusMessage = String(format: "Uploading '\(objectName)' (%.2f MB)...", fileSizeMB)
-            await self.draw(screen: screen)
 
             // Detect content type
             let contentType = swiftObjectUploadForm.detectContentType()
@@ -190,20 +279,35 @@ extension TUI {
             let uploadState = UploadState()
 
             // Run upload in background task
-            Task {
+            let uploadTask = Task {
                 do {
+                    // Check for cancellation before starting
+                    try Task.checkCancellation()
                     try await client.swift.uploadObject(request: request)
+                    await uploadState.markComplete()
+                } catch is CancellationError {
+                    // Task was cancelled - do not mark as failed
                     await uploadState.markComplete()
                 } catch {
                     await uploadState.markFailed(error)
                 }
             }
 
-            // Monitor upload with animated status
+            // Store reference to inner upload task for proper cancellation
+            operation.uploadTask = uploadTask
+
+            // Monitor upload with animated status (non-blocking)
             var elapsed: TimeInterval = 0
             let updateInterval: TimeInterval = 0.3 // 300ms
 
             while true {
+                // Check if operation was cancelled
+                if operation.status == .cancelled {
+                    activeUploadMessage = nil
+                    statusMessage = "Upload cancelled: \(objectName)"
+                    return
+                }
+
                 let status = await uploadState.checkStatus()
 
                 if status.complete {
@@ -213,15 +317,26 @@ extension TUI {
                     break
                 }
 
-                // Update animated status
+                // Update animated status without blocking
                 elapsed += updateInterval
                 let dots = String(repeating: ".", count: (Int(elapsed * 3) % 4))
-                statusMessage = String(format: "Uploading '\(objectName)' (%.2f MB)\(dots)", fileSizeMB)
-                await self.draw(screen: screen)
+                activeUploadMessage = "Uploading '\(objectName)' (\(fileSizeFormatted))\(dots)"
+
+                // Update operation progress (estimate based on time)
+                operation.progress = min(0.9, elapsed / 10.0) // Cap at 90% until complete
+                operation.bytesTransferred = Int64(Double(fileSize) * operation.progress)
+
+                // Trigger UI redraw to update operation detail view
+                markNeedsRedraw()
 
                 // Sleep to allow UI updates and avoid busy-waiting
                 try? await Task.sleep(nanoseconds: UInt64(updateInterval * 1_000_000_000))
             }
+
+            // Mark operation as complete
+            operation.markCompleted()
+            operation.progress = 1.0
+            operation.bytesTransferred = Int64(fileSize)
 
             // Refresh object list for the current container
             if let currentContainer = swiftNavState.currentContainer {
@@ -229,73 +344,40 @@ extension TUI {
             }
 
             // Show success
+            activeUploadMessage = nil
             statusMessage = "Object '\(objectName)' uploaded successfully"
-            await self.draw(screen: screen)
         } catch {
-            statusMessage = "Failed to upload object: \(error.localizedDescription)"
-            await self.draw(screen: screen)
+            // Categorize and log error
+            let transferError = TransferError.from(
+                error: error,
+                context: "upload",
+                objectName: objectName
+            )
+
+            // Mark operation as failed
+            if let operation = swiftBackgroundOps.getAllOperations().first(where: { $0.objectName == objectName }) {
+                operation.markFailed(error: transferError.userFacingMessage)
+            }
+
+            activeUploadMessage = nil
+            statusMessage = "Failed to upload object: \(transferError.userFacingMessage)"
         }
     }
 
-    private func drawUploadProgress(
-        screen: OpaquePointer?,
-        fileName: String,
-        currentBytes: Int64,
-        totalBytes: Int64,
-        overallProgress: Double
-    ) async {
-        guard let screen = screen else { return }
-
-        // Calculate display values
-        let mbCurrent = Double(currentBytes) / (1024 * 1024)
-        let mbTotal = Double(totalBytes) / (1024 * 1024)
-        let percentage = Int(overallProgress * 100)
-
-        // Update status message
-        statusMessage = String(format: "Uploading: %d%% (%.2f MB / %.2f MB)", percentage, mbCurrent, mbTotal)
-
-        // Create progress bar component
-        let progressBarWidth = min(60, Int(screenCols) - 10)
-        let progressBar = ProgressBar(
-            progress: overallProgress,
-            label: fileName,
-            width: progressBarWidth,
-            showPercentage: true
-        )
-
-        // Draw progress bar near bottom of screen
-        let surface = SwiftTUI.surface(from: screen)
-        let progressY = screenRows - 5
-        let progressBounds = Rect(
-            x: 2,
-            y: progressY,
-            width: screenCols - 4,
-            height: 3
-        )
-
-        await SwiftTUI.render(progressBar.build(), on: surface, in: progressBounds)
-
-        // Update the screen immediately
-        SwiftTUI.doupdate()
-
-        // Also trigger a full redraw to ensure visibility
-        await self.draw(screen: screen)
-    }
-
-    private func uploadDirectory(path: String, containerName: String, screen: OpaquePointer?) async {
+    private func uploadDirectoryInBackground(path: String, containerName: String, operation: SwiftBackgroundOperation, screen: OpaquePointer?) async {
         let prefix = swiftObjectUploadForm.prefix.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         let recursive = swiftObjectUploadForm.recursive
 
-        statusMessage = "Scanning directory '\(path)'..."
-        await self.draw(screen: screen)
+        operation.status = .running
+        activeUploadMessage = "Scanning directory '\(path)'..."
 
         do {
             // Get list of files to upload
             let filesToUpload = try collectFilesToUpload(directoryPath: path, recursive: recursive)
 
             if filesToUpload.isEmpty {
+                activeUploadMessage = nil
                 statusMessage = "No files found in directory"
-                await self.draw(screen: screen)
                 return
             }
 
@@ -313,110 +395,105 @@ extension TUI {
                 }
             }
 
-            // Upload each file with progress tracking
-            for (index, fileInfo) in filesToUpload.enumerated() {
-                let currentFile = index + 1
+            // Update operation with total size and file count
+            operation.totalBytes = totalBytes
+            operation.filesTotal = totalFiles
 
-                // Build object name
-                let objectName: String
-                if !prefix.isEmpty {
-                    objectName = "\(prefix)/\(fileInfo.relativePath)"
-                } else {
-                    objectName = fileInfo.relativePath
+            // Progress tracking actor for concurrent uploads
+            let uploadProgress = SwiftTransferProgressTracker()
+
+            // Concurrent upload limit (avoid overwhelming the server)
+            let maxConcurrentUploads = 10
+
+            // Use TaskGroup for concurrent uploads
+            await withTaskGroup(of: (success: Bool, fileName: String, bytes: Int64, skipped: Bool).self) { group in
+                var fileIterator = filesToUpload.enumerated().makeIterator()
+                var activeUploads = 0
+                var activeFileNames: Set<String> = []
+
+                // Start initial batch of uploads
+                while activeUploads < maxConcurrentUploads, let (index, fileInfo) = fileIterator.next() {
+                    await uploadProgress.fileStarted(fileInfo.relativePath)
+                    activeFileNames.insert(fileInfo.relativePath)
+                    group.addTask {
+                        await self.uploadSingleFile(
+                            fileInfo: fileInfo,
+                            index: index,
+                            containerName: containerName,
+                            prefix: prefix,
+                            client: self.client
+                        )
+                    }
+                    activeUploads += 1
                 }
 
-                do {
-                    // Read file data
-                    let data = try Data(contentsOf: fileInfo.url)
-                    let fileSize = Int64(data.count)
-
-                    // Show progress for this file
-                    statusMessage = "Uploading file \(currentFile) of \(totalFiles): \(fileInfo.relativePath)"
-
-                    // Draw multi-file progress
-                    await drawMultiFileProgress(
-                        screen: screen,
-                        currentFile: currentFile,
-                        totalFiles: totalFiles,
-                        currentFileName: fileInfo.relativePath,
-                        currentFileBytes: fileSize,
-                        totalBytes: totalBytes
-                    )
-
-                    // Detect content type from file extension
-                    let contentType = detectContentType(for: fileInfo.url)
-
-                    // Create upload request
-                    let request = UploadSwiftObjectRequest(
-                        containerName: containerName,
-                        objectName: objectName,
-                        data: data,
-                        contentType: contentType,
-                        metadata: [:],
-                        deleteAfter: nil,
-                        deleteAt: nil
-                    )
-
-                    // Upload with background task and status updates
-                    actor FileUploadState {
-                        var isComplete = false
-                        var error: (any Error)?
-
-                        func markComplete() {
-                            isComplete = true
-                        }
-
-                        func markFailed(_ error: any Error) {
-                            self.error = error
-                            isComplete = true
-                        }
-
-                        func checkStatus() -> (complete: Bool, error: (any Error)?) {
-                            return (isComplete, error)
-                        }
+                // Process results and start new uploads
+                while let result = await group.next() {
+                    // Check for cancellation
+                    if operation.status == .cancelled {
+                        group.cancelAll()
+                        activeUploadMessage = nil
+                        statusMessage = "Directory upload cancelled"
+                        return
                     }
 
-                    let uploadState = FileUploadState()
-
-                    // Run upload in background
-                    Task {
-                        do {
-                            try await client.swift.uploadObject(request: request)
-                            await uploadState.markComplete()
-                        } catch {
-                            await uploadState.markFailed(error)
-                        }
+                    // Update progress based on result
+                    activeFileNames.remove(result.fileName)
+                    if result.success {
+                        await uploadProgress.fileCompleted(result.fileName, bytes: result.bytes, skipped: result.skipped)
+                    } else {
+                        await uploadProgress.fileFailed(result.fileName)
                     }
 
-                    // Monitor upload with animated status
-                    var elapsed: TimeInterval = 0
-                    let updateInterval: TimeInterval = 0.3
+                    // Update progress display
+                    let progress = await uploadProgress.getProgress()
+                    successCount = progress.completed
+                    failedCount = progress.failed
+                    failedFiles = progress.failedFiles
 
-                    while true {
-                        let status = await uploadState.checkStatus()
+                    let uploadingList = activeFileNames.prefix(3).joined(separator: ", ")
+                    let moreCount = max(0, activeFileNames.count - 3)
+                    let uploadingText = moreCount > 0 ? "\(uploadingList) +\(moreCount) more" : uploadingList
 
-                        if status.complete {
-                            if let error = status.error {
-                                throw error
-                            }
-                            break
+                    let skipText = progress.skipped > 0 ? " (\(progress.skipped) skipped)" : ""
+                    activeUploadMessage = "Uploading \(progress.completed + progress.failed)/\(totalFiles)\(skipText): \(uploadingText)"
+
+                    // Update operation progress
+                    operation.progress = Double(progress.completed + progress.failed) / Double(totalFiles)
+                    operation.bytesTransferred = progress.bytes
+                    operation.filesSkipped = progress.skipped
+                    operation.filesCompleted = progress.completed
+
+                    // Trigger UI redraw
+                    markNeedsRedraw()
+
+                    // Start next upload if available
+                    if let (index, fileInfo) = fileIterator.next() {
+                        await uploadProgress.fileStarted(fileInfo.relativePath)
+                        activeFileNames.insert(fileInfo.relativePath)
+                        group.addTask {
+                            await self.uploadSingleFile(
+                                fileInfo: fileInfo,
+                                index: index,
+                                containerName: containerName,
+                                prefix: prefix,
+                                client: self.client
+                            )
                         }
-
-                        // Update animated status
-                        elapsed += updateInterval
-                        let dots = String(repeating: ".", count: (Int(elapsed * 3) % 4))
-                        statusMessage = "Uploading \(currentFile)/\(totalFiles): \(fileInfo.relativePath)\(dots)"
-                        await self.draw(screen: screen)
-
-                        try? await Task.sleep(nanoseconds: UInt64(updateInterval * 1_000_000_000))
                     }
-
-                    successCount += 1
-                } catch {
-                    failedCount += 1
-                    failedFiles.append(fileInfo.relativePath)
                 }
             }
+
+            // Final progress update
+            let finalProgress = await uploadProgress.getProgress()
+            successCount = finalProgress.completed
+            failedCount = finalProgress.failed
+            failedFiles = finalProgress.failedFiles
+            let skippedCount = finalProgress.skipped
+
+            // Update operation with final counts
+            operation.filesSkipped = skippedCount
+            operation.filesCompleted = successCount
 
             // Refresh object list for the current container
             if let currentContainer = swiftNavState.currentContainer {
@@ -424,61 +501,96 @@ extension TUI {
             }
 
             // Show final status
+            activeUploadMessage = nil
+            let itemText = SwiftTransferProgressTracker.formatItemCount(successCount, singular: "file", plural: "files")
+            let skipText = SwiftTransferProgressTracker.formatSkipMessage(skipped: skippedCount)
             if failedCount == 0 {
-                statusMessage = "Successfully uploaded \(successCount) files"
+                statusMessage = "Successfully uploaded \(itemText)\(skipText)"
             } else {
-                statusMessage = "Uploaded \(successCount) files, \(failedCount) failed: \(failedFiles.joined(separator: ", "))"
+                statusMessage = "Uploaded \(itemText)\(skipText), \(failedCount) failed: \(failedFiles.joined(separator: ", "))"
             }
-
-            // Return to object list
-            changeView(to: .swiftContainerDetail, resetSelection: false)
-            await self.draw(screen: screen)
         } catch {
-            statusMessage = "Failed to upload directory: \(error.localizedDescription)"
-            await self.draw(screen: screen)
+            // Categorize error
+            let transferError = TransferError.from(
+                error: error,
+                context: "directory upload",
+                filePath: path
+            )
+
+            activeUploadMessage = nil
+            statusMessage = "Failed to upload directory: \(transferError.userFacingMessage)"
         }
     }
 
-    private func drawMultiFileProgress(
-        screen: OpaquePointer?,
-        currentFile: Int,
-        totalFiles: Int,
-        currentFileName: String,
-        currentFileBytes: Int64,
-        totalBytes: Int64
-    ) async {
-        guard let screen = screen else { return }
+    private func uploadSingleFile(
+        fileInfo: FileToUpload,
+        index: Int,
+        containerName: String,
+        prefix: String,
+        client: OpenStackClient
+    ) async -> (success: Bool, fileName: String, bytes: Int64, skipped: Bool) {
+        // Build object name
+        let objectName: String
+        if !prefix.isEmpty {
+            objectName = "\(prefix)/\(fileInfo.relativePath)"
+        } else {
+            objectName = fileInfo.relativePath
+        }
 
-        // Create file progress info
-        let fileInfo = FileProgressInfo(
-            currentFile: currentFile,
-            totalFiles: totalFiles,
-            currentFileName: currentFileName,
-            currentFileBytes: currentFileBytes,
-            totalBytes: totalBytes
-        )
+        do {
+            // Check if object already exists with same content (ETAG optimization)
+            do {
+                let metadata = try await client.swift.getObjectMetadata(containerName: containerName, objectName: objectName)
 
-        // Create multi-file progress bar component
-        let progressBarWidth = min(60, Int(screenCols) - 10)
-        let progressBar = MultiFileProgressBar(
-            fileInfo: fileInfo,
-            width: progressBarWidth
-        )
+                // Object exists - check if ETAGs match
+                if let remoteEtag = metadata.etag {
+                    let matches = try await FileHashUtility.localFileMatchesRemote(
+                        localFileURL: fileInfo.url,
+                        remoteEtag: remoteEtag
+                    )
 
-        // Draw progress bar near bottom of screen
-        let surface = SwiftTUI.surface(from: screen)
-        let progressY = screenRows - 7
-        let progressBounds = Rect(
-            x: 2,
-            y: progressY,
-            width: screenCols - 4,
-            height: 5
-        )
+                    if matches {
+                        // File is identical - skip upload
+                        let fileSize = (try? FileManager.default.attributesOfItem(atPath: fileInfo.url.path)[.size] as? Int64) ?? 0
+                        return (success: true, fileName: fileInfo.relativePath, bytes: fileSize, skipped: true)
+                    }
+                }
+            } catch {
+                // Object doesn't exist or HEAD failed - proceed with upload
+            }
 
-        await SwiftTUI.render(progressBar.build(), on: surface, in: progressBounds)
+            // Read file data
+            let data = try Data(contentsOf: fileInfo.url)
+            let fileSize = Int64(data.count)
 
-        // Update the screen
-        SwiftTUI.doupdate()
+            // Detect content type from file extension
+            let contentType = detectContentType(for: fileInfo.url)
+
+            // Create upload request
+            let request = UploadSwiftObjectRequest(
+                containerName: containerName,
+                objectName: objectName,
+                data: data,
+                contentType: contentType,
+                metadata: [:],
+                deleteAfter: nil,
+                deleteAt: nil
+            )
+
+            // Check for cancellation before uploading
+            try Task.checkCancellation()
+
+            // Upload the file
+            try await client.swift.uploadObject(request: request)
+
+            return (success: true, fileName: fileInfo.relativePath, bytes: fileSize, skipped: false)
+        } catch is CancellationError {
+            // Task was cancelled - return failure but don't log error
+            return (success: false, fileName: fileInfo.relativePath, bytes: 0, skipped: false)
+        } catch {
+            // Upload failed
+            return (success: false, fileName: fileInfo.relativePath, bytes: 0, skipped: false)
+        }
     }
 
     private struct FileToUpload {
@@ -540,27 +652,6 @@ extension TUI {
     }
 
     private func detectContentType(for url: URL) -> String? {
-        let ext = url.pathExtension.lowercased()
-
-        switch ext {
-        case "txt": return "text/plain"
-        case "html", "htm": return "text/html"
-        case "css": return "text/css"
-        case "js": return "application/javascript"
-        case "json": return "application/json"
-        case "xml": return "application/xml"
-        case "pdf": return "application/pdf"
-        case "jpg", "jpeg": return "image/jpeg"
-        case "png": return "image/png"
-        case "gif": return "image/gif"
-        case "svg": return "image/svg+xml"
-        case "zip": return "application/zip"
-        case "tar": return "application/x-tar"
-        case "gz": return "application/gzip"
-        case "mp3": return "audio/mpeg"
-        case "mp4": return "video/mp4"
-        case "avi": return "video/x-msvideo"
-        default: return "application/octet-stream"
-        }
+        return SwiftStorageHelpers.detectContentType(for: url)
     }
 }

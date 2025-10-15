@@ -24,6 +24,15 @@ struct SwiftContainerMetadataForm {
             style: .accent
         )))
 
+        // Current values section
+        fields.append(.info(FormFieldInfo(
+            id: "currentValuesHeader",
+            label: "Current Values",
+            value: "Modify the ACLs below to update container access control",
+            isVisible: true,
+            style: .info
+        )))
+
         // Read ACL field
         fields.append(.text(FormFieldText(
             id: "readACL",

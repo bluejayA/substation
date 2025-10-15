@@ -93,8 +93,15 @@ extension TUI {
         case Int32(10): // ENTER - apply changes
             needsRedraw = true
             await uiHelpers.performSubnetRouterManagement()
+        case Int32(27): // ESC - back to subnet list
+            _ = await handleSubnetRouterManagementEscape()
         default:
             break
         }
+    }
+
+    private func handleSubnetRouterManagementEscape() async -> Bool {
+        // Use centralized ESC handling
+        return await NavigationInputHandler.handleEscapeKey(tui: self)
     }
 }
