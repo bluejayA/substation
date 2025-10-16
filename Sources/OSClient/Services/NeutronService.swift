@@ -610,9 +610,16 @@ public actor NeutronService: OpenStackService {
         // Query ports where device_id matches the router ID
         let ports = try await listPorts(deviceId: routerId)
 
-        // Filter for router interface ports and convert to RouterInterface
+        // Filter for ALL router-related ports (not just router_interface)
+        // Includes: network:router_interface, network:router_gateway, network:router_interface_distributed
         let interfaces = ports
-            .filter { $0.deviceOwner?.hasPrefix("network:router_interface") == true }
+            .filter { port in
+                guard let deviceOwner = port.deviceOwner else { return false }
+                // Include any port owned by a router component
+                return deviceOwner.hasPrefix("network:router_interface") ||
+                       deviceOwner.hasPrefix("network:router_gateway") ||
+                       deviceOwner == "network:router_interface_distributed"
+            }
             .compactMap { port -> RouterInterface? in
                 // Get subnet ID and IP address from fixedIps
                 guard let fixedIp = port.fixedIps?.first else { return nil }
@@ -623,6 +630,12 @@ public actor NeutronService: OpenStackService {
                     ipAddress: fixedIp.ipAddress
                 )
             }
+
+        logger.logInfo("Fetched router interfaces", context: [
+            "routerId": routerId,
+            "totalPorts": ports.count,
+            "interfaceCount": interfaces.count
+        ])
 
         return interfaces
     }

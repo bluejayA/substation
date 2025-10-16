@@ -1120,8 +1120,10 @@ class InputHandler {
             guard tui.selectedIndex < tui.cachedRouters.count else { return "" }
             return tui.cachedRouters[tui.selectedIndex].id
         case .ports:
-            guard tui.selectedIndex < tui.cachedPorts.count else { return "" }
-            return tui.cachedPorts[tui.selectedIndex].id
+            // Ports are sorted in the view, so we need to use the filtered/sorted list
+            let filteredPorts = FilterUtils.filterPorts(tui.cachedPorts, query: tui.searchQuery)
+            guard tui.selectedIndex < filteredPorts.count else { return "" }
+            return filteredPorts[tui.selectedIndex].id
         case .floatingIPs:
             guard tui.selectedIndex < tui.cachedFloatingIPs.count else { return "" }
             return tui.cachedFloatingIPs[tui.selectedIndex].id
@@ -1888,8 +1890,6 @@ class InputHandler {
             "count": itemCount
         ])
 
-        tui.statusMessage = "Deleting \(itemCount) \(resourceType)..."
-
         let batchOperation: BatchOperationType
 
         switch tui.currentView {
@@ -1928,31 +1928,70 @@ class InputHandler {
             return
         }
 
-        let result = await tui.batchOperationManager.execute(batchOperation) { @Sendable progress in
-            Task { @MainActor [weak tui] in
-                tui?.statusMessage = "Deleting: \(progress.currentOperation)/\(progress.totalOperations) (\(Int(progress.completionPercentage * 100))%)"
-            }
-        }
+        // Create background operation
+        let backgroundOp = SwiftBackgroundOperation(
+            type: .bulkDelete,
+            resourceType: resourceType,
+            itemsTotal: itemCount
+        )
 
-        if result.status == .completed {
-            tui.statusMessage = "Successfully deleted \(result.successfulOperations)/\(itemCount) \(resourceType)"
-            if result.failedOperations > 0 {
-                tui.statusMessage = tui.statusMessage! + " (\(result.failedOperations) failed)"
-            }
-        } else {
-            tui.statusMessage = "Bulk delete failed: \(result.error?.localizedDescription ?? "Unknown error")"
-        }
+        // Add to background operations manager
+        tui.swiftBackgroundOps.addOperation(backgroundOp)
 
+        // Exit multi-select mode immediately
         tui.multiSelectMode = false
         tui.multiSelectedResourceIDs.removeAll()
 
-        await tui.dataManager.refreshAllData()
+        // Show status message and stay on current view
+        tui.statusMessage = "Started bulk delete of \(itemCount) \(resourceType) in background"
 
-        Logger.shared.logUserAction("bulk_delete_completed", details: [
-            "view": "\(tui.currentView)",
-            "successful": result.successfulOperations,
-            "failed": result.failedOperations
-        ])
+        // Launch background task
+        let task = Task { @MainActor [weak tui, weak backgroundOp] in
+            guard let tui = tui, let backgroundOp = backgroundOp else { return }
+
+            backgroundOp.status = .running
+
+            let result = await tui.batchOperationManager.execute(batchOperation) { @Sendable progress in
+                Task { @MainActor [weak backgroundOp] in
+                    guard let backgroundOp = backgroundOp else { return }
+                    backgroundOp.itemsCompleted = progress.currentOperation
+                    backgroundOp.progress = progress.completionPercentage
+                }
+            }
+
+            // Update background operation with final results
+            backgroundOp.itemsCompleted = result.successfulOperations
+            backgroundOp.itemsFailed = result.failedOperations
+
+            // Mark as completed if batch completed (even with some failures)
+            // Individual failures are tracked via itemsFailed count
+            if result.status == .completed || result.status == .failed {
+                if result.failedOperations == result.totalOperations {
+                    // All operations failed - mark as failed with error
+                    let errorMsg = result.error?.localizedDescription ?? "All \(result.totalOperations) operations failed"
+                    backgroundOp.markFailed(error: errorMsg)
+                } else {
+                    // At least some succeeded - mark as completed
+                    backgroundOp.markCompleted()
+                }
+            } else if result.status == .cancelled {
+                backgroundOp.status = .cancelled
+            } else {
+                // Unexpected status
+                backgroundOp.markFailed(error: "Unexpected status: \(result.status.rawValue)")
+            }
+
+            // Refresh data after completion
+            await tui.dataManager.refreshAllData()
+
+            Logger.shared.logUserAction("bulk_delete_completed", details: [
+                "view": "\(tui.currentView)",
+                "successful": result.successfulOperations,
+                "failed": result.failedOperations
+            ])
+        }
+
+        backgroundOp.task = task
     }
 
 
@@ -2285,6 +2324,9 @@ class InputHandler {
             tui.selectedIndex = max(0, remainingOps.count - 1)
         }
 
+        // Use SwiftTUI's clear function to clear the screen before redrawing
+        // This ensures proper clearing through the SwiftTUI abstraction layer
+        SwiftTUI.clear(WindowHandle(screen))
         await tui.draw(screen: screen)
     }
 

@@ -369,6 +369,7 @@ struct MiscViews {
                 ("Floating IP Management", [
                     "SHIFT-C: Create new floating IP",
                     "SHIFT-M: Manage server attachment",
+                    "SHIFT-P: Manage port attachment",
                     "DELETE: Release floating IP",
                     "Provides external network access for servers",
                 ]),
@@ -888,8 +889,13 @@ struct MiscViews {
         )
     }
 
+    // Cache build information - computed once at first access
+    private static let cachedBuildInfo: (version: String, buildDate: String, gitCommit: String, configuration: String) = {
+        return getBuildInformation()
+    }()
+
     private static func getAboutInformation() -> [(String, [String])] {
-        let buildInfo = getBuildInformation()
+        let buildInfo = cachedBuildInfo
 
         let platform: String
         #if os(Linux)
@@ -955,8 +961,8 @@ struct MiscViews {
         // Get dynamic version from git tag or commit
         let version = getGitVersion()
 
-        // Get dynamic build date - current compilation time
-        let buildDate = Date().iso8601Formatted()
+        // Get actual build date from executable modification time
+        let buildDate = getExecutableBuildDate()
 
         // Get configuration
         #if DEBUG
@@ -969,6 +975,18 @@ struct MiscViews {
         let gitCommit = getGitCommitHash()
 
         return (version: version, buildDate: buildDate, gitCommit: gitCommit, configuration: configuration)
+    }
+
+    private static func getExecutableBuildDate() -> String {
+        // Try to get the modification date of the current executable
+        if let executablePath = ProcessInfo.processInfo.arguments.first,
+           let attributes = try? FileManager.default.attributesOfItem(atPath: executablePath),
+           let modificationDate = attributes[.modificationDate] as? Date {
+            return modificationDate.iso8601Formatted()
+        }
+
+        // Fallback to current date if we can't read the executable
+        return Date().iso8601Formatted()
     }
 
     private static func getGitVersion() -> String {

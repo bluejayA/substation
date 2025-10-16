@@ -253,10 +253,29 @@ struct FloatingIPCreateForm {
     }
 
     func validateForm() -> [String] {
-        let errors: [String] = []
+        var errors: [String] = []
 
-        // Validation for external network is handled by getNetworkValidationError
-        // Other fields are validated by their respective getters
+        // Validate external network selection
+        if selectedExternalNetworkID == nil {
+            errors.append("External network selection is required")
+        }
+
+        // Validate specific IP format if provided
+        if let specificIPError = getSpecificIPValidationError(externalNetworks: []) {
+            if !specificIPAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors.append(specificIPError)
+            }
+        }
+
+        // Validate DNS name if provided
+        if let dnsNameError = getDNSNameValidationError() {
+            errors.append(dnsNameError)
+        }
+
+        // Validate DNS domain if provided
+        if let dnsDomainError = getDNSDomainValidationError() {
+            errors.append(dnsDomainError)
+        }
 
         return errors
     }

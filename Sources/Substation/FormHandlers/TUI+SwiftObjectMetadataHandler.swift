@@ -10,111 +10,31 @@ import SwiftTUI
 @MainActor
 extension TUI {
 
+    /// Handle input for Swift object metadata form using the universal handler
     internal func handleSwiftObjectMetadataInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = swiftObjectMetadataFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = swiftObjectMetadataFormState
+        var localForm = swiftObjectMetadataForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                swiftObjectMetadataFormState.nextField()
-                swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = swiftObjectMetadataFormState.getCurrentField() {
-                switch currentField {
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        swiftObjectMetadataFormState.activateCurrentField()
-                        swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        swiftObjectMetadataFormState.handleCharacterInput(" ")
-                        swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                        await self.draw(screen: screen)
-                    }
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                swiftObjectMetadataFormState.deactivateCurrentField()
-                swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = swiftObjectMetadataForm.validateForm()
-                if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
-                    return
-                }
-
-                await submitSwiftObjectMetadata(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = swiftObjectMetadataFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    swiftObjectMetadataFormState.previousField()
-                } else {
-                    swiftObjectMetadataFormState.nextField()
-                }
-                swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                swiftObjectMetadataFormState.cancelCurrentField()
-                swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Cancel and return to object list
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.swiftObjectMetadataFormState = formState
+                self.swiftObjectMetadataForm = form
+                await self.submitSwiftObjectMetadata(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .swiftContainerDetail, resetSelection: false)
             }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = swiftObjectMetadataFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    swiftObjectMetadataFormState.handleCharacterInput(Character(scalar))
-                    swiftObjectMetadataForm.updateFromFormState(swiftObjectMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
-
-        // Rebuild form state to reflect any changes in form fields
-        swiftObjectMetadataFormState = FormBuilderState(
-            fields: swiftObjectMetadataForm.buildFields(
-                selectedFieldId: swiftObjectMetadataFormState.getCurrentFieldId(),
-                activeFieldId: swiftObjectMetadataFormState.getActiveFieldId(),
-                formState: swiftObjectMetadataFormState
-            ),
-            preservingStateFrom: swiftObjectMetadataFormState
         )
+
+        // Update actor-isolated properties with modified local copies
+        swiftObjectMetadataFormState = localFormState
+        swiftObjectMetadataForm = localForm
     }
 
     private func submitSwiftObjectMetadata(screen: OpaquePointer?) async {
@@ -154,3 +74,8 @@ extension TUI {
         }
     }
 }
+
+// MARK: - SwiftObjectMetadataForm Protocol Conformance
+
+// SwiftObjectMetadataForm already has all required methods
+extension SwiftObjectMetadataForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

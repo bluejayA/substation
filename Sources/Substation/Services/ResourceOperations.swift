@@ -393,7 +393,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting server '\(serverName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deleteServer(id: server.id)
@@ -465,7 +465,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting network '\(networkName ?? "Unknown")'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deleteNetwork(id: network.id)
@@ -544,7 +544,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting subnet '\(subnetName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deleteSubnet(id: subnet.id)
@@ -629,7 +629,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting port '\(portName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deletePort(id: port.id)
@@ -706,57 +706,114 @@ final class ResourceOperations {
             return
         }
 
-        // Show deletion in progress
-        statusMessage = "Deleting router '\(routerName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        // Create background operation for router deletion with dependency cleanup
+        let interfaceCount = router.interfaces?.count ?? 0
+        let hasGateway = router.externalGatewayInfo != nil
+        let totalSteps = interfaceCount + (hasGateway ? 1 : 0) + 1 // interfaces + gateway + delete
 
-        do {
-            try await client.deleteRouter(id: router.id)
+        let operation = SwiftBackgroundOperation(
+            type: .bulkDelete,
+            resourceType: "router",
+            itemsTotal: totalSteps
+        )
+        tui.swiftBackgroundOps.addOperation(operation)
 
-            // Remove from cached routers
-            if let index = cachedRouters.firstIndex(where: { $0.id == router.id }) {
-                cachedRouters.remove(at: index)
+        // Show status and navigate to operations view
+        statusMessage = "Started cleanup and deletion of router '\(routerName)'"
+        tui.changeView(to: .swiftBackgroundOperations, resetSelection: false)
+
+        // Launch background cleanup task
+        Task { @MainActor [weak self, weak operation] in
+            guard let self = self, let operation = operation else { return }
+            operation.status = .running
+            var completedSteps = 0
+
+            do {
+                // Step 0: Fetch fresh router details to get all current interfaces
+                Logger.shared.logInfo("Fetching fresh router details for cleanup")
+                let freshRouter = try await self.client.getRouter(id: router.id, forceRefresh: true)
+
+                // Update total steps based on actual interface count
+                let actualInterfaceCount = freshRouter.interfaces?.count ?? 0
+                let actualHasGateway = freshRouter.externalGatewayInfo != nil
+                let actualTotalSteps = actualInterfaceCount + (actualHasGateway ? 1 : 0) + 1
+                operation.itemsTotal = actualTotalSteps
+
+                Logger.shared.logInfo("Router cleanup details", context: [
+                    "routerId": router.id,
+                    "interfaceCount": actualInterfaceCount,
+                    "hasGateway": actualHasGateway,
+                    "totalSteps": actualTotalSteps
+                ])
+
+                // Step 1: Remove all router interfaces (subnet detachments)
+                if let interfaces = freshRouter.interfaces, !interfaces.isEmpty {
+                    Logger.shared.logInfo("Removing \(interfaces.count) router interfaces")
+                    for (index, interface) in interfaces.enumerated() {
+                        Logger.shared.logInfo("Processing interface \(index + 1)/\(interfaces.count)", context: [
+                            "subnetId": interface.subnetId ?? "nil",
+                            "portId": interface.portId ?? "nil",
+                            "ipAddress": interface.ipAddress ?? "nil"
+                        ])
+
+                        // Use port_id if available (more specific), otherwise subnet_id
+                        if let portId = interface.portId {
+                            try await self.client.removeRouterInterface(routerId: router.id, portId: portId)
+                            Logger.shared.logInfo("Removed router interface using port ID: \(portId)")
+                        } else if let subnetId = interface.subnetId {
+                            try await self.client.removeRouterInterface(routerId: router.id, subnetId: subnetId)
+                            Logger.shared.logInfo("Removed router interface using subnet ID: \(subnetId)")
+                        } else {
+                            Logger.shared.logWarning("Interface has neither port ID nor subnet ID, skipping")
+                        }
+                        completedSteps += 1
+                        operation.itemsCompleted = completedSteps
+                        operation.progress = Double(completedSteps) / Double(actualTotalSteps)
+                    }
+                } else {
+                    Logger.shared.logInfo("No interfaces found on router")
+                }
+
+                // Step 2: Clear external gateway if present
+                if freshRouter.externalGatewayInfo != nil {
+                    Logger.shared.logInfo("Clearing external gateway for router: \(router.id)")
+                    let clearGatewayRequest = UpdateRouterRequest(
+                        name: nil,
+                        description: nil,
+                        adminStateUp: nil,
+                        externalGatewayInfo: nil,
+                        routes: nil
+                    )
+                    _ = try await self.client.updateRouter(id: router.id, request: clearGatewayRequest)
+                    Logger.shared.logInfo("Cleared external gateway")
+                    completedSteps += 1
+                    operation.itemsCompleted = completedSteps
+                    operation.progress = Double(completedSteps) / Double(actualTotalSteps)
+                }
+
+                // Step 3: Delete the router
+                Logger.shared.logInfo("Deleting router: \(router.id)")
+                try await self.client.deleteRouter(id: router.id)
+                completedSteps += 1
+                operation.itemsCompleted = completedSteps
+                operation.progress = 1.0
+
+                // Mark operation as completed
+                operation.markCompleted()
+
+                // Refresh data
+                await self.tui.dataManager.refreshAllData()
+
+                Logger.shared.logInfo("Router '\(routerName)' deleted successfully with all dependencies cleaned up")
+
+            } catch {
+                Logger.shared.logError("Failed to delete router '\(routerName)': \(error)")
+                operation.itemsFailed = totalSteps - completedSteps
+                operation.markFailed(error: error.localizedDescription)
+
+                // Refresh data even on failure to show current state
+                await self.tui.dataManager.refreshAllData()
             }
-
-            // Adjust selection if needed
-            let newMaxIndex = max(0, filteredRouters.count - 2) // -1 for removed item, -1 for 0-based
-            selectedIndex = min(selectedIndex, newMaxIndex)
-
-            statusMessage = "Router '\(routerName)' deleted successfully"
-
-            // Refresh data to get updated router list
-            tui.refreshAfterOperation()
-
-        } catch let error as OpenStackError {
-            let baseMsg = "Failed to delete router '\(routerName)'"
-            switch error {
-            case .authenticationFailed:
-                statusMessage = "\(baseMsg): Authentication failed - check credentials"
-            case .endpointNotFound:
-                statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
-            case .unexpectedResponse:
-                statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
-                    case .networkError(let error):
-                        statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
-                    case .decodingError(let error):
-                        statusMessage = "\(baseMsg): Data decoding error - \(error.localizedDescription)"
-                    case .encodingError(let error):
-                        statusMessage = "\(baseMsg): Data encoding error - \(error.localizedDescription)"
-                    case .configurationError(let message):
-                        statusMessage = "\(baseMsg): Configuration error - \(message)"
-                    case .performanceEnhancementsNotAvailable:
-                        statusMessage = "\(baseMsg): Performance enhancements not available"
-                    case .missingRequiredField(let field):
-                        statusMessage = "\(baseMsg): Missing required field: \(field)"
-                    case .invalidResponse:
-                        statusMessage = "\(baseMsg): Invalid response from server"
-                    case .invalidURL:
-                        statusMessage = "\(baseMsg): Invalid URL configuration"
-            }
-        } catch {
-            statusMessage = "Failed to delete router '\(routerName)': \(error.localizedDescription)"
         }
     }
 
@@ -825,7 +882,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting volume '\(volumeName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deleteVolume(id: volume.id)
@@ -1007,7 +1064,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting key pair '\(keyPairName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deleteKeyPair(name: keyPairName)
@@ -1023,6 +1080,10 @@ final class ResourceOperations {
 
             // Refresh keypair cache
             await dataManager.refreshKeyPairData()
+
+            // Clear screen to remove graphical artifacts from deleted keypair
+            SwiftTUI.clear(WindowHandle(screen))
+            await tui.draw(screen: screen)
 
         } catch let error as OpenStackError {
             let baseMsg = "Failed to delete key pair '\(keyPairName)'"
@@ -1080,7 +1141,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting secret '\(secretName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.barbican.deleteSecret(id: secret.id)
@@ -1096,6 +1157,10 @@ final class ResourceOperations {
 
             // Refresh secrets cache
             await dataManager.refreshSecretsData()
+
+            // Clear screen to remove graphical artifacts from deleted secret
+            SwiftTUI.clear(WindowHandle(screen))
+            await tui.draw(screen: screen)
 
         } catch let error as OpenStackError {
             let baseMsg = "Failed to delete secret '\(secretName)'"
@@ -1138,7 +1203,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = "Creating secret '\(secretName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             let expiration = tui.barbicanSecretCreateForm.getExpirationDate()
@@ -1215,7 +1280,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting image '\(imageName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deleteImage(id: image.id)
@@ -1276,7 +1341,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = "Creating key pair '\(keyPairName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             let trimmedKey = keyPairCreateForm.publicKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1394,7 +1459,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = maxVolumesCount > 1 ? "Creating \(maxVolumesCount) volumes..." : "Creating volume '\(volumeNameBase)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             // Create volumes with indexed names if maxVolumesCount > 1
@@ -1513,7 +1578,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = "Creating port '\(portName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             // Prepare security groups if port security is enabled
@@ -1600,7 +1665,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = "Creating floating IP..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             // Create the floating IP with all selected parameters
@@ -1663,7 +1728,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = "Creating network '\(networkName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             // Collect all form data
@@ -1683,8 +1748,9 @@ final class ResourceOperations {
             tui.networkCreateForm = NetworkCreateForm()
             tui.networkCreateFormState = FormBuilderState(fields: [])
 
-            // Refresh network cache and return to list
-            tui.refreshAfterOperation()
+            // Refresh network cache immediately before returning to list
+            await dataManager.refreshAllData()
+            lastRefresh = Date()
             tui.changeView(to: .networks, resetSelection: false)
 
         } catch let error as OpenStackError {
@@ -1732,7 +1798,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = "Creating security group '\(securityGroupName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             // Collect all form data
@@ -1795,7 +1861,7 @@ final class ResourceOperations {
 
         // Show creation in progress
         statusMessage = "Creating subnet '\(subnetName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             // Collect all form data - use selected network ID
@@ -2015,6 +2081,10 @@ final class ResourceOperations {
             statusMessage = "Server group '\(serverGroup.name ?? "Unknown")' deleted successfully"
             Logger.shared.logInfo("Deleted server group: \(serverGroup.name ?? "Unknown")")
 
+            // Clear screen to remove graphical artifacts from deleted server group
+            SwiftTUI.clear(WindowHandle(screen))
+            await tui.draw(screen: screen)
+
         } catch {
             statusMessage = "Failed to delete server group: \(error.localizedDescription)"
             Logger.shared.logError("Failed to delete server group '\(serverGroup.name ?? "Unknown")': \(error.localizedDescription)")
@@ -2041,7 +2111,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting security group '\(securityGroupName)'..."
-        await tui.draw(screen: screen) // Refresh UI to show progress message
+        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
 
         do {
             try await client.deleteSecurityGroup(id: securityGroup.id)

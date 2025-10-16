@@ -7,114 +7,36 @@ import Glibc
 import OSClient
 import SwiftTUI
 
+// MARK: - Swift Container Create Input Handler (Universal Pattern)
+
 @MainActor
 extension TUI {
 
+    /// Handle input for SwiftContainer create form using the universal handler
     internal func handleSwiftContainerCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = swiftContainerCreateFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = swiftContainerCreateFormState
+        var localForm = swiftContainerCreateForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                swiftContainerCreateFormState.nextField()
-                swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = swiftContainerCreateFormState.getCurrentField() {
-                switch currentField {
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        swiftContainerCreateFormState.activateCurrentField()
-                        swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        swiftContainerCreateFormState.handleCharacterInput(" ")
-                        swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                swiftContainerCreateFormState.deactivateCurrentField()
-                swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = swiftContainerCreateForm.validateForm()
-                if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
-                    return
-                }
-
-                await submitSwiftContainerCreation(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = swiftContainerCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    swiftContainerCreateFormState.previousField()
-                } else {
-                    swiftContainerCreateFormState.nextField()
-                }
-                swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                swiftContainerCreateFormState.cancelCurrentField()
-                swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Cancel and return to container list
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.swiftContainerCreateFormState = formState
+                self.swiftContainerCreateForm = form
+                await self.submitSwiftContainerCreation(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .swift, resetSelection: false)
             }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = swiftContainerCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    swiftContainerCreateFormState.handleCharacterInput(Character(scalar))
-                    swiftContainerCreateForm.updateFromFormState(swiftContainerCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
-
-        // Rebuild form state to reflect any changes in form fields
-        swiftContainerCreateFormState = FormBuilderState(
-            fields: swiftContainerCreateForm.buildFields(
-                selectedFieldId: swiftContainerCreateFormState.getCurrentFieldId(),
-                activeFieldId: swiftContainerCreateFormState.getActiveFieldId(),
-                formState: swiftContainerCreateFormState
-            ),
-            preservingStateFrom: swiftContainerCreateFormState
         )
+
+        // Update actor-isolated properties with modified local copies
+        swiftContainerCreateFormState = localFormState
+        swiftContainerCreateForm = localForm
     }
 
     private func submitSwiftContainerCreation(screen: OpaquePointer?) async {
@@ -146,3 +68,8 @@ extension TUI {
         }
     }
 }
+
+// MARK: - SwiftContainerCreateForm Protocol Conformance
+
+// SwiftContainerCreateForm already has all required methods
+extension SwiftContainerCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

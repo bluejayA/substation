@@ -10,118 +10,39 @@ import SwiftTUI
 @MainActor
 extension TUI {
 
+    /// Handle input for Swift Directory Download form using universal handler
     internal func handleSwiftDirectoryDownloadInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = swiftDirectoryDownloadFormState.isCurrentFieldActive()
+        var localFormState = swiftDirectoryDownloadFormState
+        var localForm = swiftDirectoryDownloadForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                swiftDirectoryDownloadFormState.nextField()
-                swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = swiftDirectoryDownloadFormState.getCurrentField() {
-                switch currentField {
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        swiftDirectoryDownloadFormState.activateCurrentField()
-                        swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        swiftDirectoryDownloadFormState.handleCharacterInput(" ")
-                        swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                        await self.draw(screen: screen)
-                    }
-                case .checkbox:
-                    if !isFieldActive {
-                        // Toggle checkbox
-                        swiftDirectoryDownloadFormState.toggleCurrentField()
-                        swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                        await self.draw(screen: screen)
-                    }
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                swiftDirectoryDownloadFormState.deactivateCurrentField()
-                swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = swiftDirectoryDownloadForm.validateForm()
-                if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
-                    return
-                }
-
-                await submitSwiftDirectoryDownload(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = swiftDirectoryDownloadFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    swiftDirectoryDownloadFormState.previousField()
-                } else {
-                    swiftDirectoryDownloadFormState.nextField()
-                }
-                swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                swiftDirectoryDownloadFormState.cancelCurrentField()
-                swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Cancel and return to container list
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                self.swiftDirectoryDownloadFormState = formState
+                self.swiftDirectoryDownloadForm = form
+                await self.submitSwiftDirectoryDownload(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .swift, resetSelection: false)
             }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = swiftDirectoryDownloadFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    swiftDirectoryDownloadFormState.handleCharacterInput(Character(scalar))
-                    swiftDirectoryDownloadForm.updateFromFormState(swiftDirectoryDownloadFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
-
-        // Rebuild form state to reflect any changes in form fields
-        swiftDirectoryDownloadFormState = FormBuilderState(
-            fields: swiftDirectoryDownloadForm.buildFields(
-                selectedFieldId: swiftDirectoryDownloadFormState.getCurrentFieldId(),
-                activeFieldId: swiftDirectoryDownloadFormState.getActiveFieldId(),
-                formState: swiftDirectoryDownloadFormState
-            ),
-            preservingStateFrom: swiftDirectoryDownloadFormState
         )
+
+        // Rebuild form state to reflect any changes
+        localFormState = FormBuilderState(
+            fields: localForm.buildFields(
+                selectedFieldId: localFormState.getCurrentFieldId(),
+                activeFieldId: localFormState.getActiveFieldId(),
+                formState: localFormState
+            ),
+            preservingStateFrom: localFormState
+        )
+
+        // Update actor-isolated properties
+        swiftDirectoryDownloadFormState = localFormState
+        swiftDirectoryDownloadForm = localForm
     }
 
     private func submitSwiftDirectoryDownload(screen: OpaquePointer?) async {
@@ -442,3 +363,9 @@ extension TUI {
         }
     }
 }
+
+// MARK: - SwiftDirectoryDownloadForm Protocol Conformance
+
+// SwiftDirectoryDownloadForm already conforms to all required protocols
+extension SwiftDirectoryDownloadForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}
+

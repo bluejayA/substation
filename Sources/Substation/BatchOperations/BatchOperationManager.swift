@@ -565,7 +565,20 @@ actor BatchOperationManager {
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteServer(id: operation.resourceIdentifier)
+        // Log project ID for debugging
+        let projectId = await client.projectID
+        Logger.shared.logDebug("BatchOperationManager - Deleting server \(operation.resourceIdentifier) using project ID: \(projectId ?? "nil")")
+
+        do {
+            try await client.deleteServer(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            // Treat 404 as success - resource already deleted (idempotent)
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Server \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeNetworkCreate(
@@ -591,7 +604,15 @@ actor BatchOperationManager {
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteNetwork(id: operation.resourceIdentifier)
+        do {
+            try await client.deleteNetwork(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Network \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeSubnetCreate(
@@ -642,7 +663,15 @@ actor BatchOperationManager {
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteVolume(id: operation.resourceIdentifier)
+        do {
+            try await client.deleteVolume(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Volume \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeVolumeAttach(
@@ -773,56 +802,152 @@ actor BatchOperationManager {
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteSubnet(id: operation.resourceIdentifier)
+        do {
+            try await client.deleteSubnet(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Subnet \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeRouterDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteRouter(id: operation.resourceIdentifier)
+        let routerId = operation.resourceIdentifier
+
+        // Fetch fresh router details to get all current interfaces
+        let router = try await client.getRouter(id: routerId, forceRefresh: true)
+
+        // Step 1: Remove all router interfaces (subnet detachments)
+        if let interfaces = router.interfaces, !interfaces.isEmpty {
+            Logger.shared.logDebug("BatchOperationManager - Removing \(interfaces.count) router interfaces for \(routerId)")
+            for interface in interfaces {
+                // Use port_id if available (more specific), otherwise subnet_id
+                if let portId = interface.portId {
+                    try await client.removeRouterInterface(routerId: routerId, portId: portId)
+                } else if let subnetId = interface.subnetId {
+                    try await client.removeRouterInterface(routerId: routerId, subnetId: subnetId)
+                }
+            }
+        }
+
+        // Step 2: Clear external gateway if present
+        if router.externalGatewayInfo != nil {
+            Logger.shared.logDebug("BatchOperationManager - Clearing external gateway for router \(routerId)")
+            let clearGatewayRequest = UpdateRouterRequest(
+                name: nil,
+                description: nil,
+                adminStateUp: nil,
+                externalGatewayInfo: nil,
+                routes: nil
+            )
+            _ = try await client.updateRouter(id: routerId, request: clearGatewayRequest)
+        }
+
+        // Step 3: Delete the router
+        do {
+            try await client.deleteRouter(id: routerId)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Router \(routerId) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executePortDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deletePort(id: operation.resourceIdentifier)
+        do {
+            try await client.deletePort(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Port \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeFloatingIPDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteFloatingIP(id: operation.resourceIdentifier)
+        do {
+            try await client.deleteFloatingIP(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - FloatingIP \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeSecurityGroupDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteSecurityGroup(id: operation.resourceIdentifier)
+        do {
+            try await client.deleteSecurityGroup(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - SecurityGroup \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeServerGroupDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteServerGroup(id: operation.resourceIdentifier)
+        do {
+            try await client.deleteServerGroup(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - ServerGroup \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeKeyPairDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteKeyPair(name: operation.resourceIdentifier)
+        do {
+            try await client.deleteKeyPair(name: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - KeyPair \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeImageDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.deleteImage(id: operation.resourceIdentifier)
+        do {
+            try await client.deleteImage(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Image \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     // MARK: - Swift Object Storage Executors
@@ -851,7 +976,15 @@ actor BatchOperationManager {
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
     ) async throws {
-        try await client.swift.deleteContainer(containerName: operation.resourceIdentifier)
+        do {
+            try await client.swift.deleteContainer(containerName: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Swift container \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     private func executeSwiftObjectUpload(
@@ -903,7 +1036,15 @@ actor BatchOperationManager {
             throw BatchOperationError.executionFailed("Swift delete operation not found")
         }
 
-        try await client.swift.deleteObject(containerName: containerName, objectName: operation.resourceIdentifier)
+        do {
+            try await client.swift.deleteObject(containerName: containerName, objectName: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Swift object \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
     }
 
     // MARK: - Helper Methods

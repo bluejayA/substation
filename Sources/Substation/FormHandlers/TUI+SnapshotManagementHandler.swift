@@ -19,74 +19,60 @@ extension TUI {
         return .form(fieldCount: fieldCount)
     }
 
+    /// Handle input for snapshot management form using the universal handler
     internal func handleSnapshotManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        // Check if a field is currently active
-        let isFieldActive = snapshotManagementFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = snapshotManagementFormState
+        var localForm = snapshotManagementForm
 
-        // Rebuild form state with current form values
-        snapshotManagementFormState = FormBuilderState(fields: snapshotManagementForm.buildFields(
-            selectedFieldId: snapshotManagementFormState.getCurrentFieldId(),
-            activeFieldId: snapshotManagementFormState.getActiveFieldId(),
-            formState: snapshotManagementFormState
-        ))
-
-        // Try common navigation when NOT in field edit mode
-        if !isFieldActive {
-            if await handleCommonNavigation(ch, screen: screen, context: snapshotManagementNavigationContext) {
-                return
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.snapshotManagementFormState = formState
+                self.snapshotManagementForm = form
+                await self.actions.executeSnapshotCreation(screen: screen)
+            },
+            onCancel: {
+                self.changeView(to: .serverSnapshotManagement, resetSelection: false)
             }
-        }
+        )
 
-        // Handle view-specific input
-        await handleSnapshotManagementSpecificInput(ch, screen: screen, isFieldActive: isFieldActive)
-    }
-
-    private func handleSnapshotManagementSpecificInput(_ ch: Int32, screen: OpaquePointer?, isFieldActive: Bool) async {
-        switch ch {
-        case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                snapshotManagementFormState.nextField()
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                snapshotManagementFormState.deactivateCurrentField()
-            } else if snapshotManagementForm.isValid() {
-                // Submit form
-                await actions.executeSnapshotCreation(screen: screen)
-                return
-            }
-
-        case Int32(32): // SPACE - Activate current field for editing
-            if !isFieldActive {
-                snapshotManagementFormState.activateCurrentField()
-            } else {
-                // Add space character
-                snapshotManagementFormState.handleCharacterInput(" ")
-            }
-
-        case Int32(127), Int32(8): // BACKSPACE
-            if isFieldActive {
-                let _ = snapshotManagementFormState.handleSpecialKey(ch)
-            }
-
-        default:
-            // Handle printable characters for text input
-            if isFieldActive && ch >= 32 && ch <= 126, let unicodeScalar = UnicodeScalar(Int(ch)) {
-                let character = Character(unicodeScalar)
-                snapshotManagementFormState.handleCharacterInput(character)
-            }
-        }
-
-        // Update form values from state
-        if let nameState = snapshotManagementFormState.textFieldStates[SnapshotFieldId.name.rawValue] {
-            snapshotManagementForm.snapshotName = nameState.value
-        }
-        if let descState = snapshotManagementFormState.textFieldStates[SnapshotFieldId.description.rawValue] {
-            snapshotManagementForm.snapshotDescription = descState.value
-        }
-
-        needsRedraw = true
+        // Update actor-isolated properties with modified local copies
+        snapshotManagementFormState = localFormState
+        snapshotManagementForm = localForm
     }
 }
+
+// MARK: - SnapshotManagementForm Protocol Conformance
+
+extension SnapshotManagementForm {
+    /// Adapter for FormStateRebuildable - makes formState non-optional
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        return self.buildFields(selectedFieldId: selectedFieldId, activeFieldId: activeFieldId, formState: Optional.some(formState))
+    }
+
+    /// Update form from FormBuilderState
+    mutating func updateFromFormState(_ state: FormBuilderState) {
+        if let nameState = state.textFieldStates[SnapshotFieldId.name.rawValue] {
+            self.snapshotName = nameState.value
+        }
+        if let descState = state.textFieldStates[SnapshotFieldId.description.rawValue] {
+            self.snapshotDescription = descState.value
+        }
+    }
+
+    /// Validate the form and return error messages
+    func validateForm() -> [String] {
+        if let error = getValidationError() {
+            return [error]
+        }
+        return []
+    }
+}
+
+// Declare protocol conformance
+extension SnapshotManagementForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

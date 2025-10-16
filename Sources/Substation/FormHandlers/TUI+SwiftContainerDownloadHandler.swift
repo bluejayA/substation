@@ -10,136 +10,65 @@ import SwiftTUI
 @MainActor
 extension TUI {
 
+    /// Handle input for Swift Container Download form using universal handler
+    /// This form requires confirmation modal before starting background download
     internal func handleSwiftContainerDownloadInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = swiftContainerDownloadFormState.isCurrentFieldActive()
+        var localFormState = swiftContainerDownloadFormState
+        var localForm = swiftContainerDownloadForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                swiftContainerDownloadFormState.nextField()
-                swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = swiftContainerDownloadFormState.getCurrentField() {
-                switch currentField {
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        swiftContainerDownloadFormState.activateCurrentField()
-                        swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        swiftContainerDownloadFormState.handleCharacterInput(" ")
-                        swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                        await self.draw(screen: screen)
-                    }
-                case .checkbox:
-                    if !isFieldActive {
-                        // Toggle checkbox
-                        swiftContainerDownloadFormState.toggleCurrentCheckbox()
-                        swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                        await self.draw(screen: screen)
-                    }
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                swiftContainerDownloadFormState.deactivateCurrentField()
-                swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = swiftContainerDownloadForm.validateForm()
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Validation
+                let errors = form.validateForm()
                 if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
+                    self.statusMessage = "Errors: \(errors.joined(separator: ", "))"
                     return
                 }
 
-                // Check if directory already exists and show confirmation modal
-                if swiftContainerDownloadForm.directoryExists() {
+                // Confirmation modal if directory exists
+                if form.directoryExists() {
                     let confirmed = await ConfirmationModal.show(
                         title: "Overwrite Existing Directory",
                         message: "The target directory already exists. Do you want to overwrite the files?",
                         details: ["This action may overwrite existing files"],
                         screen: screen,
-                        screenRows: screenRows,
-                        screenCols: screenCols
+                        screenRows: self.screenRows,
+                        screenCols: self.screenCols
                     )
 
                     if !confirmed {
-                        statusMessage = "Download cancelled"
-                        await self.draw(screen: screen)
+                        self.statusMessage = "Download cancelled"
                         return
                     }
                 }
 
-                await submitSwiftContainerDownload(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = swiftContainerDownloadFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    swiftContainerDownloadFormState.previousField()
-                } else {
-                    swiftContainerDownloadFormState.nextField()
-                }
-                swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                swiftContainerDownloadFormState.cancelCurrentField()
-                swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Cancel and return to container list
+                // Start background operation
+                self.swiftContainerDownloadFormState = formState
+                self.swiftContainerDownloadForm = form
+                await self.submitSwiftContainerDownload(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .swift, resetSelection: false)
             }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = swiftContainerDownloadFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    swiftContainerDownloadFormState.handleCharacterInput(Character(scalar))
-                    swiftContainerDownloadForm.updateFromFormState(swiftContainerDownloadFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
-
-        // Rebuild form state to reflect any changes in form fields
-        swiftContainerDownloadFormState = FormBuilderState(
-            fields: swiftContainerDownloadForm.buildFields(
-                selectedFieldId: swiftContainerDownloadFormState.getCurrentFieldId(),
-                activeFieldId: swiftContainerDownloadFormState.getActiveFieldId(),
-                formState: swiftContainerDownloadFormState
-            ),
-            preservingStateFrom: swiftContainerDownloadFormState
         )
+
+        // Rebuild form state to reflect any changes
+        localFormState = FormBuilderState(
+            fields: localForm.buildFields(
+                selectedFieldId: localFormState.getCurrentFieldId(),
+                activeFieldId: localFormState.getActiveFieldId(),
+                formState: localFormState
+            ),
+            preservingStateFrom: localFormState
+        )
+
+        // Update actor-isolated properties
+        swiftContainerDownloadFormState = localFormState
+        swiftContainerDownloadForm = localForm
     }
 
     private func submitSwiftContainerDownload(screen: OpaquePointer?) async {
@@ -419,3 +348,8 @@ extension TUI {
         }
     }
 }
+
+// MARK: - SwiftContainerDownloadForm Protocol Conformance
+
+// SwiftContainerDownloadForm already conforms to all required protocols
+extension SwiftContainerDownloadForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

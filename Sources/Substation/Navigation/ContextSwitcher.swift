@@ -214,8 +214,26 @@ final class ContextSwitcher: @unchecked Sendable {
             // Replace the client in TUI
             tui.client = newClient
 
-            // Also update DataManager's client reference
+            // Update DataManager's client reference
             tui.dataManager = DataManager(client: newClient, tui: tui)
+
+            // Update BatchOperationManager with new client
+            tui.batchOperationManager = BatchOperationManager(
+                client: newClient,
+                maxConcurrency: 10
+            )
+
+            // Update ResourceResolver with new client
+            tui.resourceResolver = ResourceResolver(
+                cachedServers: tui.resourceCache.servers,
+                cachedNetworks: tui.resourceCache.networks,
+                cachedImages: tui.resourceCache.images,
+                cachedFlavors: tui.resourceCache.flavors,
+                cachedSubnets: tui.resourceCache.subnets,
+                cachedSecurityGroups: tui.resourceCache.securityGroups,
+                resourceNameCache: tui.resourceNameCache,
+                client: newClient
+            )
 
             // Initialize project ID for the new client
             await tui.dataManager.initializeProjectID()
@@ -232,10 +250,24 @@ final class ContextSwitcher: @unchecked Sendable {
             Logger.shared.logInfo("Successfully switched to cloud context: \(cloudName)")
 
         } catch {
-            // Rollback on failure
+            // Rollback on failure - restore all client-dependent managers
             currentContext = previousContext
             tui.client = previousClient
             tui.dataManager = DataManager(client: previousClient, tui: tui)
+            tui.batchOperationManager = BatchOperationManager(
+                client: previousClient,
+                maxConcurrency: 10
+            )
+            tui.resourceResolver = ResourceResolver(
+                cachedServers: tui.resourceCache.servers,
+                cachedNetworks: tui.resourceCache.networks,
+                cachedImages: tui.resourceCache.images,
+                cachedFlavors: tui.resourceCache.flavors,
+                cachedSubnets: tui.resourceCache.subnets,
+                cachedSecurityGroups: tui.resourceCache.securityGroups,
+                resourceNameCache: tui.resourceNameCache,
+                client: previousClient
+            )
 
             throw ContextSwitchError.switchFailed(
                 cloudName,

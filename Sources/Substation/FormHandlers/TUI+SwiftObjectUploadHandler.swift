@@ -10,116 +10,39 @@ import SwiftTUI
 @MainActor
 extension TUI {
 
+    /// Handle input for Swift Object Upload form using universal handler
     internal func handleSwiftObjectUploadInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = swiftObjectUploadFormState.isCurrentFieldActive()
+        var localFormState = swiftObjectUploadFormState
+        var localForm = swiftObjectUploadForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                swiftObjectUploadFormState.nextField()
-                swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = swiftObjectUploadFormState.getCurrentField() {
-                switch currentField {
-                case .checkbox:
-                    // Checkboxes toggle directly without activation
-                    swiftObjectUploadFormState.toggleCurrentField()
-                    swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                    await self.draw(screen: screen)
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        swiftObjectUploadFormState.activateCurrentField()
-                        swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        swiftObjectUploadFormState.handleCharacterInput(" ")
-                        swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                        await self.draw(screen: screen)
-                    }
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                swiftObjectUploadFormState.deactivateCurrentField()
-                swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = swiftObjectUploadForm.validateForm()
-                if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
-                    return
-                }
-
-                await submitSwiftObjectUpload(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = swiftObjectUploadFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    swiftObjectUploadFormState.previousField()
-                } else {
-                    swiftObjectUploadFormState.nextField()
-                }
-                swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                swiftObjectUploadFormState.cancelCurrentField()
-                swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Cancel and return to container list
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                self.swiftObjectUploadFormState = formState
+                self.swiftObjectUploadForm = form
+                await self.submitSwiftObjectUpload(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .swift, resetSelection: false)
             }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = swiftObjectUploadFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    swiftObjectUploadFormState.handleCharacterInput(Character(scalar))
-                    swiftObjectUploadForm.updateFromFormState(swiftObjectUploadFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
-
-        // Rebuild form state to reflect any changes in form fields
-        swiftObjectUploadFormState = FormBuilderState(
-            fields: swiftObjectUploadForm.buildFields(
-                selectedFieldId: swiftObjectUploadFormState.getCurrentFieldId(),
-                activeFieldId: swiftObjectUploadFormState.getActiveFieldId(),
-                formState: swiftObjectUploadFormState
-            ),
-            preservingStateFrom: swiftObjectUploadFormState
         )
+
+        // Rebuild form state to reflect any changes
+        localFormState = FormBuilderState(
+            fields: localForm.buildFields(
+                selectedFieldId: localFormState.getCurrentFieldId(),
+                activeFieldId: localFormState.getActiveFieldId(),
+                formState: localFormState
+            ),
+            preservingStateFrom: localFormState
+        )
+
+        // Update actor-isolated properties
+        swiftObjectUploadFormState = localFormState
+        swiftObjectUploadForm = localForm
     }
 
     private func submitSwiftObjectUpload(screen: OpaquePointer?) async {
@@ -655,3 +578,9 @@ extension TUI {
         return SwiftStorageHelpers.detectContentType(for: url)
     }
 }
+
+// MARK: - SwiftObjectUploadForm Protocol Conformance
+
+// SwiftObjectUploadForm already conforms to all required protocols
+extension SwiftObjectUploadForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}
+

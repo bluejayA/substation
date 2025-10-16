@@ -14,6 +14,8 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    /// Handle input for Barbican Secret create form using universal handler
+    /// This form has 3 special input modes: payload editor, date selection, legacy selection
     internal func handleBarbicanSecretCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Special handling for payload edit mode (full-screen editor)
         if barbicanSecretCreateForm.payloadEditMode {
@@ -33,266 +35,73 @@ extension TUI {
             return
         }
 
-        let isFieldActive = self.barbicanSecretCreateFormState.isCurrentFieldActive()
+        // Normal form handling with universal handler
+        var localFormState = barbicanSecretCreateFormState
+        var localFormAdapter = BarbicanSecretCreateFormAdapter(form: barbicanSecretCreateForm)
 
-        switch ch {
-        case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                self.barbicanSecretCreateFormState.nextField()
-                self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-
-                // Rebuild fields
-                self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                    selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.barbicanSecretCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            }
-
-        case 353: // SHIFT+TAB - Navigate to previous field
-            if !isFieldActive {
-                self.barbicanSecretCreateFormState.previousField()
-                self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-
-                // Rebuild fields
-                self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                    selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.barbicanSecretCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            }
-
-        case 258, 259: // DOWN/UP - Navigate within active field or between fields
-            if isFieldActive {
-                // Navigate within active selector
-                if let currentField = self.barbicanSecretCreateFormState.getCurrentField() {
-                    if case .selector(let selectorField) = currentField {
-                        if var state = self.barbicanSecretCreateFormState.selectorStates[selectorField.id] {
-                            if ch == 258 { // DOWN
-                                state.moveDown()
-                            } else { // UP
-                                state.moveUp()
-                            }
-                            self.barbicanSecretCreateFormState.selectorStates[selectorField.id] = state
-
-                            // Rebuild fields with updated highlightedIndex
-                            self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                                selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                                activeFieldId: selectorField.id,
-                                formState: self.barbicanSecretCreateFormState
-                            ))
-
-                            await self.draw(screen: screen)
-                        }
-                    }
-                }
-            } else {
-                // Navigate between fields
-                if ch == 258 { // DOWN
-                    self.barbicanSecretCreateFormState.nextField()
-                } else { // UP
-                    self.barbicanSecretCreateFormState.previousField()
-                }
-                self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-
-                // Rebuild fields
-                self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                    selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.barbicanSecretCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE - Activate field or select item
-            if !isFieldActive {
-                // Check if this is a special field that needs custom handling
-                if let currentField = self.barbicanSecretCreateFormState.getCurrentField() {
-                    if case .text(let textField) = currentField,
+        // Custom key handler for special field behaviors
+        let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout BarbicanSecretCreateFormAdapter, OpaquePointer?) async -> Bool = { ch, formState, formAdapter, screen in
+            // SPACE on special fields enters their special modes
+            if ch == Int32(32) && !formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField() {
+                    if case .text(let textField) = field,
                        textField.id == BarbicanSecretCreateFieldId.payload.rawValue {
-                        // Enter payload edit mode (full-screen editor)
-                        self.barbicanSecretCreateForm.payloadEditMode = true
+                        formAdapter.form.payloadEditMode = true
                         await self.draw(screen: screen)
-                        return
-                    } else if case .info(let infoField) = currentField,
+                        return true
+                    } else if case .info(let infoField) = field,
                               infoField.id == BarbicanSecretCreateFieldId.expirationDate.rawValue {
-                        // Enter legacy date selection mode
-                        self.barbicanSecretCreateForm.enterSelectionMode()
+                        formAdapter.form.enterSelectionMode()
                         await self.draw(screen: screen)
-                        return
-                    }
-                }
-
-                // Activate current field
-                self.barbicanSecretCreateFormState.activateCurrentField()
-                self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-
-                // Rebuild fields with active field ID to ensure selector renders correctly
-                self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                    selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                    activeFieldId: self.barbicanSecretCreateFormState.getActiveFieldId(),
-                    formState: self.barbicanSecretCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            } else {
-                // In active mode, handle based on field type
-                if let currentField = self.barbicanSecretCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .text:
-                        // For text fields, add space as character
-                        self.barbicanSecretCreateFormState.handleCharacterInput(" ")
-                        self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-                        await self.draw(screen: screen)
-                    case .selector:
-                        // For selector, SPACE selects the highlighted item
-                        self.barbicanSecretCreateFormState.toggleCurrentField()
-                        self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-
-                        // Deactivate the selector after selection
-                        self.barbicanSecretCreateFormState.deactivateCurrentField()
-
-                        // Rebuild fields
-                        self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                            selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                            activeFieldId: nil,
-                            formState: self.barbicanSecretCreateFormState
-                        ))
-
-                        await self.draw(screen: screen)
-                    default:
-                        break
+                        return true
                     }
                 }
             }
 
-        case Int32(10), Int32(13): // ENTER - Submit or deactivate field
-            if isFieldActive {
-                // Deactivate field
-                if let currentField = self.barbicanSecretCreateFormState.getCurrentField() {
-                    if case .selector = currentField {
-                        // For selector, ENTER confirms selection
-                        self.barbicanSecretCreateFormState.toggleCurrentField()
-                    } else if case .text(let textField) = currentField,
-                              textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
-                        // For file path field, load file on ENTER
-                        if let error = self.barbicanSecretCreateForm.loadPayloadFromFile() {
-                            self.statusMessage = error
-                        } else {
-                            self.statusMessage = "File loaded successfully"
-                        }
+            // ENTER on file path field loads file
+            if (ch == Int32(10) || ch == Int32(13)) && formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField(),
+                   case .text(let textField) = field,
+                   textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
+                    if let error = formAdapter.form.loadPayloadFromFile() {
+                        self.statusMessage = error
+                    } else {
+                        self.statusMessage = "File loaded successfully"
                     }
-                }
-
-                self.barbicanSecretCreateFormState.deactivateCurrentField()
-                self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-
-                // Rebuild fields
-                self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                    selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.barbicanSecretCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = self.barbicanSecretCreateForm.validate()
-                if errors.isEmpty {
-                    await self.resourceOperations.createSecret(screen: screen)
-                } else {
-                    self.barbicanSecretCreateFormState.showValidationErrors = true
-                    self.statusMessage = "Error: \(errors.first!)"
-                    await self.draw(screen: screen)
+                    return false // Let universal handler continue with deactivation
                 }
             }
 
-        case Int32(27): // ESC - Cancel or deactivate
-            if isFieldActive {
-                self.barbicanSecretCreateFormState.deactivateCurrentField()
-                self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-
-                // Rebuild fields
-                self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                    selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.barbicanSecretCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            } else {
-                self.changeView(to: .barbicanSecrets, resetSelection: false)
-            }
-
-        case Int32(127), Int32(8), Int32(263): // BACKSPACE/DELETE
-            if isFieldActive {
-                if let currentField = self.barbicanSecretCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .text:
-                        let handled = self.barbicanSecretCreateFormState.handleSpecialKey(ch)
-                        if handled {
-                            self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-                            await self.draw(screen: screen)
-                        }
-                    case .selector(let selectorField):
-                        // BACKSPACE removes last search character
-                        if var state = self.barbicanSecretCreateFormState.selectorStates[selectorField.id] {
-                            state.removeLastSearchCharacter()
-                            self.barbicanSecretCreateFormState.selectorStates[selectorField.id] = state
-
-                            // Rebuild fields
-                            self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                                selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                                activeFieldId: selectorField.id,
-                                formState: self.barbicanSecretCreateFormState
-                            ))
-
-                            await self.draw(screen: screen)
-                        }
-                    default:
-                        break
-                    }
-                }
-            }
-
-        default:
-            // Handle character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    let char = Character(scalar)
-                    if let currentField = self.barbicanSecretCreateFormState.getCurrentField() {
-                        switch currentField {
-                        case .text:
-                            self.barbicanSecretCreateFormState.handleCharacterInput(char)
-                            self.barbicanSecretCreateForm.updateFromFormState(self.barbicanSecretCreateFormState)
-                            await self.draw(screen: screen)
-                        case .selector(let selectorField):
-                            // Add to search query
-                            if var state = self.barbicanSecretCreateFormState.selectorStates[selectorField.id] {
-                                state.appendToSearch(char)
-                                self.barbicanSecretCreateFormState.selectorStates[selectorField.id] = state
-
-                                // Rebuild fields
-                                self.barbicanSecretCreateFormState = FormBuilderState(fields: self.barbicanSecretCreateForm.buildFields(
-                                    selectedFieldId: self.barbicanSecretCreateFormState.getCurrentFieldId(),
-                                    activeFieldId: selectorField.id,
-                                    formState: self.barbicanSecretCreateFormState
-                                ))
-
-                                await self.draw(screen: screen)
-                            }
-                        default:
-                            break
-                        }
-                    }
-                }
-            }
+            return false // Let universal handler process
         }
+
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localFormAdapter,
+            onSubmit: { formState, formAdapter in
+                // Receive formState and formAdapter as parameters to avoid exclusivity violation
+                self.barbicanSecretCreateFormState = formState
+                self.barbicanSecretCreateForm = formAdapter.form
+                await self.resourceOperations.createSecret(screen: screen)
+            },
+            onCancel: {
+                self.changeView(to: .barbicanSecrets, resetSelection: false)
+            },
+            customKeyHandler: customHandler
+        )
+
+        // Rebuild after universal handler to ensure field visibility is correct
+        localFormState = FormBuilderState(fields: localFormAdapter.form.buildFields(
+            selectedFieldId: localFormState.getCurrentFieldId(),
+            activeFieldId: nil,
+            formState: localFormState
+        ))
+
+        // Update actor-isolated properties
+        barbicanSecretCreateFormState = localFormState
+        barbicanSecretCreateForm = localFormAdapter.form
     }
 
     // MARK: - Payload Editor Input Handler
@@ -380,5 +189,24 @@ extension TUI {
         default:
             break
         }
+    }
+}
+
+// MARK: - BarbicanSecretCreateForm Adapter
+
+/// Adapter to make BarbicanSecretCreateForm work with universal handler
+struct BarbicanSecretCreateFormAdapter: FormStateUpdatable, FormStateRebuildable, FormValidatable {
+    var form: BarbicanSecretCreateForm
+
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        return form.buildFields(selectedFieldId: selectedFieldId, activeFieldId: activeFieldId, formState: formState)
+    }
+
+    mutating func updateFromFormState(_ formState: FormBuilderState) {
+        form.updateFromFormState(formState)
+    }
+
+    func validateForm() -> [String] {
+        return form.validate()
     }
 }

@@ -31,6 +31,7 @@ final class TUI {
     internal lazy var dataManager: DataManager = DataManager(client: client, tui: self)
     internal lazy var inputHandler: InputHandler = InputHandler(tui: self)
     internal lazy var formInputHandler: FormInputHandler = FormInputHandler(tui: self)
+    internal lazy var universalFormInputHandler: UniversalFormInputHandler = UniversalFormInputHandler(tui: self)
     internal lazy var resourceOperations: ResourceOperations = ResourceOperations(tui: self)
     internal lazy var actions: Actions = Actions(tui: self)
     internal lazy var uiHelpers: UIHelpers = UIHelpers(tui: self)
@@ -50,7 +51,7 @@ final class TUI {
     internal let loadingStateManager: LoadingStateManager
 
     // Phase 5.1: Batch Operations Framework
-    internal let batchOperationManager: BatchOperationManager
+    internal var batchOperationManager: BatchOperationManager
 
     // Phase 5.3: Advanced Search System - Now using static methods
 

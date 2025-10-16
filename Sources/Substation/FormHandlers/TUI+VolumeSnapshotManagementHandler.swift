@@ -14,101 +14,50 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    /// Handle input for volume snapshot management form using the universal handler
     internal func handleVolumeSnapshotManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        // Check if a field is currently active
-        let isFieldActive = volumeSnapshotManagementFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = volumeSnapshotManagementFormState
+        var localForm = volumeSnapshotManagementForm
 
-        // Rebuild form state with current form values
-        volumeSnapshotManagementFormState = FormBuilderState(fields: volumeSnapshotManagementForm.buildFields(
-            selectedFieldId: volumeSnapshotManagementFormState.getCurrentFieldId(),
-            activeFieldId: volumeSnapshotManagementFormState.getActiveFieldId(),
-            formState: volumeSnapshotManagementFormState
-        ), preservingStateFrom: volumeSnapshotManagementFormState)
-
-        // Step 1: Try common navigation (only when field is NOT active)
-        if !isFieldActive {
-            if await handleVolumeSnapshotManagementCommonNavigation(ch) {
-                volumeSnapshotManagementForm.updateFromFormState(volumeSnapshotManagementFormState)
-                needsRedraw = true
-                return
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.volumeSnapshotManagementFormState = formState
+                self.volumeSnapshotManagementForm = form
+                await self.actions.executeVolumeSnapshotCreation(screen: screen)
+            },
+            onCancel: {
+                self.changeView(to: .volumeSnapshotManagement, resetSelection: false)
             }
-        }
+        )
 
-        // Step 2: Handle view-specific keys (form input and text editing)
-        await handleVolumeSnapshotManagementSpecificInput(ch, screen: screen, isFieldActive: isFieldActive)
-
-        // Update form values from state
-        volumeSnapshotManagementForm.updateFromFormState(volumeSnapshotManagementFormState)
-        needsRedraw = true
-    }
-
-    // MARK: - Common Navigation
-
-    private func handleVolumeSnapshotManagementCommonNavigation(_ ch: Int32) async -> Bool {
-        // Handle UP/DOWN navigation between form fields when no field is active
-        // Note: ESC handling is done in the specific input handler for form-based views
-        switch ch {
-        case Int32(259): // KEY_UP
-            volumeSnapshotManagementFormState.previousField()
-            return true
-
-        case Int32(258): // KEY_DOWN
-            volumeSnapshotManagementFormState.nextField()
-            return true
-
-        case Int32(27): // ESC
-            return await handleVolumeSnapshotManagementEscape()
-
-        default:
-            return false
-        }
-    }
-
-    // MARK: - View-Specific Input
-
-    private func handleVolumeSnapshotManagementSpecificInput(_ ch: Int32, screen: OpaquePointer?, isFieldActive: Bool) async {
-        switch ch {
-        case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                volumeSnapshotManagementFormState.nextField()
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                volumeSnapshotManagementFormState.deactivateCurrentField()
-            } else if volumeSnapshotManagementForm.isValid() {
-                // Submit form
-                await actions.executeVolumeSnapshotCreation(screen: screen)
-                return
-            }
-
-        case Int32(32): // SPACE - Activate current field for editing or add space character
-            if !isFieldActive {
-                volumeSnapshotManagementFormState.activateCurrentField()
-            } else {
-                // Add space character
-                volumeSnapshotManagementFormState.handleCharacterInput(" ")
-            }
-
-        case Int32(127), Int32(8): // BACKSPACE
-            if isFieldActive {
-                let _ = volumeSnapshotManagementFormState.handleSpecialKey(ch)
-            }
-
-        default:
-            // Handle printable characters for text input
-            if isFieldActive && ch >= 32 && ch <= 126, let unicodeScalar = UnicodeScalar(Int(ch)) {
-                let character = Character(unicodeScalar)
-                volumeSnapshotManagementFormState.handleCharacterInput(character)
-            }
-        }
-    }
-
-    // MARK: - ESC Handling
-
-    private func handleVolumeSnapshotManagementEscape() async -> Bool {
-        // Use centralized ESC handling
-        return await NavigationInputHandler.handleEscapeKey(tui: self)
+        // Update actor-isolated properties with modified local copies
+        volumeSnapshotManagementFormState = localFormState
+        volumeSnapshotManagementForm = localForm
     }
 }
+
+// MARK: - VolumeSnapshotManagementForm Protocol Conformance
+
+extension VolumeSnapshotManagementForm {
+    /// Adapter for FormStateRebuildable - makes formState non-optional
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        return self.buildFields(selectedFieldId: selectedFieldId, activeFieldId: activeFieldId, formState: Optional.some(formState))
+    }
+
+    /// Validate the form and return error messages
+    func validateForm() -> [String] {
+        if let error = getValidationError() {
+            return [error]
+        }
+        return []
+    }
+}
+
+// Declare protocol conformance
+extension VolumeSnapshotManagementForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

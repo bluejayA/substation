@@ -19,79 +19,50 @@ extension TUI {
         return .form(fieldCount: fieldCount)
     }
 
+    /// Handle input for volume backup management form using the universal handler
     internal func handleVolumeBackupManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        // Check if a field is currently active
-        let isFieldActive = volumeBackupManagementFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = volumeBackupManagementFormState
+        var localForm = volumeBackupManagementForm
 
-        // Rebuild form state with current form values
-        volumeBackupManagementFormState = FormBuilderState(fields: volumeBackupManagementForm.buildFields(
-            selectedFieldId: volumeBackupManagementFormState.getCurrentFieldId(),
-            activeFieldId: volumeBackupManagementFormState.getActiveFieldId(),
-            formState: volumeBackupManagementFormState
-        ), preservingStateFrom: volumeBackupManagementFormState)
-
-        // Try common navigation when NOT in field edit mode
-        if !isFieldActive {
-            if await handleCommonNavigation(ch, screen: screen, context: volumeBackupManagementNavigationContext) {
-                return
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.volumeBackupManagementFormState = formState
+                self.volumeBackupManagementForm = form
+                await self.actions.executeVolumeBackupCreation(screen: screen)
+            },
+            onCancel: {
+                self.changeView(to: .volumeBackupManagement, resetSelection: false)
             }
-        }
+        )
 
-        // Handle view-specific input
-        await handleVolumeBackupManagementSpecificInput(ch, screen: screen, isFieldActive: isFieldActive)
-    }
-
-    private func handleVolumeBackupManagementSpecificInput(_ ch: Int32, screen: OpaquePointer?, isFieldActive: Bool) async {
-        switch ch {
-        case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                volumeBackupManagementFormState.nextField()
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                volumeBackupManagementFormState.deactivateCurrentField()
-            } else if volumeBackupManagementForm.isValid() {
-                // Submit form
-                await actions.executeVolumeBackupCreation(screen: screen)
-                return
-            }
-
-        case Int32(32): // SPACE - Activate field or toggle checkbox
-            if !isFieldActive {
-                // Check if current field is a checkbox
-                let currentFieldId = volumeBackupManagementFormState.getCurrentFieldId()
-                if currentFieldId == VolumeBackupFieldId.incremental.rawValue {
-                    // Only toggle if checkbox is not disabled (i.e., full backup exists)
-                    if volumeBackupManagementForm.canCreateIncrementalBackup() {
-                        volumeBackupManagementFormState.toggleCurrentCheckbox()
-                    }
-                } else {
-                    // Activate text field for editing
-                    volumeBackupManagementFormState.activateCurrentField()
-                }
-            } else {
-                // Add space character when in text editing mode
-                volumeBackupManagementFormState.handleCharacterInput(" ")
-            }
-
-        case Int32(127), Int32(8): // BACKSPACE
-            if isFieldActive {
-                let _ = volumeBackupManagementFormState.handleSpecialKey(ch)
-            }
-
-        default:
-            // Handle printable characters for text input
-            if isFieldActive && ch >= 32 && ch <= 126, let unicodeScalar = UnicodeScalar(Int(ch)) {
-                let character = Character(unicodeScalar)
-                volumeBackupManagementFormState.handleCharacterInput(character)
-            }
-        }
-
-        // Update form values from state
-        volumeBackupManagementForm.updateFromFormState(volumeBackupManagementFormState)
-
-        needsRedraw = true
+        // Update actor-isolated properties with modified local copies
+        volumeBackupManagementFormState = localFormState
+        volumeBackupManagementForm = localForm
     }
 }
+
+// MARK: - VolumeBackupManagementForm Protocol Conformance
+
+extension VolumeBackupManagementForm {
+    /// Adapter for FormStateRebuildable - makes formState non-optional
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        return self.buildFields(selectedFieldId: selectedFieldId, activeFieldId: activeFieldId, formState: Optional.some(formState))
+    }
+
+    /// Validate the form and return error messages
+    func validateForm() -> [String] {
+        if let error = getValidationError() {
+            return [error]
+        }
+        return []
+    }
+}
+
+// Declare protocol conformance
+extension VolumeBackupManagementForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

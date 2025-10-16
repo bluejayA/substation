@@ -8,126 +8,63 @@ import OSClient
 import SwiftTUI
 import MemoryKit
 
+// MARK: - KeyPair Create Input Handler (Universal Pattern)
+//
+// This is the NEW universal pattern that replaces 133 lines of duplicated code
+// with just 53 lines. This handler demonstrates the universal form pattern.
+
 @MainActor
 extension TUI {
 
+    /// Handle input for KeyPair create form using the universal handler
     internal func handleKeyPairCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = keyPairCreateFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = keyPairCreateFormState
+        var localForm = keyPairCreateForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                keyPairCreateFormState.nextField()
-                keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = keyPairCreateFormState.getCurrentField() {
-                switch currentField {
-                case .selector:
-                    if !isFieldActive {
-                        // Open selector
-                        keyPairCreateFormState.activateCurrentField()
-                        keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Toggle selection
-                        keyPairCreateFormState.toggleCurrentField()
-                        keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        keyPairCreateFormState.activateCurrentField()
-                        keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        keyPairCreateFormState.handleCharacterInput(" ")
-                        keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                keyPairCreateFormState.deactivateCurrentField()
-                keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-
-                // If was file path field, load the file
-                if let field = keyPairCreateFormState.getCurrentField(),
+        // Custom key handler for KeyPair-specific behavior
+        let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout KeyPairCreateForm, OpaquePointer?) async -> Bool = { ch, formState, form, screen in
+            // Loading file when ENTER is pressed on publicKeyFilePath field
+            if ch == Int32(10) || ch == Int32(13) { // ENTER
+                if formState.isCurrentFieldActive(),
+                   let field = formState.getCurrentField(),
                    case .text(let textField) = field,
                    textField.id == "publicKeyFilePath" {
-                    if let error = keyPairCreateForm.loadPublicKeyFromFile() {
-                        statusMessage = "Error: \(error)"
+                    // Load public key from file
+                    if let error = form.loadPublicKeyFromFile() {
+                        self.statusMessage = "Error: \(error)"
                     } else {
-                        statusMessage = "Public key loaded"
+                        self.statusMessage = "Public key loaded"
                     }
-                }
-
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = keyPairCreateForm.validateForm()
-                if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
-                    return
-                }
-
-                await resourceOperations.submitKeyPairCreation(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = keyPairCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    keyPairCreateFormState.previousField()
-                } else {
-                    keyPairCreateFormState.nextField()
-                }
-                keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                keyPairCreateFormState.cancelCurrentField()
-                keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                self.changeView(to: .keyPairs, resetSelection: false)
-            }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = keyPairCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                    await self.draw(screen: screen)
+                    return false // Let universal handler continue with normal ENTER behavior
                 }
             }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    keyPairCreateFormState.handleCharacterInput(Character(scalar))
-                    keyPairCreateForm.updateFromFormState(keyPairCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
+            return false // Let universal handler process this key
         }
+
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.keyPairCreateFormState = formState
+                self.keyPairCreateForm = form
+                await self.resourceOperations.submitKeyPairCreation(screen: screen)
+            },
+            onCancel: {
+                self.changeView(to: .keyPairs, resetSelection: false)
+            },
+            customKeyHandler: customHandler
+        )
+
+        // Update actor-isolated properties with modified local copies
+        keyPairCreateFormState = localFormState
+        keyPairCreateForm = localForm
     }
 }
+
+// MARK: - KeyPairCreateForm Protocol Conformance
+// KeyPairCreateForm naturally conforms to all three protocols
+extension KeyPairCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

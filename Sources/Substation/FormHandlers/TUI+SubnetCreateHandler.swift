@@ -4,205 +4,68 @@ import Darwin
 #else
 import Glibc
 #endif
-import struct OSClient.Port
 import OSClient
 import SwiftTUI
 import MemoryKit
 
-// MARK: - Subnet Create Input Handler
+// MARK: - Subnet Create Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
+    /// Handle input for Subnet create form using the universal handler
     internal func handleSubnetCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        // Check if a field is currently active (being edited)
-        let isFieldActive = subnetCreateFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = subnetCreateFormState
+        var localForm = subnetCreateForm
 
-        switch ch {
-        case Int32(9): // TAB - Cycle select options or navigate to next field
-            if isFieldActive {
-                if let currentField = subnetCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .select:
-                        // For select fields (IP version), cycle through options
-                        subnetCreateFormState.toggleCurrentField()
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    default:
-                        break
-                    }
-                }
-            } else {
-                subnetCreateFormState.nextField()
-                subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case 353: // SHIFT+TAB - Cycle select options backwards or navigate to previous field
-            if isFieldActive {
-                if let currentField = subnetCreateFormState.getCurrentField() {
-                    if case .select = currentField {
-                        subnetCreateFormState.cyclePreviousOption()
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                }
-            } else {
-                subnetCreateFormState.previousField()
-                subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE - Toggle checkbox, activate field, or add space character
-            // Check if current field is a checkbox - checkboxes toggle directly without activation
-            if let currentField = subnetCreateFormState.getCurrentField(), case .checkbox = currentField {
-                subnetCreateFormState.toggleCurrentField()
-                subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                await self.draw(screen: screen)
-            } else if !isFieldActive {
-                // Not active: activate the field
-                subnetCreateFormState.activateCurrentField()
-                subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Active: check field type to determine behavior
-                if let currentField = subnetCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .text, .number:
-                        // For text/number fields, add space as character
-                        subnetCreateFormState.handleCharacterInput(" ")
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    case .toggle, .select:
-                        // For toggle/select fields, space toggles
-                        subnetCreateFormState.toggleCurrentField()
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    case .selector:
-                        // For selector fields in active state, space toggles selection
-                        subnetCreateFormState.toggleCurrentField()
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    default:
-                        break
-                    }
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER - Deactivate field or submit form
-            needsRedraw = true
-            if isFieldActive {
-                // Deactivate the current field
-                subnetCreateFormState.deactivateCurrentField()
-                subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Create subnet if form is valid
-                let errors = subnetCreateForm.validate(availableNetworks: cachedNetworks)
-                if errors.isEmpty {
-                    await resourceOperations.submitSubnetCreation(screen: screen)
-                } else {
-                    subnetCreateFormState.showValidationErrors = true
-                    statusMessage = "Error: \(errors.first!)"
-                    await self.draw(screen: screen)
-                }
-            }
-
-        case Int32(260): // KEY_LEFT - Navigate left in select fields
-            if isFieldActive {
-                if let currentField = subnetCreateFormState.getCurrentField() {
-                    if case .select = currentField {
-                        subnetCreateFormState.cyclePreviousOption()
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                }
-            }
-
-        case Int32(261): // KEY_RIGHT - Navigate right in select fields
-            if isFieldActive {
-                if let currentField = subnetCreateFormState.getCurrentField() {
-                    if case .select = currentField {
-                        subnetCreateFormState.toggleCurrentField()
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                }
-            }
-
-        case Int32(259), Int32(258): // KEY_UP/DOWN - Navigate in selector or between fields
-            if isFieldActive {
-                let handled = subnetCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    subnetCreateFormState.previousField()
-                } else {
-                    subnetCreateFormState.nextField()
-                }
-                subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC - Deactivate field or cancel creation
-            if isFieldActive {
-                subnetCreateFormState.deactivateCurrentField()
-                subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                await self.draw(screen: screen)
-            } else {
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.subnetCreateFormState = formState
+                self.subnetCreateForm = form
+                await self.resourceOperations.submitSubnetCreation(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .subnets, resetSelection: false)
             }
+        )
 
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE/DELETE - Remove character
-            if isFieldActive {
-                let handled = subnetCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        case Int32(47): // "/" - Search in selector or input in text field
-            if isFieldActive {
-                if let currentField = subnetCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .selector:
-                        // For selector fields, "/" is used for search
-                        subnetCreateFormState.handleCharacterInput("/")
-                        await self.draw(screen: screen)
-                    case .text, .number:
-                        // For text/number fields, "/" is a regular character
-                        subnetCreateFormState.handleCharacterInput("/")
-                        subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                        await self.draw(screen: screen)
-                    default:
-                        break
-                    }
-                }
-            }
-
-        default:
-            // Handle character input for text fields
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    let char = Character(scalar)
-                    subnetCreateFormState.handleCharacterInput(char)
-                    subnetCreateForm.updateFromFormState(subnetCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
+        // Update actor-isolated properties with modified local copies
+        subnetCreateFormState = localFormState
+        subnetCreateForm = localForm
     }
 }
 
-// MARK: - SubnetCreateForm FormState Integration
+// MARK: - SubnetCreateForm Protocol Conformance Adapters
 
 extension SubnetCreateForm {
+    /// Wrapper to conform to FormValidatable protocol
+    func validateForm() -> [String] {
+        // Use basic validate() without networks - full validation
+        // will be called in the submission handler with cached networks
+        return self.validate()
+    }
+
+    /// Adapter for FormStateRebuildable - ignores cachedNetworks parameter
+    /// since protocol doesn't support it. Forms are initialized with networks once.
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        // Call with empty networks array - the selector state already contains selected IDs
+        return self.buildFields(
+            selectedFieldId: selectedFieldId,
+            activeFieldId: activeFieldId,
+            cachedNetworks: [],
+            formState: formState
+        )
+    }
+
+    /// Implementation of FormStateUpdatable protocol
+    /// Updates form fields from FormBuilderState
     mutating func updateFromFormState(_ formState: FormBuilderState) {
-        // Update form data from FormBuilderState
         let fields = formState.fields
 
         for field in fields {
@@ -247,7 +110,6 @@ extension SubnetCreateForm {
 
         // Update navigation state
         if let currentFieldId = formState.getCurrentFieldId() {
-            // Map field ID back to SubnetCreateField enum
             switch currentFieldId {
             case SubnetCreateFieldId.name.rawValue:
                 self.currentField = .name
@@ -288,3 +150,7 @@ extension SubnetCreateForm {
         }
     }
 }
+
+// Declare protocol conformance after adapters are defined
+extension SubnetCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}
+
