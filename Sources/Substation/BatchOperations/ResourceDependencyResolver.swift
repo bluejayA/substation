@@ -319,41 +319,14 @@ actor ResourceDependencyResolver {
         var operations: [PlannedOperation] = []
 
         switch batchType {
-        case .serverBulkCreate(let configs):
-            operations = await buildServerCreateOperations(configs)
-
         case .serverBulkDelete(let serverIDs):
             operations = await buildServerDeleteOperations(serverIDs)
-
-        case .networkTopologyDeploy(let topology):
-            operations = await buildNetworkTopologyOperations(topology)
-
-        case .volumeBulkCreate(let configs):
-            operations = await buildVolumeCreateOperations(configs)
 
         case .volumeBulkDelete(let volumeIDs):
             operations = await buildVolumeDeleteOperations(volumeIDs)
 
-        case .volumeBulkAttach(let attachments):
-            operations = await buildVolumeAttachOperations(attachments)
-
-        case .volumeBulkDetach(let detachments):
-            operations = await buildVolumeDetachOperations(detachments)
-
-        case .floatingIPBulkCreate(let configs):
-            operations = await buildFloatingIPCreateOperations(configs)
-
-        case .floatingIPBulkAssign(let assignments):
-            operations = await buildFloatingIPAssignOperations(assignments)
-
-        case .securityGroupBulkCreate(let configs):
-            operations = await buildSecurityGroupCreateOperations(configs)
-
         case .networkInterfaceBulkAttach(let interfaces):
             operations = await buildNetworkInterfaceAttachOperations(interfaces)
-
-        case .resourceCleanup(let criteria):
-            operations = await buildResourceCleanupOperations(criteria)
 
         case .networkBulkDelete(let networkIDs):
             operations = await buildNetworkDeleteOperations(networkIDs)
@@ -382,41 +355,14 @@ actor ResourceDependencyResolver {
         case .imageBulkDelete(let imageIDs):
             operations = await buildImageDeleteOperations(imageIDs)
 
-        case .swiftContainerBulkCreate(let configs):
-            operations = await buildSwiftContainerCreateOperations(configs)
-
         case .swiftContainerBulkDelete(let containerNames):
             operations = await buildSwiftContainerDeleteOperations(containerNames)
-
-        case .swiftObjectBulkUpload(let uploadOps):
-            operations = await buildSwiftObjectUploadOperations(uploadOps)
-
-        case .swiftObjectBulkDownload(let downloadOps):
-            operations = await buildSwiftObjectDownloadOperations(downloadOps)
 
         case .swiftObjectBulkDelete(let containerName, let objectNames):
             operations = await buildSwiftObjectDeleteOperations(containerName: containerName, objectNames: objectNames)
         }
 
         return operations
-    }
-
-    private func buildServerCreateOperations(_ configs: [ServerCreateConfig]) async -> [PlannedOperation] {
-        return configs.enumerated().map { (index, config) in
-            PlannedOperation(
-                id: "server-create-\(index)",
-                type: .server,
-                action: .create,
-                resourceIdentifier: config.name,
-                dependencies: Set(config.networkIDs.map { "network-\($0)" }),
-                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
-                metadata: [
-                    "imageID": config.imageID,
-                    "flavorID": config.flavorID,
-                    "keyPair": config.keyPairName ?? ""
-                ]
-            )
-        }
     }
 
     private func buildServerDeleteOperations(_ serverIDs: [String]) async -> [PlannedOperation] {
@@ -432,84 +378,6 @@ actor ResourceDependencyResolver {
         }
     }
 
-    private func buildNetworkTopologyOperations(_ topology: NetworkTopologyDeployment) async -> [PlannedOperation] {
-        var operations: [PlannedOperation] = []
-
-        // 1. Create network first
-        let networkOp = PlannedOperation(
-            id: "network-\(topology.network.name)",
-            type: .network,
-            action: .create,
-            resourceIdentifier: topology.network.name,
-            dependencies: [],
-            estimatedDuration: OperationAction.create.estimatedDurationSeconds,
-            metadata: ["external": String(topology.network.external)]
-        )
-        operations.append(networkOp)
-
-        // 2. Create subnets (depend on network)
-        for (index, subnet) in topology.subnets.enumerated() {
-            let subnetOp = PlannedOperation(
-                id: "subnet-\(subnet.name)-\(index)",
-                type: .subnet,
-                action: .create,
-                resourceIdentifier: subnet.name,
-                dependencies: Set([networkOp.id]),
-                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
-                metadata: ["cidr": subnet.cidr]
-            )
-            operations.append(subnetOp)
-        }
-
-        // 3. Create router (if specified)
-        if let router = topology.router {
-            let routerOp = PlannedOperation(
-                id: "router-\(router.name)",
-                type: .router,
-                action: .create,
-                resourceIdentifier: router.name,
-                dependencies: Set([networkOp.id]),
-                estimatedDuration: OperationAction.create.estimatedDurationSeconds * 1.5, // Routers take slightly longer
-                metadata: ["external_gateway": router.externalGatewayNetworkID ?? ""]
-            )
-            operations.append(routerOp)
-        }
-
-        // 4. Create ports (depend on network and subnets)
-        let subnetDeps = Set(topology.subnets.enumerated().map { "subnet-\($0.element.name)-\($0.offset)" })
-        for (index, port) in topology.ports.enumerated() {
-            let portOp = PlannedOperation(
-                id: "port-\(port.name)-\(index)",
-                type: .port,
-                action: .create,
-                resourceIdentifier: port.name,
-                dependencies: Set([networkOp.id]).union(subnetDeps),
-                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
-                metadata: ["subnet": port.subnetID ?? ""]
-            )
-            operations.append(portOp)
-        }
-
-        return operations
-    }
-
-    private func buildVolumeCreateOperations(_ configs: [VolumeCreateConfig]) async -> [PlannedOperation] {
-        return configs.enumerated().map { (index, config) in
-            PlannedOperation(
-                id: "volume-create-\(index)",
-                type: .volume,
-                action: .create,
-                resourceIdentifier: config.name,
-                dependencies: [],
-                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
-                metadata: [
-                    "size": String(config.size),
-                    "type": config.volumeType ?? "default"
-                ]
-            )
-        }
-    }
-
     private func buildVolumeDeleteOperations(_ volumeIDs: [String]) async -> [PlannedOperation] {
         return volumeIDs.enumerated().map { (index, volumeID) in
             PlannedOperation(
@@ -519,85 +387,6 @@ actor ResourceDependencyResolver {
                 resourceIdentifier: volumeID,
                 dependencies: [],
                 estimatedDuration: OperationAction.delete.estimatedDurationSeconds
-            )
-        }
-    }
-
-    private func buildVolumeAttachOperations(_ attachments: [VolumeAttachmentOperation]) async -> [PlannedOperation] {
-        return attachments.enumerated().map { (index, attachment) in
-            PlannedOperation(
-                id: "volume-attach-\(index)",
-                type: .volume,
-                action: .attach,
-                resourceIdentifier: attachment.volumeID,
-                dependencies: Set(["server-\(attachment.serverID)"]),
-                estimatedDuration: OperationAction.attach.estimatedDurationSeconds,
-                metadata: [
-                    "serverID": attachment.serverID,
-                    "device": attachment.device ?? ""
-                ]
-            )
-        }
-    }
-
-    private func buildVolumeDetachOperations(_ detachments: [VolumeDetachmentOperation]) async -> [PlannedOperation] {
-        return detachments.enumerated().map { (index, detachment) in
-            PlannedOperation(
-                id: "volume-detach-\(index)",
-                type: .volume,
-                action: .detach,
-                resourceIdentifier: detachment.volumeID,
-                dependencies: [],
-                estimatedDuration: OperationAction.detach.estimatedDurationSeconds,
-                metadata: ["serverID": detachment.serverID]
-            )
-        }
-    }
-
-    private func buildFloatingIPCreateOperations(_ configs: [FloatingIPCreateConfig]) async -> [PlannedOperation] {
-        return configs.enumerated().map { (index, config) in
-            PlannedOperation(
-                id: "floatingip-create-\(index)",
-                type: .floatingIP,
-                action: .create,
-                resourceIdentifier: "floating-ip-\(index)",
-                dependencies: Set(["network-\(config.networkID)"]),
-                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
-                metadata: ["networkID": config.networkID]
-            )
-        }
-    }
-
-    private func buildFloatingIPAssignOperations(_ assignments: [FloatingIPAssignment]) async -> [PlannedOperation] {
-        return assignments.enumerated().map { (index, assignment) in
-            PlannedOperation(
-                id: "floatingip-assign-\(index)",
-                type: .floatingIP,
-                action: .attach,
-                resourceIdentifier: assignment.floatingIPID,
-                dependencies: Set(["server-\(assignment.serverID)"]),
-                estimatedDuration: OperationAction.attach.estimatedDurationSeconds,
-                metadata: [
-                    "serverID": assignment.serverID,
-                    "portID": assignment.portID ?? ""
-                ]
-            )
-        }
-    }
-
-    private func buildSecurityGroupCreateOperations(_ configs: [SecurityGroupCreateConfig]) async -> [PlannedOperation] {
-        return configs.enumerated().map { (index, config) in
-            PlannedOperation(
-                id: "securitygroup-create-\(index)",
-                type: .securityGroup,
-                action: .create,
-                resourceIdentifier: config.name,
-                dependencies: [],
-                estimatedDuration: OperationAction.create.estimatedDurationSeconds,
-                metadata: [
-                    "rulesCount": String(config.rules.count),
-                    "description": config.description
-                ]
             )
         }
     }
@@ -620,69 +409,6 @@ actor ResourceDependencyResolver {
                 ]
             )
         }
-    }
-
-    private func buildResourceCleanupOperations(_ criteria: ResourceCleanupCriteria) async -> [PlannedOperation] {
-        var operations: [PlannedOperation] = []
-        var operationIndex = 0
-
-        // Build cleanup operations in safe deletion order (high priority first)
-        let resourceTypes = ResourceType.allCases.sorted { $0.deletionPriority < $1.deletionPriority }
-
-        for resourceType in resourceTypes {
-            switch resourceType {
-            case .server where criteria.includeServers:
-                // Add server cleanup operations
-                let serverOps = (1...5).map { i in
-                    PlannedOperation(
-                        id: "cleanup-server-\(operationIndex + i)",
-                        type: .server,
-                        action: .delete,
-                        resourceIdentifier: "cleanup-server-\(i)",
-                        dependencies: [],
-                        estimatedDuration: OperationAction.delete.estimatedDurationSeconds
-                    )
-                }
-                operations.append(contentsOf: serverOps)
-                operationIndex += serverOps.count
-
-            case .volume where criteria.includeVolumes:
-                // Add volume cleanup operations
-                let volumeOps = (1...3).map { i in
-                    PlannedOperation(
-                        id: "cleanup-volume-\(operationIndex + i)",
-                        type: .volume,
-                        action: .delete,
-                        resourceIdentifier: "cleanup-volume-\(i)",
-                        dependencies: [],
-                        estimatedDuration: OperationAction.delete.estimatedDurationSeconds
-                    )
-                }
-                operations.append(contentsOf: volumeOps)
-                operationIndex += volumeOps.count
-
-            case .network where criteria.includeNetworks:
-                // Add network cleanup operations
-                let networkOps = (1...2).map { i in
-                    PlannedOperation(
-                        id: "cleanup-network-\(operationIndex + i)",
-                        type: .network,
-                        action: .delete,
-                        resourceIdentifier: "cleanup-network-\(i)",
-                        dependencies: [],
-                        estimatedDuration: OperationAction.delete.estimatedDurationSeconds
-                    )
-                }
-                operations.append(contentsOf: networkOps)
-                operationIndex += networkOps.count
-
-            default:
-                // Skip resource types not selected for cleanup
-                continue
-            }
-        }
-
-        return operations
     }
 
     private func createExecutionPhases(from operations: [PlannedOperation]) async -> [ExecutionPhase] {
@@ -933,19 +659,6 @@ actor ResourceDependencyResolver {
 
     // MARK: - Swift Object Storage Operations
 
-    private func buildSwiftContainerCreateOperations(_ configs: [SwiftContainerCreateConfig]) async -> [PlannedOperation] {
-        return configs.enumerated().map { (index, config) in
-            PlannedOperation(
-                id: "swift-container-create-\(index)",
-                type: .swiftContainer,
-                action: .create,
-                resourceIdentifier: config.name,
-                dependencies: [],
-                estimatedDuration: 2.0
-            )
-        }
-    }
-
     private func buildSwiftContainerDeleteOperations(_ containerNames: [String]) async -> [PlannedOperation] {
         return containerNames.enumerated().map { (index, name) in
             PlannedOperation(
@@ -955,32 +668,6 @@ actor ResourceDependencyResolver {
                 resourceIdentifier: name,
                 dependencies: [],
                 estimatedDuration: 3.0
-            )
-        }
-    }
-
-    private func buildSwiftObjectUploadOperations(_ operations: [SwiftObjectUploadOperation]) async -> [PlannedOperation] {
-        return operations.enumerated().map { (index, op) in
-            PlannedOperation(
-                id: "swift-object-upload-\(index)",
-                type: .swiftObject,
-                action: .create,
-                resourceIdentifier: "\(op.containerName)/\(op.objectName)",
-                dependencies: [],
-                estimatedDuration: 5.0
-            )
-        }
-    }
-
-    private func buildSwiftObjectDownloadOperations(_ operations: [SwiftObjectDownloadOperation]) async -> [PlannedOperation] {
-        return operations.enumerated().map { (index, op) in
-            PlannedOperation(
-                id: "swift-object-download-\(index)",
-                type: .swiftObject,
-                action: .update, // Using update as closest match for download action
-                resourceIdentifier: "\(op.containerName)/\(op.objectName)",
-                dependencies: [],
-                estimatedDuration: 4.0
             )
         }
     }

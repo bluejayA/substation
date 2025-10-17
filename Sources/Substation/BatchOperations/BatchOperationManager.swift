@@ -147,58 +147,9 @@ actor BatchOperationManager {
 
         // Basic validation based on operation type
         switch operation {
-        case .serverBulkCreate(let configs):
-            if configs.isEmpty {
-                errors.append("No server configurations provided")
-            }
-            for (index, config) in configs.enumerated() {
-                if config.name.isEmpty {
-                    errors.append("Server \(index): Name is required")
-                }
-                if config.imageID.isEmpty {
-                    errors.append("Server \(index): Image ID is required")
-                }
-                if config.flavorID.isEmpty {
-                    errors.append("Server \(index): Flavor ID is required")
-                }
-                if config.networkIDs.isEmpty {
-                    errors.append("Server \(index): At least one network is required")
-                }
-            }
-
         case .serverBulkDelete(let serverIDs):
             if serverIDs.isEmpty {
                 errors.append("No server IDs provided for deletion")
-            }
-
-        case .networkTopologyDeploy(let topology):
-            if topology.network.name.isEmpty {
-                errors.append("Network name is required")
-            }
-            for (index, subnet) in topology.subnets.enumerated() {
-                if subnet.name.isEmpty {
-                    errors.append("Subnet \(index): Name is required")
-                }
-                if subnet.cidr.isEmpty {
-                    errors.append("Subnet \(index): CIDR is required")
-                }
-                // Basic CIDR validation
-                if !isValidCIDR(subnet.cidr) {
-                    errors.append("Subnet \(index): Invalid CIDR format")
-                }
-            }
-
-        case .volumeBulkCreate(let configs):
-            if configs.isEmpty {
-                errors.append("No volume configurations provided")
-            }
-            for (index, config) in configs.enumerated() {
-                if config.name.isEmpty {
-                    errors.append("Volume \(index): Name is required")
-                }
-                if config.size <= 0 {
-                    errors.append("Volume \(index): Size must be positive")
-                }
             }
 
         case .volumeBulkDelete(let volumeIDs):
@@ -206,69 +157,9 @@ actor BatchOperationManager {
                 errors.append("No volume IDs provided for deletion")
             }
 
-        case .volumeBulkAttach(let operations):
-            if operations.isEmpty {
-                errors.append("No volume attachment operations provided")
-            }
-            for (index, op) in operations.enumerated() {
-                if op.volumeID.isEmpty {
-                    errors.append("Attachment \(index): Volume ID is required")
-                }
-                if op.serverID.isEmpty {
-                    errors.append("Attachment \(index): Server ID is required")
-                }
-            }
-
-        case .volumeBulkDetach(let operations):
-            if operations.isEmpty {
-                errors.append("No volume detachment operations provided")
-            }
-
-        case .swiftContainerBulkCreate(let configs):
-            if configs.isEmpty {
-                errors.append("No Swift container configurations provided")
-            }
-            for (index, config) in configs.enumerated() {
-                if config.name.isEmpty {
-                    errors.append("Container \(index): Name is required")
-                }
-            }
-
         case .swiftContainerBulkDelete(let containerNames):
             if containerNames.isEmpty {
                 errors.append("No container names provided for deletion")
-            }
-
-        case .swiftObjectBulkUpload(let operations):
-            if operations.isEmpty {
-                errors.append("No upload operations provided")
-            }
-            for (index, op) in operations.enumerated() {
-                if op.objectName.isEmpty {
-                    errors.append("Upload \(index): Object name is required")
-                }
-                if op.localPath.isEmpty {
-                    errors.append("Upload \(index): Local path is required")
-                }
-                if op.containerName.isEmpty {
-                    errors.append("Upload \(index): Container name is required")
-                }
-            }
-
-        case .swiftObjectBulkDownload(let operations):
-            if operations.isEmpty {
-                errors.append("No download operations provided")
-            }
-            for (index, op) in operations.enumerated() {
-                if op.objectName.isEmpty {
-                    errors.append("Download \(index): Object name is required")
-                }
-                if op.containerName.isEmpty {
-                    errors.append("Download \(index): Container name is required")
-                }
-                if op.localPath.isEmpty {
-                    errors.append("Download \(index): Destination path is required")
-                }
             }
 
         case .swiftObjectBulkDelete(let containerName, let objectNames):
@@ -408,50 +299,17 @@ actor BatchOperationManager {
             let resourceID: String?
 
             switch (operation.type, operation.action) {
-            case (.server, .create):
-                resourceID = try await executeServerCreate(operation, execution: execution)
-
             case (.server, .delete):
                 try await executeServerDelete(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
-
-            case (.network, .create):
-                resourceID = try await executeNetworkCreate(operation, execution: execution)
 
             case (.network, .delete):
                 try await executeNetworkDelete(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
 
-            case (.subnet, .create):
-                resourceID = try await executeSubnetCreate(operation, execution: execution)
-
-            case (.volume, .create):
-                resourceID = try await executeVolumeCreate(operation, execution: execution)
-
             case (.volume, .delete):
                 try await executeVolumeDelete(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
-
-            case (.volume, .attach):
-                try await executeVolumeAttach(operation, execution: execution)
-                resourceID = operation.resourceIdentifier
-
-            case (.volume, .detach):
-                try await executeVolumeDetach(operation, execution: execution)
-                resourceID = operation.resourceIdentifier
-
-            case (.floatingIP, .create):
-                resourceID = try await executeFloatingIPCreate(operation, execution: execution)
-
-            case (.floatingIP, .attach):
-                try await executeFloatingIPAssign(operation, execution: execution)
-                resourceID = operation.resourceIdentifier
-
-            case (.securityGroup, .create):
-                resourceID = try await executeSecurityGroupCreate(operation, execution: execution)
-
-            case (.port, .create):
-                resourceID = try await executePortCreate(operation, execution: execution)
 
             case (.port, .attach):
                 try await executeNetworkInterfaceAttach(operation, execution: execution)
@@ -489,18 +347,8 @@ actor BatchOperationManager {
                 try await executeImageDelete(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
 
-            case (.swiftContainer, .create):
-                resourceID = try await executeSwiftContainerCreate(operation, execution: execution)
-
             case (.swiftContainer, .delete):
                 try await executeSwiftContainerDelete(operation, execution: execution)
-                resourceID = operation.resourceIdentifier
-
-            case (.swiftObject, .upload):
-                resourceID = try await executeSwiftObjectUpload(operation, execution: execution)
-
-            case (.swiftObject, .download):
-                try await executeSwiftObjectDownload(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
 
             case (.swiftObject, .delete):
@@ -538,29 +386,6 @@ actor BatchOperationManager {
 
     // MARK: - Individual Operation Executors
 
-    private func executeServerCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        // Extract configuration from batch operation
-        guard case .serverBulkCreate(let configs) = execution.type,
-              let config = configs.first(where: { $0.name == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Server configuration not found")
-        }
-
-        let server = try await client.createServer(
-            name: config.name,
-            imageRef: config.imageID,
-            flavorRef: config.flavorID,
-            networkId: config.networkIDs.first ?? "",
-            keyName: config.keyPairName,
-            userData: config.userData,
-            securityGroups: config.securityGroups,
-            availabilityZone: config.availabilityZone
-        )
-        return server.id
-    }
-
     private func executeServerDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
@@ -581,25 +406,6 @@ actor BatchOperationManager {
         }
     }
 
-    private func executeNetworkCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        // Extract configuration from batch operation
-        guard case .networkTopologyDeploy(let topology) = execution.type else {
-            throw BatchOperationError.executionFailed("Network topology configuration not found")
-        }
-
-        let network = try await client.createNetwork(
-            name: topology.network.name,
-            description: nil,
-            adminStateUp: topology.network.adminStateUp,
-            shared: topology.network.shared,
-            external: topology.network.external
-        )
-        return network.id
-    }
-
     private func executeNetworkDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
@@ -615,50 +421,6 @@ actor BatchOperationManager {
         }
     }
 
-    private func executeSubnetCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        guard case .networkTopologyDeploy(let topology) = execution.type,
-              let subnetConfig = topology.subnets.first(where: { $0.name == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Subnet configuration not found")
-        }
-
-        // For simplicity, we'll use a placeholder network ID
-        // In a real implementation, you'd resolve the network ID from dependencies
-        let networkID = "placeholder-network-id"
-
-        let subnet = try await client.createSubnet(
-            name: subnetConfig.name,
-            networkID: networkID,
-            cidr: subnetConfig.cidr,
-            ipVersion: 4,
-            gatewayIP: subnetConfig.gatewayIP,
-            dnsNameservers: subnetConfig.dnsNameservers.isEmpty ? nil : subnetConfig.dnsNameservers,
-            enableDhcp: true
-        )
-        return subnet.id
-    }
-
-    private func executeVolumeCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        guard case .volumeBulkCreate(let configs) = execution.type,
-              let config = configs.first(where: { $0.name == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Volume configuration not found")
-        }
-
-        let volume = try await client.createVolumeFromImage(
-            name: config.name,
-            size: config.size,
-            imageRef: nil,
-            availabilityZone: config.availabilityZone,
-            volumeType: config.volumeType
-        )
-        return volume.id
-    }
-
     private func executeVolumeDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
@@ -672,117 +434,6 @@ actor BatchOperationManager {
             }
             throw error
         }
-    }
-
-    private func executeVolumeAttach(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws {
-        let serverID = operation.metadata["serverID"] ?? ""
-        let _ = operation.metadata["device"]
-
-        try await client.attachVolume(
-            volumeId: operation.resourceIdentifier,
-            serverId: serverID
-        )
-    }
-
-    private func executeVolumeDetach(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws {
-        let serverID = operation.metadata["serverID"] ?? ""
-
-        try await client.detachVolume(
-            serverId: serverID,
-            volumeId: operation.resourceIdentifier
-        )
-    }
-
-    private func executeFloatingIPCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        let networkID = operation.metadata["networkID"] ?? ""
-
-        let floatingIP = try await client.createFloatingIP(
-            networkID: networkID,
-            portID: nil,
-            subnetID: nil,
-            description: operation.metadata["description"]
-        )
-        return floatingIP.id
-    }
-
-    private func executeFloatingIPAssign(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws {
-        let _ = operation.metadata["serverID"] ?? ""
-        let portID = operation.metadata["portID"]
-
-        _ = try await client.updateFloatingIP(
-            id: operation.resourceIdentifier,
-            portID: portID
-        )
-    }
-
-    private func executeSecurityGroupCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        guard case .securityGroupBulkCreate(let configs) = execution.type,
-              let config = configs.first(where: { $0.name == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Security group configuration not found")
-        }
-
-        let securityGroup = try await client.createSecurityGroup(
-            name: config.name,
-            description: config.description
-        )
-
-        // Create rules if specified
-        for rule in config.rules {
-            let direction = SecurityGroupDirection(rawValue: rule.direction) ?? .ingress
-            let protocolEnum = SecurityGroupProtocol(rawValue: rule.ipProtocol)
-            let ethertype = SecurityGroupEtherType.ipv4 // Default to IPv4
-
-            _ = try await client.createSecurityGroupRule(
-                securityGroupId: securityGroup.id,
-                direction: direction,
-                protocol: protocolEnum,
-                ethertype: ethertype,
-                portRangeMin: rule.portRangeMin,
-                portRangeMax: rule.portRangeMax,
-                remoteIpPrefix: rule.remoteIPPrefix,
-                remoteGroupId: rule.remoteGroupID
-            )
-        }
-
-        return securityGroup.id
-    }
-
-    private func executePortCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        guard case .networkTopologyDeploy(let topology) = execution.type,
-              let portConfig = topology.ports.first(where: { $0.name == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Port configuration not found")
-        }
-
-        // For simplicity, using placeholder network ID
-        let networkID = "placeholder-network-id"
-
-        let port = try await client.createPort(
-            name: portConfig.name,
-            description: nil,
-            networkID: networkID,
-            subnetID: nil,
-            securityGroups: portConfig.securityGroups.isEmpty ? nil : portConfig.securityGroups,
-            qosPolicyID: nil
-        )
-        return port.id
     }
 
     private func executeNetworkInterfaceAttach(
@@ -952,26 +603,6 @@ actor BatchOperationManager {
 
     // MARK: - Swift Object Storage Executors
 
-    private func executeSwiftContainerCreate(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        guard case .swiftContainerBulkCreate(let configs) = execution.type,
-              let config = configs.first(where: { $0.name == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Swift container configuration not found")
-        }
-
-        let request = CreateSwiftContainerRequest(
-            name: config.name,
-            metadata: config.metadata,
-            readACL: config.readACL,
-            writeACL: config.writeACL
-        )
-
-        try await client.swift.createContainer(request: request)
-        return config.name
-    }
-
     private func executeSwiftContainerDelete(
         _ operation: ResourceDependencyResolver.PlannedOperation,
         execution: BatchOperationExecution
@@ -985,47 +616,6 @@ actor BatchOperationManager {
             }
             throw error
         }
-    }
-
-    private func executeSwiftObjectUpload(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws -> String {
-        guard case .swiftObjectBulkUpload(let operations) = execution.type,
-              let uploadOp = operations.first(where: { $0.objectName == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Swift upload operation not found")
-        }
-
-        // Read file data
-        let fileURL = URL(fileURLWithPath: uploadOp.localPath)
-        let data = try Data(contentsOf: fileURL)
-
-        let request = UploadSwiftObjectRequest(
-            containerName: uploadOp.containerName,
-            objectName: uploadOp.objectName,
-            data: data,
-            contentType: uploadOp.contentType,
-            metadata: uploadOp.metadata
-        )
-
-        try await client.swift.uploadObject(request: request)
-        return uploadOp.objectName
-    }
-
-    private func executeSwiftObjectDownload(
-        _ operation: ResourceDependencyResolver.PlannedOperation,
-        execution: BatchOperationExecution
-    ) async throws {
-        guard case .swiftObjectBulkDownload(let operations) = execution.type,
-              let downloadOp = operations.first(where: { $0.objectName == operation.resourceIdentifier }) else {
-            throw BatchOperationError.executionFailed("Swift download operation not found")
-        }
-
-        let data = try await client.swift.downloadObject(containerName: downloadOp.containerName, objectName: downloadOp.objectName)
-
-        // Write to destination
-        let fileURL = URL(fileURLWithPath: downloadOp.localPath)
-        try data.write(to: fileURL)
     }
 
     private func executeSwiftObjectDelete(
