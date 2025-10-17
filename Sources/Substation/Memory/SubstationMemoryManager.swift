@@ -362,16 +362,6 @@ extension SubstationMemoryManager {
     func clearResourceNameCache() async {
         await clearCache(type: .resourceNames)
     }
-
-    /// Legacy compatibility method for FilterCache.clearCache()
-    func clearFilterCache() async {
-        await clearCache(type: .filterResults)
-    }
-
-    /// Legacy compatibility method for search cache cleanup
-    func clearSearchCache() async {
-        await clearCache(type: .searchResults)
-    }
 }
 
 // MARK: - System Health Report Types

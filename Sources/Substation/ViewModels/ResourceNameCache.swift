@@ -17,13 +17,6 @@ final class ResourceNameCache {
         Logger.shared.logInfo("ResourceNameCache initialized with MemoryKit integration")
     }
 
-    /// Legacy initializer for backward compatibility
-    convenience init() {
-        // Create a default SubstationMemoryManager if none provided
-        // This will be replaced when proper dependency injection is set up
-        fatalError("ResourceNameCache requires MemoryKit adapter. Use init(adapter:) instead.")
-    }
-
     // MARK: - Legacy API Compatibility
 
     func setFlavorName(_ id: String, name: String) {

@@ -324,47 +324,6 @@ final class WelcomeScreen: @unchecked Sendable {
         return sections
     }
 
-    /// Get shortcuts reference (frequently used commands) - Legacy text format
-    /// Deprecated: Use getShortcutsSections() for DetailView component
-    /// - Returns: Formatted shortcuts text
-    @available(*, deprecated, message: "Use getShortcutsSections() instead")
-    func getShortcutsReference() -> String {
-        return """
-        FREQUENTLY USED COMMANDS:
-
-        NAVIGATION:
-        :dashboard    - Main dashboard view
-        :servers      - Server management
-        :networks     - Network management
-        :volumes      - Volume management
-        :images       - Image catalog
-        :flavors      - Flavor specifications
-
-        ACTIONS:
-        :create       - Create resource (context-aware)
-        :delete       - Delete selected resource
-        :start        - Start server
-        :stop         - Stop server
-        :restart      - Restart server
-        :refresh      - Refresh current view
-
-        UTILITIES:
-        :ctx          - List/switch clouds
-        :help         - Show help
-        :shortcuts    - This reference
-        :tutorial     - Interactive tutorial
-        :quit         - Exit application
-
-        UNIVERSAL KEYS:
-        UP/DOWN       - Navigate items
-        SPACE         - View details
-        ESC           - Go back/cancel
-        /             - Search
-        ?             - Context help
-        ^C            - Quit
-        """
-    }
-
     /// Get command workflow examples as DetailView sections
     /// - Returns: Array of DetailSection for command examples
     func getExamplesSections() -> [DetailSection] {

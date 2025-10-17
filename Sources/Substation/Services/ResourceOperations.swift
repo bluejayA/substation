@@ -209,10 +209,10 @@ final class ResourceOperations {
             return
         }
 
-        // Get selected network and key pair (optional)
+        // Get selected network, key pair, and server group (optional)
         let selectedNetworkId = serverCreateForm.selectedNetworks.first
         let selectedKeyPairName = serverCreateForm.selectedKeyPairName
-        let _ = serverCreateForm.selectedServerGroupID // TODO: Server group support not implemented yet
+        let selectedServerGroupID = serverCreateForm.selectedServerGroupID
 
         // Use the base server name - Nova will append -0, -1, -2, etc. automatically when maxCount > 1
         let serverName = serverCreateForm.serverName
@@ -282,7 +282,7 @@ final class ResourceOperations {
                     minCount: maxServersCount,
                     maxCount: maxServersCount,
                     returnReservationId: nil,
-                    serverGroup: nil,
+                    serverGroup: selectedServerGroupID,
                     blockDeviceMapping: nil
                 )
                 newServer = try await client.createServer(request: request)
@@ -335,7 +335,7 @@ final class ResourceOperations {
                     minCount: maxServersCount,
                     maxCount: maxServersCount,
                     returnReservationId: nil,
-                    serverGroup: nil,
+                    serverGroup: selectedServerGroupID,
                     blockDeviceMapping: blockDeviceMapping
                 )
                 newServer = try await self.client.createServer(request: request)

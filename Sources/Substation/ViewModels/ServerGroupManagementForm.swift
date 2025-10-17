@@ -163,24 +163,6 @@ struct ServerGroupManagementForm {
         pendingRemovals.removeAll()
     }
 
-    // Server navigation
-    mutating func moveToNextServer() {
-        let servers = getAllServers()
-        if !servers.isEmpty {
-            selectedResourceIndex = min(selectedResourceIndex + 1, servers.count - 1)
-        }
-    }
-
-    mutating func moveToPreviousServer() {
-        selectedResourceIndex = max(selectedResourceIndex - 1, 0)
-    }
-
-    func getSelectedServer() -> Server? {
-        let servers = getAllServers()
-        guard selectedResourceIndex < servers.count else { return nil }
-        return servers[selectedResourceIndex]
-    }
-
     func getNavigationHelp() -> String {
         return "UP/DOWN: Navigate servers | ENTER/ESC: Back to server groups"
     }
