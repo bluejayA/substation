@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 /// Unified image selection view used by both Server Create and Volume Create forms
 struct ImageSelectionView {
@@ -19,7 +19,7 @@ struct ImageSelectionView {
         title: String = "Select Image",
         description: String? = nil
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Sort images alphabetically for consistent display
         let sortedImages = images.sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
@@ -64,6 +64,6 @@ struct ImageSelectionView {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }

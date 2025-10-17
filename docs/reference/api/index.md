@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API reference for Substation's packages: OSClient, SwiftTUI, and CrossPlatformTimer.
+Complete API reference for Substation's packages: OSClient, SwiftNCurses, and CrossPlatformTimer.
 
 ## Quick Reference
 
@@ -9,14 +9,14 @@ Complete API reference for Substation's packages: OSClient, SwiftTUI, and CrossP
 | Package | Purpose | When to Use |
 |---------|---------|-------------|
 | **OSClient** | OpenStack API client | Interacting with OpenStack services |
-| **SwiftTUI** | Terminal UI framework | Building terminal UIs |
+| **SwiftNCurses** | Terminal UI framework | Building terminal UIs |
 | **CrossPlatformTimer** | Timer utilities | Periodic tasks, animations |
 
 ### Quick Start
 
 ```swift
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import CrossPlatformTimer
 
 // Connect to OpenStack
@@ -30,8 +30,8 @@ let client = try await OpenStackClient.connect(
 )
 
 // Initialize terminal UI
-let screen = SwiftTUI.initializeScreen()
-defer { SwiftTUI.cleanup(screen) }
+let screen = SwiftNCurses.initializeScreen()
+defer { SwiftNCurses.cleanup(screen) }
 
 // Create auto-refresh timer
 let timer = createCompatibleTimer(interval: 5.0, repeats: true) {
@@ -63,7 +63,7 @@ let timer = createCompatibleTimer(interval: 5.0, repeats: true) {
 - Handle OpenStack errors
 - Monitor API performance
 
-### [SwiftTUI - Terminal UI Framework](swifttui.md)
+### [SwiftNCurses - Terminal UI Framework](SwiftNCurses.md)
 
 **What's in it**:
 
@@ -97,7 +97,7 @@ let timer = createCompatibleTimer(interval: 5.0, repeats: true) {
 **Read this** when you need to:
 
 - Build complete applications
-- Integrate OSClient with SwiftTUI
+- Integrate OSClient with SwiftNCurses
 - Implement auto-refresh
 - Create multi-view applications
 - Handle timers and periodic tasks
@@ -129,7 +129,7 @@ print("Cache hit rate: \(stats.hitRate * 100)%")
 
 ```swift
 // Render text
-await SwiftTUI.render(
+await SwiftNCurses.render(
     Text("Hello, World!").bold().color(.blue),
     on: surface,
     in: bounds
@@ -139,10 +139,10 @@ await SwiftTUI.render(
 let list = List(items: items)
     .selectedIndex(0)
     .scrollable(true)
-await SwiftTUI.render(list, on: surface, in: bounds)
+await SwiftNCurses.render(list, on: surface, in: bounds)
 
 // Handle input
-let key = SwiftTUI.getInput(screen)
+let key = SwiftNCurses.getInput(screen)
 switch key {
 case KEY_UP: moveUp()
 case KEY_DOWN: moveDown()
@@ -151,7 +151,7 @@ default: break
 }
 
 // Refresh screen
-SwiftTUI.refresh(screen)
+SwiftNCurses.refresh(screen)
 ```
 
 ### Timer Operations
@@ -317,7 +317,7 @@ See: [Error Handling](osclient.md#error-handling)
 API implementation is organized across multiple packages:
 
 - `/Sources/OSClient/` - OpenStack client library
-- `/Sources/SwiftTUI/` - Terminal UI framework
+- `/Sources/SwiftNCurses/` - Terminal UI framework
 - `/Sources/CrossPlatformTimer/` - Timer utilities
 - `/Sources/MemoryKit/` - Multi-level caching
 - `/Sources/Substation/` - Substation application
@@ -353,13 +353,13 @@ refresh();
 endwin();
 ```
 
-**Swift (SwiftTUI)**:
+**Swift (SwiftNCurses)**:
 
 ```swift
-let screen = SwiftTUI.initializeScreen()
-defer { SwiftTUI.cleanup(screen) }
-await SwiftTUI.render(Text("Hello, World!"), on: surface, in: bounds)
-SwiftTUI.refresh(screen)
+let screen = SwiftNCurses.initializeScreen()
+defer { SwiftNCurses.cleanup(screen) }
+await SwiftNCurses.render(Text("Hello, World!"), on: surface, in: bounds)
+SwiftNCurses.refresh(screen)
 ```
 
 ## Best Practices
@@ -415,8 +415,8 @@ await client.cacheManager.configure(
 
 ```swift
 // Always use defer for cleanup
-let screen = SwiftTUI.initializeScreen()
-defer { SwiftTUI.cleanup(screen) }
+let screen = SwiftNCurses.initializeScreen()
+defer { SwiftNCurses.cleanup(screen) }
 
 let timer = createCompatibleTimer(...)
 defer { timer.invalidate() }

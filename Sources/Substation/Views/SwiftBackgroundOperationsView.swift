@@ -4,7 +4,7 @@ import Darwin
 #else
 import Glibc
 #endif
-import SwiftTUI
+import SwiftNCurses
 
 struct SwiftBackgroundOperationsView {
 

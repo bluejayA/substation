@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct VolumeSnapshotSelectionView {
     @MainActor
@@ -17,7 +17,7 @@ struct VolumeSnapshotSelectionView {
         searchQuery: String?,
         title: String = "Select Source Snapshot"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         let tabs = [
             FormSelectorTab<VolumeSnapshot>(
@@ -57,6 +57,6 @@ struct VolumeSnapshotSelectionView {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }

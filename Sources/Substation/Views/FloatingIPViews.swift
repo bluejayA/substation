@@ -1,7 +1,7 @@
 import Foundation
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct FloatingIPViews {
 
@@ -736,12 +736,12 @@ struct FloatingIPViews {
                                        cachedNetworks: [Network], cachedSubnets: [Subnet]) async {
 
         // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > Self.floatingIPCreateMinScreenWidth && height > Self.floatingIPCreateMinScreenHeight else {
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.floatingIPCreateBoundsMinWidth, width), height: max(Self.floatingIPCreateBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.floatingIPCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.floatingIPCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -764,7 +764,7 @@ struct FloatingIPViews {
         // Render the form
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
         // If a selector field is active, render specialized view as overlay
         if let currentField = floatingIPCreateFormState.getCurrentField() {
@@ -852,10 +852,10 @@ struct FloatingIPViews {
                 columns: field.columns,
                 maxHeight: Int(height)
             ) {
-                let surface = SwiftTUI.surface(from: screen)
+                let surface = SwiftNCurses.surface(from: screen)
                 let overlayBounds = Rect(x: startCol, y: startRow, width: width, height: height)
                 surface.clear(rect: overlayBounds)
-                await SwiftTUI.render(selectorComponent, on: surface, in: overlayBounds)
+                await SwiftNCurses.render(selectorComponent, on: surface, in: overlayBounds)
             }
         }
     }
@@ -877,12 +877,12 @@ struct FloatingIPViews {
                                        scrollOffset: Int, selectedIndex: Int) async {
 
         // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > Self.floatingIPServerSelectionMinScreenWidth && height > Self.floatingIPServerSelectionMinScreenHeight else {
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.floatingIPServerSelectionBoundsMinWidth, width), height: max(Self.floatingIPServerSelectionBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.floatingIPServerSelectionScreenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.floatingIPServerSelectionScreenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -945,7 +945,7 @@ struct FloatingIPViews {
         // Render unified server selection view
         let serverSelectionComponent = VStack(spacing: Self.floatingIPServerSelectionComponentSpacing, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(serverSelectionComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(serverSelectionComponent, on: surface, in: bounds)
     }
 
     // MARK: - Server Selection Component Creation

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // MARK: - StatusListColumn
@@ -66,13 +66,13 @@ struct StatusListView<T: Sendable> {
     ) async {
         // Defensive bounds checking
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title with multi-select indicator
@@ -123,7 +123,7 @@ struct StatusListView<T: Sendable> {
         // Render
         let listComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(listComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(listComponent, on: surface, in: bounds)
     }
 
     // MARK: - Header Building

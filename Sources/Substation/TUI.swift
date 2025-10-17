@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - Default Logger Implementation
@@ -472,9 +472,9 @@ final class TUI {
         try await self.memoryContainer.initialize(with: memoryConfig)
         Logger.shared.logDebug("Memory container initialized successfully")
 
-        // Configure SwiftTUI to use the same shared logger
-        Logger.shared.logDebug("Configuring SwiftTUI logging")
-        SwiftTUI.configureLogging(logger: sharedLogger)
+        // Configure SwiftNCurses to use the same shared logger
+        Logger.shared.logDebug("Configuring SwiftNCurses logging")
+        SwiftNCurses.configureLogging(logger: sharedLogger)
 
         // Initialize ResourceNameCache with MemoryKit adapter
         Logger.shared.logDebug("Creating resource name cache")
@@ -770,12 +770,12 @@ final class TUI {
             shouldCleanup = false // App.swift will handle cleanup
 
             // Get current screen dimensions
-            screenRows = SwiftTUI.getMaxY(screen)
-            screenCols = SwiftTUI.getMaxX(screen)
+            screenRows = SwiftNCurses.getMaxY(screen)
+            screenCols = SwiftNCurses.getMaxX(screen)
         } else {
-            // Initialize terminal using SwiftTUI abstractions
+            // Initialize terminal using SwiftNCurses abstractions
             Logger.shared.logDebug("Initializing new terminal session")
-            let initResult = SwiftTUI.initializeTerminalSession()
+            let initResult = SwiftNCurses.initializeTerminalSession()
             guard initResult.success, let newScreen = initResult.screen else {
                 let errorMsg = "Failed to initialize terminal session"
                 Logger.shared.logError(errorMsg)
@@ -793,7 +793,7 @@ final class TUI {
 
         defer {
             if shouldCleanup {
-                SwiftTUI.cleanupTerminal()
+                SwiftNCurses.cleanupTerminal()
                 Logger.shared.logDebug("Cleaned up terminal")
             }
         }
@@ -801,11 +801,11 @@ final class TUI {
         if screenRows < 20 || screenCols < 80 {
             let errorMsg = "Terminal too small: need 80x20, got \(screenCols)x\(screenRows)"
             Logger.shared.logError(errorMsg)
-            let surface = SwiftTUI.surface(from: screen.pointer)
+            let surface = SwiftNCurses.surface(from: screen.pointer)
             let errorBounds = Rect(x: 0, y: 0, width: screenCols, height: 1)
-            await SwiftTUI.render(Text("Terminal too small. Need at least 80x20, got \(screenCols)x\(screenRows) - \(errorMsg)").error(), on: surface, in: errorBounds)
-            SwiftTUI.batchedRefresh(screen)
-            SwiftTUI.waitForInput(screen)
+            await SwiftNCurses.render(Text("Terminal too small. Need at least 80x20, got \(screenCols)x\(screenRows) - \(errorMsg)").error(), on: surface, in: errorBounds)
+            SwiftNCurses.batchedRefresh(screen)
+            SwiftNCurses.waitForInput(screen)
             return
         }
 
@@ -850,19 +850,19 @@ final class TUI {
         let loopStartTime = Date()
 
         while running {
-            let ch = SwiftTUI.getInput(screen)
+            let ch = SwiftNCurses.getInput(screen)
 
             // Handle window resize
             if ch == Int32(410) { // KEY_RESIZE
                 Logger.shared.logUserAction("window_resize", details: [
                     "oldSize": "\(screenCols)x\(screenRows)"
                 ])
-                screenRows = SwiftTUI.getMaxY(screen)
-                screenCols = SwiftTUI.getMaxX(screen)
+                screenRows = SwiftNCurses.getMaxY(screen)
+                screenCols = SwiftNCurses.getMaxX(screen)
                 Logger.shared.logUserAction("window_resized", details: [
                     "newSize": "\(screenCols)x\(screenRows)"
                 ])
-                SwiftTUI.clear(screen)
+                SwiftNCurses.clear(screen)
                 forceRedraw() // Force immediate redraw for resize
                 await self.draw(screen: screen.pointer)
 
@@ -1470,7 +1470,7 @@ final class TUI {
     /// Uses DetailView component with dynamic status updates during data load
     /// - Parameter screen: The screen pointer for rendering
 
-    // Colors are now managed semantically through SwiftTUI.drawStyledText(color: .semantic)
+    // Colors are now managed semantically through SwiftNCurses.drawStyledText(color: .semantic)
 
     internal func draw(screen: OpaquePointer?) async {
         // Only redraw if needed and throttle to prevent excessive redraws
@@ -1500,7 +1500,7 @@ final class TUI {
 
         // Clear screen only if full redraw is needed
         if renderPlan.shouldClearScreen {
-            SwiftTUI.clear(WindowHandle(screen))
+            SwiftNCurses.clear(WindowHandle(screen))
         }
 
         // Draw layout components based on render plan
@@ -1526,7 +1526,7 @@ final class TUI {
 
         // Render horizontal separator line above bottom bars
         if renderPlan.renderStatusBar {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             // When unified input is shown: separator at screenRows - 3 (input at -2, status at -1)
             // When no input: separator at screenRows - 2 (status at -1)
             let separatorRow = showUnifiedInput ? screenRows - 3 : screenRows - 2
@@ -1536,7 +1536,7 @@ final class TUI {
             let separatorText = String(repeating: "-", count: Int(screenCols))
             let separatorComponent = Text(separatorText).info()
 
-            await SwiftTUI.render(separatorComponent, on: surface, in: separatorBounds)
+            await SwiftNCurses.render(separatorComponent, on: surface, in: separatorBounds)
         }
 
         // Render unified input bar (above status bar)
@@ -1560,15 +1560,15 @@ final class TUI {
         // Render modal overlay if active
         if let modal = userFeedback.currentModal {
             let start = Date()
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let modalBounds = Rect(x: 0, y: 0, width: screenCols, height: screenRows)
             let modalComponent = ModalView(modal: modal)
-            await SwiftTUI.render(modalComponent, on: surface, in: modalBounds)
+            await SwiftNCurses.render(modalComponent, on: surface, in: modalBounds)
             componentTimings["modal"] = Date().timeIntervalSince(start)
         }
 
         // Batched refresh: updates virtual screen then flushes once (reduces syscalls)
-        SwiftTUI.batchedRefresh(WindowHandle(screen))
+        SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
         // Mark render as clean
         renderOptimizer.markClean()
@@ -1597,23 +1597,23 @@ final class TUI {
     }
 
     internal func confirmServer(_ itemName: String, screen: OpaquePointer?, state: String) async -> Bool {
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
         defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let promptLine = screenRows - 2
         let promptBounds = Rect(x: 0, y: promptLine, width: screenCols, height: 1)
 
-        // Display confirmation prompt using SwiftTUI
+        // Display confirmation prompt using SwiftNCurses
         let promptText = " \(state.capitalized) '\(itemName)'? Press Y to confirm, any other key to cancel: "
         let promptComponent = Text(promptText).warning()
 
         surface.clear(rect: promptBounds)
-        await SwiftTUI.render(promptComponent, on: surface, in: promptBounds)
+        await SwiftNCurses.render(promptComponent, on: surface, in: promptBounds)
 
-        let ch = SwiftTUI.getInput(WindowHandle(screen))
+        let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
         // Clear prompt
         surface.clear(rect: promptBounds)

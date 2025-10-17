@@ -27,12 +27,12 @@ public struct ConfirmationModal {
         screenCols: Int32
     ) async -> Bool {
         // Set blocking mode for input
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
         defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Calculate modal dimensions based on content
         let modalWidth: Int32 = min(60, screenCols - 4)
@@ -88,7 +88,7 @@ public struct ConfirmationModal {
         let _ = compatWRefresh(WindowHandle(screen))
 
         // Get input
-        let ch = SwiftTUI.getInput(WindowHandle(screen))
+        let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
         // Clear modal area immediately
         surface.clear(rect: modalBounds)

@@ -460,7 +460,7 @@ substation --cloud staging
 - MemoryKit (caching)
 - Substation (main app - UI coordination)
 - Service Layer (business logic)
-- SwiftTUI (terminal UI framework - custom implementation)
+- SwiftNCurses (terminal UI framework - custom implementation)
 
 ### Does Substation work on Windows?
 

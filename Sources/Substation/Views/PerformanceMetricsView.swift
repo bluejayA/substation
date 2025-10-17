@@ -4,7 +4,7 @@ import Darwin
 #else
 import Glibc
 #endif
-import SwiftTUI
+import SwiftNCurses
 
 // MARK: - Performance Metrics View
 
@@ -34,9 +34,9 @@ struct PerformanceMetricsView {
 
         // Defensive bounds checking
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 

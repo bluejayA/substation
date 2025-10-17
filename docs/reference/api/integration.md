@@ -1,6 +1,6 @@
 # Integration Guide
 
-CrossPlatformTimer utilities and integration examples for building complete applications with OSClient and SwiftTUI.
+CrossPlatformTimer utilities and integration examples for building complete applications with OSClient and SwiftNCurses.
 
 ## CrossPlatformTimer API
 
@@ -64,14 +64,14 @@ let backgroundTimer = createCompatibleTimer(interval: 30.0, repeats: true) {
 
 ```swift
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import CrossPlatformTimer
 
 @main
 struct MyOpenStackApp {
     static func main() async {
-        let screen = SwiftTUI.initializeScreen()
-        defer { SwiftTUI.cleanup(screen) }
+        let screen = SwiftNCurses.initializeScreen()
+        defer { SwiftNCurses.cleanup(screen) }
 
         // Initialize OpenStack client
         let client = try await OpenStackClient.connect(
@@ -84,7 +84,7 @@ struct MyOpenStackApp {
         )
 
         // Create UI surface
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: 0, y: 0, width: 80, height: 24)
 
         // Set up refresh timer
@@ -97,7 +97,7 @@ struct MyOpenStackApp {
         // Main application loop
         var running = true
         while running {
-            let key = SwiftTUI.getInput(screen)
+            let key = SwiftNCurses.getInput(screen)
             if key == 113 { // 'q' key
                 running = false
             }
@@ -111,11 +111,11 @@ func updateServerList(client: OpenStackClient, surface: Surface, bounds: Rect) a
         let serverNames = servers.map { $0.name }
 
         let listComponent = List(items: serverNames)
-        await SwiftTUI.render(listComponent, on: surface, in: bounds)
-        SwiftTUI.refresh(surface.screen)
+        await SwiftNCurses.render(listComponent, on: surface, in: bounds)
+        SwiftNCurses.refresh(surface.screen)
     } catch {
         let errorText = Text("Error: \(error.localizedDescription)").color(.red)
-        await SwiftTUI.render(errorText, on: surface, in: bounds)
+        await SwiftNCurses.render(errorText, on: surface, in: bounds)
     }
 }
 ```
@@ -157,7 +157,7 @@ actor ServerListView {
             .selectedIndex(selectedIndex)
             .scrollable(true)
 
-        await SwiftTUI.render(list, on: surface, in: bounds)
+        await SwiftNCurses.render(list, on: surface, in: bounds)
     }
 
     func moveUp() {
@@ -204,7 +204,7 @@ actor Application {
     }
 
     private func render() async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: 0, y: 0, width: 80, height: 24)
 
         switch currentView {
@@ -218,11 +218,11 @@ actor Application {
             await renderVolumes(on: surface, in: bounds)
         }
 
-        SwiftTUI.refresh(screen)
+        SwiftNCurses.refresh(screen)
     }
 
     private func handleInput() async {
-        let key = SwiftTUI.getInput(screen)
+        let key = SwiftNCurses.getInput(screen)
 
         switch key {
         case Int32(UnicodeScalar("d").value):
@@ -243,7 +243,7 @@ actor Application {
     private func renderDashboard(on surface: Surface, in bounds: Rect) async {
         let text = Text("Dashboard View - Press 's' for servers, 'n' for networks, 'v' for volumes")
             .bold()
-        await SwiftTUI.render(text, on: surface, in: bounds)
+        await SwiftNCurses.render(text, on: surface, in: bounds)
     }
 
     private func renderServers(on surface: Surface, in bounds: Rect) async {
@@ -256,10 +256,10 @@ actor Application {
             ]
 
             let table = Table(data: servers, columns: columns)
-            await SwiftTUI.render(table, on: surface, in: bounds)
+            await SwiftNCurses.render(table, on: surface, in: bounds)
         } catch {
             let errorText = Text("Error loading servers: \(error)").color(.red)
-            await SwiftTUI.render(errorText, on: surface, in: bounds)
+            await SwiftNCurses.render(errorText, on: surface, in: bounds)
         }
     }
 
@@ -316,7 +316,7 @@ actor ServerCreateView {
             )
         }
 
-        await SwiftTUI.render(form, on: surface, in: bounds)
+        await SwiftNCurses.render(form, on: surface, in: bounds)
     }
 
     private func loadFlavors() async -> [Flavor] {
@@ -419,7 +419,7 @@ actor StatusMonitor {
         """
 
         let text = Text(metricsText).color(.green)
-        await SwiftTUI.render(text, on: surface, in: bounds)
+        await SwiftNCurses.render(text, on: surface, in: bounds)
     }
 }
 ```
@@ -446,27 +446,27 @@ for server in servers {
 }
 ```
 
-### SwiftTUI Only
+### SwiftNCurses Only
 
 ```swift
-import SwiftTUI
+import SwiftNCurses
 
-let screen = SwiftTUI.initializeScreen()
-defer { SwiftTUI.cleanup(screen) }
+let screen = SwiftNCurses.initializeScreen()
+defer { SwiftNCurses.cleanup(screen) }
 
-let surface = SwiftTUI.surface(from: screen)
+let surface = SwiftNCurses.surface(from: screen)
 let bounds = Rect(x: 0, y: 0, width: 80, height: 24)
 
-await SwiftTUI.render(
+await SwiftNCurses.render(
     Text("Hello, World!").bold().color(.blue),
     on: surface,
     in: bounds
 )
 
-SwiftTUI.refresh(screen)
+SwiftNCurses.refresh(screen)
 
 // Wait for input
-_ = SwiftTUI.getInput(screen)
+_ = SwiftNCurses.getInput(screen)
 ```
 
 ### CrossPlatformTimer Only
@@ -539,8 +539,8 @@ let refreshTimer = createCompatibleTimer(interval: 5.0, repeats: true) {
 ```swift
 // Good: Use defer for cleanup
 func runApp() async {
-    let screen = SwiftTUI.initializeScreen()
-    defer { SwiftTUI.cleanup(screen) }
+    let screen = SwiftNCurses.initializeScreen()
+    defer { SwiftNCurses.cleanup(screen) }
 
     let timer = createCompatibleTimer(...)
     defer { timer.invalidate() }
@@ -558,15 +558,15 @@ var lastRenderedServers: [Server] = []
 func render() async {
     guard servers != lastRenderedServers else { return }
 
-    await SwiftTUI.render(serverList, on: surface, in: bounds)
-    SwiftTUI.refresh(screen)
+    await SwiftNCurses.render(serverList, on: surface, in: bounds)
+    SwiftNCurses.refresh(screen)
 
     lastRenderedServers = servers
 }
 
 // Don't: Render on every loop iteration
 // while running {
-//     await SwiftTUI.render(...)  // Wasteful if nothing changed
+//     await SwiftNCurses.render(...)  // Wasteful if nothing changed
 // }
 ```
 
@@ -630,12 +630,12 @@ class MyApp {
 
 ```swift
 // Problem: Forgot to call refresh
-await SwiftTUI.render(component, on: surface, in: bounds)
-// Missing: SwiftTUI.refresh(screen)
+await SwiftNCurses.render(component, on: surface, in: bounds)
+// Missing: SwiftNCurses.refresh(screen)
 
 // Solution: Always refresh after rendering
-await SwiftTUI.render(component, on: surface, in: bounds)
-SwiftTUI.refresh(screen)  // Now screen updates
+await SwiftNCurses.render(component, on: surface, in: bounds)
+SwiftNCurses.refresh(screen)  // Now screen updates
 ```
 
 **Issue**: Actor isolation errors
@@ -653,5 +653,5 @@ let servers = await view.servers  // Correct
 **See Also**:
 
 - [OSClient API](osclient.md) - OpenStack client library reference
-- [SwiftTUI API](swifttui.md) - Terminal UI framework reference
+- [SwiftNCurses API](SwiftNCurses.md) - Terminal UI framework reference
 - [API Reference Index](index.md) - Quick reference and navigation

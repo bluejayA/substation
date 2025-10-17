@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 import struct OSClient.Port
 
@@ -258,7 +258,7 @@ struct MainPanelView {
         guard mainWidth > 10 && mainHeight > 5 else { return }
 
         // Fill main panel background to match header and sidebar styling
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let mainBounds = Rect(
             x: mainStartCol, y: mainStartRow, width: mainWidth, height: mainHeight)
         await surface.fill(rect: mainBounds, character: " ", style: .secondary)

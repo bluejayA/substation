@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 @MainActor
 struct SidebarView {
@@ -11,9 +11,9 @@ struct SidebarView {
         // Skip rendering if sidebar is hidden (width = 0)
         guard sidebarWidth > 0 else { return }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
-        // Clear and draw sidebar background using SwiftTUI
+        // Clear and draw sidebar background using SwiftNCurses
         let sidebarBounds = Rect(x: 0, y: 2, width: sidebarWidth, height: screenRows - 4)
         await surface.fill(rect: sidebarBounds, character: " ", style: .secondary)
 
@@ -59,13 +59,13 @@ struct SidebarView {
         // Render the entire sidebar as a VStack
         let sidebarComponent = VStack(spacing: 0, children: components)
         let contentBounds = Rect(x: 0, y: 2, width: sidebarWidth, height: screenRows - 4)
-        await SwiftTUI.render(sidebarComponent, on: surface, in: contentBounds)
+        await SwiftNCurses.render(sidebarComponent, on: surface, in: contentBounds)
 
-        // Vertical separator using SwiftTUI
+        // Vertical separator using SwiftNCurses
         let separatorComponents = (0..<Int(screenRows - 4)).map { _ in Text("|").info() }
         let separatorSection = VStack(spacing: 0, children: separatorComponents)
         let separatorBounds = Rect(x: sidebarWidth, y: 2, width: 1, height: screenRows - 4)
-        await SwiftTUI.render(separatorSection, on: surface, in: separatorBounds)
+        await SwiftNCurses.render(separatorSection, on: surface, in: separatorBounds)
     }
 
     // MARK: - Command Filtering

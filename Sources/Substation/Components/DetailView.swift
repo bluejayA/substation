@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 // MARK: - DetailSection
 
@@ -110,7 +110,7 @@ struct DetailView {
         width: Int32,
         height: Int32
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Defensive bounds checking
         guard width > Self.minScreenWidth && height > Self.minScreenHeight else {
@@ -120,7 +120,7 @@ struct DetailView {
                 width: max(Self.boundsMinWidth, width),
                 height: max(Self.boundsMinHeight, height)
             )
-            await SwiftTUI.render(Text(Self.screenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.screenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -200,10 +200,10 @@ struct DetailView {
             visibleComponents = Array(components.prefix(maxVisibleComponents))
         }
 
-        // Render using VStack (let SwiftTUI handle the layout)
+        // Render using VStack (let SwiftNCurses handle the layout)
         let detailComponent = VStack(spacing: Self.componentSpacing, children: visibleComponents)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(detailComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(detailComponent, on: surface, in: bounds)
     }
 
     // MARK: - Convenience Builders

@@ -1,7 +1,7 @@
 import Foundation
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 extension FloatingIPViews {
     @MainActor

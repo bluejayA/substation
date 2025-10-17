@@ -1,7 +1,7 @@
 import Foundation
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct AllowedAddressPairManagementView {
 
@@ -41,12 +41,12 @@ struct AllowedAddressPairManagementView {
         resourceNameCache: ResourceNameCache
     ) async {
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Defensive bounds checking
         guard width > minScreenWidth && height > minScreenHeight else {
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text(screenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(screenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -98,7 +98,7 @@ struct AllowedAddressPairManagementView {
             components.append(Text(helpTextSelectPorts).info().padding(helpTextEdgeInsets))
             let emptyComponent = VStack(spacing: componentSpacing, children: components)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-            await SwiftTUI.render(emptyComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(emptyComponent, on: surface, in: bounds)
         } else {
             let contentHeight = height - reservedSpace
 
@@ -179,7 +179,7 @@ struct AllowedAddressPairManagementView {
 
             let selectorComponent = VStack(spacing: componentSpacing, children: components)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-            await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(selectorComponent, on: surface, in: bounds)
         }
     }
 }

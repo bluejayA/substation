@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 /// ServerCreateView using FormBuilder component
 /// This replaces the old manual form rendering with the unified FormBuilder
@@ -24,7 +24,7 @@ struct ServerCreateView {
         form: ServerCreateForm,
         formState: FormBuilderState
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Handle loading state
         if form.isLoading {
@@ -35,7 +35,7 @@ struct ServerCreateView {
             ]
             let loadingComponent = VStack(spacing: 0, children: components)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: Self.loadingErrorBoundsHeight)
-            await SwiftTUI.render(loadingComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(loadingComponent, on: surface, in: bounds)
             return
         }
 
@@ -48,7 +48,7 @@ struct ServerCreateView {
             ]
             let errorComponent = VStack(spacing: 0, children: components)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: Self.loadingErrorBoundsHeight)
-            await SwiftTUI.render(errorComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(errorComponent, on: surface, in: bounds)
             return
         }
 
@@ -71,7 +71,7 @@ struct ServerCreateView {
         // Render the form
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
         // If a selector field is active, render specialized view as overlay
         if let currentField = formState.getCurrentField() {
@@ -171,10 +171,10 @@ struct ServerCreateView {
                 columns: field.columns,
                 maxHeight: Int(height)
             ) {
-                let surface = SwiftTUI.surface(from: screen)
+                let surface = SwiftNCurses.surface(from: screen)
                 let overlayBounds = Rect(x: startCol, y: startRow, width: width, height: height)
                 surface.clear(rect: overlayBounds)
-                await SwiftTUI.render(selectorComponent, on: surface, in: overlayBounds)
+                await SwiftNCurses.render(selectorComponent, on: surface, in: overlayBounds)
             }
         }
     }
@@ -234,10 +234,10 @@ struct ServerCreateView {
                 columns: field.columns,
                 maxHeight: Int(height)
             ) {
-                let surface = SwiftTUI.surface(from: screen)
+                let surface = SwiftNCurses.surface(from: screen)
                 let overlayBounds = Rect(x: startCol, y: startRow, width: width, height: height)
                 surface.clear(rect: overlayBounds)
-                await SwiftTUI.render(selectorComponent, on: surface, in: overlayBounds)
+                await SwiftNCurses.render(selectorComponent, on: surface, in: overlayBounds)
             }
         }
     }

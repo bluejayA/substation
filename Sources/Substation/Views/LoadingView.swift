@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 struct LoadingView {
     // MARK: - ASCII Art Constants - Modern, Clean Design
@@ -66,7 +66,7 @@ struct LoadingView {
                                   statusMessage: String? = nil) async {
 
         // Create surface for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Make it full screen - ignore provided boundaries and use entire screen
         let fullScreenWidth = width
@@ -79,7 +79,7 @@ struct LoadingView {
             let errorBounds = Rect(x: 0, y: 0,
                                    width: max(loadingBoundsMinWidth, fullScreenWidth),
                                    height: max(loadingBoundsMinHeight, fullScreenHeight))
-            await SwiftTUI.render(Text(loadingScreenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(loadingScreenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -127,7 +127,7 @@ struct LoadingView {
                                bottom: loadingBottomPadding, trailing: loadingTrailingPadding))
 
         let bounds = Rect(x: fullScreenStartCol, y: fullScreenStartRow, width: fullScreenWidth, height: fullScreenHeight)
-        await SwiftTUI.render(loadingComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(loadingComponent, on: surface, in: bounds)
     }
 
     private static func createProgressIndicator(step: Int, width: Int32) -> any Component {

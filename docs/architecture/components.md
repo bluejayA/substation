@@ -2,13 +2,13 @@
 
 This document provides a detailed view of Substation's component architecture, including the Terminal UI layer, service layer, and form building system.
 
-## Terminal UI Layer (SwiftTUI)
+## Terminal UI Layer (SwiftNCurses)
 
-The custom-built SwiftTUI framework provides a cross-platform terminal UI abstraction:
+The custom-built SwiftNCurses framework provides a cross-platform terminal UI abstraction:
 
 ```mermaid
 graph LR
-    subgraph "SwiftTUI Framework"
+    subgraph "SwiftNCurses Framework"
         Core[Core Engine]
         Components[UI Components]
         Drawing[Drawing Context]
@@ -70,7 +70,7 @@ graph LR
     Buffer --> NCurses
 ```
 
-### SwiftTUI Components
+### SwiftNCurses Components
 
 | Component | Purpose | Key Features |
 |-----------|---------|--------------|

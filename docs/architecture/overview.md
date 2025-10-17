@@ -39,7 +39,7 @@ Substation is built with a modular, layered architecture that emphasizes perform
 **No monoliths here.** Each package is independently useful.
 
 - **Separation of Concerns** - Clear layer boundaries between UI, business logic, and services
-  - `/Sources/SwiftTUI` - Terminal UI framework (reusable in any Swift TUI app)
+  - `/Sources/SwiftNCurses` - Terminal UI framework (reusable in any Swift TUI app)
   - `/Sources/OSClient` - OpenStack client (use it in your own projects)
   - `/Sources/MemoryKit` - Multi-level caching system
   - `/Sources/CrossPlatformTimer` - Timer abstraction (because macOS != Linux)
@@ -53,7 +53,7 @@ Substation is built with a modular, layered architecture that emphasizes perform
 ```swift
 // From Package.swift
 .library(name: "OSClient", targets: ["OSClient"]),           // OpenStack client
-.library(name: "SwiftTUI", targets: ["SwiftTUI"]),           // Terminal UI
+.library(name: "SwiftNCurses", targets: ["SwiftNCurses"]),           // Terminal UI
 .library(name: "MemoryKit", targets: ["MemoryKit"]),         // Multi-level cache
 .library(name: "CrossPlatformTimer", targets: ["CrossPlatformTimer"]),
 .executable(name: "substation", targets: ["Substation"])     // Main app
@@ -141,7 +141,7 @@ graph TB
         App[App Entry Point]
     end
 
-    subgraph "SwiftTUI Package (UI Framework)"
+    subgraph "SwiftNCurses Package (UI Framework)"
         Core[Rendering Core]
         Components[UI Components]
         Events[Event System]
@@ -203,7 +203,7 @@ The system is designed for seamless operation across macOS and Linux:
 graph LR
     subgraph "Platform Abstraction"
         CrossPlatform[CrossPlatformTimer]
-        SwiftTUI[SwiftTUI Framework]
+        SwiftNCurses[SwiftNCurses Framework]
         Foundation[Swift Foundation]
     end
 
@@ -227,11 +227,11 @@ graph LR
 
     CrossPlatform --> Darwin
     CrossPlatform --> Glibc
-    SwiftTUI --> Darwin
-    SwiftTUI --> Glibc
+    SwiftNCurses --> Darwin
+    SwiftNCurses --> Glibc
 
     OSClient --> CrossPlatform
-    Core --> SwiftTUI
+    Core --> SwiftNCurses
     Network --> Foundation
 
     Darwin --> Keychain
@@ -328,16 +328,16 @@ let client = try await OpenStackClient(
 let servers = try await client.nova.listServers()
 ```
 
-### SwiftTUI Framework
+### SwiftNCurses Framework
 
 ```swift
-import SwiftTUI
+import SwiftNCurses
 
 @main
 struct MyTerminalApp {
     static func main() async {
-        let surface = SwiftTUI.createSurface()
-        await SwiftTUI.render(
+        let surface = SwiftNCurses.createSurface()
+        await SwiftNCurses.render(
             Text("Hello, Terminal!").bold(),
             on: surface,
             in: Rect(x: 0, y: 0, width: 80, height: 24)
@@ -361,11 +361,11 @@ let timer = createCompatibleTimer(interval: 1.0, repeats: true) {
 ```mermaid
 graph TD
     Substation --> OSClient
-    Substation --> SwiftTUI
+    Substation --> SwiftNCurses
     Substation --> CrossPlatformTimer
 
-    SwiftTUI --> CrossPlatformTimer
-    SwiftTUI --> CNCurses
+    SwiftNCurses --> CrossPlatformTimer
+    SwiftNCurses --> CNCurses
 
     OSClient --> CrossPlatformTimer
 

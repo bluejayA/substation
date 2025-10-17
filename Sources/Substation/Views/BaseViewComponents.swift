@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct BaseViewComponents {
     // MARK: - Core Rendering Helpers
@@ -10,18 +10,18 @@ struct BaseViewComponents {
                           width: Int32, title: String? = nil) async {
         guard let title = title, title.count + 4 < width else { return }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let titleStart = startCol + 2
         let bounds = Rect(x: titleStart, y: startRow, width: Int32(title.count + 4), height: 1)
         let titleComponent = Text("[ \(title) ]").accent()
 
-        await SwiftTUI.render(titleComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(titleComponent, on: surface, in: bounds)
     }
 
     @MainActor
     static func drawBorder(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                           width: Int32, height: Int32, title: String? = nil) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
         // Create a bordered container with optional title
@@ -30,7 +30,7 @@ struct BaseViewComponents {
             content: {}
         )
 
-        await SwiftTUI.render(borderComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(borderComponent, on: surface, in: bounds)
 
         // Draw title if provided
         if let title = title {
@@ -41,7 +41,7 @@ struct BaseViewComponents {
     @MainActor
     static func clearArea(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                          width: Int32, height: Int32) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
         // Fill with secondary background style to maintain consistent styling

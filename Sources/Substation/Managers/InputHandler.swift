@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import CrossPlatformTimer
 
 // MARK: - Input Handler

@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct SecurityGroupViews {
     // MARK: - Analysis Support
@@ -500,7 +500,7 @@ struct SecurityGroupViews {
                                            width: Int32, height: Int32, form: SecurityGroupCreateForm,
                                            formState: FormBuilderState) async {
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Build form fields with FormBuilder state
         let fields = form.buildFields(
@@ -521,7 +521,7 @@ struct SecurityGroupViews {
         // Render the form
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
     }
 
 
@@ -578,7 +578,7 @@ struct SecurityGroupViews {
 
         // Check if we're in security group selection mode
         if form.securityGroupSelectionMode {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
             // Create FormSelector for multi-select security group selection
@@ -609,12 +609,12 @@ struct SecurityGroupViews {
                 isActive: true
             )
 
-            await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+            await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
             return
         }
 
         // Main Security Group Rule Create Form
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = [
             Text(Self.sgRuleCreateFormTitle).emphasis().bold()
         ]
@@ -650,7 +650,7 @@ struct SecurityGroupViews {
         let formComponent = VStack(spacing: Self.sgRuleCreateComponentSpacing, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(formComponent, on: surface, in: bounds)
     }
 
     // MARK: - Component Creation
@@ -873,14 +873,14 @@ struct SecurityGroupViews {
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
         // Main Security Group Rules Management
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title
@@ -898,7 +898,7 @@ struct SecurityGroupViews {
             components.append(Text("    DIR    PROTO   PORTS           REMOTE").accent().bold())
             components.append(Text(String(repeating: "-", count: 46)).border())
 
-            // Display rules using SwiftTUI
+            // Display rules using SwiftNCurses
             let availableHeight = max(1, Int(height) - 10) // Reserve space for header and footer
             let maxRulesToShow = min(securityGroup.securityGroupRules?.count ?? 0, availableHeight)
 
@@ -926,7 +926,7 @@ struct SecurityGroupViews {
         let rulesManagementComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(rulesManagementComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(rulesManagementComponent, on: surface, in: bounds)
     }
 
     @MainActor
@@ -935,14 +935,14 @@ struct SecurityGroupViews {
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
         // Main Server Security Group Management
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title
@@ -986,7 +986,7 @@ struct SecurityGroupViews {
         let managementComponent = VStack(spacing: Self.componentSpacing, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(managementComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(managementComponent, on: surface, in: bounds)
     }
 
     // MARK: - Component Creation Functions for Security Group Management
@@ -1099,14 +1099,14 @@ struct SecurityGroupViews {
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
         // Main Security Group Rule Management
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title based on current mode
@@ -1120,7 +1120,7 @@ struct SecurityGroupViews {
             // Render FormSelector for rule list
             let selector = createSGRuleMgmtListComponents(form: form, width: width, height: height)
             surface.clear(rect: bounds)
-            await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+            await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
         } else if form.shouldShowCreateForm() || form.shouldShowEditForm() {
             // Check if a selector field is active
             if let currentField = form.ruleCreateFormState.getCurrentField(),
@@ -1138,7 +1138,7 @@ struct SecurityGroupViews {
                     maxHeight: Int(height)
                 ) {
                     surface.clear(rect: bounds)
-                    await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+                    await SwiftNCurses.render(selectorComponent, on: surface, in: bounds)
                 }
             } else {
                 // Render create/edit form with FormBuilder
@@ -1162,7 +1162,7 @@ struct SecurityGroupViews {
 
                 // Render the form
                 surface.clear(rect: bounds)
-                await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+                await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
             }
         }
     }

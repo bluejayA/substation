@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 struct SwiftBackgroundOperationDetailView {
 

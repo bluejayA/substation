@@ -49,7 +49,7 @@ Key models:
 
 ### 3. View Layer (`Sources/Substation/Views/SwiftViews.swift`)
 
-SwiftTUI-based views following the component pattern:
+SwiftNCurses-based views following the component pattern:
 
 ```swift
 @MainActor
@@ -209,7 +209,7 @@ static func drawSwiftObjectCopy(
     sourceContainer: String,
     formBuilderState: FormBuilderState
 ) async {
-    let surface = SwiftTUI.surface(from: screen)
+    let surface = SwiftNCurses.surface(from: screen)
 
     // Create form
     let fields = [

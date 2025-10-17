@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 /// Defines the context for navigation operations
 /// This helps determine which navigation patterns to apply

@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import struct OSClient.Port
 
 // MARK: - Virtual Scrolling Configuration

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 /// Welcome screen for new users showing command-based navigation
 /// Displays tutorial and first-run information for Substation

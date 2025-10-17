@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 struct SourceTypeSelectionView {
@@ -17,7 +17,7 @@ struct SourceTypeSelectionView {
         searchQuery: String?,
         title: String = "Select Source Type"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         let tabs = [
             FormSelectorTab<SourceTypeOption>(
@@ -47,6 +47,6 @@ struct SourceTypeSelectionView {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }

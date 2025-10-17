@@ -1,12 +1,12 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 @MainActor
 struct UnifiedInputBarView {
 
     static func draw(screen: OpaquePointer?, tui: TUI, screenCols: Int32, screenRows: Int32) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Position the input bar just above the status bar
         // Status bar is now at screenRows - 1 (bottom row)
@@ -25,7 +25,7 @@ struct UnifiedInputBarView {
         await surface.fill(rect: inputBounds, character: " ", style: .secondary)
 
         // Render the input bar
-        await SwiftTUI.render(inputComponent, on: surface, in: inputBounds)
+        await SwiftNCurses.render(inputComponent, on: surface, in: inputBounds)
     }
 
     private static func createInputBar(tui: TUI, width: Int32) -> any Component {

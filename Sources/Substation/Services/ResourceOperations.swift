@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 /// Service layer for OpenStack resource CRUD operations
@@ -1082,7 +1082,7 @@ final class ResourceOperations {
             await dataManager.refreshKeyPairData()
 
             // Clear screen to remove graphical artifacts from deleted keypair
-            SwiftTUI.clear(WindowHandle(screen))
+            SwiftNCurses.clear(WindowHandle(screen))
             await tui.draw(screen: screen)
 
         } catch let error as OpenStackError {
@@ -1159,7 +1159,7 @@ final class ResourceOperations {
             await dataManager.refreshSecretsData()
 
             // Clear screen to remove graphical artifacts from deleted secret
-            SwiftTUI.clear(WindowHandle(screen))
+            SwiftNCurses.clear(WindowHandle(screen))
             await tui.draw(screen: screen)
 
         } catch let error as OpenStackError {
@@ -2082,7 +2082,7 @@ final class ResourceOperations {
             Logger.shared.logInfo("Deleted server group: \(serverGroup.name ?? "Unknown")")
 
             // Clear screen to remove graphical artifacts from deleted server group
-            SwiftTUI.clear(WindowHandle(screen))
+            SwiftNCurses.clear(WindowHandle(screen))
             await tui.draw(screen: screen)
 
         } catch {

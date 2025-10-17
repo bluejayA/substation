@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // MARK: - Advanced Search View
@@ -125,12 +125,12 @@ struct AdvancedSearchView {
         await initializeSearchEngineIfNeeded()
 
         // Create surface for rendering
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Bounds checking
         guard width >= minScreenWidth && height >= minScreenHeight else {
             let errorBounds = Rect(x: startCol, y: startRow, width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small for Search").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small for Search").error(), on: surface, in: errorBounds)
             return
         }
 
@@ -159,7 +159,7 @@ struct AdvancedSearchView {
         let mainComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
-        await SwiftTUI.render(mainComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(mainComponent, on: surface, in: bounds)
     }
 
     // MARK: - Search Bar Component

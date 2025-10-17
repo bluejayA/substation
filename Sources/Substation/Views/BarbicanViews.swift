@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // MARK: - Barbican Views
@@ -314,9 +314,9 @@ struct BarbicanViews {
     ) async {
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 20 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
@@ -341,7 +341,7 @@ struct BarbicanViews {
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Build form fields
         let fields = form.buildFields(
@@ -362,7 +362,7 @@ struct BarbicanViews {
         // Render the form
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
         // If a selector field is active, render overlay using FormSelectorRenderer
         if let currentField = formState.getCurrentField() {
@@ -395,7 +395,7 @@ struct BarbicanViews {
         field: FormFieldSelector,
         selectorState: FormSelectorFieldState
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Use FormSelectorRenderer for standard selector rendering
         if let selectorComponent = FormSelectorRenderer.renderSelector(
@@ -410,7 +410,7 @@ struct BarbicanViews {
         ) {
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             surface.clear(rect: bounds)
-            await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(selectorComponent, on: surface, in: bounds)
         }
     }
 
@@ -423,7 +423,7 @@ struct BarbicanViews {
         height: Int32,
         form: BarbicanSecretCreateForm
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title
@@ -529,7 +529,7 @@ struct BarbicanViews {
             .padding(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(editorComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(editorComponent, on: surface, in: bounds)
     }
 
     @MainActor
@@ -541,7 +541,7 @@ struct BarbicanViews {
         height: Int32,
         form: BarbicanSecretCreateForm
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title
@@ -595,7 +595,7 @@ struct BarbicanViews {
             .padding(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(selectionComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(selectionComponent, on: surface, in: bounds)
     }
 
     @MainActor
@@ -607,7 +607,7 @@ struct BarbicanViews {
         height: Int32,
         form: BarbicanSecretCreateForm
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title
@@ -653,6 +653,6 @@ struct BarbicanViews {
             .padding(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(dateComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(dateComponent, on: surface, in: bounds)
     }
 }

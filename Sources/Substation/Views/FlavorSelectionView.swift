@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 @MainActor
@@ -23,7 +23,7 @@ struct FlavorSelectionView {
         searchQuery: String?,
         selectedCategoryIndex: Int? = nil
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let mainRect = Rect(x: startCol, y: startRow, width: width, height: height)
 
         if mode == .manual {
@@ -133,7 +133,7 @@ struct FlavorSelectionView {
         )
 
         surface.clear(rect: rect)
-        await SwiftTUI.render(selector.render(), on: surface, in: rect)
+        await SwiftNCurses.render(selector.render(), on: surface, in: rect)
     }
 
     private static func drawCategoryList(
@@ -172,7 +172,7 @@ struct FlavorSelectionView {
         )
 
         surface.clear(rect: rect)
-        await SwiftTUI.render(selector.render(), on: surface, in: rect)
+        await SwiftNCurses.render(selector.render(), on: surface, in: rect)
     }
 
     private static func drawCategoryDetail(
@@ -223,7 +223,7 @@ struct FlavorSelectionView {
         )
 
         surface.clear(rect: rect)
-        await SwiftTUI.render(selector.render(), on: surface, in: rect)
+        await SwiftNCurses.render(selector.render(), on: surface, in: rect)
     }
 
     private static func determineSizeLabels(for flavors: [Flavor]) -> [String: String] {

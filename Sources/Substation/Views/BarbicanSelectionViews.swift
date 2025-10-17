@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 struct BarbicanContentTypeSelectionView {
     @MainActor
@@ -16,7 +16,7 @@ struct BarbicanContentTypeSelectionView {
         searchQuery: String,
         title: String = "Select Payload Content Type"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let tabs = [
             FormSelectorTab<SecretPayloadContentTypeWrapper>(
                 title: "Content Types",
@@ -35,7 +35,7 @@ struct BarbicanContentTypeSelectionView {
         )
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }
 
@@ -54,7 +54,7 @@ struct BarbicanEncodingSelectionView {
         searchQuery: String,
         title: String = "Select Payload Content Encoding"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let tabs = [
             FormSelectorTab<SecretPayloadContentEncodingWrapper>(
                 title: "Encodings",
@@ -73,7 +73,7 @@ struct BarbicanEncodingSelectionView {
         )
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }
 
@@ -92,7 +92,7 @@ struct BarbicanSecretTypeSelectionView {
         searchQuery: String,
         title: String = "Select Secret Type"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let tabs = [
             FormSelectorTab<SecretTypeWrapper>(
                 title: "Secret Types",
@@ -111,7 +111,7 @@ struct BarbicanSecretTypeSelectionView {
         )
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }
 
@@ -130,7 +130,7 @@ struct BarbicanAlgorithmSelectionView {
         searchQuery: String,
         title: String = "Select Algorithm"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let tabs = [
             FormSelectorTab<SecretAlgorithmWrapper>(
                 title: "Algorithms",
@@ -149,7 +149,7 @@ struct BarbicanAlgorithmSelectionView {
         )
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }
 
@@ -168,7 +168,7 @@ struct BarbicanModeSelectionView {
         searchQuery: String,
         title: String = "Select Mode"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let tabs = [
             FormSelectorTab<SecretModeWrapper>(
                 title: "Modes",
@@ -187,7 +187,7 @@ struct BarbicanModeSelectionView {
         )
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }
 
@@ -206,7 +206,7 @@ struct BarbicanBitLengthSelectionView {
         searchQuery: String,
         title: String = "Select Bit Length"
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let tabs = [
             FormSelectorTab<BitLengthOption>(
                 title: "Bit Lengths",
@@ -225,6 +225,6 @@ struct BarbicanBitLengthSelectionView {
         )
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }

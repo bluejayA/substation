@@ -122,7 +122,7 @@ nav:
     - API Reference:
       - Quick Reference: reference/api/index.md
       - OSClient Library: reference/api/osclient.md
-      - SwiftTUI Framework: reference/api/swifttui.md
+      - SwiftNCurses Framework: reference/api/SwiftNCurses.md
       - Integration Guide: reference/api/integration.md
     - Operators:
       - Keyboard Shortcuts: reference/operators/keyboard-shortcuts.md

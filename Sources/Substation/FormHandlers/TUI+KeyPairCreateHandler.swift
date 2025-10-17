@@ -5,7 +5,7 @@ import Darwin
 import Glibc
 #endif
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - KeyPair Create Input Handler (Universal Pattern)

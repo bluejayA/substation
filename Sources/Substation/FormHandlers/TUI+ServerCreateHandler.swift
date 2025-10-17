@@ -5,7 +5,7 @@ import Darwin
 import Glibc
 #endif
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 // MARK: - Server Create Form Input Handler
 

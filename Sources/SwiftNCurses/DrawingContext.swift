@@ -210,7 +210,7 @@ public enum KeyEvent {
 // MARK: - Color Management
 
 /// Enhanced color management for better visual experience
-/// Note: Color pair initialization is now handled by SwiftTUI.ColorScheme
+/// Note: Color pair initialization is now handled by SwiftNCurses.ColorScheme
 public struct ColorManager: Sendable {
     public static let shared = ColorManager()
 
@@ -228,10 +228,10 @@ public struct ColorManager: Sendable {
 @MainActor
 public class AnimationManager: @unchecked Sendable {
     private var activeAnimations: [String: Animation] = [:]
-    private let memoryManager: SwiftTUIMemoryManager
+    private let memoryManager: SwiftNCursesMemoryManager
 
     public init() {
-        self.memoryManager = SwiftTUILoggerConfig.shared.createMemoryManager()
+        self.memoryManager = SwiftNCursesLoggerConfig.shared.createMemoryManager()
     }
 
     /// Start a simple fade animation

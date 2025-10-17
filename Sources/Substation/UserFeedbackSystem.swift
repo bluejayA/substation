@@ -1,9 +1,9 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // Resolve Position namespace conflict by using fully qualified name
-// UIPosition refers to SwiftTUI.Position which uses Int32 coordinates
+// UIPosition refers to SwiftNCurses.Position which uses Int32 coordinates
 typealias UIPosition = Position
 
 // MARK: - User Feedback System

@@ -478,7 +478,7 @@ Current test coverage:
 - **OSClient**: Core functionality covered
 - **Substation**: Configuration and authentication covered
 - **MemoryKit**: Memory management covered
-- **SwiftTUI**: Basic components covered
+- **SwiftNCurses**: Basic components covered
 
 ### Coverage Targets
 

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 
@@ -560,20 +560,20 @@ Press [ESC] to close this window
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 40 && height > 15 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Terminal too small for Health Dashboard").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Terminal too small for Health Dashboard").error(), on: surface, in: errorBounds)
             return
         }
 
         guard let telemetryActor = telemetryActor else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: startCol, y: startRow, width: width, height: height)
-            await SwiftTUI.render(Text("Telemetry system not available").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Telemetry system not available").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Fetch data with caching to prevent unnecessary refreshes during navigation
@@ -689,7 +689,7 @@ Press [ESC] to close this window
         // First render the complete health dashboard
         let healthDashboardComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(healthDashboardComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(healthDashboardComponent, on: surface, in: bounds)
 
         // Then render modal window on top if showing modal
         if navigationState?.showingModal == true {
@@ -700,7 +700,7 @@ Press [ESC] to close this window
     /// Render modal window overlay for service details using simple text-based approach
     @MainActor
     private static func renderModalWindow(screen: OpaquePointer?, startRow: Int32, startCol: Int32, width: Int32, height: Int32, navigationState: NavigationState) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Calculate modal window dimensions and position
         let modalWidth = min(width - 8, Int32(72))
@@ -762,7 +762,7 @@ Press [ESC] to close this window
         // Render modal content
         let modalComponent = VStack(spacing: 0, children: modalComponents)
         let modalBounds = Rect(x: modalStartCol, y: modalStartRow, width: modalWidth, height: modalHeight)
-        await SwiftTUI.render(modalComponent, on: surface, in: modalBounds)
+        await SwiftNCurses.render(modalComponent, on: surface, in: modalBounds)
     }
 
     // MARK: - Service Detail View
@@ -772,7 +772,7 @@ Press [ESC] to close this window
     public static func drawServiceDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                         width: Int32, height: Int32,
                                         service: HealthDashboardService, scrollOffset: Int) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Service detail header
@@ -851,7 +851,7 @@ Press [ESC] to close this window
         let visibleComponents = Array(components.dropFirst(scrollOffset))
         let serviceDetailComponent = VStack(spacing: 0, children: visibleComponents)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(serviceDetailComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(serviceDetailComponent, on: surface, in: bounds)
     }
 
     // MARK: - Section Content Rendering

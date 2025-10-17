@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 /// Service layer for UI helper operations
@@ -115,8 +115,8 @@ final class UIHelpers {
         var serverSelectedIndex = 0
 
         while true {
-            // Use SwiftTUI to render the server selection dialog
-            let surface = SwiftTUI.surface(from: screen)
+            // Use SwiftNCurses to render the server selection dialog
+            let surface = SwiftNCurses.surface(from: screen)
             let startRow = 5
             let dialogHeight = min(cachedServers.count + 4, Int(screenRows) - 10)
             let dialogWidth = screenCols - 4
@@ -152,12 +152,12 @@ final class UIHelpers {
                 // Empty content closure since we render manually
             })
 
-            await SwiftTUI.render(borderedDialog, on: surface, in: dialogBounds)
-            await SwiftTUI.render(dialogContent, on: surface, in: dialogBounds)
+            await SwiftNCurses.render(borderedDialog, on: surface, in: dialogBounds)
+            await SwiftNCurses.render(dialogContent, on: surface, in: dialogBounds)
 
-            SwiftTUI.batchedRefresh(WindowHandle(screen))
+            SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
-            let ch = SwiftTUI.getInput(WindowHandle(screen))
+            let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
             switch ch {
             case Int32(259), Int32(258): // UP/DOWN - Navigate server list
@@ -187,14 +187,14 @@ final class UIHelpers {
         var cursorPosition = snapshotName.count
 
         // Disable nodelay for dialog interaction
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
         defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
         }
 
         while true {
             // Clear screen
-            SwiftTUI.clear(WindowHandle(screen))
+            SwiftNCurses.clear(WindowHandle(screen))
 
             // Draw the snapshot dialog
             let dialogWidth: Int32 = 60
@@ -202,18 +202,18 @@ final class UIHelpers {
             let dialogStartRow = (screenRows - dialogHeight) / 2
             let dialogStartCol = (screenCols - dialogWidth) / 2
 
-            // Draw dialog box using SwiftTUI
-            let surface = SwiftTUI.surface(from: screen)
+            // Draw dialog box using SwiftNCurses
+            let surface = SwiftNCurses.surface(from: screen)
             let dialogBounds = Rect(x: dialogStartCol, y: dialogStartRow, width: dialogWidth, height: dialogHeight)
             await surface.fill(rect: dialogBounds, character: " ", style: .accent)
 
-            // Draw border using SwiftTUI
+            // Draw border using SwiftNCurses
             let topBorderBounds = Rect(x: dialogStartCol, y: dialogStartRow, width: dialogWidth, height: 1)
             let bottomBorderBounds = Rect(x: dialogStartCol, y: dialogStartRow + dialogHeight - 1, width: dialogWidth, height: 1)
-            await SwiftTUI.render(Text(String(repeating: "-", count: Int(dialogWidth))).muted(), on: surface, in: topBorderBounds)
-            await SwiftTUI.render(Text(String(repeating: "-", count: Int(dialogWidth))).muted(), on: surface, in: bottomBorderBounds)
+            await SwiftNCurses.render(Text(String(repeating: "-", count: Int(dialogWidth))).muted(), on: surface, in: topBorderBounds)
+            await SwiftNCurses.render(Text(String(repeating: "-", count: Int(dialogWidth))).muted(), on: surface, in: bottomBorderBounds)
 
-            // Create dialog content using SwiftTUI
+            // Create dialog content using SwiftNCurses
             let dialogComponents: [any Component] = [
                 Text(""),  // Spacer for top border
                 Text("  Create Server Snapshot").accent().bold(),
@@ -228,16 +228,16 @@ final class UIHelpers {
 
             let dialogContent = VStack(spacing: 0, children: dialogComponents)
             let contentBounds = Rect(x: dialogStartCol, y: dialogStartRow, width: dialogWidth, height: dialogHeight)
-            await SwiftTUI.render(dialogContent, on: surface, in: contentBounds)
+            await SwiftNCurses.render(dialogContent, on: surface, in: contentBounds)
 
             // Position cursor manually for input field
             let displayName = String(snapshotName.prefix(Int(dialogWidth) - 6))
             let cursorCol = dialogStartCol + 2 + Int32(min(cursorPosition, displayName.count))
-            SwiftTUI.moveCursor(WindowHandle(screen), to: Point(x: cursorCol, y: dialogStartRow + 6))
+            SwiftNCurses.moveCursor(WindowHandle(screen), to: Point(x: cursorCol, y: dialogStartRow + 6))
 
-            SwiftTUI.batchedRefresh(WindowHandle(screen))
+            SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
-            let ch = SwiftTUI.getInput(WindowHandle(screen))
+            let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
             switch ch {
             case Int32(27): // ESC - Cancel
@@ -269,9 +269,9 @@ final class UIHelpers {
 
     internal func showConsoleOutputDialog(serverName: String, output: String, screen: OpaquePointer?) async {
         // Disable nodelay for dialog interaction
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
         defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
         }
 
         var verticalScrollOffset = 0
@@ -284,7 +284,7 @@ final class UIHelpers {
 
         while true {
             // Fill background with consistent secondary styling to match other views
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let fullScreenBounds = Rect(x: 0, y: 0, width: screenCols, height: screenRows)
             await surface.fill(rect: fullScreenBounds, character: " ", style: .secondary)
 
@@ -292,15 +292,15 @@ final class UIHelpers {
             let dialogWidth = screenCols
             let dialogHeight = screenRows
 
-            // Title bar using SwiftTUI
+            // Title bar using SwiftNCurses
             let titleBounds = Rect(x: 0, y: 0, width: screenCols, height: 1)
             let titleComponent = Text("Console Output: \(serverName)").accent().bold()
-            await SwiftTUI.render(titleComponent, on: surface, in: titleBounds)
+            await SwiftNCurses.render(titleComponent, on: surface, in: titleBounds)
 
-            // Help bar at bottom using SwiftTUI
+            // Help bar at bottom using SwiftNCurses
             let helpBounds = Rect(x: 0, y: screenRows - 1, width: screenCols, height: 1)
             let helpComponent = Text("UP/DOWN,j/k:scroll vertical  LEFT/RIGHT,h/l:scroll horizontal  PgUp/PgDn,Home/End  ESC:close").info()
-            await SwiftTUI.render(helpComponent, on: surface, in: helpBounds)
+            await SwiftNCurses.render(helpComponent, on: surface, in: helpBounds)
 
             // Console output content area
             let contentHeight = Int(dialogHeight - 2) // Leave space for title and help bars
@@ -335,13 +335,13 @@ final class UIHelpers {
             // Render console content
             let contentBounds = Rect(x: 0, y: 1, width: screenCols, height: Int32(contentHeight))
             let contentView = VStack(spacing: 0, children: contentComponents)
-            await SwiftTUI.render(contentView, on: surface, in: contentBounds)
+            await SwiftNCurses.render(contentView, on: surface, in: contentBounds)
 
-            // Scroll indicators using SwiftTUI
+            // Scroll indicators using SwiftNCurses
             if totalLines > contentHeight {
                 let scrollInfo = "Line \(verticalScrollOffset + 1)/\(totalLines)"
                 let scrollBounds = Rect(x: screenCols - 20, y: screenRows - 2, width: 20, height: 1)
-                await SwiftTUI.render(Text(scrollInfo).accent(), on: surface, in: scrollBounds)
+                await SwiftNCurses.render(Text(scrollInfo).accent(), on: surface, in: scrollBounds)
             }
 
             if maxLineWidth > contentWidth {
@@ -349,18 +349,18 @@ final class UIHelpers {
                 if maxHorizontalScroll > 0 {
                     let scrollInfo = "Col \(horizontalScrollOffset + 1)/\(maxLineWidth)"
                     let scrollBounds = Rect(x: 2, y: screenRows - 2, width: 20, height: 1)
-                    await SwiftTUI.render(Text(scrollInfo).accent(), on: surface, in: scrollBounds)
+                    await SwiftNCurses.render(Text(scrollInfo).accent(), on: surface, in: scrollBounds)
                 }
             }
 
-            SwiftTUI.batchedRefresh(WindowHandle(screen))
+            SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
-            let ch = SwiftTUI.getInput(WindowHandle(screen))
+            let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
             switch ch {
             case Int32(27): // ESC - Close dialog
                 // Clear screen before returning to prevent artifacts
-                SwiftTUI.clear(WindowHandle(screen))
+                SwiftNCurses.clear(WindowHandle(screen))
                 tui.forceRedraw()
                 return
             case Int32(259), Int32(258): // UP/DOWN - Scroll vertical
@@ -399,9 +399,9 @@ final class UIHelpers {
 
     internal func showPrivateKeyDialog(privateKey: String, keyPairName: String, screen: OpaquePointer?, savedPath: String? = nil) async {
         // Disable nodelay for dialog interaction
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
         defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
         }
 
         var verticalScrollOffset = 0
@@ -414,7 +414,7 @@ final class UIHelpers {
 
         while true {
             // Clear screen
-            SwiftTUI.clear(WindowHandle(screen))
+            SwiftNCurses.clear(WindowHandle(screen))
 
             // Full screen dialog - use entire screen
             let dialogWidth = screenCols
@@ -430,7 +430,7 @@ final class UIHelpers {
                 title = "PRIVATE KEY for '\(keyPairName)' - SAVE THIS NOW! (It won't be shown again)"
             }
             let titlePadding = String(repeating: " ", count: Int(screenCols) - title.count)
-            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: 0, col: 0), text: title + titlePadding, color: .error)
+            SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: 0, col: 0), text: title + titlePadding, color: .error)
 
             // Draw help bar at bottom
             let helpText: String
@@ -440,7 +440,7 @@ final class UIHelpers {
                 helpText = "UP/DOWN,j/k:scroll vertical  LEFT/RIGHT,h/l:scroll horizontal  ESC:close  IMPORTANT: Save this private key now!"
             }
             let helpPadding = String(repeating: " ", count: Int(screenCols) - helpText.count)
-            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: screenRows - 1, col: 0), text: helpText + helpPadding, color: .accent)
+            SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: screenRows - 1, col: 0), text: helpText + helpPadding, color: .accent)
 
             // Draw private key content (full screen minus title and help bars)
             let contentHeight = Int(dialogHeight - 2) // Leave space for title and help bars
@@ -463,16 +463,16 @@ final class UIHelpers {
                         visibleLine = ""
                     }
 
-                    SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: dialogStartRow + 1 + Int32(i), col: dialogStartCol), text: visibleLine, color: .info)
+                    SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: dialogStartRow + 1 + Int32(i), col: dialogStartCol), text: visibleLine, color: .info)
 
                     // Clear the rest of the line to avoid artifacts
-                    SwiftTUI.clearToEndOfLine(WindowHandle(screen))
+                    SwiftNCurses.clearToEndOfLine(WindowHandle(screen))
                 }
             }
 
-            SwiftTUI.batchedRefresh(WindowHandle(screen))
+            SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
-            let ch = SwiftTUI.getInput(WindowHandle(screen))
+            let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
             switch ch {
             case Int32(27): // ESC - Close dialog
@@ -958,9 +958,9 @@ final class UIHelpers {
 
     internal func showConsoleDialog(console: RemoteConsole, serverName: String, screen: OpaquePointer?) async {
         // Disable nodelay for dialog interaction
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
         defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
         }
 
         // Calculate main panel dimensions (matching MainPanelView layout)
@@ -979,16 +979,16 @@ final class UIHelpers {
             var row: Int32 = mainStartRow
 
             let title = "Server Console: \(serverName)"
-            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: title, color: .accent)
+            SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: title, color: .accent)
             row += 2
 
-            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Protocol: \(console.protocol)", color: .info)
+            SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Protocol: \(console.protocol)", color: .info)
             row += 1
 
-            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Type: \(console.type)", color: .info)
+            SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Type: \(console.type)", color: .info)
             row += 2
 
-            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Console URL:", color: .accent)
+            SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: "Console URL:", color: .accent)
             row += 1
 
             // Word wrap the URL to fit in main panel
@@ -997,7 +997,7 @@ final class UIHelpers {
             let urlLines = wrapText(url, maxWidth: contentWidth)
             for line in urlLines {
                 if row < mainStartRow + mainHeight - 3 {
-                    SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: line, color: .success)
+                    SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: line, color: .success)
                     row += 1
                 }
             }
@@ -1010,11 +1010,11 @@ final class UIHelpers {
             } else {
                 helpText = "Press ESC to close"
             }
-            SwiftTUI.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: helpText, color: .warning)
+            SwiftNCurses.drawStyledText(WindowHandle(screen), at: Position(row: row, col: mainStartCol), text: helpText, color: .warning)
 
-            SwiftTUI.batchedRefresh(WindowHandle(screen))
+            SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
-            let ch = SwiftTUI.getInput(WindowHandle(screen))
+            let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
             switch ch {
             case Int32(27): // ESC - Close dialog

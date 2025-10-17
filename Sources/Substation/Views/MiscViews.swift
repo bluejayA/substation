@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct MiscViews {
     @MainActor
@@ -945,7 +945,7 @@ struct MiscViews {
             ("License", [
                 "Open Source Software",
                 "Licensed under terms specified in project repository",
-                "Built with Swift and SwiftTUI framework",
+                "Built with Swift and SwiftNCurses framework",
                 "Uses NCurses for terminal interface",
             ]),
             ("Support & Documentation", [
@@ -1049,11 +1049,11 @@ struct MiscViews {
         height: Int32,
         message: String
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let messageY = startRow + height / 2
         let messageX = startCol + (width - Int32(message.count)) / 2
         let bounds = Rect(x: messageX, y: messageY, width: Int32(message.count), height: 1)
-        await SwiftTUI.render(Text(message).info(), on: surface, in: bounds)
+        await SwiftNCurses.render(Text(message).info(), on: surface, in: bounds)
     }
 
 }

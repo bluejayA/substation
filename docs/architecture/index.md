@@ -24,7 +24,7 @@ Design principles and high-level architecture:
 
 Detailed component architecture and implementation:
 
-- **Terminal UI Layer (SwiftTUI)** - Rendering pipeline, UI components, event system
+- **Terminal UI Layer (SwiftNCurses)** - Rendering pipeline, UI components, event system
 - **OSClient Service Layer** - OpenStack service clients, data managers, caching
 - **Substation Service Layer** - Resource operations, server actions, UI helpers
 - **FormBuilder System** - Declarative forms, field types, type-safe rendering
@@ -37,7 +37,7 @@ Detailed component architecture and implementation:
 
 Core technologies, dependencies, and development tools:
 
-- **Core Technologies** - Swift 6.1, actors, async/await, SwiftTUI, URLSession
+- **Core Technologies** - Swift 6.1, actors, async/await, SwiftNCurses, URLSession
 - **Package Dependencies** - swift-crypto, Foundation, NCurses
 - **Platform Support** - macOS, Linux, cross-platform abstractions
 - **Development Tools** - Build system, testing, CI/CD, performance monitoring
@@ -57,7 +57,7 @@ Core technologies, dependencies, and development tools:
 
 **Modularity:**
 
-- 4 independent packages (Substation, SwiftTUI, OSClient, CrossPlatformTimer)
+- 4 independent packages (Substation, SwiftNCurses, OSClient, CrossPlatformTimer)
 - 1 external dependency (swift-crypto for AES-256-GCM)
 - Protocol-oriented design (extensible through protocols)
 - Clear separation of concerns (UI, business logic, services)
@@ -83,11 +83,11 @@ Core technologies, dependencies, and development tools:
 ```mermaid
 graph TD
     Substation --> OSClient
-    Substation --> SwiftTUI
+    Substation --> SwiftNCurses
     Substation --> CrossPlatformTimer
 
-    SwiftTUI --> CrossPlatformTimer
-    SwiftTUI --> CNCurses
+    SwiftNCurses --> CrossPlatformTimer
+    SwiftNCurses --> CNCurses
 
     OSClient --> CrossPlatformTimer
 

@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - Flavor Selection Input Handler
@@ -80,7 +80,7 @@ extension TUI {
             scrollOffset = 0
             // Clear only the main panel area to remove artifacts before redrawing
             if let screen = screen {
-                let surface = SwiftTUI.surface(from: screen)
+                let surface = SwiftNCurses.surface(from: screen)
                 let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols)
                 let mainStartCol = sidebarWidth + 1
                 let mainStartRow: Int32 = 2
@@ -88,7 +88,7 @@ extension TUI {
                 let mainHeight = max(5, screenRows - mainStartRow - 2)
                 let mainBounds = Rect(x: mainStartCol, y: mainStartRow, width: mainWidth, height: mainHeight)
                 await surface.fill(rect: mainBounds, character: " ", style: .secondary)
-                SwiftTUI.refresh(WindowHandle(screen))
+                SwiftNCurses.refresh(WindowHandle(screen))
             }
             return true
         } else {
@@ -108,7 +108,7 @@ extension TUI {
             scrollOffset = 0
             // Clear only the main panel area to remove artifacts before redrawing
             if let screen = screen {
-                let surface = SwiftTUI.surface(from: screen)
+                let surface = SwiftNCurses.surface(from: screen)
                 let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols)
                 let mainStartCol = sidebarWidth + 1
                 let mainStartRow: Int32 = 2
@@ -116,7 +116,7 @@ extension TUI {
                 let mainHeight = max(5, screenRows - mainStartRow - 2)
                 let mainBounds = Rect(x: mainStartCol, y: mainStartRow, width: mainWidth, height: mainHeight)
                 await surface.fill(rect: mainBounds, character: " ", style: .secondary)
-                SwiftTUI.refresh(WindowHandle(screen))
+                SwiftNCurses.refresh(WindowHandle(screen))
             }
             await self.draw(screen: screen)
 
@@ -177,7 +177,7 @@ extension TUI {
                 scrollOffset = 0
                 // Clear only the main panel area to remove artifacts before redrawing
                 if let screen = screen {
-                    let surface = SwiftTUI.surface(from: screen)
+                    let surface = SwiftNCurses.surface(from: screen)
                     let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols)
                     let mainStartCol = sidebarWidth + 1
                     let mainStartRow: Int32 = 2
@@ -185,7 +185,7 @@ extension TUI {
                     let mainHeight = max(5, screenRows - mainStartRow - 2)
                     let mainBounds = Rect(x: mainStartCol, y: mainStartRow, width: mainWidth, height: mainHeight)
                     await surface.fill(rect: mainBounds, character: " ", style: .secondary)
-                    SwiftTUI.refresh(WindowHandle(screen))
+                    SwiftNCurses.refresh(WindowHandle(screen))
                 }
             } else {
                 // In category detail view - toggle selection of the highlighted flavor

@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct VolumeViews {
 
@@ -338,9 +338,9 @@ struct VolumeViews {
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
@@ -434,7 +434,7 @@ struct VolumeViews {
         }
 
         // Main Volume Create Form using FormBuilder
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -457,7 +457,7 @@ struct VolumeViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - Pagination and Virtual Scrolling Navigation Helpers
