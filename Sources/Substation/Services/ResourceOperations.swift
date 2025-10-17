@@ -2227,7 +2227,7 @@ final class ResourceOperations {
 
         // Show deletion in progress
         statusMessage = "Deleting security group '\(securityGroupName)'..."
-        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
+        tui.needsRedraw = true
 
         do {
             try await client.deleteSecurityGroup(id: securityGroup.id)

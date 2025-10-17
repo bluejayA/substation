@@ -1750,10 +1750,19 @@ class InputHandler {
             batchOperation = .keyPairBulkDelete(keyPairNames: Array(tui.multiSelectedResourceIDs))
         case .images:
             batchOperation = .imageBulkDelete(imageIDs: Array(tui.multiSelectedResourceIDs))
-        case .volumeArchives, .barbicanSecrets, .barbican, .swift, .swiftContainerDetail:
-            // These resources don't have BatchOperation support yet, handle them directly
-            await handleSimpleBulkDelete(resourceIDs: Array(tui.multiSelectedResourceIDs), screen: screen)
-            return
+        case .volumeArchives:
+            batchOperation = .volumeBackupBulkDelete(backupIDs: Array(tui.multiSelectedResourceIDs))
+        case .barbicanSecrets, .barbican:
+            batchOperation = .barbicanSecretBulkDelete(secretIDs: Array(tui.multiSelectedResourceIDs))
+        case .swift:
+            batchOperation = .swiftContainerBulkDelete(containerNames: Array(tui.multiSelectedResourceIDs))
+        case .swiftContainerDetail:
+            // Get container name from selected resource
+            guard let container = tui.selectedResource as? SwiftContainer, let containerName = container.name else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+            batchOperation = .swiftObjectBulkDelete(containerName: containerName, objectNames: Array(tui.multiSelectedResourceIDs))
         case .flavors:
             // Flavors don't support deletion
             tui.statusMessage = "Bulk operations not supported for flavors (cloud admin only)"

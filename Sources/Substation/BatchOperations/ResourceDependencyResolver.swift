@@ -15,6 +15,7 @@ actor ResourceDependencyResolver {
         case router
         case server
         case volume
+        case volumeBackup
         case floatingIP
         case securityGroup
         case serverGroup
@@ -22,6 +23,7 @@ actor ResourceDependencyResolver {
         case image
         case swiftContainer
         case swiftObject
+        case barbicanSecret
         case flavor
 
         /// Resources that must exist before this resource can be created
@@ -39,6 +41,8 @@ actor ResourceDependencyResolver {
                 return [.image, .flavor, .network, .keyPair] // Basic dependencies
             case .volume:
                 return []
+            case .volumeBackup:
+                return [.volume] // Backups depend on volumes
             case .floatingIP:
                 return [.network] // External network
             case .securityGroup:
@@ -55,6 +59,8 @@ actor ResourceDependencyResolver {
                 return []
             case .swiftObject:
                 return [.swiftContainer]
+            case .barbicanSecret:
+                return []
             }
         }
 
@@ -72,6 +78,8 @@ actor ResourceDependencyResolver {
                 return 1 // Delete servers first
             case .volume:
                 return 2 // Then volumes (may be attached to servers)
+            case .volumeBackup:
+                return 1 // Delete backups first (before volumes)
             case .port:
                 return 3 // Then ports
             case .floatingIP:
@@ -92,6 +100,8 @@ actor ResourceDependencyResolver {
                 return 2 // Delete objects before containers
             case .swiftContainer:
                 return 8 // Delete containers late (after objects)
+            case .barbicanSecret:
+                return 8 // Secrets can be deleted late
             }
         }
     }
@@ -360,6 +370,12 @@ actor ResourceDependencyResolver {
 
         case .swiftObjectBulkDelete(let containerName, let objectNames):
             operations = await buildSwiftObjectDeleteOperations(containerName: containerName, objectNames: objectNames)
+
+        case .volumeBackupBulkDelete(let backupIDs):
+            operations = await buildVolumeBackupDeleteOperations(backupIDs)
+
+        case .barbicanSecretBulkDelete(let secretIDs):
+            operations = await buildBarbicanSecretDeleteOperations(secretIDs)
         }
 
         return operations
@@ -681,6 +697,36 @@ actor ResourceDependencyResolver {
                 resourceIdentifier: "\(containerName)/\(name)",
                 dependencies: [],
                 estimatedDuration: 2.0
+            )
+        }
+    }
+
+    // MARK: - Volume Backup Operations
+
+    private func buildVolumeBackupDeleteOperations(_ backupIDs: [String]) async -> [PlannedOperation] {
+        return backupIDs.enumerated().map { (index, backupID) in
+            PlannedOperation(
+                id: "volume-backup-delete-\(index)",
+                type: .volumeBackup,
+                action: .delete,
+                resourceIdentifier: backupID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
+            )
+        }
+    }
+
+    // MARK: - Barbican Secret Operations
+
+    private func buildBarbicanSecretDeleteOperations(_ secretIDs: [String]) async -> [PlannedOperation] {
+        return secretIDs.enumerated().map { (index, secretID) in
+            PlannedOperation(
+                id: "barbican-secret-delete-\(index)",
+                type: .barbicanSecret,
+                action: .delete,
+                resourceIdentifier: secretID,
+                dependencies: [],
+                estimatedDuration: OperationAction.delete.estimatedDurationSeconds
             )
         }
     }
