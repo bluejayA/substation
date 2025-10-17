@@ -36,6 +36,7 @@ final class ResourceRegistry: @unchecked Sendable {
         .octavia: ["loadbalancers", "loadbalancer", "lb", "octavia", "o"],
         .swift: ["object storage", "swift", "objectstorage", "objects", "obj", "j"],
         .swiftBackgroundOperations: ["operations", "ops", "background", "tasks"],
+        .performanceMetrics: ["performance", "metrics", "perf", "stats"],
 
         // Utilities
         .about: ["about"],
@@ -374,12 +375,26 @@ final class ResourceRegistry: @unchecked Sendable {
             .compute: ["servers", "servergroups", "flavors", "keypairs"],
             .networking: ["networks", "subnets", "routers", "ports", "floatingips", "securitygroups"],
             .storage: ["volumes", "images", "archives"],
-            .services: ["secrets", "loadbalancers", "swift", "operations"],
+            .services: ["secrets", "loadbalancers", "swift", "operations", "performance"],
             .utilities: ["dashboard", "topology", "search", "health", "help", "about"]
         ]
     }
 
     // MARK: - Help Text Generation
+
+    /// Get a detailed description for a specific view mode
+    /// - Parameter viewMode: The view mode to describe
+    /// - Returns: A detailed description of what the view mode does
+    private func detailedDescription(for viewMode: ViewMode) -> String? {
+        switch viewMode {
+        case .performanceMetrics:
+            return "View real-time performance metrics and statistics for OpenStack operations"
+        case .swiftBackgroundOperations:
+            return "Monitor background operations for Swift Object Storage tasks"
+        default:
+            return nil
+        }
+    }
 
     /// Generate help text for a command
     func helpText(for command: String) -> String? {
@@ -390,7 +405,15 @@ final class ResourceRegistry: @unchecked Sendable {
             .prefix(3)
             .joined(separator: ", ")
 
-        var help = ":\(command) - Navigate to \(viewMode.title)"
+        var help = ":\(command) - "
+
+        // Add detailed description if available, otherwise use generic navigation text
+        if let description = detailedDescription(for: viewMode) {
+            help += description
+        } else {
+            help += "Navigate to \(viewMode.title)"
+        }
+
         if !aliasesText.isEmpty {
             help += " (aliases: \(aliasesText))"
         }

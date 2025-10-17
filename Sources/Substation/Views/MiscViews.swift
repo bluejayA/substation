@@ -76,7 +76,7 @@ struct MiscViews {
             return "Help - Main Dashboard"
         case .serverCreate, .networkCreate, .volumeCreate, .keyPairCreate, .subnetCreate, .portCreate, .routerCreate, .floatingIPCreate, .serverGroupCreate, .securityGroupCreate:
             return "Help - Resource Creation"
-        case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .securityGroupDetail, .serverGroupDetail, .healthDashboardServiceDetail, .barbicanSecretDetail, .barbicanContainerDetail:
+        case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .securityGroupDetail, .serverGroupDetail, .healthDashboardServiceDetail, .barbicanSecretDetail:
             return "Help - Resource Details"
         case .serverSecurityGroups:
             return "Help - Security Group Management"
@@ -100,12 +100,8 @@ struct MiscViews {
             return "Help - Search"
         case .barbican, .barbicanSecrets:
             return "Help - Secret Management"
-        case .barbicanContainers:
-            return "Help - Secret Container Management"
         case .barbicanSecretCreate:
             return "Help - Secret Creation"
-        case .barbicanContainerCreate:
-            return "Help - Container Creation"
         case .swift:
             return "Help - Object Storage Management"
         case .swiftContainerDetail:
@@ -516,26 +512,6 @@ struct MiscViews {
                 generalActions
             ]
 
-        case .barbicanContainers:
-            return [
-                generalNavigation,
-                ("Secret Container Management", [
-                    "SHIFT-C: Create new container",
-                    "SPACE: View container details",
-                    "DELETE: Delete selected container",
-                    "Containers organize multiple secrets",
-                    "Used for certificate bundles and key pairs",
-                ]),
-                ("Multi-Select Mode (CTRL-X)", [
-                    "CTRL-X: Toggle multi-select mode",
-                    "SPACE: Select/deselect items (in multi-select mode)",
-                    "DELETE: Bulk delete selected containers",
-                    "ESC: Exit multi-select mode",
-                    "Status icons show [ ] or [X] when in multi-select",
-                ]),
-                generalActions
-            ]
-
         case .barbicanSecretCreate:
             return [
                 ("Secret Creation Form", [
@@ -552,23 +528,6 @@ struct MiscViews {
                     "Private Key: RSA/EC private keys",
                     "Public Key: RSA/EC public keys",
                     "Opaque: Generic binary data",
-                ]),
-                generalActions
-            ]
-
-        case .barbicanContainerCreate:
-            return [
-                ("Container Creation Form", [
-                    "TAB: Move to next field",
-                    "SHIFT+TAB: Move to previous field",
-                    "SPACE: Edit text fields and select secrets",
-                    "ENTER: Create container",
-                    "ESC: Cancel and return",
-                ]),
-                ("Container Types", [
-                    "Generic: General purpose container",
-                    "Certificate: For certificate bundles",
-                    "RSA: For RSA key pairs",
                 ]),
                 generalActions
             ]

@@ -7,11 +7,11 @@ import struct OSClient.Port
 enum ViewMode: CaseIterable {
     case loading, dashboard, advancedSearch, healthDashboard, servers, serverGroups, securityGroups,
         volumes, volumeArchives, images, flavors, subnets, ports, routers, floatingIPs, networks,
-        barbican, barbicanSecrets, barbicanContainers, octavia, swift, swiftBackgroundOperations,
+        barbican, barbicanSecrets, octavia, swift, swiftBackgroundOperations,
         performanceMetrics, serverDetail, serverConsole, serverGroupDetail, networkDetail,
         securityGroupDetail, volumeDetail, volumeArchiveDetail, imageDetail, flavorDetail,
         subnetDetail, portDetail, routerDetail, floatingIPDetail, healthDashboardServiceDetail,
-        barbicanSecretDetail, barbicanContainerDetail, octaviaLoadBalancerDetail,
+        barbicanSecretDetail, octaviaLoadBalancerDetail,
         swiftContainerDetail, swiftObjectDetail, swiftBackgroundOperationDetail, serverCreate,
         serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement,
         subnetCreate, volumeCreate, portCreate, routerCreate, floatingIPCreate, keyPairs,
@@ -21,7 +21,7 @@ enum ViewMode: CaseIterable {
         securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement,
         volumeServerManagement, floatingIPServerManagement, floatingIPPortManagement,
         portServerManagement, portAllowedAddressPairManagement, subnetRouterManagement,
-        flavorSelection, barbicanSecretCreate, barbicanContainerCreate, octaviaLoadBalancerCreate,
+        flavorSelection, barbicanSecretCreate, octaviaLoadBalancerCreate,
         swiftContainerCreate, swiftObjectUpload, swiftContainerDownload, swiftObjectDownload,
         swiftDirectoryDownload, swiftContainerMetadata, swiftObjectMetadata, swiftDirectoryMetadata,
         swiftContainerWebAccess
@@ -82,16 +82,13 @@ enum ViewMode: CaseIterable {
         case .healthDashboardServiceDetail: return "Service Details"
         case .barbican: return "Secrets"
         case .barbicanSecrets: return "Secrets"
-        case .barbicanContainers: return "Secret Containers"
         case .octavia: return "Load Balancers"
         case .swift: return "Object Storage"
         case .barbicanSecretDetail: return "Secret Details"
-        case .barbicanContainerDetail: return "Container Details"
         case .octaviaLoadBalancerDetail: return "Load Balancer Details"
         case .swiftContainerDetail: return "Container Objects"
         case .swiftObjectDetail: return "Object Details"
         case .barbicanSecretCreate: return "Create Secret"
-        case .barbicanContainerCreate: return "Create Container"
         case .octaviaLoadBalancerCreate: return "Create Load Balancer"
         case .swiftContainerCreate: return "Create Container"
         case .swiftObjectUpload: return "Upload Object"
@@ -139,8 +136,8 @@ enum ViewMode: CaseIterable {
             .securityGroupServerAttachment, .securityGroupServerManagement,
             .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement,
             .floatingIPPortManagement, .portServerManagement, .portAllowedAddressPairManagement,
-            .subnetRouterManagement, .barbicanSecretDetail, .barbicanContainerDetail, .octaviaLoadBalancerDetail,
-            .swiftObjectDetail, .swiftBackgroundOperationDetail, .barbicanSecretCreate, .barbicanContainerCreate, .octaviaLoadBalancerCreate,
+            .subnetRouterManagement, .barbicanSecretDetail, .octaviaLoadBalancerDetail,
+            .swiftObjectDetail, .swiftBackgroundOperationDetail, .barbicanSecretCreate, .octaviaLoadBalancerCreate,
             .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload,
             .swiftObjectDownload, .swiftDirectoryDownload, .swiftContainerMetadata,
             .swiftObjectMetadata, .swiftDirectoryMetadata, .performanceMetrics,
@@ -158,7 +155,7 @@ enum ViewMode: CaseIterable {
             .securityGroups, .serverGroups, .keyPairs, .images:
             return true
         // Service list views (barbicanSecrets and volumeArchives support multi-select)
-        case .barbican, .barbicanSecrets, .barbicanContainers, .octavia, .swift,
+        case .barbican, .barbicanSecrets, .octavia, .swift,
             .swiftContainerDetail, .volumeArchives:
             return true
         // Note: flavors excluded - read-only, managed by cloud admin
@@ -204,11 +201,8 @@ enum ViewMode: CaseIterable {
         case .volumeBackupManagement: return .volumes
         case .healthDashboardServiceDetail: return .healthDashboard
         case .barbicanSecrets: return .barbican
-        case .barbicanContainers: return .barbican
         case .barbicanSecretDetail: return .barbicanSecrets
-        case .barbicanContainerDetail: return .barbicanContainers
         case .barbicanSecretCreate: return .barbicanSecrets
-        case .barbicanContainerCreate: return .barbicanContainers
         case .octaviaLoadBalancerDetail: return .octavia
         case .octaviaLoadBalancerCreate: return .octavia
         case .swiftContainerDetail: return .swift
@@ -737,12 +731,6 @@ struct MainPanelView {
                 scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex,
                 filterCache: tui.resourceNameCache, multiSelectMode: tui.multiSelectMode,
                 selectedItems: tui.multiSelectedResourceIDs)
-        case .barbicanContainers:
-            await BarbicanViews.drawBarbicanContainerList(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, containers: tui.cachedBarbicanContainers,
-                searchQuery: tui.searchQuery ?? "", scrollOffset: tui.scrollOffset,
-                selectedIndex: tui.selectedIndex, filterCache: tui.resourceNameCache)
         case .barbicanSecretDetail:
             if let secret = tui.selectedResource as? Secret {
                 await BarbicanViews.drawBarbicanSecretDetail(
@@ -750,21 +738,11 @@ struct MainPanelView {
                     width: mainWidth, height: mainHeight, secret: secret,
                     scrollOffset: tui.detailScrollOffset)
             }
-        case .barbicanContainerDetail:
-            if let container = tui.selectedResource as? BarbicanContainer {
-                await BarbicanViews.drawBarbicanContainerDetail(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, container: container)
-            }
         case .barbicanSecretCreate:
             await BarbicanViews.drawBarbicanSecretCreateForm(
                 screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
                 height: mainHeight, form: tui.barbicanSecretCreateForm,
                 formState: tui.barbicanSecretCreateFormState)
-        case .barbicanContainerCreate:
-            await MiscViews.drawSimpleCenteredMessage(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, message: "Create Container - Coming Soon")
 
         // Octavia views
         case .octavia:

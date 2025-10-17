@@ -243,10 +243,6 @@ final class TUI {
         get { resourceCache.secrets }
         set { Task { await resourceCache.setSecrets(newValue) } }
     }
-    internal var cachedBarbicanContainers: [BarbicanContainer] {
-        get { resourceCache.barbicanContainers }
-        set { Task { await resourceCache.setBarbicanContainers(newValue) } }
-    }
     internal var cachedLoadBalancers: [LoadBalancer] {
         get { resourceCache.loadBalancers }
         set { Task { await resourceCache.setLoadBalancers(newValue) } }

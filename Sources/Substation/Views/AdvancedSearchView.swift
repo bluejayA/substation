@@ -852,11 +852,6 @@ struct AdvancedSearchView {
                 tui.selectedIndex = index
                 return true
             }
-        case .barbicanContainer:
-            if let index = tui.cachedBarbicanContainers.firstIndex(where: { $0.id == resourceId }) {
-                tui.selectedIndex = index
-                return true
-            }
         case .loadBalancer:
             if let index = tui.cachedLoadBalancers.firstIndex(where: { $0.id == resourceId }) {
                 tui.selectedIndex = index
@@ -897,7 +892,6 @@ struct AdvancedSearchView {
         case .volumeSnapshot: return .volumes // Navigate to volumes list
         case .volumeBackup: return .volumes // Navigate to volumes list
         case .barbicanSecret: return .barbicanSecrets
-        case .barbicanContainer: return .barbicanContainers
         case .loadBalancer: return .octavia
         case .swiftContainer: return .swift
         case .swiftObject: return .swift
@@ -1458,7 +1452,6 @@ struct AdvancedSearchView {
             volumeSnapshots: tui.cachedVolumeSnapshots,
             volumeBackups: tui.cachedVolumeBackups,
             barbicanSecrets: tui.cachedSecrets,
-            barbicanContainers: tui.cachedBarbicanContainers,
             loadBalancers: tui.cachedLoadBalancers,
             swiftContainers: tui.cachedSwiftContainers,
             swiftObjects: tui.cachedSwiftObjects ?? []

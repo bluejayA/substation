@@ -94,11 +94,6 @@ final class TUIResourceCache {
         set { Task { await resourceCache.setSecrets(newValue) } }
     }
 
-    var barbicanContainers: [BarbicanContainer] {
-        get { resourceCache.barbicanContainers }
-        set { Task { await resourceCache.setBarbicanContainers(newValue) } }
-    }
-
     var loadBalancers: [LoadBalancer] {
         get { resourceCache.loadBalancers }
         set { Task { await resourceCache.setLoadBalancers(newValue) } }

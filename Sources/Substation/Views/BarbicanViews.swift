@@ -36,30 +36,6 @@ struct BarbicanViews {
         )
     }
 
-    // MARK: - Container List View
-    @MainActor
-    static func drawBarbicanContainerList(
-        screen: OpaquePointer?,
-        startRow: Int32,
-        startCol: Int32,
-        width: Int32,
-        height: Int32,
-        containers: [BarbicanContainer],
-        searchQuery: String,
-        scrollOffset: Int,
-        selectedIndex: Int,
-        filterCache: ResourceNameCache?
-    ) async {
-        await MiscViews.drawSimpleCenteredMessage(
-            screen: screen,
-            startRow: startRow,
-            startCol: startCol,
-            width: width,
-            height: height,
-            message: "Barbican Containers - Implementation Coming Soon"
-        )
-    }
-
     // MARK: - Detail Views
     @MainActor
     static func drawBarbicanSecretDetail(
@@ -280,25 +256,6 @@ struct BarbicanViews {
         case "OFB": return "Output Feedback - Stream cipher mode"
         default: return ""
         }
-    }
-
-    @MainActor
-    static func drawBarbicanContainerDetail(
-        screen: OpaquePointer?,
-        startRow: Int32,
-        startCol: Int32,
-        width: Int32,
-        height: Int32,
-        container: BarbicanContainer
-    ) async {
-        await MiscViews.drawSimpleCenteredMessage(
-            screen: screen,
-            startRow: startRow,
-            startCol: startCol,
-            width: width,
-            height: height,
-            message: "Container Detail - Implementation Coming Soon"
-        )
     }
 
     // MARK: - Create Views

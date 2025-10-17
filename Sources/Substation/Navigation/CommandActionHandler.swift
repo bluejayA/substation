@@ -321,9 +321,9 @@ final class CommandActionHandler: @unchecked Sendable {
 
         // Service views
         case .volumeArchiveDetail, .flavorDetail, .flavors, .healthDashboardServiceDetail,
-            .barbican, .barbicanContainers, .octavia, .barbicanSecretDetail,
-            .barbicanContainerDetail, .octaviaLoadBalancerDetail, .swiftObjectDetail,
-            .swiftBackgroundOperationDetail, .barbicanContainerCreate, .octaviaLoadBalancerCreate,
+            .barbican, .octavia, .barbicanSecretDetail,
+            .octaviaLoadBalancerDetail, .swiftObjectDetail,
+            .swiftBackgroundOperationDetail, .octaviaLoadBalancerCreate,
             .swiftObjectUpload, .swiftContainerDownload, .swiftObjectDownload,
             .swiftDirectoryDownload, .swiftContainerMetadata, .swiftObjectMetadata,
             .swiftDirectoryMetadata, .swiftContainerWebAccess, .swiftBackgroundOperations,

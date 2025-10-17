@@ -33,7 +33,6 @@ final class OpenStackResourceCache {
     private var syncQoSPolicies: [QoSPolicy] = []
     private var syncAvailabilityZones: [String] = []
     private var syncSecrets: [Secret] = []
-    private var syncBarbicanContainers: [BarbicanContainer] = []
     private var syncLoadBalancers: [LoadBalancer] = []
     private var syncSwiftContainers: [SwiftContainer] = []
     private var syncSwiftObjectsByContainer: [String: [SwiftObject]] = [:]
@@ -75,7 +74,6 @@ final class OpenStackResourceCache {
     var qosPolicies: [QoSPolicy] { syncQoSPolicies }
     var availabilityZones: [String] { syncAvailabilityZones }
     var secrets: [Secret] { syncSecrets }
-    var barbicanContainers: [BarbicanContainer] { syncBarbicanContainers }
     var loadBalancers: [LoadBalancer] { syncLoadBalancers }
     var swiftContainers: [SwiftContainer] { syncSwiftContainers }
     var swiftObjectsByContainer: [String: [SwiftObject]] { syncSwiftObjectsByContainer }
@@ -98,85 +96,85 @@ final class OpenStackResourceCache {
 
     func setServers(_ servers: [Server]) async {
         syncServers = servers
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(servers.count) servers")
     }
 
     func setServerGroups(_ serverGroups: [ServerGroup]) async {
         syncServerGroups = serverGroups
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(serverGroups.count) server groups")
     }
 
     func setNetworks(_ networks: [Network]) async {
         syncNetworks = networks
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(networks.count) networks")
     }
 
     func setVolumes(_ volumes: [Volume]) async {
         syncVolumes = volumes
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(volumes.count) volumes")
     }
 
     func setImages(_ images: [Image]) async {
         syncImages = images
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(images.count) images")
     }
 
     func setVolumeTypes(_ volumeTypes: [VolumeType]) async {
         syncVolumeTypes = volumeTypes
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(volumeTypes.count) volume types")
     }
 
     func setPorts(_ ports: [Port]) async {
         syncPorts = ports
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(ports.count) ports")
     }
 
     func setRouters(_ routers: [Router]) async {
         syncRouters = routers
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(routers.count) routers")
     }
 
     func setFloatingIPs(_ floatingIPs: [FloatingIP]) async {
         syncFloatingIPs = floatingIPs
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(floatingIPs.count) floating IPs")
     }
 
     func setFlavors(_ flavors: [Flavor]) async {
         syncFlavors = flavors
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(flavors.count) flavors")
     }
 
     func setSubnets(_ subnets: [Subnet]) async {
         syncSubnets = subnets
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(subnets.count) subnets")
     }
 
     func setSecurityGroups(_ securityGroups: [SecurityGroup]) async {
         syncSecurityGroups = securityGroups
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(securityGroups.count) security groups")
     }
 
     func setKeyPairs(_ keyPairs: [KeyPair]) async {
         syncKeyPairs = keyPairs
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(keyPairs.count) key pairs")
     }
 
     func setQoSPolicies(_ qosPolicies: [QoSPolicy]) async {
         syncQoSPolicies = qosPolicies
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(qosPolicies.count) QoS policies")
     }
 
@@ -187,25 +185,19 @@ final class OpenStackResourceCache {
 
     func setSecrets(_ secrets: [Secret]) async {
         syncSecrets = secrets
-        
-        Logger.shared.logDebug("OpenStackResourceCache cached \(secrets.count) secrets")
-    }
 
-    func setBarbicanContainers(_ containers: [BarbicanContainer]) async {
-        syncBarbicanContainers = containers
-        
-        Logger.shared.logDebug("OpenStackResourceCache cached \(containers.count) Barbican containers")
+        Logger.shared.logDebug("OpenStackResourceCache cached \(secrets.count) secrets")
     }
 
     func setLoadBalancers(_ loadBalancers: [LoadBalancer]) async {
         syncLoadBalancers = loadBalancers
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(loadBalancers.count) load balancers")
     }
 
     func setSwiftContainers(_ containers: [SwiftContainer]) async {
         syncSwiftContainers = containers
-        
+
         Logger.shared.logDebug("OpenStackResourceCache cached \(containers.count) Swift containers")
     }
 
@@ -276,7 +268,6 @@ final class OpenStackResourceCache {
         syncQoSPolicies.removeAll()
         syncAvailabilityZones.removeAll()
         syncSecrets.removeAll()
-        syncBarbicanContainers.removeAll()
         syncLoadBalancers.removeAll()
         syncSwiftContainers.removeAll()
         syncSwiftObjectsByContainer.removeAll()
