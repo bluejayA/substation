@@ -24,6 +24,17 @@ struct ImageSelectionView {
         // Sort images alphabetically for consistent display
         let sortedImages = images.sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
 
+        // Recalculate highlightedIndex for sorted array
+        // If a selectedImageId exists, find it in the sorted array
+        let adjustedHighlightedIndex: Int
+        if let selectedId = selectedImageIds.first,
+           let indexInSorted = sortedImages.firstIndex(where: { $0.id == selectedId }) {
+            adjustedHighlightedIndex = indexInSorted
+        } else {
+            // If no selection or can't find it, use the provided index (clamped to valid range)
+            adjustedHighlightedIndex = min(highlightedIndex, max(0, sortedImages.count - 1))
+        }
+
         let tabs = [
             FormSelectorTab<Image>(
                 title: "IMAGES",
@@ -53,7 +64,7 @@ struct ImageSelectionView {
             selectedTabIndex: 0,
             items: sortedImages,
             selectedItemIds: selectedImageIds,
-            highlightedIndex: highlightedIndex,
+            highlightedIndex: adjustedHighlightedIndex,
             checkboxMode: .basic,
             scrollOffset: scrollOffset,
             searchQuery: searchQuery,

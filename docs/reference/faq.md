@@ -140,7 +140,7 @@ See [Performance Tuning](../performance/tuning.md) for cache configuration detai
 
 - Use `/` to filter views (reduces visible resources)
 - Use project-scoped credentials (reduces total resources)
-- Press `c` to manually purge cache
+- Use `:cache-purge<Enter>` (or `:cc<Enter>`) to manually purge cache
 
 **Automatic Eviction:** Substation auto-evicts cache at 85% memory threshold to prevent OOM.
 
@@ -244,7 +244,7 @@ If the service is missing, it's not available in your OpenStack deployment. Subs
 
 **Cause:** Cache contains old data.
 
-**Solution: Press `c` to purge ALL caches**
+**Solution: Use `:cache-purge<Enter>` (or `:cc<Enter>`) to purge ALL caches**
 
 This clears L1, L2, and L3 caches. Next operations will be slower while cache rebuilds, but data will be fresh.
 

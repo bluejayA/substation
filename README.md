@@ -86,19 +86,6 @@ sudo mv substation /usr/local/bin/
 - **[Quick Start Guide](https://substation.cloud/quick-start/)** - Get up and running in 5 minutes
 - **[Getting Started](https://substation.cloud/getting-started/)** - Comprehensive first-time setup
 
-## Navigation Quick Reference
-
-Press `?` anytime for help. Here are the essentials:
-
-| Key | Action | Key | Action |
-|-----|--------|-----|--------|
-| `d` | Dashboard | `s` | Servers |
-| `n` | Networks | `v` | Volumes |
-| `e` | Security Groups | `i` | Images |
-| `z` | Advanced Search | `c` | Purge cache |
-| `/` | Filter list | `q` | Quit |
-| `:` | Command mode | `h` | Help |
-
 **Full keyboard guide:** [Keyboard Shortcuts & Navigation](https://substation.cloud/guides/operators/keyboard-shortcuts/)
 
 ### Library Overview

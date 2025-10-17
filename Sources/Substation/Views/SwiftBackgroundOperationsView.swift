@@ -50,7 +50,7 @@ struct SwiftBackgroundOperationsView {
                 header: "Container",
                 width: 18,
                 getValue: { operation in
-                    if operation.type == .bulkDelete {
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
                         return "-"
                     } else {
                         return operation.containerName
@@ -61,7 +61,7 @@ struct SwiftBackgroundOperationsView {
                 header: "Progress",
                 width: 18,
                 getValue: { operation in
-                    if operation.type == .bulkDelete {
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
                         if operation.status == .completed {
                             return "\(operation.itemsCompleted)/\(operation.itemsTotal)"
                         } else if operation.status.isActive {
@@ -84,7 +84,7 @@ struct SwiftBackgroundOperationsView {
                 header: "Size/Failed",
                 width: 14,
                 getValue: { operation in
-                    if operation.type == .bulkDelete {
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
                         if operation.itemsFailed > 0 {
                             return "\(operation.itemsFailed) failed"
                         } else {
@@ -101,7 +101,7 @@ struct SwiftBackgroundOperationsView {
                 header: "Rate",
                 width: 12,
                 getValue: { operation in
-                    if operation.type == .bulkDelete {
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
                         return "-"
                     } else if operation.status == .running {
                         return operation.formattedTransferRate

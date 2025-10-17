@@ -150,7 +150,7 @@ When data is not in cache or expired:
 
 **Manual Invalidation:**
 
-- Press `c` in Substation to purge ALL caches
+- Use `:cache-purge<Enter>` (or `:clear-cache<Enter>` or `:cc<Enter>`) in Substation to purge ALL caches
 - Clears L1, L2, and L3
 - Next operations slower while cache rebuilds
 
@@ -209,7 +209,7 @@ Substation monitors memory usage and automatically manages cache:
 
 ### Monitoring Cache Performance
 
-Press `h` in Substation for the Health Dashboard:
+Use `:health<Enter>` (or `:healthdashboard<Enter>` or `:h<Enter>`) in Substation for the Health Dashboard:
 
 **Key Metrics:**
 
@@ -329,7 +329,7 @@ All cache operations are **actor-based**:
 ### For Operators
 
 1. **Let the cache work** - Don't constantly press `c`
-2. **Monitor hit rates** - Press `h` to check cache performance
+2. **Monitor hit rates** - Use `:health<Enter>` (or `:h<Enter>`) to check cache performance
 3. **Purge strategically** - Only when data is truly stale
 4. **Accept short delays on first load** - Cache warming is normal
 
@@ -389,8 +389,8 @@ All cache operations are **actor-based**:
 
 **Solutions:**
 
-1. Press `c` to purge cache
-2. Press `r` to refresh view
+1. Use `:cache-purge<Enter>` (or `:cc<Enter>`) to purge cache
+2. Use `:refresh<Enter>` (or `:reload<Enter>`) to refresh view
 3. Fresh data loads from API
 
 ---

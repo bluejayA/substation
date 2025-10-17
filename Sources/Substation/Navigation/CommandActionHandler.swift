@@ -9,10 +9,11 @@ enum ActionType: String {
     case stop
     case restart
     case manage
+    case clearCache = "clear-cache"
 
     /// Returns all available action types
     static var all: [ActionType] {
-        return [.create, .delete, .refresh, .start, .stop, .restart, .manage]
+        return [.create, .delete, .refresh, .start, .stop, .restart, .manage, .clearCache]
     }
 
     /// Returns the command name for this action (with colon prefix for display)
@@ -21,9 +22,6 @@ enum ActionType: String {
     }
 }
 
-/// Handler for command-based actions in the application
-/// This class centralizes action validation and help text generation for command mode
-/// Phase 1: Validation and routing only - actual execution delegated to existing handlers
 @MainActor
 final class CommandActionHandler: @unchecked Sendable {
 
@@ -84,6 +82,8 @@ final class CommandActionHandler: @unchecked Sendable {
             return await executeRestartAction(in: context, tui: tui, screen: screen)
         case .manage:
             return await executeManageAction(in: context, tui: tui, screen: screen)
+        case .clearCache:
+            return await executeClearCacheAction(tui: tui, screen: screen)
         }
     }
 
@@ -96,7 +96,7 @@ final class CommandActionHandler: @unchecked Sendable {
         // Most create operations are handled by navigating to the create view
         switch context {
         case .servers:
-            await tui.resourceOperations.createServer()
+            tui.changeView(to: .serverCreate)
         case .networks:
             tui.changeView(to: .networkCreate)
         case .volumes:
@@ -247,6 +247,49 @@ final class CommandActionHandler: @unchecked Sendable {
         return true
     }
 
+    /// Execute clear-cache action to purge all application caches
+    /// - Parameters:
+    ///   - tui: The TUI instance containing the resource cache
+    ///   - screen: The screen pointer for displaying confirmation dialog
+    /// - Returns: True if cache was cleared, false if cancelled or failed
+    private func executeClearCacheAction(tui: TUI, screen: OpaquePointer?) async -> Bool {
+        guard let screen = screen else {
+            tui.statusMessage = "Cannot clear cache: screen not available"
+            return false
+        }
+
+        let confirmation = await ViewUtils.confirmOperation(
+            title: "Clear Cache",
+            message: "Clear all application caches?",
+            details: [
+                "This will clear resource names, filters, search results, and UI caches.",
+                "Cached data will be reloaded from OpenStack APIs as needed."
+            ],
+            screen: screen,
+            screenRows: tui.screenRows,
+            screenCols: tui.screenCols
+        )
+
+        guard confirmation else {
+            tui.statusMessage = "Cache clear cancelled"
+            return false
+        }
+
+        tui.statusMessage = "Clearing caches..."
+
+        // Clear all cache layers
+        await tui.resourceCache.clearAll()
+
+        // Log the action
+        Logger.shared.logUserAction("cache_cleared", details: [
+            "source": "command_mode",
+            "timestamp": Date().ISO8601Format()
+        ])
+
+        tui.statusMessage = "All caches cleared successfully"
+        return true
+    }
+
     // MARK: - Action Availability
 
     /// Check if an action can be executed in the given context
@@ -266,44 +309,44 @@ final class CommandActionHandler: @unchecked Sendable {
         switch context {
         // List views with create/delete/refresh
         case .servers:
-            return [.create, .delete, .refresh, .start, .stop, .restart]
+            return [.create, .delete, .refresh, .start, .stop, .restart, .clearCache]
         case .networks:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .volumes:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .images:
-            return [.delete, .refresh]
+            return [.delete, .refresh, .clearCache]
         case .keyPairs:
-            return [.create, .delete, .refresh]
+            return [.create, .delete, .refresh, .clearCache]
         case .subnets:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .ports:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .floatingIPs:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .routers:
-            return [.create, .delete, .refresh]
+            return [.create, .delete, .refresh, .clearCache]
         case .serverGroups:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .securityGroups:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .barbicanSecrets:
-            return [.create, .delete, .refresh]
+            return [.create, .delete, .refresh, .clearCache]
         case .swift:
-            return [.create, .delete, .refresh, .manage]
+            return [.create, .delete, .refresh, .manage, .clearCache]
         case .volumeArchives:
-            return [.delete, .refresh]
+            return [.delete, .refresh, .clearCache]
 
         // Detail views with limited actions
         case .serverDetail:
-            return [.delete, .start, .stop, .restart, .refresh]
+            return [.delete, .start, .stop, .restart, .refresh, .clearCache]
         case .networkDetail, .volumeDetail, .imageDetail, .subnetDetail, .portDetail,
             .floatingIPDetail, .routerDetail, .serverGroupDetail, .securityGroupDetail:
-            return [.delete, .refresh]
+            return [.delete, .refresh, .clearCache]
         case .keyPairDetail:
-            return [.delete, .refresh]
+            return [.delete, .refresh, .clearCache]
         case .swiftContainerDetail:
-            return [.delete, .refresh, .manage]
+            return [.delete, .refresh, .manage, .clearCache]
 
         // Views with no actions
         case .loading, .serverCreate, .networkCreate, .volumeCreate, .keyPairCreate, .subnetCreate,
@@ -328,7 +371,7 @@ final class CommandActionHandler: @unchecked Sendable {
             .swiftDirectoryDownload, .swiftContainerMetadata, .swiftObjectMetadata,
             .swiftDirectoryMetadata, .swiftContainerWebAccess, .swiftBackgroundOperations,
             .performanceMetrics, .dashboard, .healthDashboard:
-            return [.refresh]
+            return [.refresh, .clearCache]
         }
     }
 
@@ -364,6 +407,8 @@ final class CommandActionHandler: @unchecked Sendable {
             return "Restart the selected server"
         case .manage:
             return "Manage resource associations"
+        case .clearCache:
+            return "Clear all application caches"
         }
     }
 }

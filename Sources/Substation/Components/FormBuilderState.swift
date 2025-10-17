@@ -714,11 +714,29 @@ struct FormSelectorFieldState {
         self.items = items
         self.selectedItemId = selectedItemId
         self.selectedItemIds = selectedItemIds
-        self.highlightedIndex = highlightedIndex
-        self.scrollOffset = scrollOffset
         self.searchQuery = searchQuery
         self.isActive = false
         self.isMultiSelect = isMultiSelect
+
+        // If a selectedItemId is provided, find its index and set highlightedIndex to match
+        if let selectedId = selectedItemId, highlightedIndex == 0 {
+            if let index = items.firstIndex(where: { $0.id == selectedId }) {
+                self.highlightedIndex = index
+                // Adjust scroll offset to show the selected item
+                let maxVisibleItems = 10
+                if index >= maxVisibleItems {
+                    self.scrollOffset = index - maxVisibleItems / 2
+                } else {
+                    self.scrollOffset = 0
+                }
+            } else {
+                self.highlightedIndex = highlightedIndex
+                self.scrollOffset = scrollOffset
+            }
+        } else {
+            self.highlightedIndex = highlightedIndex
+            self.scrollOffset = scrollOffset
+        }
     }
 
     mutating func activate() {

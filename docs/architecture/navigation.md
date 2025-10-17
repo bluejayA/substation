@@ -12,7 +12,7 @@
 2. [Architecture](#architecture)
 3. [Components](#components)
 4. [Input Handling](#input-handling)
-5. [Command Mode](#command-mode)
+5. [Command System](#command-system)
 6. [Search System](#search-system)
 7. [Adding New Resources](#adding-new-resources)
 8. [Testing](#testing)
@@ -24,7 +24,7 @@
 
 Substation uses a **VIM-inspired command-driven navigation system** that provides:
 
-- **Command Mode**: Type `:servers` to navigate to any resource
+- **Command Input**: Type `:servers` to navigate to any resource
 - **Fuzzy Matching**: Type `:fla` and it matches "flavors"
 - **Aliases**: Multiple ways to reach the same resource (e.g., `servers`, `srv`, `s`)
 - **Advanced Search**: Cross-service search across all 19 OpenStack resource types
@@ -210,8 +210,8 @@ case .textInput:
     return handleTextInput(key)
 
 case .command:
-    // Activate command mode
-    activateCommandMode()
+    // Activate command input
+    activateCommandInput()
 
 case .fallback:
     // View-specific handlers
@@ -238,7 +238,7 @@ printableRange:    32...126                      // Alphanumeric
 **Key Features**:
 
 - Input state tracking (displayText, cursor, mode)
-- Command mode detection (auto-activates on `:`)
+- Command input detection (auto-activates on `:`)
 - Text buffer management
 - Result reporting via InputResult enum
 
@@ -266,7 +266,7 @@ case .updated:
 case .searchEntered(let query):
     // User pressed Enter in search mode
 case .commandEntered(let command):
-    // User pressed Enter in command mode
+    // User pressed Enter after typing a command
 case .cancelled:
     // User pressed ESC
 // ... etc
@@ -346,21 +346,21 @@ static func handleInput(_ key: Int32) -> Bool {
 
 #### Layer 2: UnifiedInputView State Management (Medium Priority)
 
-**Responsibility**: Handle text input, command mode, and cursor management.
+**Responsibility**: Handle text input, command input state, and cursor management.
 
 **Keys Handled**:
 
 - Alphanumeric (32-126): Text input
 - Backspace (127, 8): Delete characters
 - Arrow keys (260, 261): Cursor movement
-- Colon (58): Activate command mode
+- Colon (58): Activate command input
 - ESC (27): Cancel/clear
 - Tab (9): Completion
 
 **When to Use**:
 
 - For standard text input
-- For command mode activation
+- For command input activation
 - For cursor management
 
 **Example**:
@@ -462,7 +462,7 @@ return handleNavigationInput(key)  // Handles arrow keys in specific contexts
 
 3. **Use UnifiedInputView for text**:
    - Don't reimplement text input logic
-   - Let UnifiedInputView manage command mode detection
+   - Let UnifiedInputView manage command input detection
 
 4. **Log for debugging**:
 
@@ -476,9 +476,9 @@ return handleNavigationInput(key)  // Handles arrow keys in specific contexts
 
 ---
 
-## Command Mode
+## Command System
 
-### Activating Command Mode
+### Activating Command Input
 
 **Trigger**: Type `:` (colon)
 
@@ -487,7 +487,7 @@ return handleNavigationInput(key)  // Handles arrow keys in specific contexts
 **State Change**:
 
 ```swift
-inputState.isCommandMode = true
+inputState.isCommandInput = true
 inputState.displayText = ":"
 ```
 
@@ -496,7 +496,7 @@ inputState.displayText = ":"
 ```
 User types ":servers" + Enter
     ↓
-UnifiedInputView detects command mode
+UnifiedInputView detects command input
     ↓
 Returns .commandEntered("servers")
     ↓
@@ -539,7 +539,7 @@ TUI.changeView(to: .servers)
 
 ### Tab Completion
 
-**Trigger**: Press Tab while in command mode
+**Trigger**: Press Tab while entering a command
 
 **Behavior**:
 

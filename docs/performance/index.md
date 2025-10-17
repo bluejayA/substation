@@ -120,9 +120,9 @@ Comprehensive performance architecture, benchmarking, and optimization for Subst
 
 | Task | Command/Action |
 |------|----------------|
-| View performance metrics | Press `h` (health dashboard) |
-| Purge all caches | Press `c` (cache purge) |
-| Refresh current view | Press `r` (refresh) |
+| View performance metrics | `:health<Enter>` (or `:h<Enter>`) |
+| Purge all caches | `:cache-purge<Enter>` (or `:cc<Enter>`) |
+| Refresh current view | `:refresh<Enter>` (or `:reload<Enter>`) |
 | Run benchmarks | See [benchmarks.md](benchmarks.md) |
 | Enable debug logging | `substation --wiretap` |
 | Check memory usage | `ps aux | grep substation` |
@@ -131,9 +131,9 @@ Comprehensive performance architecture, benchmarking, and optimization for Subst
 
 | Problem | Quick Fix |
 |---------|-----------|
-| High memory usage | Press `c` to purge caches |
+| High memory usage | `:cache-purge<Enter>` (or `:cc<Enter>`) to purge caches |
 | Slow operations | Check cache hit rate (target: 80%+) |
-| Stale data | Press `r` to refresh view |
+| Stale data | `:refresh<Enter>` (or `:reload<Enter>`) to refresh view |
 | API timeouts | Check OpenStack service health |
 | Low cache hit rate | Increase TTLs (see tuning guide) |
 

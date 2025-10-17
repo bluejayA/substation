@@ -388,13 +388,6 @@ class InputHandler {
                     tui.forceRedraw()
                     return
 
-                case .configAction(let configAction):
-                    // Handle configuration actions
-                    handleConfigAction(configAction)
-                    tui.unifiedInputState.clear()
-                    tui.forceRedraw()
-                    return
-
                 case .showTutorial:
                     // Show interactive tutorial view
                     tui.changeView(to: .tutorial, resetSelection: true)
@@ -435,7 +428,7 @@ class InputHandler {
                 return
 
             case .tabCompletion(let partial):
-                // Handle Tab completion in command mode
+                // Handle Tab completion
                 if let completion = await tui.commandMode.completeCommand(partial) {
                     // Replace the current input with the completion
                     tui.unifiedInputState.displayText = ":\(completion)"
@@ -475,7 +468,6 @@ class InputHandler {
             }
         }
 
-        // PRIORITY 2: Activate unified input on / or :
         if ch == 47 { // '/' - Activate search mode
             tui.unifiedInputState.activate(asCommandMode: false)
             tui.forceRedraw()
@@ -488,8 +480,7 @@ class InputHandler {
             return
         }
 
-        // PRIORITY 3: Universal key navigation (command-based)
-        // Letter keys trigger helpful hints to use command mode
+        // Letter keys trigger helpful hints to use
         if (ch >= 97 && ch <= 122) || (ch >= 65 && ch <= 90) { // a-z or A-Z (excluding special uppercase actions)
             // Check if this is a context-sensitive uppercase action that should be handled
             let isContextAction = (ch == 77 || ch == 68 || ch == 85 || ch == 69 || ch == 80 ||
@@ -2313,32 +2304,4 @@ class InputHandler {
         }
     }
 
-    // MARK: - Configuration Action Handler
-
-    /// Handle configuration actions for navigation mode and preferences
-    /// - Parameter action: The configuration action to execute
-    private func handleConfigAction(_ action: CommandMode.ConfigAction) {
-        guard let tui = tui else { return }
-
-        switch action {
-        case .setCommandMode(let mode):
-            NavigationPreferences.shared.setMode(mode)
-            tui.statusMessage = "Navigation mode set to: \(mode.displayName)"
-            Logger.shared.logUserAction("navigation_mode_changed", details: [
-                "mode": mode.rawValue
-            ])
-
-        case .toggleMode:
-            NavigationPreferences.shared.toggleMode()
-            let mode = NavigationPreferences.shared.mode
-            tui.statusMessage = "Navigation mode toggled to: \(mode.displayName)"
-            Logger.shared.logUserAction("navigation_mode_toggled", details: [
-                "mode": mode.rawValue
-            ])
-
-        case .showPreferences:
-            let status = NavigationPreferences.shared.statusDescription()
-            tui.statusMessage = "Current Settings - \(status.replacingOccurrences(of: "\n", with: " | "))"
-        }
-    }
 }

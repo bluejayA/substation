@@ -74,8 +74,12 @@ extension Actions {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let error):
                 statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
             case .decodingError(let error):

@@ -55,7 +55,8 @@ final class ResourceRegistry: @unchecked Sendable {
         "start", "boot", "power-on",
         "stop", "shutdown", "power-off",
         "restart", "reboot",
-        "manage", "edit"
+        "manage", "edit",
+        "clear-cache", "clearcache", "cc"
     ]
 
     /// Map action command aliases to canonical action names
@@ -71,17 +72,15 @@ final class ResourceRegistry: @unchecked Sendable {
         "shutdown": "stop",
         "power-off": "stop",
         "reboot": "restart",
-        "edit": "manage"
+        "edit": "manage",
+        "clearcache": "clear-cache",
+        "cc": "clear-cache"
     ]
 
     // MARK: - Configuration Command Mapping
 
     /// Configuration commands for system settings
-    private let configCommands: [String] = [
-        "command-mode", "mode", "nav-mode",
-        "toggle-mode", "toggle",
-        "prefs", "preferences", "settings"
-    ]
+    private let configCommands: [String] = []
 
     /// Discovery and help commands (Phase 3)
     private let discoveryCommands: [String] = [
@@ -92,13 +91,7 @@ final class ResourceRegistry: @unchecked Sendable {
     ]
 
     /// Map configuration command aliases to canonical config names
-    private let configAliases: [String: String] = [
-        "mode": "command-mode",
-        "nav-mode": "command-mode",
-        "toggle": "toggle-mode",
-        "preferences": "prefs",
-        "settings": "prefs"
-    ]
+    private let configAliases: [String: String] = [:]
 
     // Reverse lookup cache for fast command resolution
     private lazy var commandLookup: [String: ViewMode] = {

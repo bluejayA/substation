@@ -511,8 +511,8 @@ final class TUI {
             await SearchEngine.shared.setSearchIndexCache(memoryContainer.searchIndexCache)
         }
 
-        // Connect command mode to context switcher for tab completion
-        Logger.shared.logDebug("Connecting command mode to context switcher")
+        // Connect to context switcher for tab completion
+        Logger.shared.logDebug("Connecting to context switcher")
         self.commandMode.contextSwitcher = self.contextSwitcher
 
         Logger.shared.logInfo("TUI initialization completed successfully")

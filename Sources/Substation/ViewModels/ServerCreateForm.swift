@@ -127,8 +127,9 @@ struct ServerCreateForm {
 
         // Use a combined items list - SourceSelectionView will show both images and volumes with TAB switching
         // The collapsed summary shows based on current bootSource
+        // Sort images alphabetically to match ImageSelectionView rendering
         let combinedSourceItems: [any FormSelectorItem] = bootSource == .image
-            ? images
+            ? images.sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
             : getBootableVolumes()
 
         let selectedSourceId = bootSource == .image ? selectedImageID : selectedVolumeID
@@ -422,6 +423,7 @@ struct ServerCreateForm {
 
     private func getBootableVolumes() -> [Volume] {
         return volumes.filter { $0.bootable?.lowercased() == "true" }
+            .sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
     }
 
     private func getFlavorsForSelection() -> [Flavor] {

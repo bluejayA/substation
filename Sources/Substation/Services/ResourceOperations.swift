@@ -217,12 +217,40 @@ final class ResourceOperations {
         // Use the base server name - Nova will append -0, -1, -2, etc. automatically when maxCount > 1
         let serverName = serverCreateForm.serverName
 
-        statusMessage = maxServersCount > 1 ? "Creating \(maxServersCount) servers..." : "Creating server..."
+        // Capture form values before going async
+        let bootSource = serverCreateForm.bootSource
+        let selectedSecurityGroupNames = serverCreateForm.selectedSecurityGroups
+
+        // Create operation tracker for bulk server creation (if more than 1)
+        let operation: SwiftBackgroundOperation?
+        if maxServersCount > 1 {
+            let op = SwiftBackgroundOperation(
+                type: .bulkCreate,
+                resourceType: "Servers",
+                itemsTotal: maxServersCount
+            )
+            tui.swiftBackgroundOps.addOperation(op)
+            op.status = .queued
+            operation = op
+        } else {
+            operation = nil
+        }
+
+        statusMessage = maxServersCount > 1 ? "Starting creation of \(maxServersCount) servers..." : "Creating server..."
+
+        // Return to servers view immediately
+        tui.changeView(to: .servers, resetSelection: false)
+
+        // Run creation in background task
+        Task { @MainActor in
+            if let op = operation {
+                op.status = .running
+            }
 
         do {
             let newServer: Server
 
-            switch serverCreateForm.bootSource {
+            switch bootSource {
             case .image:
                 // Build networks array from selected networks
                 let networks: [NetworkRequest]? = if let networkId = selectedNetworkId {
@@ -232,8 +260,8 @@ final class ResourceOperations {
                 }
 
                 // Build security groups array
-                let securityGroups: [SecurityGroupRef]? = if !serverCreateForm.selectedSecurityGroups.isEmpty {
-                    serverCreateForm.selectedSecurityGroups.map { SecurityGroupRef(name: $0) }
+                let securityGroups: [SecurityGroupRef]? = if !selectedSecurityGroupNames.isEmpty {
+                    selectedSecurityGroupNames.map { SecurityGroupRef(name: $0) }
                 } else {
                     nil
                 }
@@ -285,8 +313,8 @@ final class ResourceOperations {
                 }
 
                 // Build security groups array
-                let securityGroups: [SecurityGroupRef]? = if !serverCreateForm.selectedSecurityGroups.isEmpty {
-                    serverCreateForm.selectedSecurityGroups.map { SecurityGroupRef(name: $0) }
+                let securityGroups: [SecurityGroupRef]? = if !selectedSecurityGroupNames.isEmpty {
+                    selectedSecurityGroupNames.map { SecurityGroupRef(name: $0) }
                 } else {
                     nil
                 }
@@ -310,66 +338,83 @@ final class ResourceOperations {
                     serverGroup: nil,
                     blockDeviceMapping: blockDeviceMapping
                 )
-                newServer = try await client.createServer(request: request)
+                newServer = try await self.client.createServer(request: request)
             }
 
             // Add to cached servers and refresh
-            cachedServers.append(newServer)
+            self.cachedServers.append(newServer)
             let successMessage = maxServersCount > 1
                 ? "Started creation of \(maxServersCount) servers with name pattern '\(serverName)-N'"
-                : "Server '\(serverCreateForm.serverName)' created successfully"
-            statusMessage = successMessage
+                : "Server '\(serverName)' created successfully"
+            self.statusMessage = successMessage
 
-            // Return to servers view
-            tui.changeView(to: .servers, resetSelection: false)
+            // Mark operation as complete
+            if let operation = operation {
+                operation.itemsCompleted = maxServersCount
+                operation.markCompleted()
+                operation.progress = 1.0
+            }
 
             // Refresh data to get updated server list
-            tui.refreshAfterOperation()
+            self.tui.refreshAfterOperation()
 
         } catch let error as OpenStackError {
             let baseMsg = "Failed to create server"
             switch error {
             case .authenticationFailed:
-                statusMessage = "\(baseMsg): Authentication failed - check credentials"
+                self.statusMessage = "\(baseMsg): Authentication failed - check credentials"
             case .endpointNotFound:
-                statusMessage = "\(baseMsg): Compute service endpoint not found - check cloud config"
+                self.statusMessage = "\(baseMsg): Compute service endpoint not found - check cloud config"
             case .unexpectedResponse:
-                statusMessage = "\(baseMsg): Unexpected response - server may be overloaded"
+                self.statusMessage = "\(baseMsg): Unexpected response - server may be overloaded"
             case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP \(code) - check image/flavor/network availability"
+                self.statusMessage = "\(baseMsg): HTTP \(code) - check image/flavor/network availability"
             case .networkError(let error):
-                statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
+                self.statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
             case .decodingError(let error):
-                statusMessage = "\(baseMsg): Data decoding error - \(error.localizedDescription)"
+                self.statusMessage = "\(baseMsg): Data decoding error - \(error.localizedDescription)"
             case .encodingError(let error):
-                statusMessage = "\(baseMsg): Data encoding error - \(error.localizedDescription)"
+                self.statusMessage = "\(baseMsg): Data encoding error - \(error.localizedDescription)"
             case .configurationError(let message):
-                statusMessage = "\(baseMsg): Configuration error - \(message)"
+                self.statusMessage = "\(baseMsg): Configuration error - \(message)"
             case .performanceEnhancementsNotAvailable:
-                statusMessage = "\(baseMsg): Performance enhancements not available"
+                self.statusMessage = "\(baseMsg): Performance enhancements not available"
             case .missingRequiredField(let field):
-                statusMessage = "\(baseMsg): Missing required field - \(field)"
+                self.statusMessage = "\(baseMsg): Missing required field - \(field)"
             case .invalidResponse:
-                statusMessage = "\(baseMsg): Invalid response from server"
+                self.statusMessage = "\(baseMsg): Invalid response from server"
             case .invalidURL:
-                statusMessage = "\(baseMsg): Invalid URL configuration"
+                self.statusMessage = "\(baseMsg): Invalid URL configuration"
+            }
+            // Mark operation as failed
+            if let operation = operation {
+                operation.markFailed(error: self.statusMessage ?? "Unknown error")
             }
         } catch let decodingError as DecodingError {
             let baseMsg = "Failed to create server"
             switch decodingError {
             case .dataCorrupted(let context):
-                statusMessage = "\(baseMsg): Data corrupted - \(context.debugDescription)"
+                self.statusMessage = "\(baseMsg): Data corrupted - \(context.debugDescription)"
             case .keyNotFound(let key, _):
-                statusMessage = "\(baseMsg): Missing key '\(key.stringValue)' in response"
+                self.statusMessage = "\(baseMsg): Missing key '\(key.stringValue)' in response"
             case .typeMismatch(let type, let context):
-                statusMessage = "\(baseMsg): Type mismatch for \(type) - \(context.debugDescription)"
+                self.statusMessage = "\(baseMsg): Type mismatch for \(type) - \(context.debugDescription)"
             case .valueNotFound(let type, let context):
-                statusMessage = "\(baseMsg): Missing value for \(type) - \(context.debugDescription)"
+                self.statusMessage = "\(baseMsg): Missing value for \(type) - \(context.debugDescription)"
             @unknown default:
-                statusMessage = "\(baseMsg): JSON parsing error - \(decodingError.localizedDescription)"
+                self.statusMessage = "\(baseMsg): JSON parsing error - \(decodingError.localizedDescription)"
+            }
+            // Mark operation as failed
+            if let operation = operation {
+                operation.markFailed(error: self.statusMessage ?? "JSON parsing error")
             }
         } catch {
-            statusMessage = "Failed to create server: \(error.localizedDescription) - Type: \(type(of: error))"
+            self.statusMessage = "Failed to create server: \(error.localizedDescription) - Type: \(type(of: error))"
+            // Mark operation as failed
+            if let operation = operation {
+                operation.markFailed(error: self.statusMessage ?? "Unknown error")
+            }
+        }
         }
     }
 
@@ -421,8 +466,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -910,8 +959,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1094,8 +1147,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1171,8 +1228,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let error):
                 statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
             case .decodingError(let error):
@@ -1238,8 +1299,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let error):
                 statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
             case .decodingError(let error):
@@ -1305,8 +1370,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1410,8 +1479,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1457,101 +1530,124 @@ final class ResourceOperations {
             return
         }
 
-        // Show creation in progress
-        statusMessage = maxVolumesCount > 1 ? "Creating \(maxVolumesCount) volumes..." : "Creating volume '\(volumeNameBase)'..."
-        tui.needsRedraw = true  // Mark for redraw instead of calling draw directly
+        // Capture form values before going async
+        let sourceType = volumeCreateForm.sourceType
+        let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
+        let selectedImageID = volumeCreateForm.selectedImageID
+        let selectedSnapshotID = volumeCreateForm.selectedSnapshotID
 
-        do {
-            // Create volumes with indexed names if maxVolumesCount > 1
-            for i in 0..<maxVolumesCount {
-                let volumeName = maxVolumesCount > 1 ? "\(volumeNameBase)-\(i)" : volumeNameBase
+        // Create operation tracker for volume creation
+        let operation = SwiftBackgroundOperation(
+            type: .bulkCreate,
+            resourceType: "Volumes",
+            itemsTotal: maxVolumesCount
+        )
+        tui.swiftBackgroundOps.addOperation(operation)
+        operation.status = .queued
 
-                switch volumeCreateForm.sourceType {
-                case .blank:
-                    // Use the selected volume type ID from the form
-                    let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
+        // Show creation starting
+        statusMessage = maxVolumesCount > 1 ? "Starting creation of \(maxVolumesCount) volumes..." : "Creating volume '\(volumeNameBase)'..."
 
-                    _ = try await client.createBlankVolume(
-                        name: volumeName,
-                        size: volumeSize,
-                        volumeType: volumeTypeId
-                    )
+        // Return to volumes view immediately
+        tui.changeView(to: .volumes, resetSelection: false)
+        await tui.draw(screen: screen)
 
-                case .image:
-                    guard let selectedImageID = volumeCreateForm.selectedImageID,
-                          cachedImages.contains(where: { $0.id == selectedImageID }) else {
-                        statusMessage = "Please select an image to create volume from"
-                        return
+        // Run creation in background task
+        Task { @MainActor in
+            operation.status = .running
+
+            do {
+                // Create volumes with indexed names if maxVolumesCount > 1
+                for i in 0..<maxVolumesCount {
+                    let volumeName = maxVolumesCount > 1 ? "\(volumeNameBase)-\(i)" : volumeNameBase
+
+                    switch sourceType {
+                    case .blank:
+                        _ = try await self.client.createBlankVolume(
+                            name: volumeName,
+                            size: volumeSize,
+                            volumeType: volumeTypeId
+                        )
+
+                    case .image:
+                        guard let imageID = selectedImageID else {
+                            throw NSError(domain: "VolumeCreate", code: 1, userInfo: [NSLocalizedDescriptionKey: "No image selected"])
+                        }
+
+                        _ = try await self.client.createVolumeFromImage(
+                            name: volumeName,
+                            size: volumeSize,
+                            imageRef: imageID,
+                            volumeType: volumeTypeId
+                        )
+
+                    case .snapshot:
+                        guard let snapshotID = selectedSnapshotID else {
+                            throw NSError(domain: "VolumeCreate", code: 1, userInfo: [NSLocalizedDescriptionKey: "No snapshot selected"])
+                        }
+
+                        _ = try await self.client.createVolumeFromSnapshot(
+                            name: volumeName,
+                            size: volumeSize,
+                            snapshotId: snapshotID,
+                            volumeType: volumeTypeId
+                        )
                     }
 
-                    // Use the selected volume type ID from the form
-                    let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
-
-                    _ = try await client.createVolumeFromImage(
-                        name: volumeName,
-                        size: volumeSize,
-                        imageRef: selectedImageID,
-                        volumeType: volumeTypeId
-                    )
-
-                case .snapshot:
-                    guard let selectedSnapshotID = volumeCreateForm.selectedSnapshotID,
-                          cachedVolumeSnapshots.contains(where: { $0.id == selectedSnapshotID }) else {
-                        statusMessage = "Please select a snapshot to create volume from"
-                        return
-                    }
-
-                    // Use the selected volume type ID from the form
-                    let volumeTypeId = volumeCreateForm.selectedVolumeTypeID
-
-                    _ = try await client.createVolumeFromSnapshot(
-                        name: volumeName,
-                        size: volumeSize,
-                        snapshotId: selectedSnapshotID,
-                        volumeType: volumeTypeId
-                    )
+                    // Update operation progress after each volume
+                    operation.itemsCompleted = i + 1
+                    operation.progress = Double(i + 1) / Double(maxVolumesCount)
+                    self.tui.markNeedsRedraw()
                 }
+
+                let successMessage = maxVolumesCount > 1
+                    ? "Created \(maxVolumesCount) volumes with name pattern '\(volumeNameBase)-N'"
+                    : "Volume '\(volumeNameBase)' created successfully"
+                self.statusMessage = successMessage
+
+                // Mark operation as complete
+                operation.itemsCompleted = maxVolumesCount
+                operation.markCompleted()
+                operation.progress = 1.0
+
+                // Refresh volume cache
+                await self.dataManager.refreshVolumeData()
+
+            } catch let error as OpenStackError {
+                let baseMsg = "Failed to create volume '\(volumeNameBase)'"
+                switch error {
+                case .authenticationFailed:
+                    self.statusMessage = "\(baseMsg): Authentication failed - check credentials"
+                case .endpointNotFound:
+                    self.statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
+                case .unexpectedResponse:
+                    self.statusMessage = "\(baseMsg): Unexpected response from server"
+                case .httpError(let code, _):
+                    self.statusMessage = "\(baseMsg): HTTP error \(code)"
+                case .networkError(let error):
+                    self.statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
+                case .decodingError(let error):
+                    self.statusMessage = "\(baseMsg): Data decoding error - \(error.localizedDescription)"
+                case .encodingError(let error):
+                    self.statusMessage = "\(baseMsg): Data encoding error - \(error.localizedDescription)"
+                case .configurationError(let message):
+                    self.statusMessage = "\(baseMsg): Configuration error - \(message)"
+                case .performanceEnhancementsNotAvailable:
+                    self.statusMessage = "\(baseMsg): Performance enhancements not available"
+                case .missingRequiredField(let field):
+                    self.statusMessage = "\(baseMsg): Missing required field: \(field)"
+                case .invalidResponse:
+                    self.statusMessage = "\(baseMsg): Invalid response from server"
+                case .invalidURL:
+                    self.statusMessage = "\(baseMsg): Invalid URL configuration"
+                }
+                // Mark operation as failed
+                operation.markFailed(error: self.statusMessage ?? "Unknown error")
+            } catch {
+                self.statusMessage = "Failed to create volume '\(volumeNameBase)': \(error.localizedDescription)"
+                // Mark operation as failed
+                operation.markFailed(error: self.statusMessage ?? "Unknown error")
             }
-
-            let successMessage = maxVolumesCount > 1
-                ? "Created \(maxVolumesCount) volumes with name pattern '\(volumeNameBase)-N'"
-                : "Volume '\(volumeNameBase)' created successfully"
-            statusMessage = successMessage
-
-            // Refresh volume cache and return to list
-            await dataManager.refreshVolumeData()
-            tui.changeView(to: .volumes, resetSelection: false)
-
-        } catch let error as OpenStackError {
-            let baseMsg = "Failed to create volume '\(volumeNameBase)'"
-            switch error {
-            case .authenticationFailed:
-                statusMessage = "\(baseMsg): Authentication failed - check credentials"
-            case .endpointNotFound:
-                statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
-            case .unexpectedResponse:
-                statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
-                    case .networkError(let error):
-                        statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
-                    case .decodingError(let error):
-                        statusMessage = "\(baseMsg): Data decoding error - \(error.localizedDescription)"
-                    case .encodingError(let error):
-                        statusMessage = "\(baseMsg): Data encoding error - \(error.localizedDescription)"
-                    case .configurationError(let message):
-                        statusMessage = "\(baseMsg): Configuration error - \(message)"
-                    case .performanceEnhancementsNotAvailable:
-                        statusMessage = "\(baseMsg): Performance enhancements not available"
-                    case .missingRequiredField(let field):
-                        statusMessage = "\(baseMsg): Missing required field: \(field)"
-                    case .invalidResponse:
-                        statusMessage = "\(baseMsg): Invalid response from server"
-                    case .invalidURL:
-                        statusMessage = "\(baseMsg): Invalid URL configuration"
-            }
-        } catch {
-            statusMessage = "Failed to create volume '\(volumeNameBase)': \(error.localizedDescription)"
         }
     }
 
@@ -1618,8 +1714,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1692,8 +1792,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1762,8 +1866,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1825,8 +1933,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -1919,8 +2031,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found - check service configuration"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response from server"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
                     case .networkError(let error):
                         statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
                     case .decodingError(let error):
@@ -2200,8 +2316,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let underlyingError):
                 statusMessage = "\(baseMsg): Network error - \(underlyingError.localizedDescription)"
             case .decodingError(let underlyingError):
@@ -2280,8 +2400,12 @@ final class ResourceOperations {
                 statusMessage = "\(baseMsg): Endpoint not found"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected response"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let description):
                 statusMessage = "\(baseMsg): Network error - \(description)"
             case .decodingError(let description):

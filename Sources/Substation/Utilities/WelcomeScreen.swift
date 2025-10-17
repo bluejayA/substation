@@ -153,7 +153,6 @@ final class WelcomeScreen: @unchecked Sendable {
     func getTutorialSections() -> [DetailSection] {
         var sections: [DetailSection] = []
 
-        // Step 1: Command Mode
         sections.append(DetailSection(
             title: "Step 1: Command Mode",
             items: [
@@ -165,7 +164,6 @@ final class WelcomeScreen: @unchecked Sendable {
             titleStyle: .accent
         ))
 
-        // Step 2: Tab Completion
         sections.append(DetailSection(
             title: "Step 2: Tab Completion",
             items: [
@@ -177,7 +175,6 @@ final class WelcomeScreen: @unchecked Sendable {
             titleStyle: .accent
         ))
 
-        // Step 3: Navigation Commands
         sections.append(DetailSection(
             title: "Step 3: Navigation Commands",
             items: [
@@ -191,7 +188,6 @@ final class WelcomeScreen: @unchecked Sendable {
             titleStyle: .accent
         ))
 
-        // Step 4: Action Commands
         sections.append(DetailSection(
             title: "Step 4: Action Commands",
             items: [
@@ -206,7 +202,6 @@ final class WelcomeScreen: @unchecked Sendable {
             titleStyle: .accent
         ))
 
-        // Step 5: Context Switching
         sections.append(DetailSection(
             title: "Step 5: Context Switching",
             items: [
@@ -218,7 +213,6 @@ final class WelcomeScreen: @unchecked Sendable {
             titleStyle: .accent
         ))
 
-        // Step 6: Search & Filters
         sections.append(DetailSection(
             title: "Step 6: Search & Filters",
             items: [
@@ -231,7 +225,6 @@ final class WelcomeScreen: @unchecked Sendable {
             titleStyle: .accent
         ))
 
-        // Step 7: Getting Help
         sections.append(DetailSection(
             title: "Step 7: Getting Help",
             items: [
@@ -245,7 +238,6 @@ final class WelcomeScreen: @unchecked Sendable {
             titleStyle: .accent
         ))
 
-        // Tutorial Complete
         sections.append(DetailSection(
             title: "Tutorial Complete!",
             items: [

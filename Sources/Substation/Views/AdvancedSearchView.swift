@@ -565,18 +565,6 @@ struct AdvancedSearchView {
     }
 
     // MARK: - Input Handling
-    //
-    // This view implements Layer 1 (view-specific) input handling.
-    // See UnifiedInputView documentation for full architecture.
-    //
-    // Input Priority:
-    // 1. Navigation keys (Enter, arrows) - handled here for immediate response
-    // 2. Text input and command mode - delegated to UnifiedInputView
-    // 3. Legacy handlers - fallback for unhandled keys
-    //
-    // Key Design Decision:
-    // Enter key is handled BEFORE UnifiedInputView to prevent it from triggering
-    // a new search when the user wants to navigate to the selected result.
 
     @MainActor
     static func handleInput(_ key: Int32) -> Bool {

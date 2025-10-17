@@ -2,64 +2,6 @@ import Foundation
 import SwiftNCurses
 import OSClient
 
-// MARK: - UnifiedInputView
-//
-// Unified input handling abstraction for Substation TUI application.
-// Provides consistent input state management and keyboard handling across views.
-//
-// ## Input Handling Architecture
-//
-// The input system uses a 3-layer priority model:
-//
-// ### Layer 1: View-Specific Navigation Handlers (Highest Priority)
-// - Handles navigation keys that require immediate response
-// - Examples: Enter key for selection, Arrow keys for navigation
-// - Views check these BEFORE delegating to UnifiedInputView
-// - Example: AdvancedSearchView.handleInput checks Enter key first
-//
-// ### Layer 2: UnifiedInputView State Management (Medium Priority)
-// - Handles text input, command mode activation, cursor movement
-// - Manages InputState (displayText, cursorPosition, isActive, isCommandMode)
-// - Returns InputResult enum to indicate what happened
-// - Views process the InputResult and take appropriate action
-//
-// ### Layer 3: Legacy/Fallback Handlers (Lowest Priority)
-// - Only reached if Layers 1 and 2 return .ignored
-// - Handles view-specific keys not covered by unified system
-//
-// ## Key Responsibilities
-//
-// 1. **Command Mode Detection**: Activates when ':' is typed
-// 2. **Text Input Buffering**: Manages input text and cursor position
-// 3. **State Transitions**: Tracks active/inactive, command/search modes
-// 4. **Result Reporting**: Returns InputResult enum to caller
-//
-// ## Usage Pattern
-//
-// ```swift
-// // In view's handleInput method:
-// var state = inputState
-// let result = UnifiedInputView.handleInput(key, state: &state)
-//
-// switch result {
-// case .updated:
-//     // Text changed, update display
-// case .searchEntered(let query):
-//     // User pressed Enter in search mode
-// case .commandEntered(let command):
-//     // User pressed Enter in command mode
-// case .cancelled:
-//     // User pressed ESC
-// // ... etc
-// }
-// ```
-//
-// ## Important Notes
-//
-// - Views should handle navigation keys (Enter, arrows) BEFORE calling UnifiedInputView
-// - InputState should ideally be centralized in TUI (single source of truth)
-// - Command mode is activated by typing ':' or calling activate(asCommandMode: true)
-//
 @MainActor
 struct UnifiedInputView {
 
@@ -97,7 +39,6 @@ struct UnifiedInputView {
             }
             cursorPosition += 1
 
-            // Detect command mode activation
             if displayText.hasPrefix(":") && !isCommandMode {
                 isCommandMode = true
             }
@@ -111,7 +52,6 @@ struct UnifiedInputView {
             displayText.remove(at: displayText.index(displayText.startIndex, offsetBy: cursorPosition - 1))
             cursorPosition -= 1
 
-            // Exit command mode if : is deleted
             if !displayText.hasPrefix(":") && isCommandMode {
                 isCommandMode = false
             }
@@ -260,7 +200,6 @@ struct UnifiedInputView {
             return .ignored
 
         case 9: // TAB
-            // Tab completion only works in command mode
             if state.isCommandMode {
                 if let command = state.command {
                     return .tabCompletion(command)
@@ -272,14 +211,12 @@ struct UnifiedInputView {
             return state.deleteCharacter() ? .updated : .ignored
 
         case 259: // UP arrow
-            // History navigation only works in command mode
             if state.isCommandMode {
                 return .historyPrevious
             }
             return .ignored
 
         case 258: // DOWN arrow
-            // History navigation only works in command mode
             if state.isCommandMode {
                 return .historyNext
             }
@@ -301,7 +238,6 @@ struct UnifiedInputView {
             fallthrough
 
         default:
-            // Handle character input
             if key >= 32 && key < 127 {
                 let character = Character(UnicodeScalar(Int(key))!)
                 if !state.isActive {

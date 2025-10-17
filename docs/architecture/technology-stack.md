@@ -551,7 +551,7 @@ echo "SUCCESS: Zero warnings"
 
 **Performance Dashboard:**
 
-Press `h` in Substation to view:
+Use `:health<Enter>` (or `:h<Enter>`) in Substation to view:
 
 - Cache hit rate: 80%+ target
 - API response time: < 2s p95

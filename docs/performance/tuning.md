@@ -208,7 +208,7 @@ cacheManager.configure(
 
 **Manual cleanup**:
 
-- Press `c` in Substation to purge all caches
+- Use `:cache-purge<Enter>` (or `:cc<Enter>`) in Substation to purge all caches
 - Use when memory usage is high
 - Rebuilds cache on next access
 
@@ -282,7 +282,7 @@ OpenStackConfig(
 
 **In Substation TUI**:
 
-- Press `h` for health dashboard
+- Use `:health<Enter>` (or `:h<Enter>`) for health dashboard
 - Real-time metrics display
 - Cache hit rates, memory usage, API response times
 

@@ -32,7 +32,7 @@ ps aux | grep substation
 **Solutions**:
 
 1. **Immediate relief** - Purge caches:
-   - Press `c` in Substation (purges all caches)
+   - Use `:cache-purge<Enter>` (or `:cc<Enter>`) in Substation (purges all caches)
    - Next operations slower while cache rebuilds
    - Memory usage should drop immediately
 
@@ -210,7 +210,7 @@ case .network: return 600.0  // Increase from 5min to 10min
 
 **2. Reduce memory pressure** (if evictions are high):
 
-- Press `c` to purge stale data
+- Use `:cache-purge<Enter>` (or `:cc<Enter>`) to purge stale data
 - Increase cache eviction threshold (evict at 90% instead of 85%)
 - Add more RAM to your system
 
@@ -339,7 +339,7 @@ We timeout searches at 5 seconds. This is intentional.
 
 **1. Reduce auto-refresh frequency**:
 
-- Press `a` to toggle auto-refresh
+- Use `:auto-refresh<Enter>` (or `:toggle-refresh<Enter>`) to toggle auto-refresh
 - Increase interval from 5s to 10s or 30s
 - Manual refresh with `r` when needed
 
@@ -419,7 +419,7 @@ OpenStackConfig(
 **3. Check token cache**:
 
 - Authentication tokens cached for 1 hour
-- Press `c` to clear cache if tokens seem stale
+- Use `:cache-purge<Enter>` (or `:cc<Enter>`) to clear cache if tokens seem stale
 - Verify token TTL in Keystone configuration
 
 **4. Verify credentials**:
