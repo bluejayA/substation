@@ -11,12 +11,6 @@ struct AdvancedSearchView {
     private static var tui: TUI?
     @MainActor
     private static var searchEngine: SearchEngine = SearchEngine.shared
-    @MainActor
-    private static var unifiedSearchOrchestrator: UnifiedSearchOrchestrator?
-    @MainActor
-    private static var savedSearchManager: SavedSearchManager = SavedSearchManager.shared
-    @MainActor
-    private static var smartFilter: SmartFilter = SmartFilter()
 
     // Enhanced search state
     @MainActor
@@ -1082,35 +1076,17 @@ struct AdvancedSearchView {
             )
 
         do {
-            // Use UnifiedSearchOrchestrator for cross-service search if available
-            if let orchestrator = unifiedSearchOrchestrator {
-                let unified = try await orchestrator.globalSearch(globalSearchQuery)
-                unifiedResults = unified
-                searchResults = unified.aggregatedItems
-                totalResults = unified.totalCount
+            // Use SearchEngine for cross-service search
+            let legacyQuery = globalSearchQuery.toSearchQuery()
+            let results = try await searchEngine.search(legacyQuery)
+            searchResults = results.items
+            totalResults = results.items.count
+            lastSearchTime = Date().timeIntervalSinceReferenceDate - startTime
+            // Initialize selection to first result if we have any
+            selectedResourceId = results.items.first?.resourceId
+            unifiedResults = nil
 
-                // Update UI state
-                lastSearchTime = unified.searchTime
-                // Initialize selection to first result if we have any
-                selectedResourceId = unified.aggregatedItems.first?.resourceId
-
-                Logger.shared.logInfo("AdvancedSearchView - Unified search completed: \(unified.totalCount) results from \(unified.serviceResults.count) services")
-            } else {
-                // Fallback to single-service search using SearchEngine
-                let legacyQuery = globalSearchQuery.toSearchQuery()
-                let results = try await searchEngine.search(legacyQuery)
-                searchResults = results.items
-                totalResults = results.items.count
-                lastSearchTime = Date().timeIntervalSinceReferenceDate - startTime
-                // Initialize selection to first result if we have any
-                selectedResourceId = results.items.first?.resourceId
-                unifiedResults = nil
-
-                Logger.shared.logInfo("AdvancedSearchView - Legacy search completed: \(results.items.count) results")
-            }
-
-            // Add to search history
-            await savedSearchManager.addToHistory(query: globalSearchQuery.toSearchQuery(), resultCount: totalResults)
+            Logger.shared.logInfo("AdvancedSearchView - Search completed: \(results.items.count) results")
         } catch {
             Logger.shared.logError("AdvancedSearchView - Search failed: \(error)")
             searchResults = []
@@ -1148,20 +1124,8 @@ struct AdvancedSearchView {
 
     @MainActor
     static func getSearchAnalytics() async -> SearchAnalytics {
-        if let orchestrator = unifiedSearchOrchestrator {
-            return await orchestrator.getSearchAnalytics()
-        } else {
-            // Return empty analytics if orchestrator is not available
-            return SearchAnalytics()
-        }
-    }
-
-    // Method to initialize the orchestrator when services become available
-    @MainActor
-    static func initializeUnifiedSearch(with client: OpenStackClient) async {
-        // In a real implementation, this would extract services from the client
-        // For now, we'll continue using the SearchEngine fallback
-        Logger.shared.logInfo("AdvancedSearchView - UnifiedSearchOrchestrator initialization deferred")
+        // Return empty analytics
+        return SearchAnalytics()
     }
 
     // Initialize search engine with live OpenStack data
