@@ -231,11 +231,11 @@ struct UIUtils {
         case .dashboard:
             return 0  // Dashboard has its own navigation
         case .servers:
-            return max(0, ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP).count - 1)
+            return max(0, FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP).count - 1)
         case .networks:
-            return max(0, ResourceFilters.filterNetworks(cachedNetworks, query: searchQuery).count - 1)
+            return max(0, FilterUtils.filterNetworks(cachedNetworks, query: searchQuery).count - 1)
         case .volumes:
-            return max(0, ResourceFilters.filterVolumes(cachedVolumes, query: searchQuery).count - 1)
+            return max(0, FilterUtils.filterVolumes(cachedVolumes, query: searchQuery).count - 1)
         case .volumeArchives:
             let serverBackups = cachedImages.filter { image in
                 if let properties = image.properties,
@@ -267,11 +267,11 @@ struct UIUtils {
             }
             return max(0, filteredCount - 1)
         case .images:
-            return max(0, ResourceFilters.filterImages(cachedImages, query: searchQuery).count - 1)
+            return max(0, FilterUtils.filterImages(cachedImages, query: searchQuery).count - 1)
         case .flavors:
-            return max(0, ResourceFilters.filterFlavors(cachedFlavors, query: searchQuery).count - 1)
+            return max(0, FilterUtils.filterFlavors(cachedFlavors, query: searchQuery).count - 1)
         case .keyPairs:
-            return max(0, ResourceFilters.filterKeyPairs(cachedKeyPairs, query: searchQuery).count - 1)
+            return max(0, FilterUtils.filterKeyPairs(cachedKeyPairs, query: searchQuery).count - 1)
         case .swiftBackgroundOperations:
             return 0 // Updated dynamically in draw call
         case .subnets:
@@ -295,7 +295,7 @@ struct UIUtils {
 
         case .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement:
             // Management views handle their own filtered server counts
-            let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+            let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
             return max(0, filteredServers.count - 1)
         case .swift:
             // Swift container list view

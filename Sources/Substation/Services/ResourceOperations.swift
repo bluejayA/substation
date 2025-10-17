@@ -376,7 +376,7 @@ final class ResourceOperations {
     internal func deleteServer(screen: OpaquePointer?) async {
         guard currentView == .servers else { return }
 
-        let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
         guard selectedIndex < filteredServers.count else {
             statusMessage = "No server selected"
             return
@@ -939,7 +939,7 @@ final class ResourceOperations {
 
         if currentView == .servers {
             // From servers list view
-            let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+            let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
             guard selectedIndex < filteredServers.count else {
                 statusMessage = "No server selected"
                 return
@@ -969,7 +969,7 @@ final class ResourceOperations {
 
         if currentView == .volumes {
             // From volume list - get selected volume
-            let filteredVolumes = ResourceFilters.filterVolumes(cachedVolumes, query: searchQuery)
+            let filteredVolumes = FilterUtils.filterVolumes(cachedVolumes, query: searchQuery)
             guard selectedIndex < filteredVolumes.count else {
                 statusMessage = "No volume selected for snapshot creation"
                 return
@@ -1047,7 +1047,7 @@ final class ResourceOperations {
     internal func deleteKeyPair(screen: OpaquePointer?) async {
         guard currentView == .keyPairs else { return }
 
-        let filteredKeyPairs = ResourceFilters.filterKeyPairs(cachedKeyPairs, query: searchQuery)
+        let filteredKeyPairs = FilterUtils.filterKeyPairs(cachedKeyPairs, query: searchQuery)
         guard selectedIndex < filteredKeyPairs.count else {
             statusMessage = "No key pair selected"
             return

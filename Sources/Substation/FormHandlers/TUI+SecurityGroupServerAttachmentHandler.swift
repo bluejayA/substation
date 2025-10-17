@@ -15,12 +15,12 @@ import MemoryKit
 extension TUI {
 
     var securityGroupServerAttachmentNavigationContext: NavigationContext {
-        let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
         return .list(maxIndex: max(0, filteredServers.count - 1))
     }
 
     internal func handleSecurityGroupServerAttachmentInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
 
         // Try common navigation first
         if await handleCommonNavigation(ch, screen: screen, context: securityGroupServerAttachmentNavigationContext) {

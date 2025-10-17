@@ -199,7 +199,7 @@ extension Actions {
     internal func resizeServer(screen: OpaquePointer?) async {
         guard currentView == .servers else { return }
 
-        let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
         guard selectedIndex < filteredServers.count else {
             statusMessage = "No server selected"
             return

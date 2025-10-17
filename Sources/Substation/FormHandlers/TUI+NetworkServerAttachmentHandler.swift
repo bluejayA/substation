@@ -15,7 +15,7 @@ import MemoryKit
 extension TUI {
 
     internal func handleNetworkServerAttachmentInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
 
         switch ch {
         case 32: // SPACE - toggle server selection
