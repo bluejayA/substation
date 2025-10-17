@@ -1,7 +1,7 @@
 import Foundation
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct PortViews {
 
@@ -369,13 +369,13 @@ struct PortViews {
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
         // Check if a selector or multiselect field is active
@@ -393,7 +393,7 @@ struct PortViews {
                     maxHeight: Int(height)
                 ) {
                     surface.clear(rect: bounds)
-                    await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+                    await SwiftNCurses.render(selectorComponent, on: surface, in: bounds)
                 }
                 return
             } else if case .multiSelect(let multiSelectField) = currentField, multiSelectField.isActive {
@@ -426,7 +426,7 @@ struct PortViews {
                     maxHeight: Int(height)
                 ) {
                     surface.clear(rect: bounds)
-                    await SwiftTUI.render(multiSelectorComponent, on: surface, in: bounds)
+                    await SwiftNCurses.render(multiSelectorComponent, on: surface, in: bounds)
                 }
                 return
             }
@@ -456,7 +456,7 @@ struct PortViews {
 
         // Render the form
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
     }
 
     // MARK: - Component Creation

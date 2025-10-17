@@ -67,84 +67,137 @@ For detailed configuration including authentication methods, multiple clouds, an
 
 ## First Steps
 
+### Learning Command Input (Primary Navigation)
+
+Substation uses **command input** as the primary navigation method. Press `:` to enter command input, then type your command.
+
+**First Command:**
+
+```text
+:                    Press colon to enter command input
+: <Tab>              Press Tab to see all available commands
+: servers<Enter>     Type "servers" and press Enter to navigate
+```
+
+**Command Discovery:**
+
+1. Press `:` to enter command input
+2. Press `Tab` to see all available commands
+3. Start typing (e.g., `serv`) and press `Tab` to auto-complete
+4. Press `Enter` to execute the command
+5. Press `Esc` to cancel
+
+**Why Command Input?**
+
+- **Discoverable**: Tab completion shows all options
+- **Forgiving**: Fuzzy matching handles typos (`:servrs` suggests `:servers`)
+- **Progressive**: Learn full names first, then shortcuts (`:servers` → `:srv` → `:s`)
+- **Context-Aware**: Commands like `:create` adapt to your current view
+
 ### Navigation Basics
 
-| Key | Action |
-|-----|--------|
-| `d` | Dashboard (start here) |
-| `s` | View Servers |
-| `n` | View Networks |
-| `v` | View Volumes |
-| `?` | Show Help |
-| `q` | Quit |
+Use command input for all navigation:
+
+| Command | Aliases | Action |
+|---------|---------|--------|
+| `:dashboard` | `:dash`, `:d` | Dashboard (start here) |
+| `:servers` | `:srv`, `:s` | View Servers |
+| `:networks` | `:net`, `:n` | View Networks |
+| `:volumes` | `:vol`, `:v` | View Volumes |
+| `:help` | `:?` | Show Help |
+| `:quit` | `:exit`, `:q` | Quit |
 
 ### Common Operations
 
 **View Resources:**
 
-1. Press `s` to view servers
-2. Use `↑/↓` to navigate
-3. Press `Space` for details
-4. Press `Esc` to go back
+1. Enter command input: `:`
+2. Navigate to servers: `servers<Enter>` (or press `Tab` to see all views)
+3. Use `↑/↓` to navigate
+4. Press `Space` for details
+5. Press `Esc` to go back
 
 **Search Resources:**
 
-1. Press `/` for quick search
+1. Press `/` for quick local search (within current view)
 2. Type your query
 3. Press `Esc` to clear
 
+Or use advanced search:
+
+1. `:search<Enter>` (or `:find<Enter>` or `:z<Enter>`)
+2. Type your query
+3. Press `Enter` to search across all services
+
 **Refresh Data:**
 
-- Press `r` to refresh current view
-- Press `c` to purge cache and force refresh
+- Refresh view: `:refresh<Enter>` (or `:reload<Enter>`)
+- Purge cache: `:cache-purge<Enter>` (or `:clear-cache<Enter>` or `:cc<Enter>`)
 
-## Essential Keyboard Shortcuts
+## Essential Commands
 
-### Navigation
+### Navigation Commands
 
-| Key | View |
-|-----|------|
-| `d` | Dashboard |
-| `s` | Servers |
-| `n` | Networks |
-| `v` | Volumes |
-| `i` | Images |
-| `f` | Flavors |
-| `e` | Security Groups |
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `:dashboard` | `:dash`, `:d` | Dashboard overview |
+| `:servers` | `:srv`, `:s`, `:nova` | Servers view |
+| `:networks` | `:net`, `:n`, `:neutron` | Networks view |
+| `:volumes` | `:vol`, `:v`, `:cinder` | Volumes view |
+| `:images` | `:img`, `:i`, `:glance` | Images view |
+| `:flavors` | `:flav`, `:f` | Flavors view |
+| `:securitygroups` | `:secgroups`, `:sg`, `:e` | Security groups |
 
-### Actions
+### Action Commands (Context-Aware)
 
-| Key | Action |
-|-----|--------|
-| `↑/↓` | Navigate lists |
-| `Space` | View details |
-| `/` | Search |
-| `r` | Refresh |
-| `c` | Cache purge |
-| `?` | Help |
-| `q` | Quit |
+| Command | Aliases | Action | Context |
+|---------|---------|--------|---------|
+| `:create` | `:new`, `:add` | Create resource | All resource lists |
+| `:delete` | `:remove`, `:rm` | Delete selected | All resources |
+| `:start` | `:boot` | Start server | Server view |
+| `:stop` | `:shutdown` | Stop server | Server view |
+| `:restart` | `:reboot` | Restart server | Server view |
+| `:refresh` | `:reload` | Refresh view | All views |
+| `:cache-purge` | `:clear-cache` | Purge all caches | All views |
+
+### Global Actions
+
+| Key | Command Equivalent | Action |
+|-----|-------------------|--------|
+| `↑/↓` | - | Navigate lists |
+| `Space` | - | View details |
+| `/` | - | Local search |
+| `?` | `:help` | Context help |
+| `Esc` | - | Go back/Cancel |
 
 ## Common Workflows
 
 ### List Your Servers
 
 1. Launch Substation: `substation --cloud mycloud`
-2. Press `s` for servers
-3. Use `↑/↓` to navigate
-4. Press `Space` for server details
+2. Enter command input: `:`
+3. Navigate: `servers<Enter>` (or `srv<Enter>` or `s<Enter>`)
+4. Use `↑/↓` to navigate
+5. Press `Space` for server details
+
+### Create a Resource
+
+1. Navigate to view: `:servers<Enter>`
+2. Create resource: `:create<Enter>`
+3. Fill in form fields
+4. Submit with `Enter`
 
 ### Search Across Services
 
-1. Press `z` for advanced search
+1. Open search: `:search<Enter>` (or `:find<Enter>` or `:z<Enter>`)
 2. Type your query (e.g., "prod")
 3. Press `Enter`
 4. Results from all services appear
 
-### Purge Stale Cache
+### Refresh Data
 
-1. Press `c` to purge ALL caches
-2. Press `r` to refresh current view
-3. Fresh data loaded from API
+1. Refresh view: `:refresh<Enter>`
+2. Or purge cache: `:cache-purge<Enter>` (or `:cc<Enter>`)
 
 ## Troubleshooting
 
@@ -177,7 +230,7 @@ tail -f ~/substation.log | grep "ms)"
 
 **Problem**: Resources not showing up
 
-**Solution**: Press `c` to purge cache, then `r` to refresh
+**Solution**: `:cache-purge<Enter>` to purge cache, then `:refresh<Enter>` to reload
 
 ## Next Steps
 

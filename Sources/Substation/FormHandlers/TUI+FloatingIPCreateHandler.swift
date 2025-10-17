@@ -6,158 +6,106 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
-// MARK: - Floating IP Create Input Handler
+// MARK: - Floating IP Create Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
+    /// Handle input for FloatingIP create form using the universal handler
     internal func handleFloatingIPCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = self.floatingIPCreateFormState.isCurrentFieldActive()
+        // Create local copies to pass as inout parameters
+        // These are NOT captured by closures - closures access self properties directly
+        var localFormState = floatingIPCreateFormState
+        var localForm = floatingIPCreateForm
 
-        switch ch {
-        case Int32(9): // TAB - Next field
-            if !isFieldActive {
-                self.floatingIPCreateFormState.nextField()
-                self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                await self.draw(screen: screen)
-            }
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters (not captured) to avoid exclusivity violation
+                // Sync to self before submission so submitFloatingIPCreation can access the values
+                self.floatingIPCreateFormState = formState
+                self.floatingIPCreateForm = form
+                await self.resourceOperations.submitFloatingIPCreation(screen: screen)
+            },
+            onCancel: {
+                // Access self properties directly, don't capture local variables
+                self.changeView(to: .floatingIPs, resetSelection: false)
+            },
+            customKeyHandler: { ch, formState, form, screen in
+                // Handle form rebuilding when External Network selection changes
+                let isFieldActive = formState.isCurrentFieldActive()
 
-        case 353: // SHIFT+TAB - Previous field
-            if !isFieldActive {
-                self.floatingIPCreateFormState.previousField()
-                self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE - Activate field or add space character
-            if let currentField = self.floatingIPCreateFormState.getCurrentField() {
-                switch currentField {
-                case .text:
-                    if !isFieldActive {
-                        self.floatingIPCreateFormState.activateCurrentField()
-                        self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        self.floatingIPCreateFormState.handleCharacterInput(" ")
-                        self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                case .selector:
+                // When ENTER is pressed on the External Network field while active
+                if ch == 10 || ch == 13 {
                     if isFieldActive {
-                        self.floatingIPCreateFormState.toggleCurrentField()
-                        self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                        self.floatingIPCreateFormState = FormBuilderState(
-                            fields: self.floatingIPCreateForm.buildFields(
-                                externalNetworks: self.cachedNetworks.filter { $0.external == true },
-                                subnets: self.cachedSubnets,
-                                selectedFieldId: self.floatingIPCreateFormState.getCurrentFieldId(),
-                                activeFieldId: self.floatingIPCreateFormState.getActiveFieldId(),
-                                formState: self.floatingIPCreateFormState
-                            ),
-                            preservingStateFrom: self.floatingIPCreateFormState
-                        )
-                        await self.draw(screen: screen)
-                    } else {
-                        self.floatingIPCreateFormState.activateCurrentField()
-                        self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                        await self.draw(screen: screen)
+                        if let currentField = formState.getCurrentField() {
+                            if case .selector(let field) = currentField,
+                               field.id == FloatingIPCreateFieldId.floatingNetwork.rawValue {
+                                // Deactivate the field first
+                                formState.deactivateCurrentField()
+                                form.updateFromFormState(formState)
+
+                                // Rebuild the form with updated networks/subnets
+                                let externalNetworks = self.resourceCache.networks.filter { $0.external == true }
+                                let newFields = form.buildFields(
+                                    externalNetworks: externalNetworks,
+                                    subnets: self.resourceCache.subnets,
+                                    selectedFieldId: formState.getCurrentFieldId(),
+                                    activeFieldId: formState.getActiveFieldId(),
+                                    formState: formState
+                                )
+                                // Create new form state with rebuilt fields, preserving existing state
+                                formState = FormBuilderState(fields: newFields, preservingStateFrom: formState)
+
+                                // Mark for redraw - don't call draw directly to avoid re-entry
+                                self.needsRedraw = true
+                                return true
+                            }
+                        }
                     }
-                default:
-                    if !isFieldActive {
-                        self.floatingIPCreateFormState.activateCurrentField()
-                        self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                        await self.draw(screen: screen)
-                    }
                 }
-            }
 
-        case Int32(10), Int32(13): // ENTER - Deactivate field or submit form
-            needsRedraw = true
-            if isFieldActive {
-                self.floatingIPCreateFormState.deactivateCurrentField()
-                self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                self.floatingIPCreateFormState = FormBuilderState(
-                    fields: self.floatingIPCreateForm.buildFields(
-                        externalNetworks: self.cachedNetworks.filter { $0.external == true },
-                        subnets: self.cachedSubnets,
-                        selectedFieldId: self.floatingIPCreateFormState.getCurrentFieldId(),
-                        activeFieldId: self.floatingIPCreateFormState.getActiveFieldId(),
-                        formState: self.floatingIPCreateFormState
-                    ),
-                    preservingStateFrom: self.floatingIPCreateFormState
-                )
-                await self.draw(screen: screen)
-            } else {
-                if self.floatingIPCreateFormState.validateForm() {
-                    await self.resourceOperations.submitFloatingIPCreation(screen: screen)
-                } else {
-                    self.statusMessage = "Validation failed. Please check the form for errors."
-                    await self.draw(screen: screen)
-                }
+                return false
             }
+        )
 
-        case Int32(27): // ESC - Exit field edit mode or cancel creation
-            if isFieldActive {
-                self.floatingIPCreateFormState.cancelCurrentField()
-                self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                self.currentView = .floatingIPs
-                self.floatingIPCreateForm = FloatingIPCreateForm()
-                self.floatingIPCreateFormState = FormBuilderState(
-                    fields: self.floatingIPCreateForm.buildFields(
-                        externalNetworks: self.cachedNetworks.filter { $0.external == true },
-                        subnets: self.cachedSubnets,
-                        selectedFieldId: nil
-                    )
-                )
-                await self.draw(screen: screen)
-            }
-
-        case 258: // DOWN - Navigate down in form or selector
-            if !isFieldActive {
-                self.floatingIPCreateFormState.nextField()
-                self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                if self.floatingIPCreateFormState.handleSpecialKey(ch) {
-                    self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        case 259: // UP - Navigate up in form or selector
-            if !isFieldActive {
-                self.floatingIPCreateFormState.previousField()
-                self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                if self.floatingIPCreateFormState.handleSpecialKey(ch) {
-                    self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        case Int32(127), Int32(8): // BACKSPACE
-            if isFieldActive {
-                if self.floatingIPCreateFormState.handleSpecialKey(ch) {
-                    self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            if isFieldActive {
-                if ch >= 32 && ch < 127 {
-                    let char = Character(UnicodeScalar(Int(ch))!)
-                    self.floatingIPCreateFormState.handleCharacterInput(char)
-                    self.floatingIPCreateForm.updateFromFormState(self.floatingIPCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
+        // Sync changes back to actor-isolated properties
+        floatingIPCreateFormState = localFormState
+        floatingIPCreateForm = localForm
     }
 }
+
+// MARK: - FloatingIPCreateForm Protocol Conformance Adapters
+
+extension FloatingIPCreateForm {
+    /// Adapter for FormStateRebuildable - adds formState parameter
+    /// Note: This adapter is not used by FloatingIP form because we use a custom key handler
+    /// that rebuilds the form with proper network/subnet context
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        // This is a stub adapter - FloatingIP form uses custom rebuild logic
+        // Return minimal fields to satisfy protocol, but real rebuilding happens in custom handler
+        return [
+            .text(FormFieldText(
+                id: FloatingIPCreateFieldId.description.rawValue,
+                label: "Description",
+                value: description,
+                placeholder: "Optional description",
+                isRequired: false,
+                isVisible: true,
+                isSelected: false,
+                isActive: false,
+                cursorPosition: nil,
+                validationError: nil
+            ))
+        ]
+    }
+}
+
+// Declare protocol conformance after adapters
+extension FloatingIPCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

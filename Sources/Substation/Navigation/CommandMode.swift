@@ -21,13 +21,11 @@ final class CommandMode: @unchecked Sendable {
     // MARK: - Initialization
 
     init() {
-        // Set up history file path
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
-        let configDir = "\(homeDir)/.config/substation"
-        self.historyFilePath = "\(configDir)/command_history"
+        // Set up history file path using centralized constants
+        self.historyFilePath = AppConstants.commandHistoryPath
 
         // Ensure config directory exists
-        try? FileManager.default.createDirectory(atPath: configDir, withIntermediateDirectories: true)
+        AppConstants.ensureConfigDirectoryExists()
     }
 
     // MARK: - Command Execution
@@ -35,6 +33,7 @@ final class CommandMode: @unchecked Sendable {
     enum CommandResult {
         case ignored
         case navigateToView(ViewMode)
+        case executeAction(ActionType)
         case showHelp
         case showCommands
         case quit
@@ -42,6 +41,10 @@ final class CommandMode: @unchecked Sendable {
         case suggestion(String, String) // (original, suggested)
         case listContexts
         case switchContext(String)
+        case showTutorial
+        case showShortcuts
+        case showExamples
+        case showWelcome
     }
 
     func executeCommand(_ command: String) -> CommandResult {
@@ -68,6 +71,23 @@ final class CommandMode: @unchecked Sendable {
             return .showCommands
         }
 
+        // Discovery commands (Phase 3)
+        if trimmed == "tutorial" {
+            return .showTutorial
+        }
+
+        if trimmed == "shortcuts" {
+            return .showShortcuts
+        }
+
+        if trimmed == "examples" {
+            return .showExamples
+        }
+
+        if trimmed == "welcome" {
+            return .showWelcome
+        }
+
         // Context switching commands
         if trimmed == "ctx" || trimmed == "context" {
             return .listContexts
@@ -82,6 +102,12 @@ final class CommandMode: @unchecked Sendable {
                 }
             }
             return .error("Usage: :ctx <cloud-name> or :ctx to list clouds")
+        }
+
+        // Check if this is an action command
+        if let actionType = ResourceRegistry.shared.resolveAction(trimmed) {
+            Logger.shared.logUserAction("action_command_received", details: ["action": actionType.rawValue])
+            return .executeAction(actionType)
         }
 
         // Resource navigation - try exact match first
@@ -343,4 +369,5 @@ final class CommandMode: @unchecked Sendable {
             return ResourceRegistry.shared.primaryCommands().prefix(5).map { String($0) }
         }
     }
+
 }

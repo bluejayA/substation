@@ -3,7 +3,7 @@ import CNCurses
 
 // MARK: - Dialog Components
 
-/// SwiftTUI-compatible input dialog component
+/// SwiftNCurses-compatible input dialog component
 public struct InputDialog: Component {
     private let prompt: String
     private let maxLength: Int
@@ -22,7 +22,7 @@ public struct InputDialog: Component {
         await promptText.render(in: context)
     }
 
-    /// Get user input using SwiftTUI surface management
+    /// Get user input using SwiftNCurses surface management
     @MainActor public static func getInput(
         prompt: String,
         surface: any Surface,
@@ -33,7 +33,7 @@ public struct InputDialog: Component {
     }
 }
 
-/// SwiftTUI-compatible confirmation dialog component
+/// SwiftNCurses-compatible confirmation dialog component
 public struct ConfirmationDialog: Component {
     private let message: String
     private let confirmKey: String
@@ -83,7 +83,7 @@ public struct ConfirmationDialog: Component {
     }
 }
 
-/// SwiftTUI-compatible modal dialog container
+/// SwiftNCurses-compatible modal dialog container
 public struct Modal: Component {
     private let content: any Component
     private let title: String?
@@ -127,9 +127,9 @@ public struct Modal: Component {
     }
 }
 
-// MARK: - SwiftTUI Extensions for Dialog Support
+// MARK: - SwiftNCurses Extensions for Dialog Support
 
-extension SwiftTUI {
+extension SwiftNCurses {
     /// Show an input dialog and return the user's input
     @MainActor public static func showInputDialog(
         prompt: String,

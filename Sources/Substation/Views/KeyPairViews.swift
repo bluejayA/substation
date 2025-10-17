@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct KeyPairViews {
     @MainActor
@@ -406,12 +406,12 @@ struct KeyPairViews {
                                  keyPairCreateFormState: FormBuilderState) async {
 
         // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > Self.keyPairCreateMinScreenWidth && height > Self.keyPairCreateMinScreenHeight else {
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.keyPairCreateBoundsMinWidth, width), height: max(Self.keyPairCreateBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.keyPairCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.keyPairCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -431,7 +431,7 @@ struct KeyPairViews {
         // Render the form
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
         // If a selector field is active, render overlay
         if let currentField = keyPairCreateFormState.getCurrentField() {
@@ -448,7 +448,7 @@ struct KeyPairViews {
                     maxHeight: Int(height)
                 ) {
                     surface.clear(rect: bounds)
-                    await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+                    await SwiftNCurses.render(selectorComponent, on: surface, in: bounds)
                 }
             default:
                 break

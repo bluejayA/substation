@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - Volume Actions
@@ -55,7 +55,7 @@ extension Actions {
 
     internal func manageVolumeToServers(screen: OpaquePointer?) async {
         guard currentView == .volumes else { return }
-        let filteredVolumes = ResourceFilters.filterVolumes(cachedVolumes, query: searchQuery)
+        let filteredVolumes = FilterUtils.filterVolumes(cachedVolumes, query: searchQuery)
         guard selectedIndex < filteredVolumes.count else {
             statusMessage = "No volume selected"
             return

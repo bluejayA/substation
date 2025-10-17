@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // MARK: - Advanced Search View
@@ -11,12 +11,6 @@ struct AdvancedSearchView {
     private static var tui: TUI?
     @MainActor
     private static var searchEngine: SearchEngine = SearchEngine.shared
-    @MainActor
-    private static var unifiedSearchOrchestrator: UnifiedSearchOrchestrator?
-    @MainActor
-    private static var savedSearchManager: SavedSearchManager = SavedSearchManager.shared
-    @MainActor
-    private static var smartFilter: SmartFilter = SmartFilter()
 
     // Enhanced search state
     @MainActor
@@ -125,12 +119,12 @@ struct AdvancedSearchView {
         await initializeSearchEngineIfNeeded()
 
         // Create surface for rendering
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Bounds checking
         guard width >= minScreenWidth && height >= minScreenHeight else {
             let errorBounds = Rect(x: startCol, y: startRow, width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small for Search").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small for Search").error(), on: surface, in: errorBounds)
             return
         }
 
@@ -159,7 +153,7 @@ struct AdvancedSearchView {
         let mainComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
-        await SwiftTUI.render(mainComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(mainComponent, on: surface, in: bounds)
     }
 
     // MARK: - Search Bar Component
@@ -571,18 +565,6 @@ struct AdvancedSearchView {
     }
 
     // MARK: - Input Handling
-    //
-    // This view implements Layer 1 (view-specific) input handling.
-    // See UnifiedInputView documentation for full architecture.
-    //
-    // Input Priority:
-    // 1. Navigation keys (Enter, arrows) - handled here for immediate response
-    // 2. Text input and command mode - delegated to UnifiedInputView
-    // 3. Legacy handlers - fallback for unhandled keys
-    //
-    // Key Design Decision:
-    // Enter key is handled BEFORE UnifiedInputView to prevent it from triggering
-    // a new search when the user wants to navigate to the selected result.
 
     @MainActor
     static func handleInput(_ key: Int32) -> Bool {
@@ -852,11 +834,6 @@ struct AdvancedSearchView {
                 tui.selectedIndex = index
                 return true
             }
-        case .barbicanContainer:
-            if let index = tui.cachedBarbicanContainers.firstIndex(where: { $0.id == resourceId }) {
-                tui.selectedIndex = index
-                return true
-            }
         case .loadBalancer:
             if let index = tui.cachedLoadBalancers.firstIndex(where: { $0.id == resourceId }) {
                 tui.selectedIndex = index
@@ -897,7 +874,6 @@ struct AdvancedSearchView {
         case .volumeSnapshot: return .volumes // Navigate to volumes list
         case .volumeBackup: return .volumes // Navigate to volumes list
         case .barbicanSecret: return .barbicanSecrets
-        case .barbicanContainer: return .barbicanContainers
         case .loadBalancer: return .octavia
         case .swiftContainer: return .swift
         case .swiftObject: return .swift
@@ -1088,35 +1064,17 @@ struct AdvancedSearchView {
             )
 
         do {
-            // Use UnifiedSearchOrchestrator for cross-service search if available
-            if let orchestrator = unifiedSearchOrchestrator {
-                let unified = try await orchestrator.globalSearch(globalSearchQuery)
-                unifiedResults = unified
-                searchResults = unified.aggregatedItems
-                totalResults = unified.totalCount
+            // Use SearchEngine for cross-service search
+            let legacyQuery = globalSearchQuery.toSearchQuery()
+            let results = try await searchEngine.search(legacyQuery)
+            searchResults = results.items
+            totalResults = results.items.count
+            lastSearchTime = Date().timeIntervalSinceReferenceDate - startTime
+            // Initialize selection to first result if we have any
+            selectedResourceId = results.items.first?.resourceId
+            unifiedResults = nil
 
-                // Update UI state
-                lastSearchTime = unified.searchTime
-                // Initialize selection to first result if we have any
-                selectedResourceId = unified.aggregatedItems.first?.resourceId
-
-                Logger.shared.logInfo("AdvancedSearchView - Unified search completed: \(unified.totalCount) results from \(unified.serviceResults.count) services")
-            } else {
-                // Fallback to single-service search using SearchEngine
-                let legacyQuery = globalSearchQuery.toSearchQuery()
-                let results = try await searchEngine.search(legacyQuery)
-                searchResults = results.items
-                totalResults = results.items.count
-                lastSearchTime = Date().timeIntervalSinceReferenceDate - startTime
-                // Initialize selection to first result if we have any
-                selectedResourceId = results.items.first?.resourceId
-                unifiedResults = nil
-
-                Logger.shared.logInfo("AdvancedSearchView - Legacy search completed: \(results.items.count) results")
-            }
-
-            // Add to search history
-            await savedSearchManager.addToHistory(query: globalSearchQuery.toSearchQuery(), resultCount: totalResults)
+            Logger.shared.logInfo("AdvancedSearchView - Search completed: \(results.items.count) results")
         } catch {
             Logger.shared.logError("AdvancedSearchView - Search failed: \(error)")
             searchResults = []
@@ -1154,20 +1112,8 @@ struct AdvancedSearchView {
 
     @MainActor
     static func getSearchAnalytics() async -> SearchAnalytics {
-        if let orchestrator = unifiedSearchOrchestrator {
-            return await orchestrator.getSearchAnalytics()
-        } else {
-            // Return empty analytics if orchestrator is not available
-            return SearchAnalytics()
-        }
-    }
-
-    // Method to initialize the orchestrator when services become available
-    @MainActor
-    static func initializeUnifiedSearch(with client: OpenStackClient) async {
-        // In a real implementation, this would extract services from the client
-        // For now, we'll continue using the SearchEngine fallback
-        Logger.shared.logInfo("AdvancedSearchView - UnifiedSearchOrchestrator initialization deferred")
+        // Return empty analytics
+        return SearchAnalytics()
     }
 
     // Initialize search engine with live OpenStack data
@@ -1458,7 +1404,6 @@ struct AdvancedSearchView {
             volumeSnapshots: tui.cachedVolumeSnapshots,
             volumeBackups: tui.cachedVolumeBackups,
             barbicanSecrets: tui.cachedSecrets,
-            barbicanContainers: tui.cachedBarbicanContainers,
             loadBalancers: tui.cachedLoadBalancers,
             swiftContainers: tui.cachedSwiftContainers,
             swiftObjects: tui.cachedSwiftObjects ?? []

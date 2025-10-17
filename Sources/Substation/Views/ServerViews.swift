@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct ServerViews {
     // Layout constants
@@ -775,7 +775,7 @@ struct ServerViews {
     static func drawServerResizeManagement(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                          width: Int32, height: Int32, serverResizeForm: ServerResizeForm) async {
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let mainRect = Rect(x: startCol, y: startRow, width: width, height: height)
 
         // Clear the area
@@ -785,11 +785,11 @@ struct ServerViews {
         if serverResizeForm.isLoading {
             let titleComponent = Text("Resize Server").primary().bold()
             let titleRect = Rect(x: startCol + 2, y: startRow + 1, width: width - 4, height: 1)
-            await SwiftTUI.render(titleComponent, on: surface, in: titleRect)
+            await SwiftNCurses.render(titleComponent, on: surface, in: titleRect)
 
             let loadingComponent = Text("Loading flavors...").info()
             let loadingRect = Rect(x: startCol + 2, y: startRow + 3, width: width - 4, height: 1)
-            await SwiftTUI.render(loadingComponent, on: surface, in: loadingRect)
+            await SwiftNCurses.render(loadingComponent, on: surface, in: loadingRect)
             return
         }
 
@@ -797,11 +797,11 @@ struct ServerViews {
         if let errorMessage = serverResizeForm.errorMessage {
             let titleComponent = Text("Resize Server").primary().bold()
             let titleRect = Rect(x: startCol + 2, y: startRow + 1, width: width - 4, height: 1)
-            await SwiftTUI.render(titleComponent, on: surface, in: titleRect)
+            await SwiftNCurses.render(titleComponent, on: surface, in: titleRect)
 
             let errorComponent = Text("Error: \(errorMessage)").error()
             let errorRect = Rect(x: startCol + 2, y: startRow + 3, width: width - 4, height: 1)
-            await SwiftTUI.render(errorComponent, on: surface, in: errorRect)
+            await SwiftNCurses.render(errorComponent, on: surface, in: errorRect)
             return
         }
 
@@ -934,7 +934,7 @@ struct ServerViews {
         // Render all components
         let mainComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(mainComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(mainComponent, on: surface, in: bounds)
     }
 
     // MARK: - Pagination and Virtual Scrolling Navigation Helpers

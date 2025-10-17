@@ -47,7 +47,7 @@ public struct VirtualScrollView<Item: Sendable, ItemView: Component>: Component 
 
         // Log performance for large lists
         if items.count > 100 {
-            SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: VirtualScrollView rendering", context: [
+            SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: VirtualScrollView rendering", context: [
                 "totalItems": items.count,
                 "visibleItems": endIndex - startIndex,
                 "scrollOffset": scrollOffset
@@ -89,7 +89,7 @@ public final class VirtualListController: @unchecked Sendable {
 
     // MARK: - MemoryKit Integration
 
-    private let memoryManager: SwiftTUIMemoryManager
+    private let memoryManager: SwiftNCursesMemoryManager
     private let listId: String
     public var scrollOffset: Int = 0 {
         didSet { notifyObservers() }
@@ -118,7 +118,7 @@ public final class VirtualListController: @unchecked Sendable {
         self.itemHeight = itemHeight
         self.viewportHeight = viewportHeight
         self.listId = "virtuallist_\(UUID().uuidString)"
-        self.memoryManager = SwiftTUILoggerConfig.shared.createMemoryManager()
+        self.memoryManager = SwiftNCursesLoggerConfig.shared.createMemoryManager()
     }
 
     /// Update the total number of items
@@ -393,7 +393,7 @@ public final class ListSearchController: @unchecked Sendable {
 
     // MARK: - MemoryKit Integration
 
-    private let memoryManager: SwiftTUIMemoryManager
+    private let memoryManager: SwiftNCursesMemoryManager
     private let searchId: String
     public var searchQuery: String = "" {
         didSet {
@@ -425,7 +425,7 @@ public final class ListSearchController: @unchecked Sendable {
 
     public init() {
         self.searchId = "search_\(UUID().uuidString)"
-        self.memoryManager = SwiftTUILoggerConfig.shared.createMemoryManager()
+        self.memoryManager = SwiftNCursesLoggerConfig.shared.createMemoryManager()
     }
 
     /// Configure search

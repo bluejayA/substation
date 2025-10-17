@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 /// Service layer for resource management operations

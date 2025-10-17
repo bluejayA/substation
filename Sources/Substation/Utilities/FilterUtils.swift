@@ -3,12 +3,13 @@ import struct OSClient.Port
 import OSClient
 
 struct FilterUtils {
-    static func filterServers(_ servers: [Server], query: String?) -> [Server] {
+    static func filterServers(_ servers: [Server], query: String?, getServerIP: ((Server) -> String?)? = nil) -> [Server] {
         guard let query = query?.lowercased() else { return servers }
         return servers.filter { server in
             server.name?.lowercased().contains(query) == true ||
             server.status?.lowercased().contains(query) == true ||
-            server.id.lowercased().contains(query)
+            server.id.lowercased().contains(query) ||
+            (getServerIP?(server)?.lowercased().contains(query) == true)
         }
     }
 
@@ -133,5 +134,21 @@ struct FilterUtils {
     static func filterLines(_ lines: [String], query: String?) -> [String] {
         guard let query = query?.lowercased() else { return lines }
         return lines.filter { $0.lowercased().contains(query) }
+    }
+
+    /// Filter images to return only server snapshots
+    /// Checks metadata for source_server_id or name containing "snapshot"
+    static func filterServerSnapshots(_ images: [Image]) -> [Image] {
+        return images.filter { image in
+            // First priority: Check metadata for source_server_id
+            if let metadata = image.metadata, metadata["source_server_id"] != nil {
+                return true
+            }
+            // Legacy fallback: Check if image name contains "snapshot" (case insensitive)
+            if let name = image.name, name.lowercased().contains("snapshot") {
+                return true
+            }
+            return false
+        }
     }
 }

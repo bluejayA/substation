@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 // Virtualizes list rendering for improved performance with large datasets
 struct ListVirtualizer {
@@ -189,17 +189,17 @@ struct ListVirtualizer {
         let indicatorRow = startRow + height - 1
         let indicatorCol = startCol + width - 25
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         let currentEnd = min(scrollOffset + visibleItems, totalItems)
         let scrollInfo = "[\(scrollOffset + 1)-\(currentEnd)/\(totalItems)]"
         let scrollBounds = Rect(x: indicatorCol, y: indicatorRow, width: Int32(scrollInfo.count), height: 1)
-        await SwiftTUI.render(Text(scrollInfo).info(), on: surface, in: scrollBounds)
+        await SwiftNCurses.render(Text(scrollInfo).info(), on: surface, in: scrollBounds)
 
         // Add performance indicator for large datasets
         if totalItems > 500 {
             let virtualBounds = Rect(x: indicatorCol - 8, y: indicatorRow, width: 7, height: 1)
-            await SwiftTUI.render(Text("VIRTUAL").info(), on: surface, in: virtualBounds)
+            await SwiftNCurses.render(Text("VIRTUAL").info(), on: surface, in: virtualBounds)
         }
     }
 

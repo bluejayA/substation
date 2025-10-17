@@ -4,7 +4,7 @@ import FoundationNetworking
 #endif
 import OSClient
 import MemoryKit
-import SwiftTUI
+import SwiftNCurses
 
 // MARK: - Substation Logger Implementations
 
@@ -411,7 +411,7 @@ struct Substation {
 
         do {
             // Create shared logger for all components - Substation is the authoritative source
-            // All logs from MemoryKit, SwiftTUI, and OSClient adapters route through the SubstationLogger bridge
+            // All logs from MemoryKit, SwiftNCurses, and OSClient adapters route through the SubstationLogger bridge
             let sharedLogger: any MemoryKitLogger
             if debugMode {
                 sharedLogger = SubstationLogger()
@@ -457,7 +457,7 @@ struct Substation {
 
             // Initialize terminal early to show loading screen during connection
             Logger.shared.logDebug("Initializing terminal for early loading screen")
-            let initResult = SwiftTUI.initializeTerminalSession()
+            let initResult = SwiftNCurses.initializeTerminalSession()
             guard initResult.success, let screen = initResult.screen else {
                 let errorMsg = "Failed to initialize terminal session"
                 Logger.shared.logError(errorMsg)
@@ -466,7 +466,7 @@ struct Substation {
             }
 
             defer {
-                SwiftTUI.cleanupTerminal()
+                SwiftNCurses.cleanupTerminal()
             }
 
             let screenRows = initResult.rows
@@ -482,7 +482,7 @@ struct Substation {
                 progressStep: 0,
                 statusMessage: "Connecting to OpenStack cloud..."
             )
-            SwiftTUI.batchedRefresh(screen)
+            SwiftNCurses.batchedRefresh(screen)
 
             let connectionStart = Date().timeIntervalSinceReferenceDate
             var client = try await OSClient.connect(config: config, credentials: credentials, logger: LoggerBridge())
@@ -500,7 +500,7 @@ struct Substation {
                 progressStep: 1,
                 statusMessage: "Authenticating..."
             )
-            SwiftTUI.batchedRefresh(screen)
+            SwiftNCurses.batchedRefresh(screen)
 
             // Auto-detect region if not specified in configuration
             if needsRegionDetection {
@@ -526,7 +526,7 @@ struct Substation {
                             progressStep: 2,
                             statusMessage: "Reconnecting with detected region..."
                         )
-                        SwiftTUI.batchedRefresh(screen)
+                        SwiftNCurses.batchedRefresh(screen)
 
                         // Reconnect with the detected region
                         let reconnectConfig = OpenStackConfig(

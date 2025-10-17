@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct SubnetViews {
     @MainActor
@@ -524,7 +524,7 @@ struct SubnetViews {
         cachedNetworks: [Network],
         formState: FormBuilderState
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Build form fields
         let fields = subnetCreateForm.buildFields(
@@ -546,7 +546,7 @@ struct SubnetViews {
         // Render the form
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
         // If a selector field is active, render specialized view as overlay
         if let currentField = formState.getCurrentField() {
@@ -625,7 +625,7 @@ struct SubnetViews {
         field: FormFieldSelector,
         selectorState: FormSelectorFieldState
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Build a simple selection view for IP versions
         var components: [any Component] = []
@@ -660,6 +660,6 @@ struct SubnetViews {
         let selectorComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(selectorComponent, on: surface, in: bounds)
     }
 }

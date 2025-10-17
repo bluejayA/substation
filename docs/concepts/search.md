@@ -63,7 +63,7 @@ Press / → type "192.168" → Shows networks with this IP range
 
 ### How It Works
 
-Press `z` for advanced search:
+Use `:search<Enter>` (or `:find<Enter>` or `:z<Enter>`) for advanced search:
 
 1. Opens search interface
 2. Type query and press `Enter`
@@ -353,7 +353,7 @@ search:query:production:services:nova,neutron,cinder,glance,keystone,swift
 
 **Manual:**
 
-- Press `c` to purge ALL caches (including search)
+- Use `:cache-purge<Enter>` (or `:clear-cache<Enter>` or `:cc<Enter>`) to purge ALL caches (including search)
 
 ## Best Practices
 

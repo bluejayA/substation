@@ -879,6 +879,20 @@ public struct UpdateRouterRequest: Codable, Sendable {
     public let externalGatewayInfo: ExternalGatewayInfo?
     public let routes: [Route]?
 
+    public init(
+        name: String? = nil,
+        description: String? = nil,
+        adminStateUp: Bool? = nil,
+        externalGatewayInfo: ExternalGatewayInfo? = nil,
+        routes: [Route]? = nil
+    ) {
+        self.name = name
+        self.description = description
+        self.adminStateUp = adminStateUp
+        self.externalGatewayInfo = externalGatewayInfo
+        self.routes = routes
+    }
+
     enum CodingKeys: String, CodingKey {
         case name
         case description

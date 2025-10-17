@@ -85,29 +85,67 @@ The dashboard shows:
 - **Health Status**: OpenStack service health indicators
 - **Performance Metrics**: Cache hit rate, API response times
 
-### 3. Navigate Between Views
+### 3. Learn Command Input (Primary Navigation)
 
-Press single keys to switch between resource views:
+Substation emphasizes **command-based navigation** as the primary method. This approach is discoverable, forgiving, and teaches you the interface as you learn.
 
-| Key | View | Description |
-|-----|------|-------------|
-| `d` | Dashboard | Resource overview and health |
-| `s` | Servers | Compute instances (VMs) |
-| `n` | Networks | Virtual networks |
-| `v` | Volumes | Block storage |
-| `i` | Images | OS images and snapshots |
-| `f` | Flavors | Instance sizes/types |
-| `g` | Server Groups | Anti-affinity groups |
-| `e` | Security Groups | Firewall rules |
-| `u` | Subnets | Network subnets |
-| `p` | Ports | Network interfaces |
-| `r` | Routers | Virtual routers |
-| `l` | Floating IPs | Public IP addresses |
-| `b` | Barbican | Secrets management |
-| `o` | Octavia | Load balancers |
-| `j` | Swift | Object storage |
+**Your First Command:**
 
-### 4. Working with Resource Lists
+```text
+:                    Press colon to enter command input
+: <Tab>              Press Tab to see all available commands
+: servers<Enter>     Type "servers" and press Enter to navigate
+```
+
+**Command Discovery Features:**
+
+1. **Tab Completion**: Press `:` then `Tab` to see all available commands
+2. **Auto-Complete**: Type `:serv<Tab>` to complete to `:servers`
+3. **Fuzzy Matching**: `:servrs` suggests `:servers` (handles typos)
+4. **Command History**: Use `Up/Down` arrows to recall previous commands
+5. **Multiple Aliases**: `:servers`, `:srv`, `:s`, `:nova` all work
+
+**Progressive Learning Path:**
+
+1. **Week 1**: Use full command names (`:servers`, `:networks`, `:volumes`)
+   - Discoverable and self-documenting
+   - Tab completion teaches you the commands
+
+2. **Week 2**: Learn common aliases (`:srv`, `:net`, `:vol`)
+   - Faster typing with shorter names
+   - Still clear what you're doing
+
+3. **Week 3**: Try short aliases (`:s`, `:n`, `:v`)
+   - Very fast navigation
+   - Requires some memorization
+
+4. **Week 4+**: Graduate to single-key shortcuts (`s`, `n`, `v`)
+   - Muscle memory speed for power users
+   - Optional - use only when comfortable
+
+### 4. Navigate Between Views
+
+**Command-Based Navigation (Recommended):**
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `:dashboard` | `:dash`, `:d` | Resource overview and health |
+| `:servers` | `:srv`, `:s`, `:nova` | Compute instances (VMs) |
+| `:networks` | `:net`, `:n`, `:neutron` | Virtual networks |
+| `:volumes` | `:vol`, `:v`, `:cinder` | Block storage |
+| `:images` | `:img`, `:i`, `:glance` | OS images and snapshots |
+| `:flavors` | `:flav`, `:f` | Instance sizes/types |
+| `:servergroups` | `:srvgroups`, `:g` | Anti-affinity groups |
+| `:securitygroups` | `:secgroups`, `:sg`, `:e` | Firewall rules |
+| `:subnets` | `:sub`, `:u` | Network subnets |
+| `:ports` | `:p` | Network interfaces |
+| `:routers` | `:rtr`, `:r` | Virtual routers |
+| `:floatingips` | `:fips`, `:l` | Public IP addresses |
+| `:barbican` | `:secrets`, `:b` | Secrets management |
+| `:octavia` | `:loadbalancers`, `:lbs`, `:o` | Load balancers |
+| `:swift` | `:objects`, `:j` | Object storage |
+
+### 5. Working with Resource Lists
 
 **Navigate Lists:**
 
@@ -119,14 +157,14 @@ Home/End      Jump to start/end
 
 **View Details:**
 
-1. Navigate to any resource (e.g., press `s` for servers)
+1. Navigate to resource view: `:servers<Enter>`
 2. Use arrow keys to select a server
 3. Press `Space` or `Enter` to view full details
 4. Press `Esc` to return to the list
 
 ![Substation Image Show](../assets/substation-image-show.png)
 
-### 5. Searching for Resources
+### 6. Searching for Resources
 
 **Local Search (fast, filters current view):**
 
@@ -136,31 +174,31 @@ Type query    Results filter as you type
 Esc           Clear search
 ```
 
-**Cross-Service Search (searches all services):**
+**Cross-Service Search:**
 
 ```text
-z             Open advanced search
-Type query    Searches Nova, Neutron, Cinder, Glance, Keystone, Swift
-Enter         Execute search (< 500ms typical)
+:search<Enter>     Open advanced search (or :find<Enter> or :z<Enter>)
+Type query         Searches Nova, Neutron, Cinder, Glance, Keystone, Swift
+Enter              Execute search (< 500ms typical)
 ```
 
-### 6. Refreshing Data
+### 7. Refreshing Data
 
-**Manual Refresh:**
+**Command-Based:**
 
 ```text
-r             Refresh current view (uses cache if available)
-c             Purge ALL caches and force fresh data from API
+:refresh<Enter>         Refresh current view (uses cache if available)
+:cache-purge<Enter>     Purge ALL caches and force fresh data from API
 ```
 
-**Note:** Pressing `c` clears L1, L2, and L3 caches. Next operations will be slower while cache rebuilds.
+**Note:** Using `:cache-purge` clears L1, L2, and L3 caches. Next operations will be slower while cache rebuilds.
 
-### 7. Creating Resources
+### 8. Creating Resources
 
 #### Example: Creating a Server
 
-1. Press `s` to view servers
-2. Press `n` for "New Server" (or follow on-screen prompts)
+1. Navigate to servers: `:servers<Enter>`
+2. Create server: `:create<Enter>` (or `:new<Enter>` or `:add<Enter>`)
 3. Fill in the form:
    - Server name
    - Select flavor (instance size)
@@ -170,24 +208,39 @@ c             Purge ALL caches and force fresh data from API
 4. Press `Enter` to create
 5. Watch real-time status as server builds
 
-##### Other Creation Workflows
+#### Context-Aware Action Commands
 
-- **Networks**: Press `n` in network view
-- **Volumes**: Press `n` in volume view
-- **Security Groups**: Press `n` in security group view
+These commands adapt to your current view:
 
-## Essential Keyboard Shortcuts
+| Command | Aliases | Action | Context |
+|---------|---------|--------|---------|
+| `:create` | `:new`, `:add` | Create resource | All resource lists |
+| `:delete` | `:remove`, `:rm` | Delete selected | All resources |
+| `:start` | `:boot` | Start server | Server view |
+| `:stop` | `:shutdown` | Stop server | Server view |
+| `:restart` | `:reboot` | Restart server | Server view |
+| `:attach` | `:connect` | Attach volume/network | Volume/Network view |
+| `:detach` | `:disconnect` | Detach volume/network | Volume/Network view |
+| `:snapshot` | `:snap` | Create snapshot | Server/Volume view |
+
+#### Other Creation Workflows
+
+- **Networks**: `:networks<Enter>` then `:create<Enter>`
+- **Volumes**: `:volumes<Enter>` then `:create<Enter>`
+- **Security Groups**: `:securitygroups<Enter>` then `:create<Enter>`
+
+## Essential Commands Reference
 
 ### Global Commands
 
-| Key | Action | Description |
-|-----|--------|-------------|
-| `?` | Show Help | Context-aware help for current view |
-| `q` | Quit | Exit Substation |
-| `r` | Refresh | Refresh current view data |
-| `c` | Cache Purge | Clear ALL caches (use when data is stale) |
-| `z` | Advanced Search | Cross-service search |
-| `d` | Dashboard | Return to dashboard |
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `:help` | `:?` | Context-aware help for current view |
+| `:quit` | `:exit`, `:q` | Exit Substation |
+| `:refresh` | `:reload` | Refresh current view data |
+| `:cache-purge` | `:clear-cache` | Clear ALL caches (use when data is stale) |
+| `:search` | `:find`, `:z` | Cross-service search |
+| `:dashboard` | `:dash`, `:d` | Return to dashboard |
 
 ### List Navigation
 
@@ -198,17 +251,16 @@ c             Purge ALL caches and force fresh data from API
 | `Home/End` | Jump to start/end | `g/G` (vim-style) |
 | `Space` | View details | `Enter` |
 | `/` | Local search/filter | - |
-| `Esc` | Go back | `q` in detail view |
+| `Esc` | Go back | - |
 
 ### Resource Management
 
-| Key | Action | Context |
-|-----|--------|---------|
-| `n` | New/Create | Resource lists |
-| `d` | Delete | Selected resource |
-| `e` | Edit/Modify | Selected resource |
-| `a` | Attach/Associate | Volumes, networks |
-| `x` | Detach/Disassociate | Volumes, networks |
+| Command | Aliases | Context |
+|---------|---------|---------|
+| `:create` | `:new`, `:add` | Create resource in any list |
+| `:delete` | `:remove`, `:rm` | Delete selected resource |
+| `:attach` | `:connect` | Attach volume/network |
+| `:detach` | `:disconnect` | Detach volume/network |
 
 ## Common Workflows
 
@@ -218,7 +270,9 @@ c             Purge ALL caches and force fresh data from API
 # Launch Substation
 substation --cloud mycloud
 
-# Press 's' to view servers
+# Enter command input and navigate to servers
+:servers<Enter>     # Or :srv<Enter> or :s<Enter>
+
 # Use ↑/↓ to navigate
 # Press Space to view details
 # Press Esc to go back
@@ -230,8 +284,10 @@ substation --cloud mycloud
 # Launch Substation
 substation --cloud mycloud
 
-# Press 's' for servers
-# Press 'n' for new server
+# Navigate to servers and create
+:servers<Enter>     # Navigate to servers view
+:create<Enter>      # Open create server form
+
 # Fill in:
 #   - Name: web-server-01
 #   - Flavor: m1.medium
@@ -246,7 +302,9 @@ substation --cloud mycloud
 # Launch Substation
 substation --cloud mycloud
 
-# Press 'z' for advanced search
+# Open search
+:search<Enter>      # Or :find<Enter> or :z<Enter>
+
 # Type: "prod"
 # Press Enter
 # Results show all resources matching "prod" from:
@@ -258,12 +316,33 @@ substation --cloud mycloud
 #   - Containers (Swift)
 ```
 
-### Workflow 4: Force Fresh Data
+### Workflow 4: Manage Server Lifecycle
+
+```bash
+# Start server
+:servers<Enter>     # Navigate to servers
+# Select stopped server with ↑/↓
+:start<Enter>       # Start server (or :boot<Enter>)
+
+# Stop server
+# Select running server with ↑/↓
+:stop<Enter>        # Stop server (or :shutdown<Enter>)
+
+# Restart server
+# Select running server with ↑/↓
+:restart<Enter>     # Restart server (or :reboot<Enter>)
+
+# Delete server
+# Select server to delete with ↑/↓
+:delete<Enter>      # Delete server (confirmation required)
+```
+
+### Workflow 5: Force Fresh Data
 
 ```bash
 # When your data looks stale or wrong
-# Press 'c' to purge ALL caches
-# Press 'r' to refresh current view
+:cache-purge<Enter>  # Purge ALL caches (or :clear-cache<Enter> or :cc<Enter>)
+:refresh<Enter>      # Refresh current view (or :reload<Enter>)
 # Fresh data loaded from OpenStack API (slower, but accurate)
 ```
 
@@ -289,8 +368,8 @@ If you encounter issues, consult the comprehensive troubleshooting guide:
 
 **Stale Data:**
 
-- Press `c` to purge all caches
-- Press `r` to refresh current view
+- Use `:cache-purge<Enter>` (or `:cc<Enter>`) to purge all caches
+- Use `:refresh<Enter>` (or `:reload<Enter>`) to refresh current view
 
 For detailed troubleshooting, connection issues, performance debugging, and more, see the **[Troubleshooting Guide](../troubleshooting/index.md)**.
 

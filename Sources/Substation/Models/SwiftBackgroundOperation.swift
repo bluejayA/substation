@@ -1,6 +1,6 @@
 import Foundation
 
-/// Represents a background Swift object storage operation (upload or download)
+/// Represents a background operation (Swift storage or resource bulk operation)
 @MainActor
 final class SwiftBackgroundOperation: Identifiable {
     let id: UUID
@@ -20,16 +20,26 @@ final class SwiftBackgroundOperation: Identifiable {
     var task: Task<Void, Never>?
     var uploadTask: Task<Void, Never>?
 
+    // Resource bulk operation fields
+    let resourceType: String?
+    var itemsTotal: Int
+    var itemsCompleted: Int
+    var itemsFailed: Int
+
     enum OperationType {
         case upload
         case download
         case delete
+        case bulkDelete
+        case bulkCreate
 
         var displayName: String {
             switch self {
             case .upload: return "Upload"
             case .download: return "Download"
             case .delete: return "Delete"
+            case .bulkDelete: return "Bulk Delete"
+            case .bulkCreate: return "Bulk Create"
             }
         }
     }
@@ -59,6 +69,7 @@ final class SwiftBackgroundOperation: Identifiable {
         }
     }
 
+    /// Initialize for Swift storage operations
     init(
         type: OperationType,
         containerName: String,
@@ -79,10 +90,41 @@ final class SwiftBackgroundOperation: Identifiable {
         self.filesSkipped = 0
         self.filesCompleted = 0
         self.filesTotal = 0
+        self.resourceType = nil
+        self.itemsTotal = 0
+        self.itemsCompleted = 0
+        self.itemsFailed = 0
+    }
+
+    /// Initialize for resource bulk operations
+    init(
+        type: OperationType,
+        resourceType: String,
+        itemsTotal: Int
+    ) {
+        self.id = UUID()
+        self.type = type
+        self.containerName = ""
+        self.objectName = nil
+        self.localPath = ""
+        self.startTime = Date()
+        self.status = .queued
+        self.progress = 0.0
+        self.bytesTransferred = 0
+        self.totalBytes = 0
+        self.filesSkipped = 0
+        self.filesCompleted = 0
+        self.filesTotal = 0
+        self.resourceType = resourceType
+        self.itemsTotal = itemsTotal
+        self.itemsCompleted = 0
+        self.itemsFailed = 0
     }
 
     var displayName: String {
-        if let objName = objectName {
+        if let resourceType = resourceType {
+            return resourceType
+        } else if let objName = objectName {
             return objName
         } else {
             return localPath
@@ -111,7 +153,7 @@ final class SwiftBackgroundOperation: Identifiable {
 
     var transferRate: Double {
         guard elapsedTime > 0 else { return 0 }
-        return Double(bytesTransferred) / elapsedTime / 1024 / 1024 // MB/s
+        return Double(bytesTransferred) / elapsedTime / 1024 / 1024
     }
 
     var formattedTransferRate: String {
@@ -153,7 +195,7 @@ final class SwiftBackgroundOperation: Identifiable {
     }
 }
 
-/// Manager for tracking background Swift operations
+/// Manager for tracking background operations (Swift storage and resource bulk operations)
 @MainActor
 final class SwiftBackgroundOperationsManager {
     private var operations: [UUID: SwiftBackgroundOperation] = [:]

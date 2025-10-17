@@ -720,7 +720,7 @@ Substation stores application-specific data in `~/.config/substation/`:
 
 **Location**: `~/.config/substation/command_history`
 
-**Purpose**: Stores command mode history for UP/DOWN arrow navigation
+**Purpose**: Stores command input history for UP/DOWN arrow navigation
 
 **Details**:
 - Persistent across sessions

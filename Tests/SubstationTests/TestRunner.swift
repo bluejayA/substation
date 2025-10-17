@@ -165,7 +165,7 @@ public struct CISupport {
             <sources>
                 <source>Sources/Substation</source>
                 <source>Sources/OSClient</source>
-                <source>Sources/SwiftTUI</source>
+                <source>Sources/SwiftNCurses</source>
             </sources>
             <packages>
                 <package name="Substation" line-rate="\(summary.coverage)" branch-rate="\(summary.coverage)">
@@ -351,7 +351,7 @@ public struct DevSupport {
         let watchPaths = [
             "Sources/Substation",
             "Sources/OSClient",
-            "Sources/SwiftTUI"
+            "Sources/SwiftNCurses"
         ]
 
         var lastModificationTimes: [String: Date] = [:]

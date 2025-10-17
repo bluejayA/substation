@@ -6,18 +6,8 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
-
-// MARK: - Default Logger Implementation
-
-/// Default silent logger for TUI when none is provided
-private final class DefaultTUILogger: MemoryKitLogger, @unchecked Sendable {
-    func logDebug(_ message: String, context: [String: Any]) {}
-    func logInfo(_ message: String, context: [String: Any]) {}
-    func logWarning(_ message: String, context: [String: Any]) {}
-    func logError(_ message: String, context: [String: Any]) {}
-}
 
 // MARK: - Imports for separated modules
 // Data models, view components, and utilities are now in separate files
@@ -31,6 +21,7 @@ final class TUI {
     internal lazy var dataManager: DataManager = DataManager(client: client, tui: self)
     internal lazy var inputHandler: InputHandler = InputHandler(tui: self)
     internal lazy var formInputHandler: FormInputHandler = FormInputHandler(tui: self)
+    internal lazy var universalFormInputHandler: UniversalFormInputHandler = UniversalFormInputHandler(tui: self)
     internal lazy var resourceOperations: ResourceOperations = ResourceOperations(tui: self)
     internal lazy var actions: Actions = Actions(tui: self)
     internal lazy var uiHelpers: UIHelpers = UIHelpers(tui: self)
@@ -50,7 +41,7 @@ final class TUI {
     internal let loadingStateManager: LoadingStateManager
 
     // Phase 5.1: Batch Operations Framework
-    internal let batchOperationManager: BatchOperationManager
+    internal var batchOperationManager: BatchOperationManager
 
     // Phase 5.3: Advanced Search System - Now using static methods
 
@@ -241,10 +232,6 @@ final class TUI {
     internal var cachedSecrets: [Secret] {
         get { resourceCache.secrets }
         set { Task { await resourceCache.setSecrets(newValue) } }
-    }
-    internal var cachedBarbicanContainers: [BarbicanContainer] {
-        get { resourceCache.barbicanContainers }
-        set { Task { await resourceCache.setBarbicanContainers(newValue) } }
     }
     internal var cachedLoadBalancers: [LoadBalancer] {
         get { resourceCache.loadBalancers }
@@ -471,9 +458,9 @@ final class TUI {
         try await self.memoryContainer.initialize(with: memoryConfig)
         Logger.shared.logDebug("Memory container initialized successfully")
 
-        // Configure SwiftTUI to use the same shared logger
-        Logger.shared.logDebug("Configuring SwiftTUI logging")
-        SwiftTUI.configureLogging(logger: sharedLogger)
+        // Configure SwiftNCurses to use the same shared logger
+        Logger.shared.logDebug("Configuring SwiftNCurses logging")
+        SwiftNCurses.configureLogging(logger: sharedLogger)
 
         // Initialize ResourceNameCache with MemoryKit adapter
         Logger.shared.logDebug("Creating resource name cache")
@@ -524,8 +511,8 @@ final class TUI {
             await SearchEngine.shared.setSearchIndexCache(memoryContainer.searchIndexCache)
         }
 
-        // Connect command mode to context switcher for tab completion
-        Logger.shared.logDebug("Connecting command mode to context switcher")
+        // Connect to context switcher for tab completion
+        Logger.shared.logDebug("Connecting to context switcher")
         self.commandMode.contextSwitcher = self.contextSwitcher
 
         Logger.shared.logInfo("TUI initialization completed successfully")
@@ -671,27 +658,6 @@ final class TUI {
         userFeedback.setStatusMessage("UI caches cleared", type: .info)
     }
 
-    private func handleMemoryPressure() async {
-        // Clear caches through the memory container
-        await memoryContainer.clearAllCaches()
-
-        // Clear render optimizer caches
-        renderOptimizer.markFullScreenDirty()
-
-        // Clear virtual list controllers to reduce memory
-        virtualListControllers.removeAll()
-        searchControllers.removeAll()
-
-        // Clear MemoryKit-backed resource cache
-        await resourceCache.clearAll()
-
-        // Trigger refresh to reload essential data
-        await dataManager.refreshAllData()
-
-        // Show user notification
-        userFeedback.showInfo("Memory pressure handled - caches cleared")
-    }
-
     // MARK: - Smart Redraw Optimization
 
     // Mark screen as needing redraw
@@ -769,12 +735,12 @@ final class TUI {
             shouldCleanup = false // App.swift will handle cleanup
 
             // Get current screen dimensions
-            screenRows = SwiftTUI.getMaxY(screen)
-            screenCols = SwiftTUI.getMaxX(screen)
+            screenRows = SwiftNCurses.getMaxY(screen)
+            screenCols = SwiftNCurses.getMaxX(screen)
         } else {
-            // Initialize terminal using SwiftTUI abstractions
+            // Initialize terminal using SwiftNCurses abstractions
             Logger.shared.logDebug("Initializing new terminal session")
-            let initResult = SwiftTUI.initializeTerminalSession()
+            let initResult = SwiftNCurses.initializeTerminalSession()
             guard initResult.success, let newScreen = initResult.screen else {
                 let errorMsg = "Failed to initialize terminal session"
                 Logger.shared.logError(errorMsg)
@@ -792,7 +758,7 @@ final class TUI {
 
         defer {
             if shouldCleanup {
-                SwiftTUI.cleanupTerminal()
+                SwiftNCurses.cleanupTerminal()
                 Logger.shared.logDebug("Cleaned up terminal")
             }
         }
@@ -800,17 +766,20 @@ final class TUI {
         if screenRows < 20 || screenCols < 80 {
             let errorMsg = "Terminal too small: need 80x20, got \(screenCols)x\(screenRows)"
             Logger.shared.logError(errorMsg)
-            let surface = SwiftTUI.surface(from: screen.pointer)
+            let surface = SwiftNCurses.surface(from: screen.pointer)
             let errorBounds = Rect(x: 0, y: 0, width: screenCols, height: 1)
-            await SwiftTUI.render(Text("Terminal too small. Need at least 80x20, got \(screenCols)x\(screenRows) - \(errorMsg)").error(), on: surface, in: errorBounds)
-            SwiftTUI.batchedRefresh(screen)
-            SwiftTUI.waitForInput(screen)
+            await SwiftNCurses.render(Text("Terminal too small. Need at least 80x20, got \(screenCols)x\(screenRows) - \(errorMsg)").error(), on: surface, in: errorBounds)
+            SwiftNCurses.batchedRefresh(screen)
+            SwiftNCurses.waitForInput(screen)
             return
         }
 
         Logger.shared.logInfo("Substation initialized successfully")
 
-        // Show loading screen immediately before any data operations (if not already shown)
+        // Check for first run - will show welcome as first view after loading
+        let isFirstRun = WelcomeScreen.shared.isFirstRun()
+
+        // Show loading screen for all users (first-time and existing)
         if existingScreen == nil {
             Logger.shared.logDebug("Rendering initial loading screen")
             currentView = .loading
@@ -825,6 +794,16 @@ final class TUI {
         // Initial data fetch with loading progression
         await performInitialDataLoadWithProgress(screen: screen.pointer)
 
+        // After loading completes, set initial view based on first run
+        if isFirstRun {
+            // First run: show welcome view instead of dashboard
+            Logger.shared.logInfo("First run detected - setting initial view to welcome")
+            currentView = .welcome
+            previousView = .welcome
+            WelcomeScreen.shared.markWelcomeShown()
+        }
+        // Existing users: currentView remains .dashboard (default)
+
         Logger.shared.logInfo("Starting main event loop")
 
         // Main event loop with intelligent adaptive polling
@@ -836,19 +815,19 @@ final class TUI {
         let loopStartTime = Date()
 
         while running {
-            let ch = SwiftTUI.getInput(screen)
+            let ch = SwiftNCurses.getInput(screen)
 
             // Handle window resize
             if ch == Int32(410) { // KEY_RESIZE
                 Logger.shared.logUserAction("window_resize", details: [
                     "oldSize": "\(screenCols)x\(screenRows)"
                 ])
-                screenRows = SwiftTUI.getMaxY(screen)
-                screenCols = SwiftTUI.getMaxX(screen)
+                screenRows = SwiftNCurses.getMaxY(screen)
+                screenCols = SwiftNCurses.getMaxX(screen)
                 Logger.shared.logUserAction("window_resized", details: [
                     "newSize": "\(screenCols)x\(screenRows)"
                 ])
-                SwiftTUI.clear(screen)
+                SwiftNCurses.clear(screen)
                 forceRedraw() // Force immediate redraw for resize
                 await self.draw(screen: screen.pointer)
 
@@ -1183,10 +1162,6 @@ final class TUI {
         return filteredImages[selectedIndex]
     }
 
-    private func getServerSnapshots() -> [Image] {
-        return ResourceFilters.filterServerSnapshots(cachedImages)
-    }
-
     // MARK: - View Management
     internal func changeView(to newView: ViewMode, resetSelection: Bool = true, preserveStatus: Bool = false) {
         if currentView != newView && currentView != .help {
@@ -1452,7 +1427,11 @@ final class TUI {
         Logger.shared.logInfo("Initial data load completed, transitioning to dashboard")
     }
 
-    // Colors are now managed semantically through SwiftTUI.drawStyledText(color: .semantic)
+    /// Perform initial data load while displaying welcome view for first-time users
+    /// Uses DetailView component with dynamic status updates during data load
+    /// - Parameter screen: The screen pointer for rendering
+
+    // Colors are now managed semantically through SwiftNCurses.drawStyledText(color: .semantic)
 
     internal func draw(screen: OpaquePointer?) async {
         // Only redraw if needed and throttle to prevent excessive redraws
@@ -1482,7 +1461,7 @@ final class TUI {
 
         // Clear screen only if full redraw is needed
         if renderPlan.shouldClearScreen {
-            SwiftTUI.clear(WindowHandle(screen))
+            SwiftNCurses.clear(WindowHandle(screen))
         }
 
         // Draw layout components based on render plan
@@ -1508,7 +1487,7 @@ final class TUI {
 
         // Render horizontal separator line above bottom bars
         if renderPlan.renderStatusBar {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             // When unified input is shown: separator at screenRows - 3 (input at -2, status at -1)
             // When no input: separator at screenRows - 2 (status at -1)
             let separatorRow = showUnifiedInput ? screenRows - 3 : screenRows - 2
@@ -1518,7 +1497,7 @@ final class TUI {
             let separatorText = String(repeating: "-", count: Int(screenCols))
             let separatorComponent = Text(separatorText).info()
 
-            await SwiftTUI.render(separatorComponent, on: surface, in: separatorBounds)
+            await SwiftNCurses.render(separatorComponent, on: surface, in: separatorBounds)
         }
 
         // Render unified input bar (above status bar)
@@ -1542,15 +1521,15 @@ final class TUI {
         // Render modal overlay if active
         if let modal = userFeedback.currentModal {
             let start = Date()
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let modalBounds = Rect(x: 0, y: 0, width: screenCols, height: screenRows)
             let modalComponent = ModalView(modal: modal)
-            await SwiftTUI.render(modalComponent, on: surface, in: modalBounds)
+            await SwiftNCurses.render(modalComponent, on: surface, in: modalBounds)
             componentTimings["modal"] = Date().timeIntervalSince(start)
         }
 
         // Batched refresh: updates virtual screen then flushes once (reduces syscalls)
-        SwiftTUI.batchedRefresh(WindowHandle(screen))
+        SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
         // Mark render as clean
         renderOptimizer.markClean()
@@ -1579,308 +1558,29 @@ final class TUI {
     }
 
     internal func confirmServer(_ itemName: String, screen: OpaquePointer?, state: String) async -> Bool {
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
         defer {
-            let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let promptLine = screenRows - 2
         let promptBounds = Rect(x: 0, y: promptLine, width: screenCols, height: 1)
 
-        // Display confirmation prompt using SwiftTUI
+        // Display confirmation prompt using SwiftNCurses
         let promptText = " \(state.capitalized) '\(itemName)'? Press Y to confirm, any other key to cancel: "
         let promptComponent = Text(promptText).warning()
 
         surface.clear(rect: promptBounds)
-        await SwiftTUI.render(promptComponent, on: surface, in: promptBounds)
+        await SwiftNCurses.render(promptComponent, on: surface, in: promptBounds)
 
-        let ch = SwiftTUI.getInput(WindowHandle(screen))
+        let ch = SwiftNCurses.getInput(WindowHandle(screen))
 
         // Clear prompt
         surface.clear(rect: promptBounds)
 
         // Only Y (both uppercase and lowercase) confirms restart
         return ch == Int32(89) || ch == Int32(121) // 'Y' or 'y'
-    }
-
-    // Helper function to describe decoding errors in detail
-    internal func describingDecodingError(_ error: DecodingError) -> String {
-        switch error {
-        case .typeMismatch(let type, let context):
-            return "Type mismatch for \(type) at \(context.codingPath.map { $0.stringValue }.joined(separator: ".")): \(context.debugDescription)"
-        case .valueNotFound(let type, let context):
-            return "Missing value for \(type) at \(context.codingPath.map { $0.stringValue }.joined(separator: ".")): \(context.debugDescription)"
-        case .keyNotFound(let key, let context):
-            return "Missing key '\(key.stringValue)' at \(context.codingPath.map { $0.stringValue }.joined(separator: ".")): \(context.debugDescription)"
-        case .dataCorrupted(let context):
-            return "Data corrupted at \(context.codingPath.map { $0.stringValue }.joined(separator: ".")): \(context.debugDescription)"
-        @unknown default:
-            return "Unknown decoding error: \(error.localizedDescription)"
-        }
-    }
-
-    // MARK: - Enhanced Search and Details Methods
-
-    private func performEnhancedSearch(_ searchQuery: String) {
-        self.searchQuery = searchQuery
-
-        switch currentView {
-        case .servers:
-            searchControllers["servers"]?.updateQuery(searchQuery)
-        case .networks:
-            searchControllers["networks"]?.updateQuery(searchQuery)
-        case .volumes:
-            searchControllers["volumes"]?.updateQuery(searchQuery)
-        default:
-            break
-        }
-
-        userFeedback.showInfo("Searching for '\(searchQuery)'")
-    }
-
-    private func showServerDetails(_ server: Server) async {
-        var details = [
-            "Name: \(server.name ?? "Unnamed")",
-            "ID: \(server.id)",
-            "Status: \(server.status?.rawValue ?? "Unknown")",
-            "Flavor: \(server.flavor?.name ?? server.flavor?.id ?? "Unknown")",
-            "Image: \(server.image?.name ?? server.image?.id ?? "Unknown")"
-        ]
-
-        if let addresses = server.addresses {
-            details.append("Addresses:")
-            for (network, addressList) in addresses {
-                for address in addressList {
-                    details.append("  \(network): \(address.addr)")
-                }
-            }
-        }
-
-        userFeedback.showInfo("Server Details:\n\(details.joined(separator: "\n"))")
-    }
-
-    private func showNetworkDetails(_ network: Network) async {
-        let details = [
-            "Name: \(network.name ?? "Unknown")",
-            "ID: \(network.id)",
-            "Status: \(network.status ?? "Unknown")",
-            "Admin State: \(network.adminStateUp ?? false ? "Up" : "Down")",
-            "Shared: \(network.shared ?? false ? "Yes" : "No")",
-            "External: \(network.external ?? false ? "Yes" : "No")"
-        ].joined(separator: "\n")
-
-        userFeedback.showInfo("Network Details:\n\(details)")
-    }
-
-    private func showVolumeDetails(_ volume: Volume) async {
-        let details = [
-            "Name: \(volume.name ?? "Unnamed")",
-            "ID: \(volume.id)",
-            "Status: \(volume.status ?? "Unknown")",
-            "Size: \(volume.size ?? 0) GB",
-            "Volume Type: \(volume.volumeType ?? "Unknown")",
-            "Bootable: \(volume.bootable == "true" ? "Yes" : "No")",
-            "Encrypted: \(volume.encrypted ?? false ? "Yes" : "No")"
-        ].joined(separator: "\n")
-
-        userFeedback.showInfo("Volume Details:\n\(details)")
-    }
-
-    // MARK: - Batch Operations
-
-    /// Execute a batch server creation operation
-    internal func executeBatchServerCreate(configs: [ServerCreateConfig]) async {
-        let operationType = OperationType.batchServerCreate(serverCount: configs.count)
-        let operationId = UUID().uuidString
-
-        Logger.shared.logInfo("TUI - Starting batch server creation: \(configs.count) servers")
-
-        // Start progress tracking
-        progressIndicator.startBatchOperation(
-            id: operationId,
-            type: operationType,
-            name: "Batch Server Creation",
-            totalItems: configs.count
-        )
-
-        // Execute the batch operation
-        let operation = BatchOperationType.serverBulkCreate(configs: configs)
-        let result = await batchOperationManager.execute(operation) { @Sendable [weak self] progress in
-            Task { @MainActor in
-                self?.progressIndicator.updateBatchProgress(progress)
-            }
-        }
-
-        // Handle results
-        await uiHelpers.handleBatchOperationResult(result)
-    }
-
-    /// Execute a batch server deletion operation
-    internal func executeBatchServerDelete(serverIDs: [String]) async {
-        let operationType = OperationType.batchServerDelete(serverCount: serverIDs.count)
-        let operationId = UUID().uuidString
-
-        Logger.shared.logInfo("TUI - Starting batch server deletion: \(serverIDs.count) servers")
-
-        // Start progress tracking
-        progressIndicator.startBatchOperation(
-            id: operationId,
-            type: operationType,
-            name: "Batch Server Deletion",
-            totalItems: serverIDs.count
-        )
-
-        // Execute the batch operation
-        let operation = BatchOperationType.serverBulkDelete(serverIDs: serverIDs)
-        let result = await batchOperationManager.execute(operation) { @Sendable [weak self] progress in
-            Task { @MainActor in
-                self?.progressIndicator.updateBatchProgress(progress)
-            }
-        }
-
-        // Handle results
-        await uiHelpers.handleBatchOperationResult(result)
-    }
-
-    /// Execute a batch volume creation operation
-    internal func executeBatchVolumeCreate(configs: [VolumeCreateConfig]) async {
-        let operationType = OperationType.batchVolumeCreate(volumeCount: configs.count)
-        let operationId = UUID().uuidString
-
-        Logger.shared.logInfo("TUI - Starting batch volume creation: \(configs.count) volumes")
-
-        // Start progress tracking
-        progressIndicator.startBatchOperation(
-            id: operationId,
-            type: operationType,
-            name: "Batch Volume Creation",
-            totalItems: configs.count
-        )
-
-        // Execute the batch operation
-        let operation = BatchOperationType.volumeBulkCreate(configs: configs)
-        let result = await batchOperationManager.execute(operation) { @Sendable [weak self] progress in
-            Task { @MainActor in
-                self?.progressIndicator.updateBatchProgress(progress)
-            }
-        }
-
-        // Handle results
-        await uiHelpers.handleBatchOperationResult(result)
-    }
-
-    /// Execute a batch volume attachment operation
-    internal func executeBatchVolumeAttach(operations: [VolumeAttachmentOperation]) async {
-        let operationType = OperationType.batchVolumeAttach(attachmentCount: operations.count)
-        let operationId = UUID().uuidString
-
-        Logger.shared.logInfo("TUI - Starting batch volume attachment: \(operations.count) attachments")
-
-        // Start progress tracking
-        progressIndicator.startBatchOperation(
-            id: operationId,
-            type: operationType,
-            name: "Batch Volume Attachment",
-            totalItems: operations.count
-        )
-
-        // Execute the batch operation
-        let operation = BatchOperationType.volumeBulkAttach(operations: operations)
-        let result = await batchOperationManager.execute(operation) { @Sendable [weak self] progress in
-            Task { @MainActor in
-                self?.progressIndicator.updateBatchProgress(progress)
-            }
-        }
-
-        // Handle results
-        await uiHelpers.handleBatchOperationResult(result)
-    }
-
-    /// Execute a network topology deployment
-    internal func executeNetworkTopologyDeployment(topology: NetworkTopologyDeployment) async {
-        let operationType = OperationType.batchNetworkTopology(resourceCount: topology.totalResourceCount)
-        let operationId = UUID().uuidString
-
-        Logger.shared.logInfo("TUI - Starting network topology deployment: \(topology.name)")
-
-        // Start progress tracking
-        progressIndicator.startBatchOperation(
-            id: operationId,
-            type: operationType,
-            name: "Network Topology Deployment",
-            totalItems: topology.totalResourceCount
-        )
-
-        // Execute the batch operation
-        let operation = BatchOperationType.networkTopologyDeploy(topology: topology)
-        let result = await batchOperationManager.execute(operation) { @Sendable [weak self] progress in
-            Task { @MainActor in
-                self?.progressIndicator.updateBatchProgress(progress)
-            }
-        }
-
-        // Handle results
-        await uiHelpers.handleBatchOperationResult(result)
-    }
-
-    /// Execute a resource cleanup operation
-    internal func executeResourceCleanup(criteria: ResourceCleanupCriteria) async {
-        let estimatedResourceCount = 10 // Placeholder - would be calculated based on criteria
-        let operationType = OperationType.batchResourceCleanup(resourceCount: estimatedResourceCount)
-        let operationId = UUID().uuidString
-
-        Logger.shared.logInfo("TUI - Starting resource cleanup operation")
-
-        // Start progress tracking
-        progressIndicator.startBatchOperation(
-            id: operationId,
-            type: operationType,
-            name: "Resource Cleanup",
-            totalItems: estimatedResourceCount
-        )
-
-        // Execute the batch operation
-        let operation = BatchOperationType.resourceCleanup(criteria: criteria)
-        let result = await batchOperationManager.execute(operation) { @Sendable [weak self] progress in
-            Task { @MainActor in
-                self?.progressIndicator.updateBatchProgress(progress)
-            }
-        }
-
-        // Handle results
-        await uiHelpers.handleBatchOperationResult(result)
-    }
-
-    /// Handle the results of a batch operation
-
-    /// Get active batch operations for UI display
-    internal func getActiveBatchOperations() -> [String: OperationProgress] {
-        return progressIndicator.activeOperations
-    }
-
-    /// Cancel a batch operation
-    internal func cancelBatchOperation(operationId: String) async -> Bool {
-        Logger.shared.logInfo("TUI - Cancelling batch operation: \(operationId)")
-        let cancelled = await batchOperationManager.cancelOperation(operationID: operationId)
-
-        if cancelled {
-            statusMessage = "Batch operation cancelled"
-            markNeedsRedraw()
-        }
-
-        return cancelled
-    }
-
-    // MARK: - Enhanced Resource Management
-
-    // MARK: - Batch Operations Access
-    internal func getActiveBatchOperations() async -> [String] {
-        return await batchOperationManager.getActiveOperations()
-    }
-
-    internal func getBatchOperationStatus(operationID: String) async -> BatchOperationResult? {
-        return await batchOperationManager.getOperationStatus(operationID: operationID)
     }
 
 
@@ -2153,11 +1853,4 @@ private struct SessionMetrics {
     var connectionSuccessTime: Date?
     var connectionErrors = 0
     var frameCount = 0
-}
-
-private struct PerformanceMetrics {
-    let averageFPS: Double
-    let averageFrameTime: TimeInterval
-    let averageRenderTime: TimeInterval
-    let memoryUsage: Double
 }

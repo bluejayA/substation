@@ -1,7 +1,7 @@
 import Foundation
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct DashboardView {
     @MainActor
@@ -63,24 +63,24 @@ struct DashboardView {
 
     @MainActor
     private static func drawModernFooter(screen: OpaquePointer?, startRow: Int32, startCol: Int32, width: Int32) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Status indicators with real timestamp
         let currentTime = Date().timeOnlyFormatted()
         let statusText = "  [*] Last check: \(currentTime)"
         let statusBounds = Rect(x: startCol, y: startRow, width: width, height: 1)
-        await SwiftTUI.render(Text(statusText.padding(toLength: Int(width), withPad: " ", startingAt: 0)).primary(), on: surface, in: statusBounds)
+        await SwiftNCurses.render(Text(statusText.padding(toLength: Int(width), withPad: " ", startingAt: 0)).primary(), on: surface, in: statusBounds)
     }
 
     @MainActor
     private static func drawDashboardPanel(screen: OpaquePointer?, title: String, startRow: Int32, startCol: Int32,
                                           width: Int32, height: Int32, content: @escaping @Sendable () async -> Void) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
         let panel = BorderedContainer(title: title, content: content)
 
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     @MainActor
@@ -145,14 +145,14 @@ struct DashboardView {
             components.append(Text("    \(visualIndicators)").secondary())
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         let content = VStack(spacing: 0, children: components)
 
         let panel = BorderedContainer(title: "[*] LIVE STATUS") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     @MainActor
@@ -168,14 +168,14 @@ struct DashboardView {
         components.append(Text("  Key Pairs      \(resourceCounts.keyPairs) ..........").info())
         components.append(Text(""))
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         let content = VStack(spacing: 0, children: components)
 
         let panel = BorderedContainer(title: "[#] RESOURCES") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     @MainActor
@@ -246,13 +246,13 @@ struct DashboardView {
 
         let content = VStack(spacing: 0, children: components)
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
 
         let panel = BorderedContainer(title: "[R] ROUTERS") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     // MARK: - Bottom Row Panels
@@ -325,14 +325,14 @@ struct DashboardView {
             components.append(Text("  In-use: \(attachedCount)  Available: \(availableCount)").secondary())
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         let content = VStack(spacing: 0, children: components)
 
         let panel = BorderedContainer(title: "[#] STORAGE") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     @MainActor
@@ -379,14 +379,14 @@ struct DashboardView {
             components.append(Text("  Total: \(totalAttachedServers) attached servers").secondary())
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         let content = VStack(spacing: 0, children: components)
 
         let panel = BorderedContainer(title: "[~] NETWORK") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     @MainActor
@@ -452,14 +452,14 @@ struct DashboardView {
             components.append(Text("  [+] All quotas within limits").success())
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         let content = VStack(spacing: 0, children: components)
 
         let panel = BorderedContainer(title: "[=] QUOTAS") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: height - 2))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     // MARK: - Helper Functions
@@ -691,7 +691,7 @@ struct DashboardView {
             let maxVisibleItems = 16
             let visibleItems = Array(quotaItems.dropFirst(quotaScrollOffset).prefix(maxVisibleItems))
 
-            // Render visible items using SwiftTUI
+            // Render visible items using SwiftNCurses
             var quotaComponents: [any Component] = []
 
             for item in visibleItems {
@@ -727,12 +727,12 @@ struct DashboardView {
             return VStack(spacing: 0, children: quotaComponents)
         }()
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: 16)
         let panel = BorderedContainer(title: "Project Quotas") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: 14))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: 14))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     // Enum to represent different quota item types
@@ -775,12 +775,12 @@ struct DashboardView {
             }
         }()
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: 16)
         let panel = BorderedContainer(title: "Network Status") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: 14))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: 14))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     @MainActor
@@ -830,12 +830,12 @@ struct DashboardView {
             }
         }()
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: 12)
         let panel = BorderedContainer(title: "Volume Status") {
-            await SwiftTUI.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: 10))
+            await SwiftNCurses.render(content, on: surface, in: Rect(x: startCol + 1, y: startRow + 1, width: width - 2, height: 10))
         }
-        await SwiftTUI.render(panel, on: surface, in: bounds)
+        await SwiftNCurses.render(panel, on: surface, in: bounds)
     }
 
     private static func calculateVolumeSummary(_ volumes: [Volume]) -> (totalSize: Int, attachedCount: Int, availableCount: Int) {
@@ -988,9 +988,9 @@ struct DashboardView {
             let scrollProgress = Float(scrollOffset) / Float(max(1, totalContentHeight - availableHeight))
             let scrollText = "Scroll: \(Int(scrollProgress * 100))% (UP/DOWN to navigate)"
 
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol + 2, y: scrollIndicatorRow, width: width - 4, height: 1)
-            await SwiftTUI.render(Text(scrollText).info(), on: surface, in: bounds)
+            await SwiftNCurses.render(Text(scrollText).info(), on: surface, in: bounds)
         }
     }
 }

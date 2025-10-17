@@ -329,11 +329,35 @@ extension OpenStackClient {
         }
     }
 
+    /// Get router details with interfaces
+    public func getRouter(id: String, forceRefresh: Bool = false) async throws -> Router {
+        return try await executeWithTokenRefresh {
+            let neutron = await self.neutron
+            return try await neutron.getRouter(id: id, forceRefresh: forceRefresh)
+        }
+    }
+
     /// Delete a router
     public func deleteRouter(id: String) async throws {
         try await executeWithTokenRefresh {
             let neutron = await self.neutron
             try await neutron.deleteRouter(id: id)
+        }
+    }
+
+    /// Update a router
+    public func updateRouter(id: String, request: UpdateRouterRequest) async throws -> Router {
+        return try await executeWithTokenRefresh {
+            let neutron = await self.neutron
+            return try await neutron.updateRouter(id: id, request: request)
+        }
+    }
+
+    /// Remove an interface from a router
+    public func removeRouterInterface(routerId: String, subnetId: String? = nil, portId: String? = nil) async throws {
+        try await executeWithTokenRefresh {
+            let neutron = await self.neutron
+            try await neutron.removeRouterInterface(routerId: routerId, subnetId: subnetId, portId: portId)
         }
     }
 

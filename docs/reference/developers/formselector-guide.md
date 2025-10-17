@@ -623,9 +623,9 @@ static func drawImageSelector(screen: OpaquePointer?, form: ServerCreateForm,
         isActive: form.isSelectingImage
     )
 
-    let surface = SwiftTUI.surface(from: screen)
+    let surface = SwiftNCurses.surface(from: screen)
     let bounds = Rect(x: 0, y: 0, width: width, height: height)
-    await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+    await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
 }
 
 // 4. Handle input

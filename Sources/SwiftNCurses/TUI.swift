@@ -2,14 +2,14 @@ import Foundation
 import CNCurses
 import CrossPlatformTimer
 
-// MARK: - SwiftTUI Main Interface
+// MARK: - SwiftNCurses Main Interface
 
 /// Terminal error constant equivalent to ncurses ERR
 public let TUI_ERR: Int32 = -1
 
-/// Main interface for the SwiftTUI library
-public struct SwiftTUI {
-    /// Initialize SwiftTUI with ncurses
+/// Main interface for the SwiftNCurses library
+public struct SwiftNCurses {
+    /// Initialize SwiftNCurses with ncurses
     @MainActor public static func initialize(colorScheme: ColorScheme? = nil) {
         let scheme = colorScheme ?? ColorScheme.shared
         scheme.initialize()
@@ -25,7 +25,7 @@ public struct SwiftTUI {
         // Disable mouse reporting
         mousemask(0, nil)
 
-        // Initialize colors using SwiftTUI color scheme
+        // Initialize colors using SwiftNCurses color scheme
         guard has_colors() else { return false }
 
         let scheme = colorScheme ?? ColorScheme.shared
@@ -61,7 +61,7 @@ public struct SwiftTUI {
 
         let duration = Date().timeIntervalSinceReferenceDate - startTime
         if duration > 0.050 { // Log slow renders (>50ms)
-            SwiftTUILoggerConfig.shared.logger.logWarning("SwiftTUI: Slow render detected", context: [
+            SwiftNCursesLoggerConfig.shared.logger.logWarning("SwiftNCurses: Slow render detected", context: [
                 "duration_ms": Int(duration * 1000),
                 "component": String(describing: type(of: component))
             ])
@@ -86,7 +86,7 @@ extension Text {
 // MARK: - Cross-Platform Timer Management
 
 /// Cross-platform timer abstraction for async contexts
-extension SwiftTUI {
+extension SwiftNCurses {
     /// Create a repeating timer that works in async contexts
     @MainActor
     public static func createRepeatingTimer(
@@ -122,7 +122,7 @@ extension SwiftTUI {
 // MARK: - Terminal Initialization and Management
 
 /// Comprehensive terminal management to replace direct ncurses calls
-extension SwiftTUI {
+extension SwiftNCurses {
     /// Initialize terminal screen (replaces initscr())
     @MainActor public static func initializeScreen() -> WindowHandle? {
         guard let screen = initscr() else { return nil }
@@ -131,9 +131,9 @@ extension SwiftTUI {
 
     /// Cleanup terminal (replaces endwin())
     @MainActor public static func cleanupTerminal() {
-        SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: Cleaning up terminal", context: [:])
+        SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: Cleaning up terminal", context: [:])
         endwin()
-        SwiftTUILoggerConfig.shared.logger.logInfo("SwiftTUI: Terminal cleanup complete", context: [:])
+        SwiftNCursesLoggerConfig.shared.logger.logInfo("SwiftNCurses: Terminal cleanup complete", context: [:])
     }
 
     /// Set terminal to cbreak mode (replaces cbreak())
@@ -206,20 +206,20 @@ extension SwiftTUI {
 
     /// Complete terminal initialization sequence
     @MainActor public static func initializeTerminalSession() -> (screen: WindowHandle?, rows: Int32, cols: Int32, success: Bool) {
-        SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: Initializing terminal session", context: [:])
+        SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: Initializing terminal session", context: [:])
 
         // Set TERM if not set
         if getenv("TERM") == nil {
-            SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: TERM not set, defaulting to xterm", context: [:])
+            SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: TERM not set, defaulting to xterm", context: [:])
             setenv("TERM", "xterm", 1)
         }
 
         guard let screen = initializeScreen() else {
-            SwiftTUILoggerConfig.shared.logger.logError("SwiftTUI: Failed to initialize screen", context: [:])
+            SwiftNCursesLoggerConfig.shared.logger.logError("SwiftNCurses: Failed to initialize screen", context: [:])
             return (nil, 0, 0, false)
         }
 
-        SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: Screen initialized successfully", context: [:])
+        SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: Screen initialized successfully", context: [:])
 
         // Setup terminal modes
         // Use nodelay + cbreak for true non-blocking I/O (prevents rt_sigsuspend on Linux)
@@ -228,12 +228,12 @@ extension SwiftTUI {
               setCBreakMode() != TUI_ERR,
               enableKeypad(screen, true) != TUI_ERR,
               setNodelay(screen, true) != TUI_ERR else {
-            SwiftTUILoggerConfig.shared.logger.logError("SwiftTUI: Failed to setup terminal modes", context: [:])
+            SwiftNCursesLoggerConfig.shared.logger.logError("SwiftNCurses: Failed to setup terminal modes", context: [:])
             cleanupTerminal()
             return (nil, 0, 0, false)
         }
 
-        SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: Terminal modes configured", context: [:])
+        SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: Terminal modes configured", context: [:])
 
         // Hide cursor
         let _ = setCursorVisibility(0)
@@ -244,22 +244,22 @@ extension SwiftTUI {
 
         // Initialize colors if supported
         if hasColors() {
-            SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: Color support detected, initializing colors", context: [:])
+            SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: Color support detected, initializing colors", context: [:])
             if startColor() != TUI_ERR {
                 let _ = useDefaultColors()
                 initialize()
-                SwiftTUILoggerConfig.shared.logger.logDebug("SwiftTUI: Colors initialized successfully", context: [:])
+                SwiftNCursesLoggerConfig.shared.logger.logDebug("SwiftNCurses: Colors initialized successfully", context: [:])
             } else {
-                SwiftTUILoggerConfig.shared.logger.logWarning("SwiftTUI: Failed to start color system", context: [:])
+                SwiftNCursesLoggerConfig.shared.logger.logWarning("SwiftNCurses: Failed to start color system", context: [:])
             }
         } else {
-            SwiftTUILoggerConfig.shared.logger.logWarning("SwiftTUI: Terminal does not support colors", context: [:])
+            SwiftNCursesLoggerConfig.shared.logger.logWarning("SwiftNCurses: Terminal does not support colors", context: [:])
         }
 
         let rows = getMaxY(screen)
         let cols = getMaxX(screen)
 
-        SwiftTUILoggerConfig.shared.logger.logInfo("SwiftTUI: Terminal session initialized successfully", context: [
+        SwiftNCursesLoggerConfig.shared.logger.logInfo("SwiftNCurses: Terminal session initialized successfully", context: [
             "rows": rows,
             "cols": cols
         ])
@@ -271,7 +271,7 @@ extension SwiftTUI {
 // MARK: - Screen Management Operations
 
 /// Comprehensive screen management to replace CNCurses operations
-extension SwiftTUI {
+extension SwiftNCurses {
     /// Clear entire screen (replaces clear(), werase())
     @MainActor public static func clearScreen(_ window: WindowHandle) {
         _ = compatWErase(window)
@@ -365,7 +365,7 @@ extension SwiftTUI {
         return ColorScheme.shared.colorPair(for: color)
     }
 
-    /// Draw styled text using SwiftTUI semantic color
+    /// Draw styled text using SwiftNCurses semantic color
     @MainActor public static func drawStyledText(
         _ window: WindowHandle,
         at position: Position,
@@ -402,7 +402,7 @@ extension SwiftTUI {
         width: Int32,
         height: Int32
     ) {
-        let _ = SwiftTUI.surface(from: window)
+        let _ = SwiftNCurses.surface(from: window)
         let _ = Rect(x: startCol, y: startRow, width: width, height: height)
         // Clear by filling with spaces
         for row in startRow..<(startRow + height) {
@@ -417,7 +417,7 @@ extension SwiftTUI {
 // MARK: - Migration Helpers
 
 /// Helper functions to ease migration from existing ViewUtils patterns
-extension SwiftTUI {
+extension SwiftNCurses {
     /// Migrate from ViewUtils.colorPair pattern
     @MainActor public static func migrateColoredText(
         text: String,

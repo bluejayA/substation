@@ -641,6 +641,6 @@ await client.cacheManager.configure(
 
 **See Also**:
 
-- [SwiftTUI Framework API](swifttui.md) - Terminal UI framework
+- [SwiftNCurses Framework API](SwiftNCurses.md) - Terminal UI framework
 - [Integration Guide](integration.md) - CrossPlatformTimer and integration examples
 - [API Reference Index](index.md) - Quick reference and navigation

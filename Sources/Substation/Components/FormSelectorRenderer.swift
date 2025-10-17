@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 /// Helper to render FormSelector for different OSClient types
 /// This works around Swift's generic limitations when dealing with existential types

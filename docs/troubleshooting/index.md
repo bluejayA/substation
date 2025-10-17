@@ -38,7 +38,7 @@ tail -f ~/substation.log
 
 ### Quick Health Check
 
-Press `h` in Substation to view the health dashboard showing:
+Use `:health<Enter>` (or `:healthdashboard<Enter>` or `:h<Enter>`) in Substation to view the health dashboard showing:
 
 - OpenStack service health status
 - Cache hit rates (target: 80%+)
@@ -744,7 +744,7 @@ substation performance report
 substation health-check --all
 ```
 
-## Command Mode Issues and Debugging
+## Command Input Issues and Debugging
 
 ### Issue: Command not working
 
@@ -793,7 +793,7 @@ if priority == .navigation && key == 10 || key == 13 {
 
 ### Issue: Fuzzy matching too slow
 
-**Symptoms**: Lag when typing in command mode
+**Symptoms**: Lag when typing in command input
 
 **Diagnosis**: Too many aliases or inefficient matching
 
@@ -812,11 +812,11 @@ if let limit = limit, foundCount >= limit * 2, score < 80 {
 
 **Symptoms**: Tab key doesn't complete commands
 
-**Diagnosis**: Command mode not active or no matches
+**Diagnosis**: Command input not active or no matches
 
 **Solution**:
 
-1. Verify command mode is active (`inputState.isCommandMode`)
+1. Verify command input is active (`inputState.isCommandMode`)
 2. Check `getSuggestions()` returns matches
 3. Verify Tab key (9) is being handled
 

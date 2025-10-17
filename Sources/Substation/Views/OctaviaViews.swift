@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // MARK: - Octavia Views

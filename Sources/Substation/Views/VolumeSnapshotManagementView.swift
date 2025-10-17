@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct VolumeSnapshotManagementView {
     // Text Constants
@@ -29,9 +29,9 @@ struct VolumeSnapshotManagementView {
         )
 
         guard let volume = form.selectedVolume else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: startCol + 2, y: startRow + 2, width: 30, height: 1)
-            await SwiftTUI.render(
+            await SwiftNCurses.render(
                 Text("\(Self.errorPrefix)\(Self.noVolumeSelectedError)").error(),
                 on: surface,
                 in: errorBounds
@@ -41,9 +41,9 @@ struct VolumeSnapshotManagementView {
 
         // Loading indicator
         if form.isLoading {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let loadingBounds = Rect(x: startCol + 2, y: startRow + 2, width: 30, height: 1)
-            await SwiftTUI.render(Text(Self.loadingMessage).info(), on: surface, in: loadingBounds)
+            await SwiftNCurses.render(Text(Self.loadingMessage).info(), on: surface, in: loadingBounds)
             return
         }
 
@@ -66,7 +66,7 @@ struct VolumeSnapshotManagementView {
             showValidationErrors: false
         )
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let formBounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: formBounds)
 
@@ -74,18 +74,18 @@ struct VolumeSnapshotManagementView {
         var messageRow = startRow
         if let errorMessage = form.errorMessage {
             let errorBounds = Rect(x: startCol + 2, y: messageRow, width: Int32(errorMessage.count + 10), height: 1)
-            await SwiftTUI.render(Text("\(Self.errorPrefix)\(errorMessage)").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("\(Self.errorPrefix)\(errorMessage)").error(), on: surface, in: errorBounds)
             messageRow += 2
         }
 
         if let successMessage = form.successMessage {
             let successBounds = Rect(x: startCol + 2, y: messageRow, width: Int32(successMessage.count + 10), height: 1)
-            await SwiftTUI.render(Text("Success: \(successMessage)").success(), on: surface, in: successBounds)
+            await SwiftNCurses.render(Text("Success: \(successMessage)").success(), on: surface, in: successBounds)
             messageRow += 2
         }
 
         // Render the form
         let formRenderBounds = Rect(x: startCol, y: messageRow, width: width, height: height - (messageRow - startRow))
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: formRenderBounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: formRenderBounds)
     }
 }

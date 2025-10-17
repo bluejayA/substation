@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 // MARK: - Test Framework for OpenStack Terminal UI
 

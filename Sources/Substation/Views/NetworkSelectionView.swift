@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct NetworkSelectionView {
     @MainActor
@@ -18,7 +18,7 @@ struct NetworkSelectionView {
         title: String = "Select Network",
         checkboxMode: FormSelectorCheckboxMode = .basic
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         let tabs = [
             FormSelectorTab<Network>(
@@ -54,6 +54,6 @@ struct NetworkSelectionView {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }

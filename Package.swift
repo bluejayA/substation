@@ -10,7 +10,7 @@ let package = Package(
     ],
     products: [
         .library(name: "OSClient", targets: ["OSClient"]),
-        .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
+        .library(name: "SwiftNCurses", targets: ["SwiftNCurses"]),
         .library(name: "CrossPlatformTimer", targets: ["CrossPlatformTimer"]),
         .library(name: "MemoryKit", targets: ["MemoryKit"]),
         .executable(name: "substation", targets: ["Substation"])
@@ -51,7 +51,7 @@ let package = Package(
             path: "Sources/CNCurses"
         ),
         .target(
-            name: "SwiftTUI",
+            name: "SwiftNCurses",
             dependencies: ["CNCurses", "CrossPlatformTimer", "MemoryKit"],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
@@ -62,7 +62,7 @@ let package = Package(
             name: "Substation",
             dependencies: [
                 "OSClient",
-                "SwiftTUI",
+                "SwiftNCurses",
                 "CrossPlatformTimer",
                 "MemoryKit",
                 .product(name: "Crypto", package: "swift-crypto")
@@ -90,7 +90,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SubstationTests",
-            dependencies: ["Substation", "OSClient", "SwiftTUI"],
+            dependencies: ["Substation", "OSClient", "SwiftNCurses"],
             exclude: ["TestFramework.swift", "TestRunner.swift"],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),

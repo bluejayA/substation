@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - Snapshot Actions
@@ -34,8 +34,12 @@ extension Actions {
                 statusMessage = "\(baseMsg): Snapshots endpoint not found"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected API response"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let error):
                 statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
             case .decodingError(let error):
@@ -75,8 +79,12 @@ extension Actions {
                 statusMessage = "\(baseMsg): Snapshots endpoint not found"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected API response"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let error):
                 statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
             case .decodingError(let error):
@@ -116,8 +124,12 @@ extension Actions {
                 statusMessage = "\(baseMsg): Backups endpoint not found"
             case .unexpectedResponse:
                 statusMessage = "\(baseMsg): Unexpected API response"
-            case .httpError(let code, _):
-                statusMessage = "\(baseMsg): HTTP error \(code)"
+            case .httpError(let code, let message):
+                if let message = message {
+                    statusMessage = "\(baseMsg): \(message)"
+                } else {
+                    statusMessage = "\(baseMsg): HTTP error \(code)"
+                }
             case .networkError(let error):
                 statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
             case .decodingError(let error):

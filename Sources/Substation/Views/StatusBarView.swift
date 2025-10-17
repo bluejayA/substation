@@ -1,23 +1,23 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 @MainActor
 struct StatusBarView {
 
     static func draw(screen: OpaquePointer?, tui: TUI, screenCols: Int32, screenRows: Int32) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         // Status bar is now at the very bottom (last row)
         let statusRow = screenRows - 1
 
-        // Status bar using SwiftTUI
+        // Status bar using SwiftNCurses
         let statusBounds = Rect(x: 0, y: statusRow, width: screenCols, height: 1)
 
         let statusText = await buildEnhancedStatusText(tui: tui, screenCols: screenCols)
         let statusComponent = Text(statusText).primary()
 
         await surface.fill(rect: statusBounds, character: " ", style: .border)
-        await SwiftTUI.render(statusComponent, on: surface, in: statusBounds)
+        await SwiftNCurses.render(statusComponent, on: surface, in: statusBounds)
     }
 
     /// Builds enhanced status text that includes progress indicators and user-friendly error messages

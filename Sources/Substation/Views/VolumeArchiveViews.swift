@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct VolumeArchiveViews {
 
@@ -170,13 +170,13 @@ struct VolumeArchiveViews {
     ) async {
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title
@@ -271,7 +271,7 @@ struct VolumeArchiveViews {
         // Render unified archive list
         let archiveListComponent = VStack(spacing: 0, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(archiveListComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(archiveListComponent, on: surface, in: bounds)
     }
 
     // MARK: - Component Creation

@@ -2,50 +2,188 @@
 
 Complete keyboard shortcut reference and navigation guide for Substation. Master keyboard-driven navigation - your mouse is for the weak.
 
+## Navigation Philosophy
+
+Substation offers **two complementary navigation approaches**:
+
+1. **Command Input (Primary)** - Type `:` followed by the command name and press Enter
+   - **Discoverable**: Press `:` then Tab to see all available commands
+   - **Forgiving**: Fuzzy matching handles typos (`:servrs` suggests `:servers`)
+   - **Progressive**: Multiple aliases support learning (`:servers`, `:srv`, `:s`)
+   - **Context-Aware**: Commands like `:create` adapt to your current view
+
+2. **Single-Key Shortcuts (Alternative)** - Press a single key for instant action
+   - **Fast**: Muscle memory navigation for experienced users
+   - **Optional**: Power user feature for those who have memorized shortcuts
+   - **Legacy**: Traditional TUI navigation for vim/emacs users
+
+**For beginners**: Start with command input (`:` then Tab). It teaches you the commands as you go.
+
+**For power users**: Graduate to single-key shortcuts once you've memorized the mappings.
+
+## Command Input (Primary Navigation)
+
+Press `:` to enter command input - the primary way to navigate and execute actions in Substation.
+
+### How Command Input Works
+
+```text
+:                    Press colon to enter command input
+: <Tab>              Show all available commands
+: servers <Enter>    Navigate to servers view
+: create <Enter>     Create resource (context-aware)
+: start <Enter>      Start selected server (in server view)
+<Esc>                Cancel command input
+```
+
+### Command Discovery Features
+
+**Tab Completion:**
+- Press `:` then `Tab` to see all available commands
+- Type `:serv` then `Tab` to complete to `:servers`
+- Press `Tab` multiple times to cycle through matches
+
+**Fuzzy Matching:**
+- `:servrs` suggests `:servers` (handles typos)
+- `:netwrk` suggests `:networks`
+- `:vols` suggests `:volumes`
+
+**Command History:**
+- Press `Up Arrow` to cycle through previous commands
+- Press `Down Arrow` to cycle forward
+- History persists between sessions
+
+**Multiple Aliases:**
+- `:servers`, `:srv`, `:s`, `:nova` all work
+- `:networks`, `:net`, `:n`, `:neutron` all work
+- `:volumes`, `:vol`, `:v`, `:cinder` all work
+
+### Navigation Commands
+
+| Command | Aliases | Action |
+|---------|---------|--------|
+| `:dashboard` | `:dash`, `:d` | Navigate to dashboard |
+| `:servers` | `:srv`, `:s`, `:nova` | Navigate to servers view |
+| `:networks` | `:net`, `:n`, `:neutron` | Navigate to networks view |
+| `:volumes` | `:vol`, `:v`, `:cinder` | Navigate to volumes view |
+| `:images` | `:img`, `:i`, `:glance` | Navigate to images view |
+| `:flavors` | `:flav`, `:f` | Navigate to flavors view |
+| `:securitygroups` | `:secgroups`, `:sg`, `:e` | Navigate to security groups |
+| `:servergroups` | `:srvgroups`, `:g` | Navigate to server groups |
+| `:subnets` | `:sub`, `:u` | Navigate to subnets view |
+| `:ports` | `:p` | Navigate to ports view |
+| `:routers` | `:rtr`, `:r` | Navigate to routers view |
+| `:floatingips` | `:fips`, `:l` | Navigate to floating IPs |
+| `:keypairs` | `:keys`, `:k` | Navigate to key pairs |
+| `:barbican` | `:secrets`, `:b` | Navigate to secrets |
+| `:octavia` | `:loadbalancers`, `:lbs`, `:o` | Navigate to load balancers |
+| `:swift` | `:objects`, `:j` | Navigate to object storage |
+| `:health` | `:h` | Navigate to health dashboard |
+| `:search` | `:find`, `:z` | Navigate to advanced search |
+| `:help` | `:?` | Show help |
+
+### Action Commands (Context-Aware)
+
+These commands adapt to your current view:
+
+| Command | Aliases | Action | Context |
+|---------|---------|--------|---------|
+| `:create` | `:new`, `:add` | Create resource | All resource lists |
+| `:delete` | `:remove`, `:rm` | Delete selected resource | All resources |
+| `:start` | `:boot`, `:power-on` | Start server | Server view |
+| `:stop` | `:shutdown`, `:power-off` | Stop server | Server view |
+| `:restart` | `:reboot` | Restart server | Server view |
+| `:attach` | `:connect` | Attach volume/network | Volume/Network view |
+| `:detach` | `:disconnect` | Detach volume/network | Volume/Network view |
+| `:snapshot` | `:snap` | Create snapshot | Server/Volume view |
+| `:resize` | - | Resize server | Server view |
+| `:console` | `:logs` | View console logs | Server view |
+| `:refresh` | `:reload` | Refresh current view | All views |
+| `:cache-purge` | `:clear-cache` | Purge all caches | All views |
+| `:quit` | `:exit`, `:q` | Quit Substation | Main view |
+
+### Context Commands
+
+| Command | Action | Example |
+|---------|--------|---------|
+| `:ctx` | List available clouds | Lists all clouds from `clouds.yaml` |
+| `:ctx <cloud>` | Switch to cloud | `:ctx production` |
+| `:context <cloud>` | Switch to cloud | `:context staging` (alias for `:ctx`) |
+
+**Cloud Context Switching:**
+
+Switch between OpenStack clouds defined in your `clouds.yaml`:
+
+```bash
+# List available clouds
+:ctx
+
+# Switch to a specific cloud
+:ctx production
+:ctx staging
+:ctx dev
+
+# Tab completion for cloud names
+:ctx pro<Tab>  # Completes to :ctx production
+:ctx <Tab>     # Shows all available clouds
+```
+
+### Command Input Tips
+
+1. **Start with Tab** - Press `:` then `Tab` to discover all commands
+2. **Use fuzzy matching** - Don't worry about typos, commands will suggest corrections
+3. **Learn aliases progressively** - Start with full names (`:servers`), graduate to shortcuts (`:s`)
+4. **Context matters** - `:create` does different things in different views
+5. **History saves time** - Use Up/Down arrows to recall previous commands
+
 ## Quick Reference Card
 
 Print this and tape it to your monitor (we won't judge).
 
-### Navigation (View Switching)
+### Single-Key Shortcuts (Alternative Method)
 
-| Key | View | When You'll Need It |
-|-----|------|---------------------|
-| `d` | Dashboard | First thing, every time. Start here. |
-| `s` | Servers | "Why is prod down?" |
-| `g` | Server Groups | Advanced anti-affinity wizardry |
-| `n` | Networks | "Can you see me now?" |
-| `e` | Security Groups | Firewall archaeology and port spelunking |
-| `v` | Volumes | "Where did my data go?" (Cinder storage) |
-| `i` | Images | Finding that one CentOS 7 image from 2019 |
-| `f` | Flavors | Size matters. Choose wisely. |
-| `h` | Health Dashboard | "Is it us or them?" (usually them) |
-| `u` | Subnets | CIDR math at 3 AM. Fun times. |
-| `p` | Ports | MAC address detective work |
-| `r` | Routers | Routing table archaeology |
-| `l` | Floating IPs | The IPs that mysteriously float away |
-| `b` | Barbican (Secrets) | Where secrets hide |
-| `o` | Octavia (Load Balancers) | Distributing the pain |
-| `j` | Swift (Object Storage) | Blob storage chaos |
-| `k` | Key Pairs | SSH key management |
-| `q` | Configuration Profiles | Switch clouds/projects |
-| `z` | Advanced Search | Cross-service grep for your cloud |
+**Note**: These shortcuts are OPTIONAL. If you prefer, use command input (`:servers` instead of `s`).
 
-### Global Actions
+#### Navigation (View Switching)
 
-| Key | Action | Notes |
-|-----|--------|-------|
-| `?` | Show Help | Context-aware - changes based on current view |
-| `@` | About | Version info, credits |
-| `c` | Cache Purge | The panic button. Clears ALL caches. Use sparingly. |
-| `r` | Refresh | Refresh current view |
-| `a` | Auto-refresh Toggle | Cycle between 5s, 10s, 30s, 60s, off |
-| `/` | Search/Filter | Instant local filtering, no API calls |
-| `:` | Command Mode | command mode (see Command Mode section) |
-| `Ctrl-X` | Multi-Select Mode | Toggle multi-select mode for bulk operations |
-| `Esc` | Back/Cancel | Works everywhere, exits everything |
-| `q` | Quit | From main view only |
+| Key | Command Equivalent | View | When You'll Need It |
+|-----|-------------------|------|---------------------|
+| `d` | `:dashboard` | Dashboard | First thing, every time. Start here. |
+| `s` | `:servers` | Servers | "Why is prod down?" |
+| `g` | `:servergroups` | Server Groups | Advanced anti-affinity wizardry |
+| `n` | `:networks` | Networks | "Can you see me now?" |
+| `e` | `:securitygroups` | Security Groups | Firewall archaeology and port spelunking |
+| `v` | `:volumes` | Volumes | "Where did my data go?" (Cinder storage) |
+| `i` | `:images` | Images | Finding that one CentOS 7 image from 2019 |
+| `f` | `:flavors` | Flavors | Size matters. Choose wisely. |
+| `h` | `:health` | Health Dashboard | "Is it us or them?" (usually them) |
+| `u` | `:subnets` | Subnets | CIDR math at 3 AM. Fun times. |
+| `p` | `:ports` | Ports | MAC address detective work |
+| `r` | `:routers` | Routers | Routing table archaeology |
+| `l` | `:floatingips` | Floating IPs | The IPs that mysteriously float away |
+| `b` | `:barbican` | Barbican (Secrets) | Where secrets hide |
+| `o` | `:octavia` | Octavia (Load Balancers) | Distributing the pain |
+| `j` | `:swift` | Swift (Object Storage) | Blob storage chaos |
+| `k` | `:keypairs` | Key Pairs | SSH key management |
+| `q` | `:ctx` | Configuration Profiles | Switch clouds/projects |
+| `z` | `:search` | Advanced Search | Cross-service grep for your cloud |
 
-### List Navigation
+#### Global Actions
+
+| Key | Command Equivalent | Action | Notes |
+|-----|-------------------|--------|-------|
+| `?` | `:help` | Show Help | Context-aware - changes based on current view |
+| `@` | - | About | Version info, credits |
+| `c` | `:cache-purge` | Cache Purge | The panic button. Clears ALL caches. Use sparingly. |
+| `r` | `:refresh` | Refresh | Refresh current view |
+| `a` | - | Auto-refresh Toggle | Cycle between 5s, 10s, 30s, 60s, off |
+| `/` | - | Search/Filter | Instant local filtering, no API calls |
+| `:` | - | Command Input | PRIMARY navigation method (see Command Input section) |
+| `Ctrl-X` | - | Multi-Select Mode | Toggle multi-select mode for bulk operations |
+| `Esc` | - | Back/Cancel | Works everywhere, exits everything |
+| `q` | `:quit` | Quit | From main view only |
+
+#### List Navigation
 
 | Key | Action | Vim Users Note |
 |-----|--------|----------------|
@@ -58,7 +196,7 @@ Print this and tape it to your monitor (we won't judge).
 | `Space` | View details (or toggle selection in multi-select) | Deep dive into a resource |
 | `Enter` | View details | Same as Space, because options |
 
-### Multi-Select Mode
+#### Multi-Select Mode
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -80,12 +218,12 @@ Print this and tape it to your monitor (we won't judge).
 - Servers, Volumes, Networks, Subnets, Routers, Ports
 - Floating IPs, Security Groups, Server Groups, Key Pairs, Images
 
-### Resource Actions
+#### Resource Actions
 
-| Key | Action | Context |
-|-----|--------|---------|
-| `C` | Create | All resource lists |
-| `Del` or `D` | Delete | All resources (confirmation required) |
+| Key | Command Equivalent | Action | Context |
+|-----|-------------------|--------|---------|
+| `C` | `:create` | Create | All resource lists |
+| `Del` or `D` | `:delete` | Delete | All resources (confirmation required) |
 
 ## Context-Specific Shortcuts
 
@@ -274,38 +412,67 @@ Print this and tape it to your monitor (we won't judge).
 
 ## Navigation Patterns and Workflows
 
-### Efficient View Switching
-
-1. **Master navigation keys** - `d` `s` `n` `v` etc. for instant view switching
-2. **Use search frequently** - `/` to quickly find resources
-3. **Learn context actions** - Actions change per view
-4. **Detail views** - `Space` for quick resource inspection
-
-### Common Navigation Flows
+### Command-Based Workflows
 
 **Server Management:**
 
+```bash
+:servers          # Navigate to servers view
+↑/↓               # Select a server
+:start            # Start the selected server
 ```
-d (dashboard) → s (servers) → ↑/↓ (select) → Space (details) → Esc (back)
+
+**Alternative (single-key shortcuts):**
+
+```bash
+s                 # Navigate to servers view
+↑/↓               # Select a server
+S                 # Start the selected server
 ```
 
 **Network Troubleshooting:**
 
-```
-d (dashboard) → n (networks) → / (search) → type query → Space (details)
+```bash
+:networks         # Navigate to networks view
+/                 # Local search
+type query        # Filter results
+Space             # View details
 ```
 
 **Resource Creation:**
 
+```bash
+:servers          # Navigate to servers view
+:create           # Open create form
+Tab               # Navigate form fields
+Enter             # Submit form
 ```
-s (servers) → C (create) → Tab (navigate form) → Enter (submit)
+
+**Alternative (single-key shortcuts):**
+
+```bash
+s                 # Navigate to servers view
+C                 # Open create form
+Tab               # Navigate form fields
+Enter             # Submit form
 ```
 
 **Quick Resource Inspection:**
 
+```bash
+:volumes          # Navigate to any resource view
+↑/↓               # Select resource
+Space             # View details
+Esc               # Return to list
 ```
-Any list view → ↑/↓ (select) → Space (details) → Esc (return) → Repeat
-```
+
+### Efficient View Switching
+
+1. **Use command input** - `:servers`, `:networks`, `:volumes` for discoverable navigation
+2. **Tab completion** - Press `:` then Tab to see all available commands
+3. **Use search frequently** - `/` to quickly find resources
+4. **Learn context actions** - `:create`, `:delete`, `:start` adapt to your view
+5. **Detail views** - `Space` for quick resource inspection
 
 ## Vim-Style Navigation
 
@@ -391,116 +558,6 @@ Press `/` in any list:
 
 **Use when**: You don't know which service has the resource or need comprehensive search.
 
-## Command Mode
-
-Press `:` to enter command mode - inspired by vim. Command mode provides a powerful way to navigate, switch contexts, and execute actions. Command mode supports tab completion and command history for efficiency, making it easy to switch between OpenStack clouds and perform actions without leaving the keyboard.
-
-### Entering Command Mode
-
-| Key | Result |
-|-----|--------|
-| `:` | Activate command mode |
-| Type command | Enter command name |
-| `Enter` | Execute command |
-| `Esc` | Cancel command mode |
-
-### Command Mode Features
-
-**Tab Completion:**
-
-- Press `Tab` to auto-complete commands
-- Press `Tab` multiple times to cycle through matches
-- Works for both command names and cloud contexts
-
-**Command History:**
-
-- Press `↑` (Up arrow) to navigate to previous commands
-- Press `↓` (Down arrow) to navigate to next command
-- History persists between sessions (stored in `~/.config/substation/command_history`)
-- Maximum 50 commands stored
-
-### Available Commands
-
-**Navigation Commands:**
-
-| Command | Shortcut | Action |
-|---------|----------|--------|
-| `:servers` | `:s` | Navigate to servers view |
-| `:networks` | `:n` | Navigate to networks view |
-| `:volumes` | `:v` | Navigate to volumes view |
-| `:images` | `:i` | Navigate to images view |
-| `:flavors` | `:f` | Navigate to flavors view |
-| `:dashboard` | `:d` | Navigate to dashboard |
-| `:routers` | `:r` | Navigate to routers view |
-| `:ports` | `:p` | Navigate to ports view |
-| `:subnets` | `:u` | Navigate to subnets view |
-| `:floatingips` | `:l` | Navigate to floating IPs view |
-| `:securitygroups` | `:e` | Navigate to security groups view |
-| `:servergroups` | `:g` | Navigate to server groups view |
-| `:keypairs` | `:k` | Navigate to key pairs view |
-| `:search` | `:z` | Navigate to advanced search |
-| `:help` | `:?` | Show help |
-
-**Context Commands:**
-
-| Command | Action | Example |
-|---------|--------|---------|
-| `:ctx` | List available clouds | Lists all clouds from `clouds.yaml` |
-| `:ctx <cloud>` | Switch to cloud | `:ctx production` |
-| `:context <cloud>` | Switch to cloud | `:context staging` (alias for `:ctx`) |
-
-**Cloud Context Switching:**
-
-Switch between OpenStack clouds defined in your `clouds.yaml`:
-
-```bash
-# List available clouds
-:ctx
-
-# Switch to a specific cloud
-:ctx production
-:ctx staging
-:ctx dev
-
-# Tab completion for cloud names
-:ctx pro<Tab>  # Completes to :ctx production
-:ctx <Tab>     # Shows all available clouds
-```
-
-**Tab Completion for Cloud Names:**
-
-- Type `:ctx` (with space) and press `Tab` to see all available clouds
-- Type `:ctx p` and press `Tab` to complete cloud names starting with 'p'
-- Press `Tab` multiple times to cycle through matching clouds
-
-**Example Workflow:**
-
-```bash
-# Switch clouds quickly
-:ctx dev<Tab>    # Auto-completes to :ctx development
-<Enter>          # Switches to development cloud
-
-# Navigate using history
-:↑               # Shows previous command (:ctx development)
-:↑               # Shows earlier command (:servers)
-<Enter>          # Executes :servers
-```
-
-### Command Mode Tips
-
-1. **Use Tab completion** - Faster than typing full commands
-2. **Leverage history** - UP/DOWN arrows save keystrokes
-3. **Cloud switching** - `:ctx <Tab>` shows all clouds
-4. **Fuzzy matching** - Commands suggest closest matches
-5. **Shortcuts work** - Most commands have single-letter shortcuts
-
-### Command History Behavior
-
-- History is **persistent** across sessions
-- Commands are **deduplicated** (no consecutive duplicates)
-- **Maximum 50 commands** retained
-- **Newest commands** at the end
-- Type any character to **reset** to end of history
 
 ## Auto-Refresh Configuration
 
@@ -571,8 +628,8 @@ Every operation can be performed without a mouse:
 
 **Solutions**:
 
-- Press `r` to manually refresh
-- Press `c` to purge cache (if data is stale)
+- Use `:refresh<Enter>` (or `:reload<Enter>`) to manually refresh
+- Use `:cache-purge<Enter>` (or `:cc<Enter>`) to purge cache (if data is stale)
 - Check auto-refresh setting (press `a`)
 
 ## Cheat Sheet
@@ -583,7 +640,7 @@ Every operation can be performed without a mouse:
 Navigation:  d s n v i          (Dashboard, Servers, Networks, Volumes, Images)
 Actions:     C Del Space ? q    (Create, Delete, Details, Help, Quit)
 Search:      / z                (Local, Advanced)
-Commands:    : (then cmd name)  (Command mode - :ctx, :servers, etc.)
+Commands:    : (then cmd name)  (Command input - :ctx, :servers, etc.)
 Refresh:     r c                (Refresh, Cache purge)
 Movement:    ↑↓ j k Page-Up/Dn  (List navigation)
 Bulk Ops:    Ctrl-X Space Del   (Multi-select, Select, Bulk delete)
@@ -609,8 +666,8 @@ q       - Quit (from main view)
 6. **Learn view keys** - Faster than any mouse
 7. **Use `Space` liberally** - Quick detail inspection
 8. **Vim keys work** - `j/k` for navigation, `g/G` for jumps
-9. **Command mode Tab completion** - `:ctx <Tab>` shows all clouds
-10. **Command history** - UP/DOWN arrows in command mode recall previous commands
+9. **Command input Tab completion** - `:ctx <Tab>` shows all clouds
+10. **Command history** - UP/DOWN arrows in command input recall previous commands
 
 ---
 

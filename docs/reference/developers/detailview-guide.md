@@ -34,7 +34,7 @@
 
 - Building forms (use FormBuilder)
 - Building lists (use StatusListView)
-- Building complex custom layouts (use raw SwiftTUI components)
+- Building complex custom layouts (use raw SwiftNCurses components)
 
 ## Basic Usage
 
@@ -96,7 +96,7 @@ Standard label-value pair with optional styling:
 
 ### Custom Component
 
-For complex layouts requiring SwiftTUI components:
+For complex layouts requiring SwiftNCurses components:
 
 ```swift
 .customComponent(
@@ -517,7 +517,7 @@ components.append(basicInfoSection)
 
 let detailComponent = VStack(spacing: 0, children: components)
 let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-await SwiftTUI.render(detailComponent, on: surface, in: bounds)
+await SwiftNCurses.render(detailComponent, on: surface, in: bounds)
 ```
 
 ### After (Using DetailView)
@@ -690,7 +690,7 @@ func handleScroll(direction: ScrollDirection) {
 
 ### Issue: Custom component not rendering
 
-**Check**: Is the component valid SwiftTUI syntax?
+**Check**: Is the component valid SwiftNCurses syntax?
 
 ```swift
 // Good - valid HStack

@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct SnapshotManagementView {
     @MainActor
@@ -22,9 +22,9 @@ struct SnapshotManagementView {
         )
 
         guard let server = form.selectedServer else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: startCol + 2, y: startRow + 2, width: 30, height: 1)
-            await SwiftTUI.render(
+            await SwiftNCurses.render(
                 Text("Error: No server selected").error(),
                 on: surface,
                 in: errorBounds
@@ -52,10 +52,10 @@ struct SnapshotManagementView {
             showValidationErrors: false
         )
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let formBounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: formBounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: formBounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: formBounds)
     }
 
     @MainActor

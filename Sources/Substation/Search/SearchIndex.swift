@@ -117,12 +117,6 @@ actor SearchIndex {
             resourceCount += 1
         }
 
-        // Index Barbican containers
-        for container in resources.barbicanContainers {
-            await indexBarbicanContainer(container)
-            resourceCount += 1
-        }
-
         // Index load balancers
         for loadBalancer in resources.loadBalancers {
             await indexLoadBalancer(loadBalancer)
@@ -561,28 +555,6 @@ actor SearchIndex {
         await textIndex.addEntry(searchableText, result: result)
     }
 
-    private func indexBarbicanContainer(_ container: BarbicanContainer) async {
-        let searchableText = buildBarbicanContainerSearchText(container)
-
-        let result = SearchResult(
-            resourceId: container.containerRef ?? container.id,
-            resourceType: .barbicanContainer,
-            name: container.name,
-            description: nil,
-            status: container.status,
-            createdAt: container.created,
-            updatedAt: container.updated,
-            ipAddresses: [],
-            metadata: [:],
-            tags: [],
-            relevanceScore: 0.0,
-            matchHighlights: [],
-            relationships: []
-        )
-
-        await textIndex.addEntry(searchableText, result: result)
-    }
-
     private func indexLoadBalancer(_ loadBalancer: LoadBalancer) async {
         let searchableText = buildLoadBalancerSearchText(loadBalancer)
 
@@ -831,17 +803,6 @@ actor SearchIndex {
         if let status = secret.status { components.append(status) }
         if let algorithm = secret.algorithm { components.append(algorithm) }
         if let secretRef = secret.secretRef { components.append(secretRef) }
-
-        return components.joined(separator: " ")
-    }
-
-    private func buildBarbicanContainerSearchText(_ container: BarbicanContainer) -> String {
-        var components: [String] = []
-
-        if let name = container.name { components.append(name) }
-        if let type = container.type { components.append(type) }
-        if let status = container.status { components.append(status) }
-        if let containerRef = container.containerRef { components.append(containerRef) }
 
         return components.joined(separator: " ")
     }

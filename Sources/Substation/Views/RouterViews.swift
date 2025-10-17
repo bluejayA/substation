@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct RouterViews {
     @MainActor
@@ -457,11 +457,11 @@ struct RouterViews {
                                    routerCreateFormState: FormBuilderState,
                                    availabilityZones: [String], externalNetworks: [Network]) async {
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         guard width > Self.routerCreateMinScreenWidth && height > Self.routerCreateMinScreenHeight else {
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.routerCreateBoundsMinWidth, width), height: max(Self.routerCreateBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.routerCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.routerCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -488,7 +488,7 @@ struct RouterViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
         if let currentField = routerCreateFormState.getCurrentField() {
             switch currentField {
@@ -506,7 +506,7 @@ struct RouterViews {
                     ) {
                         let overlayBounds = Rect(x: startCol, y: startRow, width: width, height: height)
                         surface.clear(rect: overlayBounds)
-                        await SwiftTUI.render(selectorComponent, on: surface, in: overlayBounds)
+                        await SwiftNCurses.render(selectorComponent, on: surface, in: overlayBounds)
                     }
                 }
             default:
@@ -519,13 +519,13 @@ struct RouterViews {
     @MainActor
     static func drawRouterDeleteConfirmation(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                            width: Int32, height: Int32, router: Router) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let dialogWidth: Int32 = Self.routerDeleteDialogWidth
         let dialogHeight: Int32 = Self.routerDeleteDialogHeight
         let dialogStartRow = startRow + (height - dialogHeight) / 2
         let dialogStartCol = startCol + (width - dialogWidth) / 2
 
-        // Clear dialog area with error background using SwiftTUI
+        // Clear dialog area with error background using SwiftNCurses
         let backgroundBounds = Rect(x: dialogStartCol, y: dialogStartRow, width: dialogWidth, height: dialogHeight)
         await surface.fill(rect: backgroundBounds, character: " ", style: .error)
 
@@ -552,6 +552,6 @@ struct RouterViews {
             .padding(EdgeInsets(top: Self.routerDeleteDialogTopPadding, leading: Self.routerDeleteDialogLeadingPadding, bottom: Self.routerDeleteDialogBottomPadding, trailing: Self.routerDeleteDialogTrailingPadding))
 
         let dialogBounds = Rect(x: dialogStartCol, y: dialogStartRow, width: dialogWidth, height: dialogHeight)
-        await SwiftTUI.render(dialogComponent, on: surface, in: dialogBounds)
+        await SwiftNCurses.render(dialogComponent, on: surface, in: dialogBounds)
     }
 }

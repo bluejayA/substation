@@ -242,23 +242,6 @@ final class ResourceCacheAdapter {
         let stats = await getStatistics()
         return stats.hitRate
     }
-
-    // MARK: - Migration Helpers
-
-    /// Migrate from legacy ResourceNameCache
-    func migrateFromLegacyCache(_ legacyCache: ResourceNameCache) async {
-        // Note: This would need to be implemented based on legacy cache structure
-        // For now, we'll clear and let it repopulate naturally
-        await clear()
-        Logger.shared.logInfo("ResourceCacheAdapter migrated from legacy cache")
-    }
-
-    /// Warm cache with commonly accessed resources
-    func warmCache(with commonIds: [String: ResourceType]) async {
-        Logger.shared.logInfo("ResourceCacheAdapter warming cache with \(commonIds.count) common resources")
-        // This would typically fetch names from OpenStack if not cached
-        // Implementation depends on having access to OpenStack client
-    }
 }
 
 // MARK: - Supporting Types

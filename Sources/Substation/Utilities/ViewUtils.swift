@@ -1,15 +1,15 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
-/// SwiftTUI-compatible utilities replacing direct ncurses operations
+/// SwiftNCurses-compatible utilities replacing direct ncurses operations
 struct ViewUtils {
-    /// Prompt for user input using SwiftTUI
+    /// Prompt for user input using SwiftNCurses
     @MainActor static func prompt(_ text: String, screen: OpaquePointer?, screenRows: Int32) -> String? {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let position = Position(x: 1, y: screenRows - 2)
 
-        return SwiftTUI.showInputDialog(
+        return SwiftNCurses.showInputDialog(
             prompt: text,
             on: surface,
             at: position

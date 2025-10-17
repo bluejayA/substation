@@ -1,7 +1,7 @@
 import Foundation
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct NetworkInterfaceManagementView {
 
@@ -13,12 +13,12 @@ struct NetworkInterfaceManagementView {
                                                       resourceNameCache: ResourceNameCache, resourceResolver: ResourceResolver) async {
 
         // Create surface once for optimal performance
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > Self.networkInterfaceManagementMinScreenWidth && height > Self.networkInterfaceManagementMinScreenHeight else {
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.networkInterfaceManagementBoundsMinWidth, width), height: max(Self.networkInterfaceManagementBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.networkInterfaceManagementScreenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.networkInterfaceManagementScreenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -29,7 +29,7 @@ struct NetworkInterfaceManagementView {
         // Server validation with gold standard error handling
         guard form.selectedServer != nil else {
             let errorBounds = Rect(x: startCol + Self.networkInterfaceManagementErrorColOffset, y: startRow + Self.networkInterfaceManagementErrorRowOffset, width: Self.networkInterfaceManagementErrorWidth, height: Self.networkInterfaceManagementErrorHeight)
-            await SwiftTUI.render(Text(Self.networkInterfaceManagementNoServerSelectedText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.networkInterfaceManagementNoServerSelectedText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -54,7 +54,7 @@ struct NetworkInterfaceManagementView {
                 .padding(Self.networkInterfaceManagementErrorMessageEdgeInsets))
             let errorComponent = VStack(spacing: Self.networkInterfaceManagementComponentSpacing, children: components)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: Self.networkInterfaceManagementErrorComponentHeight)
-            await SwiftTUI.render(errorComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(errorComponent, on: surface, in: bounds)
             return
         }
 
@@ -64,7 +64,7 @@ struct NetworkInterfaceManagementView {
                 .padding(Self.networkInterfaceManagementLoadingEdgeInsets))
             let loadingComponent = VStack(spacing: Self.networkInterfaceManagementComponentSpacing, children: components)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: Self.networkInterfaceManagementLoadingComponentHeight)
-            await SwiftTUI.render(loadingComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(loadingComponent, on: surface, in: bounds)
             return
         }
 
@@ -79,7 +79,7 @@ struct NetworkInterfaceManagementView {
                 .padding(Self.networkInterfaceManagementEmptyStateEdgeInsets))
             let emptyComponent = VStack(spacing: Self.networkInterfaceManagementComponentSpacing, children: components)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-            await SwiftTUI.render(emptyComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(emptyComponent, on: surface, in: bounds)
             return
         }
 
@@ -221,7 +221,7 @@ struct NetworkInterfaceManagementView {
         // Render unified network interface management view
         let managementComponent = VStack(spacing: Self.networkInterfaceManagementComponentSpacing, children: components)
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(managementComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(managementComponent, on: surface, in: bounds)
     }
 
     // MARK: - Component Creation Functions

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 @MainActor
@@ -19,7 +19,7 @@ struct RouterSelectionView {
         title: String,
         checkboxMode: FormSelectorCheckboxMode = .basic
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         let tabs = [
             FormSelectorTab<Router>(
@@ -55,6 +55,6 @@ struct RouterSelectionView {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(selector.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(selector.render(), on: surface, in: bounds)
     }
 }

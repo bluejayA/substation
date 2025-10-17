@@ -163,7 +163,7 @@ let formBuilder = FormBuilder(
 )
 
 // Render it
-await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 ```
 
 ### Step 4: Handle Input
@@ -327,7 +327,7 @@ func matchesSearch(_ query: String) -> Bool {
 
 ## Related Documentation
 
-- **[API Reference](../../reference/api/index.md)** - Complete API documentation for OSClient, SwiftTUI, CrossPlatformTimer
+- **[API Reference](../../reference/api/index.md)** - Complete API documentation for OSClient, SwiftNCurses, CrossPlatformTimer
 - **[Architecture Overview](../../architecture/index.md)** - Overall system architecture
 - **[Performance Documentation](../../performance/index.md)** - Benchmarking and optimization
 

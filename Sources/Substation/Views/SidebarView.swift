@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 @MainActor
 struct SidebarView {
@@ -11,9 +11,9 @@ struct SidebarView {
         // Skip rendering if sidebar is hidden (width = 0)
         guard sidebarWidth > 0 else { return }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
-        // Clear and draw sidebar background using SwiftTUI
+        // Clear and draw sidebar background using SwiftNCurses
         let sidebarBounds = Rect(x: 0, y: 2, width: sidebarWidth, height: screenRows - 4)
         await surface.fill(rect: sidebarBounds, character: " ", style: .secondary)
 
@@ -38,7 +38,7 @@ struct SidebarView {
             if isInCommandMode {
                 views = filterViewsByCommand(commandQuery: commandQuery, allViews: ViewMode.allCases)
             } else {
-                views = ViewMode.allCases.filter { !$0.key.isEmpty }.sorted { $0.title < $1.title }
+                views = ViewMode.allCases.filter { isNavigableView($0) }.sorted { $0.title < $1.title }
             }
 
             let maxNavItems = Int(screenRows - 8) - 5 // Leave space for Resource Summary
@@ -48,27 +48,24 @@ struct SidebarView {
                 // Highlight first match with success, rest with info
                 let isFilteredView = isInCommandMode && !commandQuery.isEmpty
                 let navStyle: TextStyle = (index == 0 && isFilteredView) ? .success : .info
-                let keyStyle: TextStyle = view == currentView ? .emphasis : .secondary
+                let titleStyle: TextStyle = view == currentView ? .emphasis : navStyle
 
-                // Combine key and text for compact mode
-                var concatenated = [
-                    Text(view.key).styled(keyStyle).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 1))
-                ]
-                concatenated.append(Text("\(view.title)").styled(navStyle).padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 1)))
-                components.append(HStack(spacing: 0, children: concatenated))
+                // Display view title without key shortcuts
+                let titleText = Text(view.title).styled(titleStyle).padding(EdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 1))
+                components.append(titleText)
             }
         }
 
         // Render the entire sidebar as a VStack
         let sidebarComponent = VStack(spacing: 0, children: components)
         let contentBounds = Rect(x: 0, y: 2, width: sidebarWidth, height: screenRows - 4)
-        await SwiftTUI.render(sidebarComponent, on: surface, in: contentBounds)
+        await SwiftNCurses.render(sidebarComponent, on: surface, in: contentBounds)
 
-        // Vertical separator using SwiftTUI
+        // Vertical separator using SwiftNCurses
         let separatorComponents = (0..<Int(screenRows - 4)).map { _ in Text("|").info() }
         let separatorSection = VStack(spacing: 0, children: separatorComponents)
         let separatorBounds = Rect(x: sidebarWidth, y: 2, width: 1, height: screenRows - 4)
-        await SwiftTUI.render(separatorSection, on: surface, in: separatorBounds)
+        await SwiftNCurses.render(separatorSection, on: surface, in: separatorBounds)
     }
 
     // MARK: - Command Filtering
@@ -76,7 +73,7 @@ struct SidebarView {
     private static func filterViewsByCommand(commandQuery: String, allViews: [ViewMode]) -> [ViewMode] {
         // Show all navigable views when command mode is active but query is empty
         guard !commandQuery.isEmpty else {
-            return allViews.filter { !$0.key.isEmpty && isNavigableView($0) }.sorted { $0.title < $1.title }
+            return allViews.filter { isNavigableView($0) }.sorted { $0.title < $1.title }
         }
 
         let query = commandQuery.lowercased()
@@ -101,33 +98,7 @@ struct SidebarView {
     }
 
     private static func isNavigableView(_ view: ViewMode) -> Bool {
-        // Filter out detail views, create views, and management views
-        switch view {
-        case .loading, .help, .about:
-            return true
-        case .serverDetail, .serverGroupDetail, .networkDetail, .securityGroupDetail,
-             .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail,
-             .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail,
-             .keyPairDetail, .healthDashboardServiceDetail,
-             .barbicanSecretDetail, .barbicanContainerDetail, .octaviaLoadBalancerDetail,
-             .swiftContainerDetail, .swiftObjectDetail:
-            return false
-        case .serverCreate, .serverGroupCreate, .networkCreate, .securityGroupCreate,
-             .subnetCreate, .volumeCreate, .portCreate, .routerCreate, .floatingIPCreate,
-             .keyPairCreate, .barbicanSecretCreate, .barbicanContainerCreate,
-             .octaviaLoadBalancerCreate, .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload,
-             .swiftObjectDownload, .swiftContainerMetadata, .swiftObjectMetadata:
-            return false
-        case .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement,
-             .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement,
-             .serverResize, .volumeSnapshotManagement, .volumeBackupManagement,
-             .networkServerAttachment, .securityGroupServerAttachment,
-             .securityGroupServerManagement, .networkServerManagement,
-             .volumeServerManagement, .floatingIPServerManagement,
-             .subnetRouterManagement, .flavorSelection, .securityGroupRuleManagement:
-            return false
-        default:
-            return true
-        }
+        // Only show views that have navigation commands defined in ResourceRegistry
+        return ResourceRegistry.shared.hasNavigationCommand(for: view)
     }
 }

@@ -5,121 +5,36 @@ import Darwin
 import Glibc
 #endif
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 @MainActor
 extension TUI {
 
+    /// Handle input for Swift directory metadata form using the universal handler
     internal func handleSwiftDirectoryMetadataInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = swiftDirectoryMetadataFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = swiftDirectoryMetadataFormState
+        var localForm = swiftDirectoryMetadataForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                swiftDirectoryMetadataFormState.nextField()
-                swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = swiftDirectoryMetadataFormState.getCurrentField() {
-                switch currentField {
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        swiftDirectoryMetadataFormState.activateCurrentField()
-                        swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        swiftDirectoryMetadataFormState.handleCharacterInput(" ")
-                        swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                        await self.draw(screen: screen)
-                    }
-                case .checkbox:
-                    // Toggle checkbox
-                    swiftDirectoryMetadataFormState.toggleCurrentCheckbox()
-                    swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                    await self.draw(screen: screen)
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                swiftDirectoryMetadataFormState.deactivateCurrentField()
-                swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = swiftDirectoryMetadataForm.validateForm()
-                if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
-                    return
-                }
-
-                await submitSwiftDirectoryMetadata(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = swiftDirectoryMetadataFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    swiftDirectoryMetadataFormState.previousField()
-                } else {
-                    swiftDirectoryMetadataFormState.nextField()
-                }
-                swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                swiftDirectoryMetadataFormState.cancelCurrentField()
-                swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Cancel and return to object list
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.swiftDirectoryMetadataFormState = formState
+                self.swiftDirectoryMetadataForm = form
+                await self.submitSwiftDirectoryMetadata(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .swiftContainerDetail, resetSelection: false)
             }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = swiftDirectoryMetadataFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    swiftDirectoryMetadataFormState.handleCharacterInput(Character(scalar))
-                    swiftDirectoryMetadataForm.updateFromFormState(swiftDirectoryMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
-
-        // Rebuild form state to reflect any changes in form fields
-        swiftDirectoryMetadataFormState = FormBuilderState(
-            fields: swiftDirectoryMetadataForm.buildFields(
-                selectedFieldId: swiftDirectoryMetadataFormState.getCurrentFieldId(),
-                activeFieldId: swiftDirectoryMetadataFormState.getActiveFieldId(),
-                formState: swiftDirectoryMetadataFormState
-            ),
-            preservingStateFrom: swiftDirectoryMetadataFormState
         )
+
+        // Update actor-isolated properties with modified local copies
+        swiftDirectoryMetadataFormState = localFormState
+        swiftDirectoryMetadataForm = localForm
     }
 
     private func submitSwiftDirectoryMetadata(screen: OpaquePointer?) async {
@@ -200,3 +115,8 @@ extension TUI {
         await self.draw(screen: screen)
     }
 }
+
+// MARK: - SwiftDirectoryMetadataForm Protocol Conformance
+
+// SwiftDirectoryMetadataForm already has all required methods
+extension SwiftDirectoryMetadataForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

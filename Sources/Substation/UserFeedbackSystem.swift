@@ -1,9 +1,9 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // Resolve Position namespace conflict by using fully qualified name
-// UIPosition refers to SwiftTUI.Position which uses Int32 coordinates
+// UIPosition refers to SwiftNCurses.Position which uses Int32 coordinates
 typealias UIPosition = Position
 
 // MARK: - User Feedback System
@@ -370,117 +370,6 @@ public final class ProgressController: Sendable {
 }
 
 // MARK: - UI Components
-
-/// Notification view component
-public struct NotificationView: Component {
-    private let notification: Notification
-
-    public init(notification: Notification) {
-        self.notification = notification
-    }
-
-    public var intrinsicSize: Size {
-        return Size(width: 50, height: 3)
-    }
-
-    @MainActor
-    public func render(in context: DrawingContext) async {
-        let icon = getIcon(for: notification.type)
-        let style = getStyle(for: notification.type)
-
-        // Border
-        let borderRect = context.bounds
-        await drawBorder(in: context, rect: borderRect, style: style)
-
-        // Icon and title
-        let titleText = "\(icon) \(notification.title)"
-        let titleComponent = Text(titleText).styled(style)
-        let titleRect = Rect(
-            origin: UIPosition(x: 1, y: 0),
-            size: Size(width: context.bounds.size.width - 2, height: 1)
-        )
-        await titleComponent.render(in: context.subContext(rect: titleRect))
-
-        // Message (wrapped if necessary)
-        let messageLines = wrapText(notification.message, width: Int(context.bounds.size.width - 2))
-        for (index, line) in messageLines.prefix(1).enumerated() { // Show only first line
-            let messageRect = Rect(
-                origin: UIPosition(x: 1, y: Int32(1 + index)),
-                size: Size(width: context.bounds.size.width - 2, height: 1)
-            )
-            let messageComponent = Text(line).primary()
-            await messageComponent.render(in: context.subContext(rect: messageRect))
-        }
-    }
-
-    private func getIcon(for type: Notification.NotificationType) -> String {
-        switch type {
-        case .success: return "[PASS]"
-        case .error: return "[FAIL]"
-        case .warning: return "[WARN]"
-        case .info: return "[INFO]"
-        case .loading: return "[CREATING]"
-        }
-    }
-
-    private func getStyle(for type: Notification.NotificationType) -> TextStyle {
-        switch type {
-        case .success: return .success
-        case .error: return .error
-        case .warning: return .warning
-        case .info, .loading: return .accent
-        }
-    }
-
-    private func drawBorder(in context: DrawingContext, rect: Rect, style: TextStyle) async {
-        // Simple border drawing
-        let borderChar = "-"
-        let cornerChar = "+"
-
-        // Top border
-        for x in 0..<rect.size.width {
-            let pos = UIPosition(x: Int32(x), y: 0)
-            let char = (x == 0 || x == rect.size.width - 1) ? cornerChar : borderChar
-            await context.surface.draw(at: context.absolutePosition(for: pos), character: Character(char), style: style)
-        }
-
-        // Bottom border
-        for x in 0..<rect.size.width {
-            let pos = UIPosition(x: Int32(x), y: rect.size.height - 1)
-            let char = (x == 0 || x == rect.size.width - 1) ? "+" : borderChar
-            await context.surface.draw(at: context.absolutePosition(for: pos), character: Character(char), style: style)
-        }
-
-        // Side borders
-        for y in 1..<(rect.size.height - 1) {
-            await context.surface.draw(at: context.absolutePosition(for: UIPosition(x: 0, y: Int32(y))), character: "|", style: style)
-            await context.surface.draw(at: context.absolutePosition(for: UIPosition(x: rect.size.width - 1, y: Int32(y))), character: "|", style: style)
-        }
-    }
-
-    private func wrapText(_ text: String, width: Int) -> [String] {
-        let words = text.components(separatedBy: " ")
-        var lines: [String] = []
-        var currentLine = ""
-
-        for word in words {
-            if currentLine.isEmpty {
-                currentLine = word
-            } else if (currentLine + " " + word).count <= width {
-                currentLine += " " + word
-            } else {
-                lines.append(currentLine)
-                currentLine = word
-            }
-        }
-
-        if !currentLine.isEmpty {
-            lines.append(currentLine)
-        }
-
-        return lines
-    }
-}
 
 /// Modal view component
 public struct ModalView: Component, @unchecked Sendable {

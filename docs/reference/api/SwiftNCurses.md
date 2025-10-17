@@ -1,10 +1,10 @@
-# SwiftTUI Framework API Reference
+# SwiftNCurses Framework API Reference
 
-Complete API reference for the SwiftTUI terminal UI framework and components.
+Complete API reference for the SwiftNCurses terminal UI framework and components.
 
 ## Package Overview
 
-SwiftTUI provides a declarative terminal UI framework with:
+SwiftNCurses provides a declarative terminal UI framework with:
 
 - **SwiftUI-like syntax** for familiar development experience
 - **Cross-platform rendering** using NCurses abstraction
@@ -17,22 +17,22 @@ SwiftTUI provides a declarative terminal UI framework with:
 ### Surface Management
 
 ```swift
-import SwiftTUI
+import SwiftNCurses
 
 // Create rendering surface
-let surface = SwiftTUI.surface(from: screen)
+let surface = SwiftNCurses.surface(from: screen)
 
 // Get surface dimensions
-let (width, height) = SwiftTUI.getScreenSize()
-let maxY = SwiftTUI.getMaxY(screen)
-let maxX = SwiftTUI.getMaxX(screen)
+let (width, height) = SwiftNCurses.getScreenSize()
+let maxY = SwiftNCurses.getMaxY(screen)
+let maxX = SwiftNCurses.getMaxX(screen)
 ```
 
 ### Component Rendering
 
 ```swift
 // Basic text rendering
-await SwiftTUI.render(
+await SwiftNCurses.render(
     Text("Hello, World!").bold().color(.blue),
     on: surface,
     in: Rect(x: 0, y: 0, width: 20, height: 1)
@@ -40,18 +40,18 @@ await SwiftTUI.render(
 
 // List component
 let listComponent = List(items: ["Item 1", "Item 2", "Item 3"])
-await SwiftTUI.render(listComponent, on: surface, in: bounds)
+await SwiftNCurses.render(listComponent, on: surface, in: bounds)
 
 // Table component
 let tableComponent = Table(data: serverData, columns: columns)
-await SwiftTUI.render(tableComponent, on: surface, in: bounds)
+await SwiftNCurses.render(tableComponent, on: surface, in: bounds)
 ```
 
 ### Input Handling
 
 ```swift
 // Get user input
-let key = SwiftTUI.getInput(screen)
+let key = SwiftNCurses.getInput(screen)
 
 // Handle special keys
 switch key {
@@ -72,12 +72,12 @@ default:
 
 ```swift
 // Screen operations
-SwiftTUI.clear(screen)
-SwiftTUI.refresh(screen)
+SwiftNCurses.clear(screen)
+SwiftNCurses.refresh(screen)
 
 // Initialize/cleanup
-let screen = SwiftTUI.initializeScreen()
-SwiftTUI.cleanup(screen)
+let screen = SwiftNCurses.initializeScreen()
+SwiftNCurses.cleanup(screen)
 ```
 
 ## UI Components
@@ -109,7 +109,7 @@ let styledText = Text("Error!")
     .underline()
 
 // Render
-await SwiftTUI.render(text, on: surface, in: bounds)
+await SwiftNCurses.render(text, on: surface, in: bounds)
 ```
 
 ### List Component
@@ -137,7 +137,7 @@ let list = List(items: items)
         print("Selected: \(item)")
     }
 
-await SwiftTUI.render(list, on: surface, in: bounds)
+await SwiftNCurses.render(list, on: surface, in: bounds)
 ```
 
 ### Table Component
@@ -177,7 +177,7 @@ let table = Table(data: servers, columns: columns)
     .sortable(true)
     .selectable(true)
 
-await SwiftTUI.render(table, on: surface, in: bounds)
+await SwiftNCurses.render(table, on: surface, in: bounds)
 ```
 
 ### Form Component
@@ -210,7 +210,7 @@ let form = Form {
     // Handle form submission
 }
 
-await SwiftTUI.render(form, on: surface, in: bounds)
+await SwiftNCurses.render(form, on: surface, in: bounds)
 ```
 
 ## Color System
@@ -282,8 +282,8 @@ func splitHorizontal(bounds: Rect, ratio: Double) -> (Rect, Rect) {
 // Split screen into header and content
 let (header, content) = splitVertical(bounds: fullScreen, ratio: 0.1)
 
-await SwiftTUI.render(headerText, on: surface, in: header)
-await SwiftTUI.render(contentList, on: surface, in: content)
+await SwiftNCurses.render(headerText, on: surface, in: header)
+await SwiftNCurses.render(contentList, on: surface, in: content)
 ```
 
 ## Event Handling
@@ -316,7 +316,7 @@ let KEY_END: Int32 = 360
 ```swift
 var running = true
 while running {
-    let key = SwiftTUI.getInput(screen)
+    let key = SwiftNCurses.getInput(screen)
 
     switch key {
     case KEY_UP:
@@ -348,7 +348,7 @@ while running {
 
     // Re-render
     await renderScreen()
-    SwiftTUI.refresh(screen)
+    SwiftNCurses.refresh(screen)
 }
 ```
 
@@ -359,17 +359,17 @@ while running {
 ```swift
 // 1. Minimize full screen redraws
 // Only redraw changed regions
-await SwiftTUI.render(updatedComponent, on: surface, in: changedBounds)
+await SwiftNCurses.render(updatedComponent, on: surface, in: changedBounds)
 
 // 2. Batch updates
 let components = [component1, component2, component3]
 for (component, bounds) in zip(components, boundsList) {
-    await SwiftTUI.render(component, on: surface, in: bounds)
+    await SwiftNCurses.render(component, on: surface, in: bounds)
 }
-SwiftTUI.refresh(screen)  // Single refresh after all updates
+SwiftNCurses.refresh(screen)  // Single refresh after all updates
 
 // 3. Use double buffering
-// SwiftTUI handles this automatically
+// SwiftNCurses handles this automatically
 
 // 4. Limit rendering frequency
 let targetFPS = 60
@@ -381,10 +381,10 @@ let frameTime = 1.0 / Double(targetFPS)
 
 ```swift
 // 1. Clear screen when switching views
-SwiftTUI.clear(screen)
+SwiftNCurses.clear(screen)
 
 // 2. Cleanup on exit
-defer { SwiftTUI.cleanup(screen) }
+defer { SwiftNCurses.cleanup(screen) }
 
 // 3. Avoid retaining large data structures in components
 // Pass only what's needed for rendering
@@ -406,7 +406,7 @@ defer { SwiftTUI.cleanup(screen) }
 
 ```swift
 // Check terminal size
-let (width, height) = SwiftTUI.getScreenSize()
+let (width, height) = SwiftNCurses.getScreenSize()
 
 // Ensure minimum size
 guard width >= 80 && height >= 24 else {
@@ -415,7 +415,7 @@ guard width >= 80 && height >= 24 else {
 }
 
 // Handle resize events
-// SwiftTUI automatically handles SIGWINCH on supported platforms
+// SwiftNCurses automatically handles SIGWINCH on supported platforms
 ```
 
 ## Common Patterns
@@ -440,7 +440,7 @@ struct ListView {
             .selectedIndex(selectedIndex)
             .scrollable(true)
 
-        await SwiftTUI.render(list, on: surface, in: bounds)
+        await SwiftNCurses.render(list, on: surface, in: bounds)
     }
 }
 ```
@@ -458,7 +458,7 @@ struct TableView<T> {
             .selectable(true)
             .sortable(true)
 
-        await SwiftTUI.render(table, on: surface, in: bounds)
+        await SwiftNCurses.render(table, on: surface, in: bounds)
     }
 }
 ```
@@ -494,7 +494,7 @@ struct FormView {
             )
         }
 
-        await SwiftTUI.render(form, on: surface, in: bounds)
+        await SwiftNCurses.render(form, on: surface, in: bounds)
     }
 }
 ```
@@ -549,15 +549,15 @@ endwin();
 **After**:
 
 ```swift
-let screen = SwiftTUI.initializeScreen()
-defer { SwiftTUI.cleanup(screen) }
+let screen = SwiftNCurses.initializeScreen()
+defer { SwiftNCurses.cleanup(screen) }
 
-await SwiftTUI.render(
+await SwiftNCurses.render(
     Text("Hello, World!"),
-    on: SwiftTUI.surface(from: screen),
+    on: SwiftNCurses.surface(from: screen),
     in: Rect(x: 0, y: 0, width: 20, height: 1)
 )
-SwiftTUI.refresh(screen)
+SwiftNCurses.refresh(screen)
 ```
 
 ## Best Practices
@@ -566,20 +566,20 @@ SwiftTUI.refresh(screen)
 
 ```swift
 // Good: Initialize at app start
-let screen = SwiftTUI.initializeScreen()
-defer { SwiftTUI.cleanup(screen) }
+let screen = SwiftNCurses.initializeScreen()
+defer { SwiftNCurses.cleanup(screen) }
 
 // Bad: Initialize multiple times
-// let screen1 = SwiftTUI.initializeScreen()
-// let screen2 = SwiftTUI.initializeScreen()  // Don't do this
+// let screen1 = SwiftNCurses.initializeScreen()
+// let screen2 = SwiftNCurses.initializeScreen()  // Don't do this
 ```
 
 ### 2. Always Use Defer for Cleanup
 
 ```swift
 // Ensures cleanup even on error
-let screen = SwiftTUI.initializeScreen()
-defer { SwiftTUI.cleanup(screen) }
+let screen = SwiftNCurses.initializeScreen()
+defer { SwiftNCurses.cleanup(screen) }
 
 // Your app code here
 ```
@@ -588,21 +588,21 @@ defer { SwiftTUI.cleanup(screen) }
 
 ```swift
 // Good: Render all components, then refresh once
-await SwiftTUI.render(header, on: surface, in: headerBounds)
-await SwiftTUI.render(content, on: surface, in: contentBounds)
-await SwiftTUI.render(footer, on: surface, in: footerBounds)
-SwiftTUI.refresh(screen)  // Single refresh
+await SwiftNCurses.render(header, on: surface, in: headerBounds)
+await SwiftNCurses.render(content, on: surface, in: contentBounds)
+await SwiftNCurses.render(footer, on: surface, in: footerBounds)
+SwiftNCurses.refresh(screen)  // Single refresh
 
 // Bad: Refresh after each component
-// await SwiftTUI.render(header, ...)
-// SwiftTUI.refresh(screen)  // Too many refreshes
+// await SwiftNCurses.render(header, ...)
+// SwiftNCurses.refresh(screen)  // Too many refreshes
 ```
 
 ### 4. Handle Terminal Resize
 
 ```swift
 // Check for resize and adjust layout
-let (newWidth, newHeight) = SwiftTUI.getScreenSize()
+let (newWidth, newHeight) = SwiftNCurses.getScreenSize()
 if newWidth != currentWidth || newHeight != currentHeight {
     currentWidth = newWidth
     currentHeight = newHeight

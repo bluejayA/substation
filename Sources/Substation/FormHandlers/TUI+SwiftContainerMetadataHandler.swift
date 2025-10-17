@@ -5,116 +5,36 @@ import Darwin
 import Glibc
 #endif
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 @MainActor
 extension TUI {
 
+    /// Handle input for Swift container metadata form using the universal handler
     internal func handleSwiftContainerMetadataInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = swiftContainerMetadataFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = swiftContainerMetadataFormState
+        var localForm = swiftContainerMetadataForm
 
-        switch ch {
-        case Int32(9): // TAB
-            if !isFieldActive {
-                swiftContainerMetadataFormState.nextField()
-                swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE
-            if let currentField = swiftContainerMetadataFormState.getCurrentField() {
-                switch currentField {
-                case .text:
-                    if !isFieldActive {
-                        // Activate text field
-                        swiftContainerMetadataFormState.activateCurrentField()
-                        swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                        await self.draw(screen: screen)
-                    } else {
-                        // Add space character
-                        swiftContainerMetadataFormState.handleCharacterInput(" ")
-                        swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                        await self.draw(screen: screen)
-                    }
-                default:
-                    break
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER
-            if isFieldActive {
-                // Deactivate field
-                swiftContainerMetadataFormState.deactivateCurrentField()
-                swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = swiftContainerMetadataForm.validateForm()
-                if !errors.isEmpty {
-                    statusMessage = "Errors: \(errors.joined(separator: ", "))"
-                    await self.draw(screen: screen)
-                    return
-                }
-
-                await submitSwiftContainerMetadata(screen: screen)
-            }
-
-        case Int32(259), Int32(258): // UP/DOWN
-            if isFieldActive {
-                let handled = swiftContainerMetadataFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                if ch == Int32(259) {
-                    swiftContainerMetadataFormState.previousField()
-                } else {
-                    swiftContainerMetadataFormState.nextField()
-                }
-                swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(27): // ESC
-            if isFieldActive {
-                swiftContainerMetadataFormState.cancelCurrentField()
-                swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Cancel and return to container list
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.swiftContainerMetadataFormState = formState
+                self.swiftContainerMetadataForm = form
+                await self.submitSwiftContainerMetadata(screen: screen)
+            },
+            onCancel: {
                 self.changeView(to: .swift, resetSelection: false)
             }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE
-            if isFieldActive {
-                let handled = swiftContainerMetadataFormState.handleSpecialKey(ch)
-                if handled {
-                    swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            // Character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    swiftContainerMetadataFormState.handleCharacterInput(Character(scalar))
-                    swiftContainerMetadataForm.updateFromFormState(swiftContainerMetadataFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
-
-        // Rebuild form state to reflect any changes in form fields
-        swiftContainerMetadataFormState = FormBuilderState(
-            fields: swiftContainerMetadataForm.buildFields(
-                selectedFieldId: swiftContainerMetadataFormState.getCurrentFieldId(),
-                activeFieldId: swiftContainerMetadataFormState.getActiveFieldId(),
-                formState: swiftContainerMetadataFormState
-            ),
-            preservingStateFrom: swiftContainerMetadataFormState
         )
+
+        // Update actor-isolated properties with modified local copies
+        swiftContainerMetadataFormState = localFormState
+        swiftContainerMetadataForm = localForm
     }
 
     private func submitSwiftContainerMetadata(screen: OpaquePointer?) async {
@@ -162,3 +82,8 @@ extension TUI {
         await self.draw(screen: screen)
     }
 }
+
+// MARK: - SwiftContainerMetadataForm Protocol Conformance
+
+// SwiftContainerMetadataForm already has all required methods
+extension SwiftContainerMetadataForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

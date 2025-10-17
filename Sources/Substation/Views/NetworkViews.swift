@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct NetworkViews {
     @MainActor
@@ -361,11 +361,11 @@ struct NetworkViews {
                                 width: Int32, height: Int32, networkCreateForm: NetworkCreateForm,
                                 networkCreateFormState: FormBuilderState) async {
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         guard width > Self.networkCreateMinScreenWidth && height > Self.networkCreateMinScreenHeight else {
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.networkCreateBoundsMinWidth, width), height: max(Self.networkCreateBoundsMinHeight, height))
-            await SwiftTUI.render(Text(Self.networkCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text(Self.networkCreateScreenTooSmallText).error(), on: surface, in: errorBounds)
             return
         }
 
@@ -387,7 +387,7 @@ struct NetworkViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
     }
 
 }

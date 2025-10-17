@@ -61,7 +61,7 @@ let form = FormBuilder(
 )
 
 // Render
-await SwiftTUI.render(form.render(), on: surface, in: bounds)
+await SwiftNCurses.render(form.render(), on: surface, in: bounds)
 ```
 
 ### 2. State Management
@@ -425,7 +425,7 @@ if let selectorState = formState.getSelectorState(fieldId),
             maxHeight: maxHeight
         ) {
             // Render the typed selector component
-            await SwiftTUI.render(component, on: surface, in: bounds)
+            await SwiftNCurses.render(component, on: surface, in: bounds)
         }
     }
 }

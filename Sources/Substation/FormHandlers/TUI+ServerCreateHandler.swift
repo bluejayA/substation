@@ -5,309 +5,166 @@ import Darwin
 import Glibc
 #endif
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 // MARK: - Server Create Form Input Handler
 
 @MainActor
 extension TUI {
 
+    /// Handle input for Server create form using universal handler
+    /// Server form has custom TAB behavior for boot source and flavor mode switching
     internal func handleServerCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        // Check if a field is currently active (being edited)
-        let isFieldActive = serverCreateFormState.isCurrentFieldActive()
+        var localFormState = serverCreateFormState
+        var localForm = serverCreateForm
 
-        switch ch {
-        case Int32(9): // TAB - Cycle select options, switch source mode, or navigate to next field
-            if isFieldActive {
-                if let currentField = serverCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .select:
-                        // For select fields, cycle through options
-                        serverCreateFormState.toggleCurrentField()
-                        serverCreateForm.updateFromFormState(serverCreateFormState)
-                        await self.draw(screen: screen)
-                    case .selector(let selectorField) where selectorField.id == ServerCreateFieldId.source.rawValue:
-                        // For source selector, TAB toggles between image/volume mode
-                        serverCreateForm.toggleBootSource()
-                        // Clear selection when switching modes
-                        if serverCreateForm.bootSource == .image {
-                            serverCreateForm.selectedVolumeID = nil
-                        } else {
-                            serverCreateForm.selectedImageID = nil
-                        }
-                        // Rebuild state to reflect mode change
-                        serverCreateFormState = FormBuilderState(fields: serverCreateForm.buildFields(
-                            selectedFieldId: serverCreateFormState.getCurrentFieldId(),
-                            activeFieldId: serverCreateFormState.getActiveFieldId(),
-                            formState: serverCreateFormState
-                        ))
-                        await self.draw(screen: screen)
-                    case .selector(let selectorField) where selectorField.id == ServerCreateFieldId.flavor.rawValue:
-                        // For flavor selector, TAB toggles between manual/workload-based mode
-                        serverCreateForm.toggleFlavorSelectionMode()
-                        // Rebuild state to reflect mode change
-                        serverCreateFormState = FormBuilderState(fields: serverCreateForm.buildFields(
-                            selectedFieldId: serverCreateFormState.getCurrentFieldId(),
-                            activeFieldId: serverCreateFormState.getActiveFieldId(),
-                            formState: serverCreateFormState
-                        ))
-                        await self.draw(screen: screen)
-                    default:
-                        break
-                    }
-                }
-            } else {
-                serverCreateFormState.nextField()
-                serverCreateForm.updateFromFormState(serverCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case 353: // SHIFT+TAB - Cycle select options backwards or navigate to previous field
-            if isFieldActive {
-                // If current field is select type, cycle options backwards
-                if let currentField = serverCreateFormState.getCurrentField() {
-                    if case .select = currentField {
-                        serverCreateFormState.cyclePreviousOption()
-                        serverCreateForm.updateFromFormState(serverCreateFormState)
-                        await self.draw(screen: screen)
-                    }
-                }
-            } else {
-                serverCreateFormState.previousField()
-                serverCreateForm.updateFromFormState(serverCreateFormState)
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE - Activate field or add space character
-            if !isFieldActive {
-                // Not active: activate the field
-                serverCreateFormState.activateCurrentField()
-                serverCreateForm.updateFromFormState(serverCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Active: check field type to determine behavior
-                if let currentField = serverCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .text, .number:
-                        // For text/number fields, add space as character
-                        serverCreateFormState.handleCharacterInput(" ")
-                        serverCreateForm.updateFromFormState(serverCreateFormState)
-                        await self.draw(screen: screen)
-                    case .toggle, .select:
-                        // For toggle/select fields, space toggles
-                        serverCreateFormState.toggleCurrentField()
-                        serverCreateForm.updateFromFormState(serverCreateFormState)
-                        await self.draw(screen: screen)
-                    case .selector(let selectorField):
-                        // Special handling for source selector
-                        if selectorField.id == ServerCreateFieldId.source.rawValue {
-                            // Get the highlighted item from the filtered and sorted list
-                            if let state = serverCreateFormState.selectorStates[selectorField.id] {
-                                let filteredItems = state.getFilteredItems()
-                                let highlightedIndex = state.highlightedIndex
-
-                                if serverCreateForm.bootSource == .image {
-                                    // Sort images alphabetically (same as SourceSelectionView)
-                                    let sortedImages = filteredItems.compactMap { $0 as? Image }.sorted {
-                                        ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending
-                                    }
-                                    if highlightedIndex < sortedImages.count {
-                                        let selectedImage = sortedImages[highlightedIndex]
-                                        serverCreateForm.selectedImageID = selectedImage.id
-                                        serverCreateForm.selectedVolumeID = nil
-                                        // Update the state
-                                        if var state = serverCreateFormState.selectorStates[selectorField.id] {
-                                            state.selectedItemId = selectedImage.id
-                                            serverCreateFormState.selectorStates[selectorField.id] = state
-                                        }
-                                        await self.draw(screen: screen)
-                                    }
-                                } else {
-                                    // Boot from volume - sort volumes alphabetically (same as SourceSelectionView)
-                                    let sortedVolumes = filteredItems.compactMap { $0 as? Volume }.sorted {
-                                        ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending
-                                    }
-                                    if highlightedIndex < sortedVolumes.count {
-                                        let selectedVolume = sortedVolumes[highlightedIndex]
-                                        serverCreateForm.selectedVolumeID = selectedVolume.id
-                                        serverCreateForm.selectedImageID = nil
-                                        // Update the state
-                                        if var state = serverCreateFormState.selectorStates[selectorField.id] {
-                                            state.selectedItemId = selectedVolume.id
-                                            serverCreateFormState.selectorStates[selectorField.id] = state
-                                        }
-                                        await self.draw(screen: screen)
-                                    }
-                                }
-                            }
-                        } else if selectorField.id == ServerCreateFieldId.flavor.rawValue &&
-                           serverCreateForm.flavorSelectionMode == .workloadBased {
-                            // Special handling for flavor selector in workload mode
-                            if serverCreateForm.selectedCategoryIndex == nil {
-                                // Drill into the highlighted category
-                                serverCreateForm.selectedCategoryIndex = serverCreateFormState.selectorStates[selectorField.id]?.highlightedIndex
-                                await self.draw(screen: screen)
+        // Custom key handler for TAB mode switching
+        let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout ServerCreateForm, OpaquePointer?) async -> Bool = { ch, formState, form, screen in
+            // Intercept TAB when in active mode for source and flavor fields
+            if ch == Int32(9) && formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField() {
+                    if case .selector(let selector) = field {
+                        // Source field: Toggle boot source mode (image/volume)
+                        if selector.id == ServerCreateFieldId.source.rawValue {
+                            form.toggleBootSource()
+                            if form.bootSource == .image {
+                                form.selectedVolumeID = nil
                             } else {
-                                // In category detail: select the highlighted flavor
-                                let highlightedIndex = serverCreateFormState.selectorStates[selectorField.id]?.highlightedIndex ?? 0
-                                // Get the category and its flavors
-                                let categories = FlavorSelectionView.generateWorkloadRecommendations(flavors: serverCreateForm.flavors)
-                                if let categoryIdx = serverCreateForm.selectedCategoryIndex,
-                                   categoryIdx < categories.count {
-                                    let category = categories[categoryIdx]
-                                    if highlightedIndex < category.flavors.count {
-                                        let selectedFlavor = category.flavors[highlightedIndex]
-                                        serverCreateForm.selectedFlavorID = selectedFlavor.id
-                                        // Also update the state so it's marked as selected
-                                        if var state = serverCreateFormState.selectorStates[selectorField.id] {
-                                            state.selectedItemId = selectedFlavor.id
-                                            serverCreateFormState.selectorStates[selectorField.id] = state
-                                        }
-                                        await self.draw(screen: screen)
-                                    }
-                                }
+                                form.selectedImageID = nil
                             }
-                        } else {
-                            // Normal selection behavior
-                            serverCreateFormState.toggleCurrentField()
-                            serverCreateForm.updateFromFormState(serverCreateFormState)
+                            // Rebuild state to reflect mode change
+                            formState = FormBuilderState(fields: form.buildFields(
+                                selectedFieldId: formState.getCurrentFieldId(),
+                                activeFieldId: formState.getActiveFieldId(),
+                                formState: formState
+                            ))
                             await self.draw(screen: screen)
+                            return true // Handled
                         }
-                    case .multiSelect:
-                        // For multiselect fields, space toggles selection
-                        serverCreateFormState.toggleCurrentField()
-                        serverCreateForm.updateFromFormState(serverCreateFormState)
-                        await self.draw(screen: screen)
-                    default:
-                        break
+                        // Flavor field: Toggle flavor selection mode (manual/workload-based)
+                        else if selector.id == ServerCreateFieldId.flavor.rawValue {
+                            form.toggleFlavorSelectionMode()
+                            formState = FormBuilderState(fields: form.buildFields(
+                                selectedFieldId: formState.getCurrentFieldId(),
+                                activeFieldId: formState.getActiveFieldId(),
+                                formState: formState
+                            ))
+                            await self.draw(screen: screen)
+                            return true // Handled
+                        }
                     }
                 }
             }
 
-        case Int32(10), Int32(13): // ENTER - Deactivate field or submit form
-            needsRedraw = true
-            if isFieldActive {
-                // Exit field editing/selection mode
-                // Special handling for flavor selector in workload mode
-                if let currentField = serverCreateFormState.getCurrentField(),
-                   case .selector(let selectorField) = currentField,
-                   selectorField.id == ServerCreateFieldId.flavor.rawValue,
-                   serverCreateForm.flavorSelectionMode == .workloadBased {
-                    // Clear category selection when exiting
-                    serverCreateForm.selectedCategoryIndex = nil
-                }
-                serverCreateFormState.deactivateCurrentField()
-                serverCreateForm.updateFromFormState(serverCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                // Submit form if valid
-                if serverCreateForm.isValid() {
-                    await resourceOperations.createServer()
-                } else {
-                    let errors = serverCreateForm.validate()
-                    statusMessage = "Validation failed: \(errors.first ?? "Unknown error")"
-                    await self.draw(screen: screen)
-                }
-            }
-
-        case Int32(27): // ESC - Cancel field editing or cancel creation
-            if isFieldActive {
-                // Check if we're in a category detail view and should go back to category list
-                if let currentField = serverCreateFormState.getCurrentField(),
-                   case .selector(let selectorField) = currentField,
-                   selectorField.id == ServerCreateFieldId.flavor.rawValue,
-                   serverCreateForm.flavorSelectionMode == .workloadBased,
-                   serverCreateForm.selectedCategoryIndex != nil {
+            // Special handling for ESC in flavor category detail view
+            if ch == Int32(27) && formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField(),
+                   case .selector(let selector) = field,
+                   selector.id == ServerCreateFieldId.flavor.rawValue,
+                   form.flavorSelectionMode == .workloadBased,
+                   form.selectedCategoryIndex != nil {
                     // Go back to category list
-                    serverCreateForm.selectedCategoryIndex = nil
+                    form.selectedCategoryIndex = nil
                     await self.draw(screen: screen)
-                } else {
-                    // Normal deactivation
-                    serverCreateFormState.deactivateCurrentField()
-                    serverCreateForm.updateFromFormState(serverCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            } else {
-                // Cancel and return to server list
-                currentView = .servers
-                serverCreateForm.reset()
-                serverCreateFormState = FormBuilderState(fields: [])
-                await self.draw(screen: screen)
-            }
-
-        case Int32(127), Int32(8): // BACKSPACE - Delete character
-            if isFieldActive {
-                let handled = serverCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    serverCreateForm.updateFromFormState(serverCreateFormState)
-                    await self.draw(screen: screen)
+                    return true // Handled
                 }
             }
 
-        case 258, 259: // DOWN/UP - Navigate within active field or between fields
-            if isFieldActive {
-                // Special bounds checking for flavor selector in category detail mode
-                if let currentField = serverCreateFormState.getCurrentField(),
-                   case .selector(let selectorField) = currentField,
-                   selectorField.id == ServerCreateFieldId.flavor.rawValue,
-                   serverCreateForm.flavorSelectionMode == .workloadBased,
-                   let categoryIdx = serverCreateForm.selectedCategoryIndex {
-                    // In category detail: limit navigation to category's flavor count
-                    let categories = FlavorSelectionView.generateWorkloadRecommendations(flavors: serverCreateForm.flavors)
-                    if categoryIdx < categories.count {
-                        let category = categories[categoryIdx]
-                        let maxIndex = category.flavors.count - 1
-                        if var state = serverCreateFormState.selectorStates[selectorField.id] {
-                            let currentIndex = state.highlightedIndex
-                            if ch == 258 { // DOWN
-                                state.highlightedIndex = min(currentIndex + 1, maxIndex)
-                            } else { // UP
-                                state.highlightedIndex = max(currentIndex - 1, 0)
+            // Special handling for SPACE in flavor workload mode
+            if ch == Int32(32) && formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField(),
+                   case .selector(let selector) = field,
+                   selector.id == ServerCreateFieldId.flavor.rawValue,
+                   form.flavorSelectionMode == .workloadBased {
+                    if form.selectedCategoryIndex == nil {
+                        // Drill into category
+                        form.selectedCategoryIndex = formState.selectorStates[selector.id]?.highlightedIndex
+                        await self.draw(screen: screen)
+                        return true // Handled
+                    } else {
+                        // Select flavor in category
+                        let highlightedIndex = formState.selectorStates[selector.id]?.highlightedIndex ?? 0
+                        let categories = FlavorSelectionView.generateWorkloadRecommendations(flavors: form.flavors)
+                        if let categoryIdx = form.selectedCategoryIndex,
+                           categoryIdx < categories.count {
+                            let category = categories[categoryIdx]
+                            if highlightedIndex < category.flavors.count {
+                                let selectedFlavor = category.flavors[highlightedIndex]
+                                form.selectedFlavorID = selectedFlavor.id
+                                if var state = formState.selectorStates[selector.id] {
+                                    state.selectedItemId = selectedFlavor.id
+                                    formState.selectorStates[selector.id] = state
+                                }
+                                await self.draw(screen: screen)
+                                return true // Handled
                             }
-                            serverCreateFormState.selectorStates[selectorField.id] = state
-                            await self.draw(screen: screen)
                         }
                     }
-                } else {
-                    // Normal navigation
-                    let handled = serverCreateFormState.handleSpecialKey(ch)
-                    if handled {
-                        serverCreateForm.updateFromFormState(serverCreateFormState)
-                        await self.draw(screen: screen)
-                    }
                 }
-            } else {
-                // Navigate between fields
-                if ch == 258 { // DOWN
-                    serverCreateFormState.nextField()
-                } else { // UP
-                    serverCreateFormState.previousField()
-                }
-                serverCreateForm.updateFromFormState(serverCreateFormState)
-                await self.draw(screen: screen)
             }
 
-        default:
-            // Handle character input for text fields (excluding SPACE which is handled above)
-            if isFieldActive && ch > 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    let char = Character(scalar)
-                    serverCreateFormState.handleCharacterInput(char)
-                    serverCreateForm.updateFromFormState(serverCreateFormState)
-                    await self.draw(screen: screen)
+            // Special handling for ENTER in flavor category detail view
+            if (ch == Int32(10) || ch == Int32(13)) && formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField(),
+                   case .selector(let selector) = field,
+                   selector.id == ServerCreateFieldId.flavor.rawValue,
+                   form.flavorSelectionMode == .workloadBased {
+                    // Clear category selection when exiting
+                    form.selectedCategoryIndex = nil
                 }
             }
+
+            return false // Let universal handler process
         }
 
-        // Rebuild form state to reflect any changes in form fields
-        // IMPORTANT: Pass previous state to preserve navigation, search, and activation state
-        serverCreateFormState = FormBuilderState(
-            fields: serverCreateForm.buildFields(
-                selectedFieldId: serverCreateFormState.getCurrentFieldId(),
-                activeFieldId: serverCreateFormState.getActiveFieldId(),
-                formState: serverCreateFormState
-            ),
-            preservingStateFrom: serverCreateFormState
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Sync state before submission
+                self.serverCreateFormState = formState
+                self.serverCreateForm = form
+                await self.resourceOperations.createServer()
+            },
+            onCancel: {
+                self.currentView = .servers
+                self.serverCreateForm.reset()
+                self.serverCreateFormState = FormBuilderState(fields: [])
+            },
+            customKeyHandler: customHandler
         )
+
+        // Always rebuild after universal handler to reflect any changes
+        localFormState = FormBuilderState(
+            fields: localForm.buildFields(
+                selectedFieldId: localFormState.getCurrentFieldId(),
+                activeFieldId: localFormState.getActiveFieldId(),
+                formState: localFormState
+            ),
+            preservingStateFrom: localFormState
+        )
+
+        // Update actor-isolated properties
+        serverCreateFormState = localFormState
+        serverCreateForm = localForm
     }
 }
+
+// MARK: - ServerCreateForm Protocol Conformance Adapters
+
+extension ServerCreateForm {
+    /// Adapter for FormStateRebuildable - makes formState non-optional
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        return self.buildFields(selectedFieldId: selectedFieldId, activeFieldId: activeFieldId, formState: Optional.some(formState))
+    }
+
+    /// Adapter for FormValidatable
+    func validateForm() -> [String] {
+        return self.validate()
+    }
+}
+
+// Declare protocol conformance
+extension ServerCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

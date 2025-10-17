@@ -1,4 +1,4 @@
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 @MainActor
@@ -52,7 +52,7 @@ struct SourceSelectionView {
         scrollOffset: Int,
         searchQuery: String?
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let rect = Rect(x: startCol, y: startRow, width: width, height: height)
         let bootableVolumes = volumes.filter { $0.bootable?.lowercased() == "true" }
 
@@ -94,6 +94,6 @@ struct SourceSelectionView {
         )
 
         surface.clear(rect: rect)
-        await SwiftTUI.render(selector.render(), on: surface, in: rect)
+        await SwiftNCurses.render(selector.render(), on: surface, in: rect)
     }
 }

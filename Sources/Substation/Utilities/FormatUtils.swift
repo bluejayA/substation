@@ -18,20 +18,4 @@ struct FormatUtils {
             return String(format: "%.1fGB", Double(bytes) / (1024.0 * 1024.0 * 1024.0))
         }
     }
-
-    static func wrapText(_ text: String, maxWidth: Int) -> [String] {
-        guard maxWidth > 0 else { return [text] }
-
-        var lines: [String] = []
-        var currentIndex = text.startIndex
-
-        while currentIndex < text.endIndex {
-            let endIndex = text.index(currentIndex, offsetBy: maxWidth, limitedBy: text.endIndex) ?? text.endIndex
-            let line = String(text[currentIndex..<endIndex])
-            lines.append(line)
-            currentIndex = endIndex
-        }
-
-        return lines.isEmpty ? [""] : lines
-    }
 }

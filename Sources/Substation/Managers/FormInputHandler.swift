@@ -5,7 +5,7 @@ import Darwin
 import Glibc
 #endif
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 /// Centralized handler for all form-based input handling
 /// This class eliminates duplicate input handling code across 30+ FormHandlers by:

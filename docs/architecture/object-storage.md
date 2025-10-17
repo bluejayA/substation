@@ -81,7 +81,7 @@ graph TB
 - Render container and object lists
 - Display action menus for Swift operations
 - Handle user input and navigation
-- Integrate with SwiftTUI framework
+- Integrate with SwiftNCurses framework
 
 **Key Components:**
 ```swift
@@ -99,7 +99,7 @@ struct SwiftObjectListView: View {
 
 **Design Patterns:**
 - MVVM (Model-View-ViewModel)
-- SwiftUI-style declarative views via SwiftTUI
+- SwiftUI-style declarative views via SwiftNCurses
 - Reactive state management
 
 #### Background Operations Views
@@ -686,7 +686,7 @@ func updateOperationProgress(id: UUID, progress: TransferProgress) {
 ```
 
 **Publisher Pattern:**
-- SwiftUI/SwiftTUI observes `@Published` properties
+- SwiftUI/SwiftNCurses observes `@Published` properties
 - Automatic UI updates on state changes
 - Thread-safe via MainActor isolation
 
@@ -882,7 +882,7 @@ if etagOptimizationEnabled {
 
 ### Observer Pattern
 
-**SwiftUI/SwiftTUI Integration:**
+**SwiftUI/SwiftNCurses Integration:**
 ```swift
 @Published var backgroundOperations: [SwiftBackgroundOperation]
 // UI automatically observes and updates

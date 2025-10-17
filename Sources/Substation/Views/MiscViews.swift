@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct MiscViews {
     @MainActor
@@ -76,7 +76,7 @@ struct MiscViews {
             return "Help - Main Dashboard"
         case .serverCreate, .networkCreate, .volumeCreate, .keyPairCreate, .subnetCreate, .portCreate, .routerCreate, .floatingIPCreate, .serverGroupCreate, .securityGroupCreate:
             return "Help - Resource Creation"
-        case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .securityGroupDetail, .serverGroupDetail, .healthDashboardServiceDetail, .barbicanSecretDetail, .barbicanContainerDetail:
+        case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail, .securityGroupDetail, .serverGroupDetail, .healthDashboardServiceDetail, .barbicanSecretDetail:
             return "Help - Resource Details"
         case .serverSecurityGroups:
             return "Help - Security Group Management"
@@ -100,12 +100,8 @@ struct MiscViews {
             return "Help - Search"
         case .barbican, .barbicanSecrets:
             return "Help - Secret Management"
-        case .barbicanContainers:
-            return "Help - Secret Container Management"
         case .barbicanSecretCreate:
             return "Help - Secret Creation"
-        case .barbicanContainerCreate:
-            return "Help - Container Creation"
         case .swift:
             return "Help - Object Storage Management"
         case .swiftContainerDetail:
@@ -369,6 +365,7 @@ struct MiscViews {
                 ("Floating IP Management", [
                     "SHIFT-C: Create new floating IP",
                     "SHIFT-M: Manage server attachment",
+                    "SHIFT-P: Manage port attachment",
                     "DELETE: Release floating IP",
                     "Provides external network access for servers",
                 ]),
@@ -515,26 +512,6 @@ struct MiscViews {
                 generalActions
             ]
 
-        case .barbicanContainers:
-            return [
-                generalNavigation,
-                ("Secret Container Management", [
-                    "SHIFT-C: Create new container",
-                    "SPACE: View container details",
-                    "DELETE: Delete selected container",
-                    "Containers organize multiple secrets",
-                    "Used for certificate bundles and key pairs",
-                ]),
-                ("Multi-Select Mode (CTRL-X)", [
-                    "CTRL-X: Toggle multi-select mode",
-                    "SPACE: Select/deselect items (in multi-select mode)",
-                    "DELETE: Bulk delete selected containers",
-                    "ESC: Exit multi-select mode",
-                    "Status icons show [ ] or [X] when in multi-select",
-                ]),
-                generalActions
-            ]
-
         case .barbicanSecretCreate:
             return [
                 ("Secret Creation Form", [
@@ -551,23 +528,6 @@ struct MiscViews {
                     "Private Key: RSA/EC private keys",
                     "Public Key: RSA/EC public keys",
                     "Opaque: Generic binary data",
-                ]),
-                generalActions
-            ]
-
-        case .barbicanContainerCreate:
-            return [
-                ("Container Creation Form", [
-                    "TAB: Move to next field",
-                    "SHIFT+TAB: Move to previous field",
-                    "SPACE: Edit text fields and select secrets",
-                    "ENTER: Create container",
-                    "ESC: Cancel and return",
-                ]),
-                ("Container Types", [
-                    "Generic: General purpose container",
-                    "Certificate: For certificate bundles",
-                    "RSA: For RSA key pairs",
                 ]),
                 generalActions
             ]
@@ -888,8 +848,13 @@ struct MiscViews {
         )
     }
 
+    // Cache build information - computed once at first access
+    private static let cachedBuildInfo: (version: String, buildDate: String, gitCommit: String, configuration: String) = {
+        return getBuildInformation()
+    }()
+
     private static func getAboutInformation() -> [(String, [String])] {
-        let buildInfo = getBuildInformation()
+        let buildInfo = cachedBuildInfo
 
         let platform: String
         #if os(Linux)
@@ -939,7 +904,7 @@ struct MiscViews {
             ("License", [
                 "Open Source Software",
                 "Licensed under terms specified in project repository",
-                "Built with Swift and SwiftTUI framework",
+                "Built with Swift and SwiftNCurses framework",
                 "Uses NCurses for terminal interface",
             ]),
             ("Support & Documentation", [
@@ -955,8 +920,8 @@ struct MiscViews {
         // Get dynamic version from git tag or commit
         let version = getGitVersion()
 
-        // Get dynamic build date - current compilation time
-        let buildDate = Date().iso8601Formatted()
+        // Get actual build date from executable modification time
+        let buildDate = getExecutableBuildDate()
 
         // Get configuration
         #if DEBUG
@@ -969,6 +934,18 @@ struct MiscViews {
         let gitCommit = getGitCommitHash()
 
         return (version: version, buildDate: buildDate, gitCommit: gitCommit, configuration: configuration)
+    }
+
+    private static func getExecutableBuildDate() -> String {
+        // Try to get the modification date of the current executable
+        if let executablePath = ProcessInfo.processInfo.arguments.first,
+           let attributes = try? FileManager.default.attributesOfItem(atPath: executablePath),
+           let modificationDate = attributes[.modificationDate] as? Date {
+            return modificationDate.iso8601Formatted()
+        }
+
+        // Fallback to current date if we can't read the executable
+        return Date().iso8601Formatted()
     }
 
     private static func getGitVersion() -> String {
@@ -1031,11 +1008,11 @@ struct MiscViews {
         height: Int32,
         message: String
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         let messageY = startRow + height / 2
         let messageX = startCol + (width - Int32(message.count)) / 2
         let bounds = Rect(x: messageX, y: messageY, width: Int32(message.count), height: 1)
-        await SwiftTUI.render(Text(message).info(), on: surface, in: bounds)
+        await SwiftNCurses.render(Text(message).info(), on: surface, in: bounds)
     }
 
 }

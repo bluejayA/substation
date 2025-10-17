@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct ImageViews {
 
@@ -656,7 +656,7 @@ struct ImageViews {
                                              width: Int32, height: Int32, image: Image,
                                              classifiedProperties: ClassifiedProperties) async {
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title Section (Following Gold Standard)
@@ -696,7 +696,7 @@ struct ImageViews {
             .padding(imageDetailSectionEdgeInsets)
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftTUI.render(imageDetailComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(imageDetailComponent, on: surface, in: bounds)
     }
 
     // MARK: - Property Classification

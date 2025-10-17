@@ -5,7 +5,7 @@ import Darwin
 import Glibc
 #endif
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 /// Centralized handler for all basic navigation inputs (UP/DOWN/PAGE UP/PAGE DOWN/HOME/END/etc.)
 /// This consolidates 70+ duplicate input handling cases from across 30+ form handlers

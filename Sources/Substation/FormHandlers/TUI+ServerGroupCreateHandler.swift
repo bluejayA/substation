@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - Server Group Create Input Handler
@@ -14,248 +14,38 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    /// Handle input for server group create form using the universal handler
     internal func handleServerGroupCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        let isFieldActive = self.serverGroupCreateFormState.isCurrentFieldActive()
+        // Get local references to avoid actor-isolated inout issues
+        var localFormState = serverGroupCreateFormState
+        var localForm = serverGroupCreateForm
 
-        switch ch {
-        case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                self.serverGroupCreateFormState.nextField()
-                self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-
-                // Rebuild fields
-                self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                    selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.serverGroupCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            }
-
-        case 353: // SHIFT+TAB - Navigate to previous field
-            if !isFieldActive {
-                self.serverGroupCreateFormState.previousField()
-                self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-
-                // Rebuild fields
-                self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                    selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.serverGroupCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            }
-
-        case 258, 259: // DOWN/UP - Navigate within active field or between fields
-            if isFieldActive {
-                // Navigate within active selector
-                if let currentField = self.serverGroupCreateFormState.getCurrentField() {
-                    if case .selector(let selectorField) = currentField {
-                        if var state = self.serverGroupCreateFormState.selectorStates[selectorField.id] {
-                            if ch == 258 { // DOWN
-                                state.moveDown()
-                            } else { // UP
-                                state.moveUp()
-                            }
-                            self.serverGroupCreateFormState.selectorStates[selectorField.id] = state
-
-                            // Rebuild fields with updated highlightedIndex
-                            self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                                selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                                activeFieldId: selectorField.id,
-                                formState: self.serverGroupCreateFormState
-                            ))
-
-                            await self.draw(screen: screen)
-                        }
-                    }
-                }
-            } else {
-                // Navigate between fields
-                if ch == 258 { // DOWN
-                    self.serverGroupCreateFormState.nextField()
-                } else { // UP
-                    self.serverGroupCreateFormState.previousField()
-                }
-                self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-
-                // Rebuild fields
-                self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                    selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.serverGroupCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            }
-
-        case Int32(32): // SPACE - Activate field or select item
-            if !isFieldActive {
-                // Activate current field
-                self.serverGroupCreateFormState.activateCurrentField()
-                self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-
-                // Rebuild fields with active field ID to ensure selector renders correctly
-                self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                    selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                    activeFieldId: self.serverGroupCreateFormState.getActiveFieldId(),
-                    formState: self.serverGroupCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            } else {
-                // In active mode, handle based on field type
-                if let currentField = self.serverGroupCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .text:
-                        // For text fields, add space as character
-                        self.serverGroupCreateFormState.handleCharacterInput(" ")
-                        self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-                        await self.draw(screen: screen)
-                    case .selector:
-                        // For selector, SPACE selects the highlighted item
-                        self.serverGroupCreateFormState.toggleCurrentField()
-                        self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-
-                        // Deactivate the selector after selection
-                        self.serverGroupCreateFormState.deactivateCurrentField()
-
-                        // Rebuild fields
-                        self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                            selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                            activeFieldId: nil,
-                            formState: self.serverGroupCreateFormState
-                        ))
-
-                        await self.draw(screen: screen)
-                    default:
-                        break
-                    }
-                }
-            }
-
-        case Int32(10), Int32(13): // ENTER - Submit or deactivate field
-            if isFieldActive {
-                // Deactivate field
-                if let currentField = self.serverGroupCreateFormState.getCurrentField() {
-                    if case .selector = currentField {
-                        // For selector, ENTER confirms selection
-                        self.serverGroupCreateFormState.toggleCurrentField()
-                    }
-                }
-
-                self.serverGroupCreateFormState.deactivateCurrentField()
-                self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-
-                // Rebuild fields
-                self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                    selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.serverGroupCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            } else {
-                // Submit form
-                let errors = self.serverGroupCreateForm.validate()
-                if errors.isEmpty {
-                    await self.resourceOperations.submitServerGroupCreation()
-                } else {
-                    self.serverGroupCreateFormState.showValidationErrors = true
-                    self.statusMessage = "Error: \(errors.first!)"
-                    await self.draw(screen: screen)
-                }
-            }
-
-        case Int32(27): // ESC - Cancel or deactivate
-            if isFieldActive {
-                self.serverGroupCreateFormState.deactivateCurrentField()
-                self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-
-                // Rebuild fields
-                self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                    selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: self.serverGroupCreateFormState
-                ))
-
-                await self.draw(screen: screen)
-            } else {
+        await universalFormInputHandler.handleInput(
+            ch,
+            screen: screen,
+            formState: &localFormState,
+            form: &localForm,
+            onSubmit: { formState, form in
+                // Receive formState and form as parameters to avoid exclusivity violation
+                self.serverGroupCreateFormState = formState
+                self.serverGroupCreateForm = form
+                await self.resourceOperations.submitServerGroupCreation()
+            },
+            onCancel: {
                 self.changeView(to: .serverGroups, resetSelection: false)
             }
+        )
 
-        case Int32(127), Int32(8), Int32(263): // BACKSPACE/DELETE
-            if isFieldActive {
-                if let currentField = self.serverGroupCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .text:
-                        let handled = self.serverGroupCreateFormState.handleSpecialKey(ch)
-                        if handled {
-                            self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-                            await self.draw(screen: screen)
-                        }
-                    case .selector(let selectorField):
-                        // BACKSPACE removes last search character
-                        if var state = self.serverGroupCreateFormState.selectorStates[selectorField.id] {
-                            state.removeLastSearchCharacter()
-                            self.serverGroupCreateFormState.selectorStates[selectorField.id] = state
-
-                            // Rebuild fields
-                            self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                                selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                                activeFieldId: selectorField.id,
-                                formState: self.serverGroupCreateFormState
-                            ))
-
-                            await self.draw(screen: screen)
-                        }
-                    default:
-                        break
-                    }
-                }
-            }
-
-        default:
-            // Handle character input
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    let char = Character(scalar)
-                    if let currentField = self.serverGroupCreateFormState.getCurrentField() {
-                        switch currentField {
-                        case .text:
-                            self.serverGroupCreateFormState.handleCharacterInput(char)
-                            self.serverGroupCreateForm.updateFromFormState(self.serverGroupCreateFormState)
-                            await self.draw(screen: screen)
-                        case .selector(let selectorField):
-                            // Add to search query
-                            if var state = self.serverGroupCreateFormState.selectorStates[selectorField.id] {
-                                state.appendToSearch(char)
-                                self.serverGroupCreateFormState.selectorStates[selectorField.id] = state
-
-                                // Rebuild fields
-                                self.serverGroupCreateFormState = FormBuilderState(fields: self.serverGroupCreateForm.buildFields(
-                                    selectedFieldId: self.serverGroupCreateFormState.getCurrentFieldId(),
-                                    activeFieldId: selectorField.id,
-                                    formState: self.serverGroupCreateFormState
-                                ))
-
-                                await self.draw(screen: screen)
-                            }
-                        default:
-                            break
-                        }
-                    }
-                }
-            }
-        }
+        // Update actor-isolated properties with modified local copies
+        serverGroupCreateFormState = localFormState
+        serverGroupCreateForm = localForm
     }
 }
 
-// MARK: - ServerGroupCreateForm FormState Integration
+// MARK: - ServerGroupCreateForm Protocol Conformance
 
 extension ServerGroupCreateForm {
+    /// Update form from FormBuilderState
     mutating func updateFromFormState(_ formState: FormBuilderState) {
         // Update form data from FormBuilderState
         let fields = formState.fields
@@ -306,4 +96,12 @@ extension ServerGroupCreateForm {
             self.policySelectionMode = false
         }
     }
+
+    /// Adapter for FormValidatable - wraps validate() as validateForm()
+    func validateForm() -> [String] {
+        return self.validate()
+    }
 }
+
+// Declare protocol conformance
+extension ServerGroupCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

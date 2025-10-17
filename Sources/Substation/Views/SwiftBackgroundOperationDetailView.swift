@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 
 struct SwiftBackgroundOperationDetailView {
 
@@ -103,7 +103,7 @@ struct SwiftBackgroundOperationDetailView {
         if operation.status.isActive {
             helpText = "Press DELETE to cancel | ESC to return"
         } else {
-            helpText = "Press ESC to return to operations list"
+            helpText = "Press DELETE to remove | ESC to return"
         }
 
         // Create and render the detail view

@@ -43,7 +43,7 @@
 ```swift
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 extension ServerViews {
     @MainActor
@@ -483,7 +483,7 @@ extension BarbicanViews {
 
 ```swift
 static func drawDetailedVolumeList(...) async {
-    let surface = SwiftTUI.surface(from: screen)
+    let surface = SwiftNCurses.surface(from: screen)
     var components: [any Component] = []
 
     // Title
@@ -494,7 +494,7 @@ static func drawDetailedVolumeList(...) async {
     let statusHeader = String("STATUS".prefix(12)).padding(toLength: 12, withPad: " ", startingAt: 0)
     // ... 100+ lines of manual rendering logic
 
-    await SwiftTUI.render(VStack(spacing: 0, children: components), on: surface, in: bounds)
+    await SwiftNCurses.render(VStack(spacing: 0, children: components), on: surface, in: bounds)
 }
 ```
 

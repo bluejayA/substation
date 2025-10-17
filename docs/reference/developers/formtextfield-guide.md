@@ -362,7 +362,7 @@ let mtuErrors = InputValidator.validateNumericInput(mtu, min: 68, max: 9000)
 ```swift
 struct NetworkCreateView {
     static func drawForm(screen: OpaquePointer?, form: NetworkCreateForm) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var components: [any Component] = []
 
         // Title
@@ -397,7 +397,7 @@ struct NetworkCreateView {
 
         // Render all
         let formComponent = VStack(spacing: 0, children: components)
-        await SwiftTUI.render(formComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(formComponent, on: surface, in: bounds)
     }
 }
 ```

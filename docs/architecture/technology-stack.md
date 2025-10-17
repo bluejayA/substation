@@ -53,7 +53,7 @@ public actor CoreTokenManager {
 
 **Actor-Based Architecture:**
 
-- **MainActor** - UI updates (SwiftTUI rendering)
+- **MainActor** - UI updates (SwiftNCurses rendering)
 - **Service Actors** - API calls (OpenStack client operations)
 - **Worker Actors** - Background tasks (search, benchmarks, telemetry)
 
@@ -78,7 +78,7 @@ public actor OpenStackClientCore {
 }
 ```
 
-### UI Framework: Custom SwiftTUI
+### UI Framework: Custom SwiftNCurses
 
 **Built from Scratch on NCurses:**
 
@@ -551,7 +551,7 @@ echo "SUCCESS: Zero warnings"
 
 **Performance Dashboard:**
 
-Press `h` in Substation to view:
+Use `:health<Enter>` (or `:h<Enter>`) in Substation to view:
 
 - Cache hit rate: 80%+ target
 - API response time: < 2s p95

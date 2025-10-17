@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - Security Group Rule Management Input Handler
@@ -20,41 +20,64 @@ extension TUI {
         return .list(maxIndex: max(0, ruleCount - 1))
     }
 
+    /// Handle input for Security Group Rule Management using universal handler pattern
+    /// This is a dual-mode handler: list navigation + form input
     internal func handleSecurityGroupRuleManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
         guard var form = securityGroupRuleManagementForm else { return }
 
-        // Handle list mode separately (no FormBuilder)
+        // Mode detection: list vs form
         if form.shouldShowRulesList() {
-            // Try common navigation first
+            // LIST MODE: Handle list navigation
             let context = securityGroupRuleListNavigationContext
             if await handleSecurityGroupRuleListNavigation(ch, context: context) {
                 await self.draw(screen: screen)
                 return
             }
-
-            // Handle view-specific keys
+            // Handle list-specific keys (A/C for add, SPACE for edit, DELETE, ESC)
             await handleSecurityGroupRuleListInput(ch, screen: screen, form: &form)
             securityGroupRuleManagementForm = form
             return
         }
 
-        // Handle create/edit mode with FormBuilder
+        // FORM MODE: Use universal handler
         if form.shouldShowCreateForm() || form.shouldShowEditForm() {
-            let isFieldActive = form.ruleCreateFormState.isCurrentFieldActive()
+            var localFormState = form.ruleCreateFormState
+            var localFormAdapter = SecurityGroupRuleCreateFormAdapter(form: form.ruleCreateForm)
 
-            // Try common navigation when NOT in field edit mode
-            if !isFieldActive {
-                let fieldCount = form.ruleCreateFormState.fields.count
-                if await NavigationInputHandler.handleFormNavigation(ch, fieldCount: fieldCount, tui: self) {
-                    await self.draw(screen: screen)
-                    return
+            await universalFormInputHandler.handleInput(
+                ch,
+                screen: screen,
+                formState: &localFormState,
+                form: &localFormAdapter,
+                onSubmit: { formState, formAdapter in
+                    // Sync state before submission
+                    form.ruleCreateFormState = formState
+                    form.ruleCreateForm = formAdapter.form
+
+                    if form.shouldShowCreateForm() {
+                        await self.resourceOperations.createSecurityGroupRule(screen: screen)
+                    } else {
+                        await self.resourceOperations.updateSecurityGroupRule(screen: screen)
+                    }
+                },
+                onCancel: {
+                    form.returnToListMode()
                 }
-            }
+            )
 
-            // Handle view-specific form input
-            await handleSecurityGroupRuleFormInput(ch, screen: screen, form: &form, isFieldActive: isFieldActive)
-            securityGroupRuleManagementForm = form
+            // Update form with changes
+            form.ruleCreateFormState = localFormState
+            form.ruleCreateForm = localFormAdapter.form
+
+            // Rebuild formState after changes
+            form.ruleCreateFormState = FormBuilderState(fields: form.ruleCreateForm.buildFields(
+                selectedFieldId: form.ruleCreateFormState.getCurrentFieldId(),
+                activeFieldId: nil,
+                formState: form.ruleCreateFormState
+            ))
         }
+
+        securityGroupRuleManagementForm = form
     }
 
     /// Handle common navigation for rule list
@@ -67,6 +90,7 @@ extension TUI {
         }
     }
 
+    /// Handle list-specific input keys
     private func handleSecurityGroupRuleListInput(_ ch: Int32, screen: OpaquePointer?, form: inout SecurityGroupRuleManagementForm) async {
         switch ch {
         case Int32(65), Int32(67): // A or C - Add/Create new rule
@@ -85,111 +109,26 @@ extension TUI {
             break
         }
     }
+}
 
-    private func handleSecurityGroupRuleFormInput(_ ch: Int32, screen: OpaquePointer?, form: inout SecurityGroupRuleManagementForm, isFieldActive: Bool) async {
-        switch ch {
-        case Int32(9): // TAB - Navigate to next field
-            if !isFieldActive {
-                form.ruleCreateFormState.nextField()
-                form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                form.ruleCreateFormState = FormBuilderState(fields: form.ruleCreateForm.buildFields(
-                    selectedFieldId: form.ruleCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: form.ruleCreateFormState
-                ))
-                await self.draw(screen: screen)
-            }
+// MARK: - SecurityGroupRuleCreateForm Adapter
 
-        case 353: // SHIFT+TAB - Navigate to previous field
-            if !isFieldActive {
-                form.ruleCreateFormState.previousField()
-                form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                form.ruleCreateFormState = FormBuilderState(fields: form.ruleCreateForm.buildFields(
-                    selectedFieldId: form.ruleCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: form.ruleCreateFormState
-                ))
-                await self.draw(screen: screen)
-            }
+/// Adapter to make SecurityGroupRuleCreateForm work with universal handler
+/// Form has validateForm() returning (isValid: Bool, errors: [String])
+/// but FormValidatable expects validateForm() returning [String]
+struct SecurityGroupRuleCreateFormAdapter: FormStateUpdatable, FormStateRebuildable, FormValidatable {
+    var form: SecurityGroupRuleCreateForm
 
-        case Int32(32): // SPACE - Activate field or add space
-            if !isFieldActive {
-                form.ruleCreateFormState.activateCurrentField()
-                form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                if let currentField = form.ruleCreateFormState.getCurrentField() {
-                    switch currentField {
-                    case .text:
-                        form.ruleCreateFormState.handleCharacterInput(" ")
-                        form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                        await self.draw(screen: screen)
-                    case .selector:
-                        form.ruleCreateFormState.toggleCurrentField()
-                        form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                        await self.draw(screen: screen)
-                    default:
-                        break
-                    }
-                }
-            }
+    func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
+        return form.buildFields(selectedFieldId: selectedFieldId, activeFieldId: activeFieldId, formState: formState)
+    }
 
-        case Int32(10), Int32(13): // ENTER - Deactivate field or submit
-            needsRedraw = true
-            if isFieldActive {
-                form.ruleCreateFormState.deactivateCurrentField()
-                form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                form.ruleCreateFormState = FormBuilderState(fields: form.ruleCreateForm.buildFields(
-                    selectedFieldId: form.ruleCreateFormState.getCurrentFieldId(),
-                    activeFieldId: nil,
-                    formState: form.ruleCreateFormState
-                ))
-                await self.draw(screen: screen)
-            } else {
-                if form.shouldShowCreateForm() {
-                    await resourceOperations.createSecurityGroupRule(screen: screen)
-                } else {
-                    await resourceOperations.updateSecurityGroupRule(screen: screen)
-                }
-            }
+    mutating func updateFromFormState(_ formState: FormBuilderState) {
+        form.updateFromFormState(formState)
+    }
 
-        case Int32(259), Int32(258): // UP/DOWN - Navigate in selector when active
-            if isFieldActive {
-                let handled = form.ruleCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        case Int32(27): // ESC - Deactivate field or cancel
-            if isFieldActive {
-                form.ruleCreateFormState.deactivateCurrentField()
-                form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                await self.draw(screen: screen)
-            } else {
-                form.returnToListMode()
-                await self.draw(screen: screen)
-            }
-
-        case Int32(8), Int32(127), Int32(263): // BACKSPACE/DELETE
-            if isFieldActive {
-                let handled = form.ruleCreateFormState.handleSpecialKey(ch)
-                if handled {
-                    form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-
-        default:
-            if isFieldActive && ch >= 32 && ch < 127 {
-                if let scalar = UnicodeScalar(Int(ch)) {
-                    let char = Character(scalar)
-                    form.ruleCreateFormState.handleCharacterInput(char)
-                    form.ruleCreateForm.updateFromFormState(form.ruleCreateFormState)
-                    await self.draw(screen: screen)
-                }
-            }
-        }
+    func validateForm() -> [String] {
+        let validation = form.validateForm()
+        return validation.isValid ? [] : validation.errors
     }
 }

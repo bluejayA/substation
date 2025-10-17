@@ -3,21 +3,21 @@ import MemoryKit
 
 // MARK: - Default Logger Implementation
 
-/// Default silent logger for SwiftTUI when none is provided
-private final class DefaultSwiftTUILogger: MemoryKitLogger, @unchecked Sendable {
+/// Default silent logger for SwiftNCurses when none is provided
+private final class DefaultSwiftNCursesLogger: MemoryKitLogger, @unchecked Sendable {
     func logDebug(_ message: String, context: [String: Any]) {}
     func logInfo(_ message: String, context: [String: Any]) {}
     func logWarning(_ message: String, context: [String: Any]) {}
     func logError(_ message: String, context: [String: Any]) {}
 }
 
-// MARK: - SwiftTUI Memory Management Integration
+// MARK: - SwiftNCurses Memory Management Integration
 
-/// SwiftTUIMemoryManager provides a specialized MemoryKit integration layer
-/// for the SwiftTUI framework, handling component caching, animation state,
+/// SwiftNCursesMemoryManager provides a specialized MemoryKit integration layer
+/// for the SwiftNCurses framework, handling component caching, animation state,
 /// and UI performance optimizations.
 @MainActor
-public final class SwiftTUIMemoryManager {
+public final class SwiftNCursesMemoryManager {
 
     // MARK: - Core MemoryKit Instance
 
@@ -46,7 +46,7 @@ public final class SwiftTUIMemoryManager {
 
         public init(
             maxCacheSize: Int = 1500, // Increased for UI component density
-            maxMemoryBudget: Int = 30 * 1024 * 1024, // 30MB optimized for SwiftTUI
+            maxMemoryBudget: Int = 30 * 1024 * 1024, // 30MB optimized for SwiftNCurses
             cleanupInterval: TimeInterval = 600.0, // 10 minutes - reduced from 3min to lower CPU usage
             enableMetrics: Bool = true,
             enableLeakDetection: Bool = false, // Disabled to reduce CPU overhead
@@ -63,7 +63,7 @@ public final class SwiftTUIMemoryManager {
 
     // MARK: - Initialization
 
-    nonisolated init(configuration: Configuration = Configuration(logger: DefaultSwiftTUILogger())) {
+    nonisolated init(configuration: Configuration = Configuration(logger: DefaultSwiftNCursesLogger())) {
         // Use the global singleton MemoryManager instance
         // This ensures only one background task runner exists application-wide
         self.memoryManager = MemoryManager.shared
@@ -102,7 +102,7 @@ public final class SwiftTUIMemoryManager {
         )
         self.inputBufferCache = TypedCacheManager(configuration: inputBufferCacheConfig, logger: configuration.logger)
 
-        logger.logInfo("SwiftTUIMemoryManager initialized with MemoryKit integration", context: [
+        logger.logInfo("SwiftNCursesMemoryManager initialized with MemoryKit integration", context: [
             "maxCacheSize": configuration.maxCacheSize,
             "maxMemoryBudget": configuration.maxMemoryBudget
         ])
@@ -232,7 +232,7 @@ public final class SwiftTUIMemoryManager {
     /// Execute cache operation with full MemoryKit protection
     func executeProtectedCacheOperation<T: Sendable>(
         operationId: String = UUID().uuidString,
-        service: String = "SwiftTUICache",
+        service: String = "SwiftNCursesCache",
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
         do {
@@ -248,7 +248,7 @@ public final class SwiftTUIMemoryManager {
     }
 
     /// Get comprehensive cache statistics
-    func getCacheStatistics() async -> SwiftTUICacheStatistics {
+    func getCacheStatistics() async -> SwiftNCursesCacheStatistics {
         let componentStats = await componentCache.getStatistics()
         let animationStats = await animationCache.getStatistics()
         let virtualListStats = await virtualListCache.getStatistics()
@@ -262,7 +262,7 @@ public final class SwiftTUIMemoryManager {
             summary: "System health: OK, Cache hits: \(metrics.cacheHits), Cache misses: \(metrics.cacheMisses)"
         )
 
-        return SwiftTUICacheStatistics(
+        return SwiftNCursesCacheStatistics(
             componentCache: componentStats,
             animationCache: animationStats,
             virtualListCache: virtualListStats,
@@ -286,7 +286,7 @@ public final class SwiftTUIMemoryManager {
     /// Force cleanup of all caches
     func forceCleanup() async {
         await memoryManager.forceCleanup()
-        logger.logInfo("SwiftTUIMemoryManager performed force cleanup", context: [:])
+        logger.logInfo("SwiftNCursesMemoryManager performed force cleanup", context: [:])
     }
 
     /// Clear all caches
@@ -295,11 +295,11 @@ public final class SwiftTUIMemoryManager {
         await animationCache.clear()
         await virtualListCache.clear()
         await inputBufferCache.clear()
-        logger.logInfo("SwiftTUIMemoryManager cleared all caches", context: [:])
+        logger.logInfo("SwiftNCursesMemoryManager cleared all caches", context: [:])
     }
 
     /// Clear specific cache type
-    func clearCache(type: SwiftTUICacheType) async {
+    func clearCache(type: SwiftNCursesCacheType) async {
         switch type {
         case .components:
             await componentCache.clear()
@@ -310,13 +310,13 @@ public final class SwiftTUIMemoryManager {
         case .inputBuffers:
             await inputBufferCache.clear()
         }
-        logger.logInfo("SwiftTUIMemoryManager cleared \(type) cache", context: [:])
+        logger.logInfo("SwiftNCursesMemoryManager cleared \(type) cache", context: [:])
     }
 }
 
 // MARK: - Supporting Types
 
-public enum SwiftTUICacheType {
+public enum SwiftNCursesCacheType {
     case components
     case animations
     case virtualLists
@@ -421,7 +421,7 @@ public struct InputBufferEntry: Sendable, Codable {
     }
 }
 
-public struct SwiftTUICacheStatistics: Sendable {
+public struct SwiftNCursesCacheStatistics: Sendable {
     public let componentCache: CacheStatistics
     public let animationCache: CacheStatistics
     public let virtualListCache: CacheStatistics
@@ -430,7 +430,7 @@ public struct SwiftTUICacheStatistics: Sendable {
 
     public var summary: String {
         return """
-        SwiftTUI Cache Statistics:
+        SwiftNCurses Cache Statistics:
         Component Cache: \(componentCache.hitCount)/\(componentCache.accessCount) hits (\(String(format: "%.1f", componentCache.hitRate * 100))%)
         Animation Cache: \(animationCache.hitCount)/\(animationCache.accessCount) hits (\(String(format: "%.1f", animationCache.hitRate * 100))%)
         Virtual List Cache: \(virtualListCache.hitCount)/\(virtualListCache.accessCount) hits (\(String(format: "%.1f", virtualListCache.hitRate * 100))%)

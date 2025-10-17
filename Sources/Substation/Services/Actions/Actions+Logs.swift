@@ -6,7 +6,7 @@ import Glibc
 #endif
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 import MemoryKit
 
 // MARK: - Server Console Log Actions
@@ -17,7 +17,7 @@ extension Actions {
     internal func viewServerLogs(screen: OpaquePointer?) async {
         guard currentView == .servers else { return }
 
-        let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
         guard selectedIndex < filteredServers.count else {
             statusMessage = "No server selected"
             return
@@ -77,7 +77,7 @@ extension Actions {
     internal func viewServerConsole(screen: OpaquePointer?) async {
         guard currentView == .servers else { return }
 
-        let filteredServers = ResourceFilters.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
+        let filteredServers = FilterUtils.filterServers(cachedServers, query: searchQuery, getServerIP: resourceResolver.getServerIP)
         guard selectedIndex < filteredServers.count else {
             statusMessage = "No server selected"
             return

@@ -303,7 +303,6 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
     case volumeSnapshot = "volume_snapshot"
     case volumeBackup = "volume_backup"
     case barbicanSecret = "barbican_secret"
-    case barbicanContainer = "barbican_container"
     case loadBalancer = "load_balancer"
     case swiftContainer = "swift_container"
     case swiftObject = "swift_object"
@@ -325,7 +324,6 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
         case .volumeSnapshot: return "Volume Snapshot"
         case .volumeBackup: return "Volume Backup"
         case .barbicanSecret: return "Secret"
-        case .barbicanContainer: return "Secret Container"
         case .loadBalancer: return "Load Balancer"
         case .swiftContainer: return "Object Container"
         case .swiftObject: return "Object"
@@ -349,7 +347,6 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
         case .volumeSnapshot: return "Volume Snapshots"
         case .volumeBackup: return "Volume Backups"
         case .barbicanSecret: return "Secrets"
-        case .barbicanContainer: return "Secret Containers"
         case .loadBalancer: return "Load Balancers"
         case .swiftContainer: return "Object Containers"
         case .swiftObject: return "Objects"
@@ -373,7 +370,6 @@ public enum SearchResourceType: String, Codable, CaseIterable, Sendable {
         case .volumeSnapshot: return "[SNAP]"
         case .volumeBackup: return "[BACKUP]"
         case .barbicanSecret: return "[SECRET]"
-        case .barbicanContainer: return "[VAULT]"
         case .loadBalancer: return "[LB]"
         case .swiftContainer: return "[BUCKET]"
         case .swiftObject: return "[FILE]"
@@ -399,7 +395,6 @@ public struct SearchableResources: Sendable {
     let volumeSnapshots: [VolumeSnapshot]
     let volumeBackups: [VolumeBackup]
     let barbicanSecrets: [Secret]
-    let barbicanContainers: [BarbicanContainer]
     let loadBalancers: [LoadBalancer]
     let swiftContainers: [SwiftContainer]
     let swiftObjects: [SwiftObject]
@@ -420,7 +415,6 @@ public struct SearchableResources: Sendable {
         volumeSnapshots: [VolumeSnapshot] = [],
         volumeBackups: [VolumeBackup] = [],
         barbicanSecrets: [Secret] = [],
-        barbicanContainers: [BarbicanContainer] = [],
         loadBalancers: [LoadBalancer] = [],
         swiftContainers: [SwiftContainer] = [],
         swiftObjects: [SwiftObject] = []
@@ -440,7 +434,6 @@ public struct SearchableResources: Sendable {
         self.volumeSnapshots = volumeSnapshots
         self.volumeBackups = volumeBackups
         self.barbicanSecrets = barbicanSecrets
-        self.barbicanContainers = barbicanContainers
         self.loadBalancers = loadBalancers
         self.swiftContainers = swiftContainers
         self.swiftObjects = swiftObjects
@@ -450,7 +443,7 @@ public struct SearchableResources: Sendable {
         let count1 = servers.count + networks.count + subnets.count + ports.count
         let count2 = routers.count + volumes.count + images.count + flavors.count
         let count3 = securityGroups.count + keyPairs.count + floatingIPs.count + serverGroups.count
-        let count4 = volumeSnapshots.count + volumeBackups.count + barbicanSecrets.count + barbicanContainers.count
+        let count4 = volumeSnapshots.count + volumeBackups.count + barbicanSecrets.count
         let count5 = loadBalancers.count + swiftContainers.count + swiftObjects.count
         return count1 + count2 + count3 + count4 + count5
     }
@@ -472,7 +465,6 @@ public struct SearchableResources: Sendable {
         case .volumeSnapshot: return volumeSnapshots.count
         case .volumeBackup: return volumeBackups.count
         case .barbicanSecret: return barbicanSecrets.count
-        case .barbicanContainer: return barbicanContainers.count
         case .loadBalancer: return loadBalancers.count
         case .swiftContainer: return swiftContainers.count
         case .swiftObject: return swiftObjects.count

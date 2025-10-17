@@ -1,5 +1,5 @@
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct VolumeManagementView {
     // Layout Constants
@@ -87,16 +87,16 @@ struct VolumeManagementView {
 
         // Defensive bounds checking - prevent crashes on small screens
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
         guard let volume = form.selectedVolume else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: startCol + Self.contentIndent, y: startRow + Self.titleStartOffset, width: Self.errorMessageWidth, height: Self.rowSpacing)
-            await SwiftTUI.render(Text("\(Self.errorPrefix)\(Self.noVolumeSelectedError)").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("\(Self.errorPrefix)\(Self.noVolumeSelectedError)").error(), on: surface, in: errorBounds)
             return
         }
 
@@ -146,8 +146,8 @@ struct VolumeManagementView {
         // Render all components as unified VStack
         let contentBounds = Rect(x: startCol + Self.contentIndent, y: startRow + Self.titleStartOffset,
                                width: width - Self.contentIndent, height: height - Self.titleStartOffset)
-        let surface = SwiftTUI.surface(from: screen)
-        await SwiftTUI.render(VStack(spacing: 1, children: components), on: surface, in: contentBounds)
+        let surface = SwiftNCurses.surface(from: screen)
+        await SwiftNCurses.render(VStack(spacing: 1, children: components), on: surface, in: contentBounds)
 
         // Footer components (rendered separately for positioning)
         await renderFooterComponents(screen: screen, startRow: startRow, startCol: startCol,
@@ -246,7 +246,7 @@ struct VolumeManagementView {
     @MainActor
     private static func renderFooterComponents(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                              width: Int32, height: Int32, form: VolumeManagementForm, volume: Volume) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Pending changes summary
         if form.hasPendingChanges() {
@@ -254,17 +254,17 @@ struct VolumeManagementView {
             let selectedCount = form.pendingAttachments.count
             let summaryText = String(format: Self.pendingAttachmentFormat, selectedCount)
             let summaryBounds = Rect(x: startCol + Self.contentIndent, y: summaryRow, width: Int32(summaryText.count), height: Self.rowSpacing)
-            await SwiftTUI.render(Text(summaryText).accent(), on: surface, in: summaryBounds)
+            await SwiftNCurses.render(Text(summaryText).accent(), on: surface, in: summaryBounds)
         }
 
         // Footer with controls
         let footerRow = startRow + height - Self.footerOffset
         let mainFooterBounds = Rect(x: startCol + Self.contentIndent, y: footerRow, width: Int32(Self.mainFooterText.count), height: Self.rowSpacing)
-        await SwiftTUI.render(Text(Self.mainFooterText).info(), on: surface, in: mainFooterBounds)
+        await SwiftNCurses.render(Text(Self.mainFooterText).info(), on: surface, in: mainFooterBounds)
 
         let footerControls = getFooterControls(for: form.selectedOperation, volume: volume)
         let controlsBounds = Rect(x: startCol + Self.contentIndent, y: footerRow + Self.controlsOffset, width: Int32(footerControls.count), height: Self.rowSpacing)
-        await SwiftTUI.render(Text(footerControls).info(), on: surface, in: controlsBounds)
+        await SwiftNCurses.render(Text(footerControls).info(), on: surface, in: controlsBounds)
     }
 
     // MARK: - Helper Functions

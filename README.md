@@ -4,7 +4,7 @@
 
 **A high-performance, cross-platform terminal user interface for OpenStack infrastructure management.**
 
-Built with Swift 6.1 and custom SwiftTUI framework, because sometimes you just need to manage your cloud without leaving the terminal - especially at 3 AM when the pagers won't stop screaming.
+Built with Swift 6.1 and custom SwiftNCurses framework, because sometimes you just need to manage your cloud without leaving the terminal - especially at 3 AM when the pagers won't stop screaming.
 
 > "Finally, an OpenStack tool that doesn't make me want to throw my laptop out the window." - Anonymous Cloud Operator (me)
 
@@ -43,7 +43,7 @@ The good stuff that keeps you from rage-quitting:
   - L1/L2/L3 cache hierarchy, like a proper computer
   - Memory pressure handling and automatic cleanup
   - Type-safe caching because we're not savages
-- **Modular Package Design** - OSClient, SwiftTUI, CrossPlatformTimer, MemoryKit - All reusable
+- **Modular Package Design** - OSClient, SwiftNCurses, CrossPlatformTimer, MemoryKit - All reusable
 - **Cross-Platform** - Native macOS and Linux support (Windows users, we feel your pain)
 
 ## Package Architecture
@@ -52,7 +52,7 @@ Substation is built as a modular Swift package (because monoliths are so 2010):
 
 - **`OSClient`**: OpenStack API client library with caching and authentication - The heavy lifter
 - **`MemoryKit`**: Multi-level caching system - L1/L2/L3 cache hierarchy, memory pressure handling
-- **`SwiftTUI`**: Custom terminal UI framework (NCurses-based) - Making terminals pretty since 2024
+- **`SwiftNCurses`**: Custom terminal UI framework (NCurses-based) - Making terminals pretty since 2024
 - **`CrossPlatformTimer`**: Cross-platform timer utilities - Because macOS and Linux can't agree on anything
 - **`Substation`**: Main executable combining all components - Where the magic happens
 
@@ -86,19 +86,6 @@ sudo mv substation /usr/local/bin/
 - **[Quick Start Guide](https://substation.cloud/quick-start/)** - Get up and running in 5 minutes
 - **[Getting Started](https://substation.cloud/getting-started/)** - Comprehensive first-time setup
 
-## Navigation Quick Reference
-
-Press `?` anytime for help. Here are the essentials:
-
-| Key | Action | Key | Action |
-|-----|--------|-----|--------|
-| `d` | Dashboard | `s` | Servers |
-| `n` | Networks | `v` | Volumes |
-| `e` | Security Groups | `i` | Images |
-| `z` | Advanced Search | `c` | Purge cache |
-| `/` | Filter list | `q` | Quit |
-| `:` | Command mode | `h` | Help |
-
 **Full keyboard guide:** [Keyboard Shortcuts & Navigation](https://substation.cloud/guides/operators/keyboard-shortcuts/)
 
 ### Library Overview
@@ -107,7 +94,7 @@ All standalone, all reusable, all tested:
 
 - **OSClient** (`/Sources/OSClient`): Standalone OpenStack client library - Use it in your own projects
 - **MemoryKit** (`/Sources/MemoryKit`): Multi-level caching system - L1/L2/L3 cache hierarchy with memory pressure handling
-- **SwiftTUI** (`/Sources/SwiftTUI`): Terminal UI framework with SwiftUI-like declarative syntax - Pretty terminals made easy
+- **SwiftNCurses** (`/Sources/SwiftNCurses`): Terminal UI framework with SwiftUI-like declarative syntax - Pretty terminals made easy
 - **CrossPlatformTimer** (`/Sources/CrossPlatformTimer`): Timer utilities that work on both macOS and Linux - Because platform differences are pain
 - **Substation** (`/Sources/Substation`): The main terminal application combining all components - The star of the show
 

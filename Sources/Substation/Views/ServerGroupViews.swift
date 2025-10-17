@@ -1,6 +1,6 @@
 import Foundation
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 struct ServerGroupViews {
     // Layout constants
@@ -351,13 +351,13 @@ struct ServerGroupViews {
     ) async {
         // Defensive bounds checking to prevent crashes on small terminals
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Build form fields
         let fields = form.buildFields(
@@ -378,7 +378,7 @@ struct ServerGroupViews {
         // Render the form
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(formBuilder.render(), on: surface, in: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
         // If a selector field is active, render overlay
         if let currentField = formState.getCurrentField() {
@@ -411,7 +411,7 @@ struct ServerGroupViews {
         field: FormFieldSelector,
         selectorState: FormSelectorFieldState
     ) async {
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Use FormSelectorRenderer for standard selector rendering
         if let selectorComponent = FormSelectorRenderer.renderSelector(
@@ -426,7 +426,7 @@ struct ServerGroupViews {
         ) {
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             surface.clear(rect: bounds)
-            await SwiftTUI.render(selectorComponent, on: surface, in: bounds)
+            await SwiftNCurses.render(selectorComponent, on: surface, in: bounds)
         }
     }
 
@@ -441,9 +441,9 @@ struct ServerGroupViews {
                                      width: width, height: height)
 
         guard let serverGroup = form.selectedServerGroup else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: startCol + uiPadding, y: startRow + uiPadding, width: width - boundsWidthOffset, height: boundsHeight)
-            await SwiftTUI.render(Text("No server group selected").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("No server group selected").error(), on: surface, in: errorBounds)
             return
         }
 
@@ -451,7 +451,7 @@ struct ServerGroupViews {
         await BaseViewComponents.drawEnhancedTitle(screen: screen, startRow: startRow, startCol: startCol,
                                             width: width, title: "Manage Server Group: \(serverGroup.name ?? unknownText)")
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
         var currentRow = startRow + 2
 
         let policyStyle = policyStyleForManagement(serverGroup.primaryPolicy)
@@ -465,10 +465,10 @@ struct ServerGroupViews {
         ])
 
         let infoBounds = Rect(x: startCol + uiPadding, y: currentRow, width: width - boundsWidthOffset, height: boundsHeight)
-        await SwiftTUI.render(infoRow, on: surface, in: infoBounds)
+        await SwiftNCurses.render(infoRow, on: surface, in: infoBounds)
         currentRow += 1
 
-        // Instructions using SwiftTUI
+        // Instructions using SwiftNCurses
         let instructions = [
             "Note: OpenStack Nova does not support modifying membership of existing servers.",
             "Server group membership can only be set during server creation."
@@ -476,30 +476,30 @@ struct ServerGroupViews {
 
         for (index, instruction) in instructions.enumerated() {
             let instructionBounds = Rect(x: startCol + uiPadding, y: currentRow + Int32(index), width: width - boundsWidthOffset, height: boundsHeight)
-            await SwiftTUI.render(Text(instruction).info(), on: surface, in: instructionBounds)
+            await SwiftNCurses.render(Text(instruction).info(), on: surface, in: instructionBounds)
         }
         currentRow += instructionSpacing
 
-        // Show pending changes if any using SwiftTUI
+        // Show pending changes if any using SwiftNCurses
         if let pendingInfo = form.getPendingChangesInfo() {
             let pendingBounds = Rect(x: startCol + uiPadding, y: currentRow, width: width - boundsWidthOffset, height: boundsHeight)
-            await SwiftTUI.render(Text(pendingInfo).warning(), on: surface, in: pendingBounds)
+            await SwiftNCurses.render(Text(pendingInfo).warning(), on: surface, in: pendingBounds)
             currentRow += 1
         }
 
-        // Server list using SwiftTUI
+        // Server list using SwiftNCurses
         let allServers = form.getAllServers()
         if allServers.isEmpty {
             let noServersBounds = Rect(x: startCol + uiPadding, y: currentRow, width: width - boundsWidthOffset, height: boundsHeight)
-            await SwiftTUI.render(Text(noServersAvailableText).info(), on: surface, in: noServersBounds)
+            await SwiftNCurses.render(Text(noServersAvailableText).info(), on: surface, in: noServersBounds)
         } else {
-            // Headers using SwiftTUI
+            // Headers using SwiftNCurses
             let headerBounds = Rect(x: startCol + uiPadding, y: currentRow, width: width - boundsWidthOffset, height: boundsHeight)
-            await SwiftTUI.render(Text(serverManagementHeader).muted(), on: surface, in: headerBounds)
+            await SwiftNCurses.render(Text(serverManagementHeader).muted(), on: surface, in: headerBounds)
             currentRow += 1
 
             let separatorBounds = Rect(x: startCol + uiPadding, y: currentRow, width: width - boundsWidthOffset, height: boundsHeight)
-            await SwiftTUI.render(Text(String(repeating: "-", count: Int(width - boundsWidthOffset))).border(), on: surface, in: separatorBounds)
+            await SwiftNCurses.render(Text(String(repeating: "-", count: Int(width - boundsWidthOffset))).border(), on: surface, in: separatorBounds)
             currentRow += 1
 
             // Server list
@@ -507,7 +507,7 @@ struct ServerGroupViews {
             let startIndex = max(0, form.selectedResourceIndex - visibleHeight / scrollCenterDivisor)
             let endIndex = min(allServers.count, startIndex + visibleHeight)
 
-            // Convert server list to SwiftTUI components
+            // Convert server list to SwiftNCurses components
             var serverListComponents: [any Component] = []
 
             for (_, serverIndex) in (startIndex..<endIndex).enumerated() {
@@ -545,7 +545,7 @@ struct ServerGroupViews {
                 let ip = getServerIP(server) ?? noneIPText
                 let ipDisplay = String(ip.prefix(ipDisplayWidth)).padding(toLength: ipDisplayWidth, withPad: " ", startingAt: 0)
 
-                // Create server row with SwiftTUI
+                // Create server row with SwiftNCurses
                 let serverRow = HStack(spacing: 0, children: [
                     Text(serverStatus.checkboxDisplay).styled(checkboxStyle),
                     Text(highlightText).styled(highlightStyle),
@@ -562,23 +562,23 @@ struct ServerGroupViews {
             // Render all server rows
             let serverListSection = VStack(spacing: 0, children: serverListComponents)
             let serverListBounds = Rect(x: startCol + uiPadding, y: currentRow, width: width - boundsWidthOffset, height: Int32(serverListComponents.count))
-            await SwiftTUI.render(serverListSection, on: surface, in: serverListBounds)
+            await SwiftNCurses.render(serverListSection, on: surface, in: serverListBounds)
         }
 
-        // Show error message if any using SwiftTUI
+        // Show error message if any using SwiftNCurses
         if let errorMessage = form.errorMessage {
             let errorRow = startRow + height - errorFooterOffset
             let truncatedError = String(errorMessage.prefix(Int(width - boundsWidthOffset)))
             let errorBounds = Rect(x: startCol + uiPadding, y: errorRow, width: width - boundsWidthOffset, height: boundsHeight)
-            await SwiftTUI.render(Text("Error: \(truncatedError)").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Error: \(truncatedError)").error(), on: surface, in: errorBounds)
         }
 
-        // Navigation help using SwiftTUI
+        // Navigation help using SwiftNCurses
         let helpRow = startRow + height - helpFooterOffset
         let helpText = form.getNavigationHelp()
         let truncatedHelp = String(helpText.prefix(Int(width - boundsWidthOffset)))
         let helpBounds = Rect(x: startCol + uiPadding, y: helpRow, width: width - boundsWidthOffset, height: boundsHeight)
-        await SwiftTUI.render(Text(truncatedHelp).info(), on: surface, in: helpBounds)
+        await SwiftNCurses.render(Text(truncatedHelp).info(), on: surface, in: helpBounds)
     }
 
     // MARK: - Helper Functions

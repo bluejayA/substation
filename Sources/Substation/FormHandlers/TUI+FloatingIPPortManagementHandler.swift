@@ -2,7 +2,7 @@ import Foundation
 import struct OSClient.FloatingIP
 import struct OSClient.Port
 import OSClient
-import SwiftTUI
+import SwiftNCurses
 
 // MARK: - Floating IP Port Management Input Handling
 

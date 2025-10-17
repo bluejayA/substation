@@ -166,14 +166,30 @@ public actor NovaService: OpenStackService {
 
     /// Delete a server with intelligent cache invalidation
     public func deleteServer(id: String) async throws {
-        try await core.requestVoid(
-            service: serviceName,
-            method: "DELETE",
-            path: "/servers/\(id)",
-            expected: 204
-        )
+        do {
+            try await core.requestVoid(
+                service: serviceName,
+                method: "DELETE",
+                path: "/servers/\(id)",
+                expected: 204
+            )
+        } catch let error as OpenStackError {
+            // Invalidate cache even on 404 - server doesn't exist (idempotent delete)
+            if case .httpError(404, _) = error {
+                await invalidationManager.invalidateForOperation(
+                    .delete,
+                    resourceType: .server,
+                    resourceId: id
+                )
+                logger.logInfo("Nova service - server already deleted, cache invalidated", context: [
+                    "serverId": id
+                ])
+                return // Treat 404 as success
+            }
+            throw error
+        }
 
-        // Intelligent invalidation for deletion
+        // Intelligent invalidation for successful deletion
         await invalidationManager.invalidateForOperation(
             .delete,
             resourceType: .server,

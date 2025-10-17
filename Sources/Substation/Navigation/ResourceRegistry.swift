@@ -15,7 +15,7 @@ final class ResourceRegistry: @unchecked Sendable {
         // Compute - Servers
         .flavors: ["flavors", "flavor", "flv", "f", "novaflavors", "novaflavor"],
         .keyPairs: ["keypairs", "keypair", "keys", "key", "kp", "k", "novakeypairs", "novakeypair"],
-        .serverGroups: ["servergroups", "servergroup", "srvgrp", "sg", "g", "novaservergroups", "novaservergroup"],
+        .serverGroups: ["server groups", "servergroups", "servergroup", "srvgrp", "sg", "g", "novaservergroups", "novaservergroup"],
         .servers: ["servers", "server", "srv", "s", "nova"],
 
         // Networking
@@ -23,18 +23,20 @@ final class ResourceRegistry: @unchecked Sendable {
         .networks: ["networks", "network", "net", "n", "neutron"],
         .ports: ["ports", "port", "p", "neutronports", "neutronport"],
         .routers: ["routers", "router", "rtr", "r", "neutronrouters", "neutronrouter"],
-        .securityGroups: ["securitygroups", "securitygroup", "secgroups", "secgroup", "sec", "e", "neutronsecuritygroups", "neutronsecuritygroup"],
+        .securityGroups: ["security groups", "securitygroups", "securitygroup", "secgroups", "secgroup", "sec", "e", "neutronsecuritygroups", "neutronsecuritygroup"],
         .subnets: ["subnets", "subnet", "sub", "u", "neutronsubnets", "neutronsubnet"],
 
         // Storage
         .images: ["images", "image", "img", "i", "glance"],
-        .volumeArchives: ["archives", "archive", "arch", "m", "volumearchives", "volumearchive", "cinderbackups", "cinderbackup"],
+        .volumeArchives: ["volume archives", "archives", "archive", "arch", "m", "volumearchives", "volumearchive", "cinderbackups", "cinderbackup"],
         .volumes: ["volumes", "volume", "vol", "v", "cinder"],
 
         // Services
         .barbicanSecrets: ["secrets", "secret", "barbican", "b"],
         .octavia: ["loadbalancers", "loadbalancer", "lb", "octavia", "o"],
-        .swift: ["swift", "objectstorage", "objects", "obj", "j"],
+        .swift: ["object storage", "swift", "objectstorage", "objects", "obj", "j"],
+        .swiftBackgroundOperations: ["operations", "ops", "background", "tasks"],
+        .performanceMetrics: ["performance", "metrics", "perf", "stats"],
 
         // Utilities
         .about: ["about"],
@@ -42,6 +44,54 @@ final class ResourceRegistry: @unchecked Sendable {
         .healthDashboard: ["health", "healthdashboard", "h"],
         .help: ["help", "?"],
     ]
+
+    // MARK: - Action Command Mapping
+
+    /// Action commands that can be executed in various contexts
+    private let actionCommands: [String] = [
+        "create", "new", "add",
+        "delete", "remove", "rm", "del",
+        "refresh", "reload",
+        "start", "boot", "power-on",
+        "stop", "shutdown", "power-off",
+        "restart", "reboot",
+        "manage", "edit",
+        "clear-cache", "clearcache", "cc"
+    ]
+
+    /// Map action command aliases to canonical action names
+    private let actionAliases: [String: String] = [
+        "new": "create",
+        "add": "create",
+        "remove": "delete",
+        "rm": "delete",
+        "del": "delete",
+        "reload": "refresh",
+        "boot": "start",
+        "power-on": "start",
+        "shutdown": "stop",
+        "power-off": "stop",
+        "reboot": "restart",
+        "edit": "manage",
+        "clearcache": "clear-cache",
+        "cc": "clear-cache"
+    ]
+
+    // MARK: - Configuration Command Mapping
+
+    /// Configuration commands for system settings
+    private let configCommands: [String] = []
+
+    /// Discovery and help commands (Phase 3)
+    private let discoveryCommands: [String] = [
+        "tutorial", "walkthrough",
+        "shortcuts", "cheatsheet",
+        "examples", "workflows",
+        "welcome", "intro"
+    ]
+
+    /// Map configuration command aliases to canonical config names
+    private let configAliases: [String: String] = [:]
 
     // Reverse lookup cache for fast command resolution
     private lazy var commandLookup: [String: ViewMode] = {
@@ -61,9 +111,79 @@ final class ResourceRegistry: @unchecked Sendable {
         return commandLookup[command.lowercased()]
     }
 
-    /// Get all available commands
+    /// Resolve an action command to its canonical ActionType
+    /// - Parameter command: The command string (without colon prefix)
+    /// - Returns: The ActionType if the command is a valid action, nil otherwise
+    func resolveAction(_ command: String) -> ActionType? {
+        let lowercased = command.lowercased()
+
+        // Check if it's a canonical action name
+        if let actionType = ActionType(rawValue: lowercased) {
+            return actionType
+        }
+
+        // Check if it's an alias
+        if let canonical = actionAliases[lowercased],
+           let actionType = ActionType(rawValue: canonical) {
+            return actionType
+        }
+
+        return nil
+    }
+
+    /// Check if a command is an action command (not a navigation command)
+    /// - Parameter command: The command string (without colon prefix)
+    /// - Returns: True if the command is an action command
+    func isActionCommand(_ command: String) -> Bool {
+        return resolveAction(command) != nil
+    }
+
+    /// Resolve a configuration command to its canonical name
+    /// - Parameter command: The command string (without colon prefix)
+    /// - Returns: The canonical config command name if valid, nil otherwise
+    func resolveConfigCommand(_ command: String) -> String? {
+        let lowercased = command.lowercased()
+
+        // Check if it's in the config commands list
+        if configCommands.contains(lowercased) {
+            return lowercased
+        }
+
+        // Check if it's an alias
+        return configAliases[lowercased]
+    }
+
+    /// Check if a command is a configuration command
+    /// - Parameter command: The command string (without colon prefix)
+    /// - Returns: True if the command is a configuration command
+    func isConfigCommand(_ command: String) -> Bool {
+        return resolveConfigCommand(command) != nil
+    }
+
+    /// Get all available commands (navigation + actions + config)
     func allCommands() -> [String] {
+        let navigationCommands = Array(commandLookup.keys)
+        return (navigationCommands + actionCommands + configCommands + discoveryCommands).sorted()
+    }
+
+    /// Get only navigation commands (excludes actions and config)
+    func navigationCommands() -> [String] {
         return Array(commandLookup.keys).sorted()
+    }
+
+    /// Get only action commands
+    func getActionCommands() -> [String] {
+        return actionCommands.sorted()
+    }
+
+    /// Get only configuration commands
+    func getConfigCommands() -> [String] {
+        return configCommands.sorted()
+    }
+
+    /// Get only discovery commands (Phase 3)
+    func getDiscoveryCommands() -> [String] {
+        return discoveryCommands.sorted()
     }
 
     /// Get primary commands (exclude single-letter aliases for display)
@@ -212,19 +332,20 @@ final class ResourceRegistry: @unchecked Sendable {
 
     // MARK: - Command Suggestions
 
-    /// Get command suggestions based on partial input
+    /// Get command suggestions based on partial input (includes actions)
     func suggestions(for partial: String, limit: Int = 5) -> [String] {
         guard !partial.isEmpty else { return [] }
 
         let partialLower = partial.lowercased()
+        let allAvailable = commandLookup.keys + actionCommands
 
         // Exact prefix matches first
-        let prefixMatches = commandLookup.keys
+        let prefixMatches = allAvailable
             .filter { $0.hasPrefix(partialLower) }
             .sorted()
 
         // Contains matches second
-        let containsMatches = commandLookup.keys
+        let containsMatches = allAvailable
             .filter { !$0.hasPrefix(partialLower) && $0.contains(partialLower) }
             .sorted()
 
@@ -247,12 +368,26 @@ final class ResourceRegistry: @unchecked Sendable {
             .compute: ["servers", "servergroups", "flavors", "keypairs"],
             .networking: ["networks", "subnets", "routers", "ports", "floatingips", "securitygroups"],
             .storage: ["volumes", "images", "archives"],
-            .services: ["secrets", "loadbalancers", "swift"],
+            .services: ["secrets", "loadbalancers", "swift", "operations", "performance"],
             .utilities: ["dashboard", "topology", "search", "health", "help", "about"]
         ]
     }
 
     // MARK: - Help Text Generation
+
+    /// Get a detailed description for a specific view mode
+    /// - Parameter viewMode: The view mode to describe
+    /// - Returns: A detailed description of what the view mode does
+    private func detailedDescription(for viewMode: ViewMode) -> String? {
+        switch viewMode {
+        case .performanceMetrics:
+            return "View real-time performance metrics and statistics for OpenStack operations"
+        case .swiftBackgroundOperations:
+            return "Monitor background operations for Swift Object Storage tasks"
+        default:
+            return nil
+        }
+    }
 
     /// Generate help text for a command
     func helpText(for command: String) -> String? {
@@ -263,7 +398,15 @@ final class ResourceRegistry: @unchecked Sendable {
             .prefix(3)
             .joined(separator: ", ")
 
-        var help = ":\(command) - Navigate to \(viewMode.title)"
+        var help = ":\(command) - "
+
+        // Add detailed description if available, otherwise use generic navigation text
+        if let description = detailedDescription(for: viewMode) {
+            help += description
+        } else {
+            help += "Navigate to \(viewMode.title)"
+        }
+
         if !aliasesText.isEmpty {
             help += " (aliases: \(aliasesText))"
         }
@@ -289,5 +432,14 @@ final class ResourceRegistry: @unchecked Sendable {
 
         lines.append("Tip: Use Tab for auto-completion")
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - View Filtering
+
+    /// Check if a ViewMode has any navigation commands defined
+    /// - Parameter viewMode: The ViewMode to check
+    /// - Returns: True if the ViewMode has navigation commands, false otherwise
+    func hasNavigationCommand(for viewMode: ViewMode) -> Bool {
+        return resourceMap[viewMode] != nil
     }
 }

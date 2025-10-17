@@ -1,31 +1,5 @@
 import Foundation
 
-// MARK: - InputPriority
-//
-// Defines the priority system for input handling in Substation TUI.
-// This helps clarify which layer should handle which keys and in what order.
-//
-// ## Architecture Overview
-//
-// Input handling uses a 3-layer priority model:
-// 1. Navigation (Highest) - Immediate response keys (Enter, arrows)
-// 2. Text Input (Medium) - Typing, editing, command mode
-// 3. Fallback (Lowest) - View-specific legacy handlers
-//
-// ## Usage
-//
-// ```swift
-// let priority = InputPriority.classify(key)
-// switch priority {
-// case .navigation:
-//     return handleNavigation(key)
-// case .textInput:
-//     return handleTextInput(key)
-// case .fallback:
-//     return handleFallback(key)
-// }
-// ```
-
 @MainActor
 struct InputPriority {
 

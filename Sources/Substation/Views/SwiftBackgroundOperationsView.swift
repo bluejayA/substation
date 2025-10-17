@@ -4,7 +4,7 @@ import Darwin
 #else
 import Glibc
 #endif
-import SwiftTUI
+import SwiftNCurses
 
 struct SwiftBackgroundOperationsView {
 
@@ -24,7 +24,7 @@ struct SwiftBackgroundOperationsView {
         let columns = [
             StatusListColumn<SwiftBackgroundOperation>(
                 header: "Type",
-                width: 10,
+                width: 12,
                 getValue: { $0.type.displayName }
             ),
             StatusListColumn<SwiftBackgroundOperation>(
@@ -42,33 +42,55 @@ struct SwiftBackgroundOperationsView {
                 }
             ),
             StatusListColumn<SwiftBackgroundOperation>(
-                header: "File/Object",
-                width: 30,
+                header: "Resource/Object",
+                width: 28,
                 getValue: { $0.displayName }
             ),
             StatusListColumn<SwiftBackgroundOperation>(
                 header: "Container",
-                width: 20,
-                getValue: { $0.containerName }
-            ),
-            StatusListColumn<SwiftBackgroundOperation>(
-                header: "Progress",
-                width: 15,
+                width: 18,
                 getValue: { operation in
-                    if operation.status == .completed {
-                        return "100%"
-                    } else if operation.status.isActive {
-                        return "\(operation.progressPercentage)%"
-                    } else {
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
                         return "-"
+                    } else {
+                        return operation.containerName
                     }
                 }
             ),
             StatusListColumn<SwiftBackgroundOperation>(
-                header: "Size",
-                width: 12,
+                header: "Progress",
+                width: 18,
                 getValue: { operation in
-                    if operation.totalBytes > 0 {
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
+                        if operation.status == .completed {
+                            return "\(operation.itemsCompleted)/\(operation.itemsTotal)"
+                        } else if operation.status.isActive {
+                            return "\(operation.itemsCompleted)/\(operation.itemsTotal) (\(operation.progressPercentage)%)"
+                        } else {
+                            return "\(operation.itemsCompleted)/\(operation.itemsTotal)"
+                        }
+                    } else {
+                        if operation.status == .completed {
+                            return "100%"
+                        } else if operation.status.isActive {
+                            return "\(operation.progressPercentage)%"
+                        } else {
+                            return "-"
+                        }
+                    }
+                }
+            ),
+            StatusListColumn<SwiftBackgroundOperation>(
+                header: "Size/Failed",
+                width: 14,
+                getValue: { operation in
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
+                        if operation.itemsFailed > 0 {
+                            return "\(operation.itemsFailed) failed"
+                        } else {
+                            return "-"
+                        }
+                    } else if operation.totalBytes > 0 {
                         return "\(operation.formattedBytesTransferred) / \(operation.formattedTotalBytes)"
                     } else {
                         return "-"
@@ -79,7 +101,9 @@ struct SwiftBackgroundOperationsView {
                 header: "Rate",
                 width: 12,
                 getValue: { operation in
-                    if operation.status == .running {
+                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
+                        return "-"
+                    } else if operation.status == .running {
                         return operation.formattedTransferRate
                     } else {
                         return "-"

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftTUI
+import SwiftNCurses
 import OSClient
 
 // MARK: - Swift Views
@@ -438,13 +438,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -467,7 +467,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - Object Upload View
@@ -483,13 +483,13 @@ struct SwiftViews {
         uploadProgress: Double? = nil
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -524,7 +524,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - StatusListView Creators
@@ -642,13 +642,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -671,7 +671,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - Container Web Access View
@@ -686,13 +686,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -715,7 +715,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - Object Metadata View
@@ -730,13 +730,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -759,7 +759,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - Directory Metadata View
@@ -774,13 +774,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -803,7 +803,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - Object Upload View
@@ -818,13 +818,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -847,7 +847,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     // MARK: - Object Download View
@@ -862,13 +862,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -891,7 +891,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     @MainActor
@@ -904,13 +904,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -933,7 +933,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
     @MainActor
@@ -946,13 +946,13 @@ struct SwiftViews {
         formBuilderState: FormBuilderState
     ) async {
         guard width > 10 && height > 10 else {
-            let surface = SwiftTUI.surface(from: screen)
+            let surface = SwiftNCurses.surface(from: screen)
             let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
-            await SwiftTUI.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
             return
         }
 
-        let surface = SwiftTUI.surface(from: screen)
+        let surface = SwiftNCurses.surface(from: screen)
 
         // Create FormBuilder instance
         let formBuilder = FormBuilder(
@@ -975,7 +975,7 @@ struct SwiftViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         surface.clear(rect: bounds)
-        await SwiftTUI.render(finalComponent, on: surface, in: bounds)
+        await SwiftNCurses.render(finalComponent, on: surface, in: bounds)
     }
 
 }
