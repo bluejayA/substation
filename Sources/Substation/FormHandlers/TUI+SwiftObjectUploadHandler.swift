@@ -418,6 +418,10 @@ extension TUI {
             operation.filesSkipped = skippedCount
             operation.filesCompleted = successCount
 
+            // Mark operation as complete
+            operation.markCompleted()
+            operation.progress = 1.0
+
             // Refresh object list for the current container
             if let currentContainer = swiftNavState.currentContainer {
                 await dataManager.fetchSwiftObjects(containerName: currentContainer, priority: "interactive", forceRefresh: true)
