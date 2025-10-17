@@ -21,13 +21,11 @@ final class CommandMode: @unchecked Sendable {
     // MARK: - Initialization
 
     init() {
-        // Set up history file path
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
-        let configDir = "\(homeDir)/.config/substation"
-        self.historyFilePath = "\(configDir)/command_history"
+        // Set up history file path using centralized constants
+        self.historyFilePath = AppConstants.commandHistoryPath
 
         // Ensure config directory exists
-        try? FileManager.default.createDirectory(atPath: configDir, withIntermediateDirectories: true)
+        AppConstants.ensureConfigDirectoryExists()
     }
 
     // MARK: - Command Execution
@@ -35,6 +33,7 @@ final class CommandMode: @unchecked Sendable {
     enum CommandResult {
         case ignored
         case navigateToView(ViewMode)
+        case executeAction(ActionType)
         case showHelp
         case showCommands
         case quit
@@ -42,6 +41,18 @@ final class CommandMode: @unchecked Sendable {
         case suggestion(String, String) // (original, suggested)
         case listContexts
         case switchContext(String)
+        case configAction(ConfigAction)
+        case showTutorial
+        case showShortcuts
+        case showExamples
+        case showWelcome
+    }
+
+    /// Configuration actions for system settings
+    enum ConfigAction {
+        case setCommandMode(NavigationMode)
+        case toggleMode
+        case showPreferences
     }
 
     func executeCommand(_ command: String) -> CommandResult {
@@ -68,6 +79,23 @@ final class CommandMode: @unchecked Sendable {
             return .showCommands
         }
 
+        // Discovery commands (Phase 3)
+        if trimmed == "tutorial" {
+            return .showTutorial
+        }
+
+        if trimmed == "shortcuts" {
+            return .showShortcuts
+        }
+
+        if trimmed == "examples" {
+            return .showExamples
+        }
+
+        if trimmed == "welcome" {
+            return .showWelcome
+        }
+
         // Context switching commands
         if trimmed == "ctx" || trimmed == "context" {
             return .listContexts
@@ -82,6 +110,17 @@ final class CommandMode: @unchecked Sendable {
                 }
             }
             return .error("Usage: :ctx <cloud-name> or :ctx to list clouds")
+        }
+
+        // Configuration commands
+        if let configResult = handleConfigCommand(trimmed) {
+            return configResult
+        }
+
+        // Check if this is an action command
+        if let actionType = ResourceRegistry.shared.resolveAction(trimmed) {
+            Logger.shared.logUserAction("action_command_received", details: ["action": actionType.rawValue])
+            return .executeAction(actionType)
         }
 
         // Resource navigation - try exact match first
@@ -342,5 +381,49 @@ final class CommandMode: @unchecked Sendable {
         default:
             return ResourceRegistry.shared.primaryCommands().prefix(5).map { String($0) }
         }
+    }
+
+    // MARK: - Configuration Command Handling
+
+    /// Handle configuration commands for navigation mode and preferences
+    /// - Parameter command: The trimmed, lowercased command string
+    /// - Returns: A CommandResult if this is a config command, nil otherwise
+    private func handleConfigCommand(_ command: String) -> CommandResult? {
+        guard let configCommand = ResourceRegistry.shared.resolveConfigCommand(command) else {
+            return nil
+        }
+
+        switch configCommand {
+        case "command-mode", "mode":
+            // Set command mode: :command-mode [hybrid|command-only] or :mode [hybrid|commands]
+            let parts = command.split(separator: " ", maxSplits: 1).map { String($0) }
+            if parts.count == 1 {
+                // Just :command-mode - show current mode
+                return .configAction(.showPreferences)
+            } else if parts.count == 2 {
+                let arg = parts[1].lowercased()
+                switch arg {
+                case "hybrid", "both":
+                    return .configAction(.setCommandMode(.hybrid))
+                case "command-only", "commands", "cmd":
+                    return .configAction(.setCommandMode(.commandOnly))
+                default:
+                    return .error("Usage: :command-mode [hybrid|command-only]\n  hybrid = commands + uppercase actions\n  command-only = commands only")
+                }
+            }
+
+        case "toggle-mode":
+            // Toggle between hybrid and command-only
+            return .configAction(.toggleMode)
+
+        case "prefs", "preferences", "settings":
+            // Show current preferences
+            return .configAction(.showPreferences)
+
+        default:
+            break
+        }
+
+        return nil
     }
 }

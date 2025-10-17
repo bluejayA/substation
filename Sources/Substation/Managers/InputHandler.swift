@@ -378,6 +378,51 @@ class InputHandler {
                     }
                     return
 
+                case .executeAction(let actionType):
+                    // Execute an action in the current context
+                    let success = await CommandActionHandler.shared.executeAction(actionType, in: tui.currentView, tui: tui, screen: screen)
+                    if success {
+                        tui.statusMessage = "Executed action: \(actionType.rawValue)"
+                    }
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .configAction(let configAction):
+                    // Handle configuration actions
+                    handleConfigAction(configAction)
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .showTutorial:
+                    // Show interactive tutorial view
+                    tui.changeView(to: .tutorial, resetSelection: true)
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .showShortcuts:
+                    // Show shortcuts reference view
+                    tui.changeView(to: .shortcuts, resetSelection: true)
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .showExamples:
+                    // Show command examples view
+                    tui.changeView(to: .examples, resetSelection: true)
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
+                case .showWelcome:
+                    // Show welcome view
+                    tui.changeView(to: .welcome, resetSelection: true)
+                    tui.unifiedInputState.clear()
+                    tui.forceRedraw()
+                    return
+
                 case .ignored:
                     break
                 }
@@ -443,166 +488,24 @@ class InputHandler {
             return
         }
 
+        // PRIORITY 3: Universal key navigation (command-based)
+        // Letter keys trigger helpful hints to use command mode
+        if (ch >= 97 && ch <= 122) || (ch >= 65 && ch <= 90) { // a-z or A-Z (excluding special uppercase actions)
+            // Check if this is a context-sensitive uppercase action that should be handled
+            let isContextAction = (ch == 77 || ch == 68 || ch == 85 || ch == 69 || ch == 80 ||
+                                   ch == 66 || ch == 82 || ch == 83 || ch == 84 || ch == 76 ||
+                                   ch == 79 || ch == 87 || ch == 90 || ch == 65 || ch == 67)
+            if !isContextAction {
+                tui.statusMessage = "Use commands for navigation (type : and press Tab for suggestions)"
+            }
+            // Allow context actions and universal keys to continue below
+        }
+
         switch ch {
-        case Int32(3): // CTRL-C
+        case Int32(3): // CTRL-C - Universal quit
             Logger.shared.logUserAction("quit_application")
             tui.running = false
-        case Int32(100): // d - Dashboard navigation
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".dashboard")
-            tui.changeView(to: .dashboard)
-        case Int32(107): // k - Key Pairs navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".keyPairs", details: ["action": "exit_detail"])
-                tui.changeView(to: .keyPairs, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".keyPairs")
-                tui.changeView(to: .keyPairs)
-            }
-        case Int32(115): // s - Servers navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".servers", details: ["action": "exit_detail"])
-                tui.changeView(to: .servers, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".servers")
-                tui.changeView(to: .servers)
-            }
-        case Int32(103): // g - Server Groups navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".serverGroups", details: ["action": "exit_detail"])
-                tui.changeView(to: .serverGroups, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".serverGroups")
-                tui.changeView(to: .serverGroups)
-            }
-        case Int32(114): // r - Routers navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".routers", details: ["action": "exit_detail"])
-                tui.changeView(to: .routers, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".routers")
-                tui.changeView(to: .routers)
-            }
-        case Int32(110): // n - Networks (lowercase)
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".networks", details: ["action": "exit_detail"])
-                tui.changeView(to: .networks, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".networks")
-                tui.changeView(to: .networks)
-            }
-        case Int32(117): // u - Subnets (lowercase)
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".subnets", details: ["action": "exit_detail"])
-                tui.changeView(to: .subnets, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".subnets")
-                tui.changeView(to: .subnets)
-            }
-        case Int32(101): // e - Security Groups (lowercase)
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".securityGroups", details: ["action": "exit_detail"])
-                tui.changeView(to: .securityGroups, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".securityGroups")
-                tui.changeView(to: .securityGroups)
-            }
-        case Int32(108): // l - Floating IPs navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".floatingIPs", details: ["action": "exit_detail"])
-                tui.changeView(to: .floatingIPs, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".floatingIPs")
-                tui.changeView(to: .floatingIPs)
-            }
-        case Int32(112): // p - Ports navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".ports", details: ["action": "exit_detail"])
-                tui.changeView(to: .ports, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".ports")
-                tui.changeView(to: .ports)
-            }
-        case Int32(118): // v - Volumes (lowercase)
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".volumes", details: ["action": "exit_detail"])
-                tui.changeView(to: .volumes, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".volumes")
-                tui.changeView(to: .volumes)
-            }
-        case Int32(105): // i - Images navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".images", details: ["action": "exit_detail"])
-                tui.changeView(to: .images, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".images")
-                tui.changeView(to: .images)
-            }
-        case Int32(102): // f - Flavors (lowercase)
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".flavors", details: ["action": "exit_detail"])
-                tui.changeView(to: .flavors, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".flavors")
-                tui.changeView(to: .flavors)
-            }
-        case Int32(104): // h - Health Dashboard navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".healthDashboard", details: ["action": "exit_detail"])
-                tui.changeView(to: .healthDashboard, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".healthDashboard")
-                tui.changeView(to: .healthDashboard)
-            }
-        case Int32(98): // b - Barbican secrets navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".barbicanSecrets", details: ["action": "exit_detail"])
-                tui.changeView(to: .barbicanSecrets, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".barbicanSecrets")
-                tui.changeView(to: .barbicanSecrets)
-            }
-        case Int32(111): // o - Octavia navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".octavia", details: ["action": "exit_detail"])
-                tui.changeView(to: .octavia, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".octavia")
-                tui.changeView(to: .octavia)
-            }
-        case Int32(106): // j - Swift navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".swift", details: ["action": "exit_detail"])
-                tui.changeView(to: .swift, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".swift")
-                tui.changeView(to: .swift)
-            }
-        case Int32(116): // t - Background Operations navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".swiftBackgroundOperations", details: ["action": "exit_detail"])
-                tui.changeView(to: .swiftBackgroundOperations, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".swiftBackgroundOperations")
-                tui.changeView(to: .swiftBackgroundOperations)
-            }
+
         case Int32(24): // CTRL-X - Toggle multi-select mode
             if !tui.currentView.isDetailView && tui.currentView.supportsMultiSelect {
                 Logger.shared.logUserAction("toggle_multi_select_mode", details: [
@@ -616,8 +519,13 @@ class InputHandler {
                 Logger.shared.logUserAction("manage_container_web_access", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageContainerWebAccess(screen: screen)
             }
-        case Int32(77): // M - Manage things
-            if tui.currentView == .swift && !tui.currentView.isDetailView {
+        case Int32(77): // M - Manage things or Performance Metrics
+            if tui.currentView == .swiftBackgroundOperations && !tui.currentView.isDetailView {
+                Logger.shared.logUserAction("show_performance_metrics", details: ["view": "swiftBackgroundOperations"])
+                Logger.shared.logNavigation("\(tui.currentView)", to: ".performanceMetrics")
+                tui.scrollOffset = 0 // Reset scroll when entering metrics view
+                tui.changeView(to: .performanceMetrics, resetSelection: false)
+            } else if tui.currentView == .swift && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("manage_container_metadata", details: ["selectedIndex": tui.selectedIndex])
                 await handleManageContainerMetadata(screen: screen)
             } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
@@ -666,28 +574,6 @@ class InputHandler {
             } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("download_object", details: ["selectedIndex": tui.selectedIndex])
                 await handleDownloadObject(screen: screen)
-            }
-        case Int32(109): // m - Volume Archives navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".volumeArchives", details: ["action": "exit_detail"])
-                await tui.actions.loadAllVolumeSnapshots()
-                await tui.actions.loadAllVolumeBackups()
-                tui.changeView(to: .volumeArchives, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".volumeArchives")
-                await tui.actions.loadAllVolumeSnapshots()
-                await tui.actions.loadAllVolumeBackups()
-                tui.changeView(to: .volumeArchives)
-            }
-        case Int32(122): // z - Advanced Search navigation
-            if tui.currentView.isDetailView {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".advancedSearch", details: ["action": "exit_detail"])
-                tui.changeView(to: .advancedSearch, resetSelection: false)
-                tui.selectedResource = nil
-            } else {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".advancedSearch")
-                tui.changeView(to: .advancedSearch)
             }
         case Int32(259), Int32(258), Int32(338), Int32(339), Int32(262), Int32(360), Int32(27): // Navigation keys
             // Use centralized navigation handler for all basic navigation
@@ -740,24 +626,11 @@ class InputHandler {
                     tui.openDetailView()
                 }
             }
-        case Int32(114): // r - Manual refresh
-            Logger.shared.logUserAction("manual_refresh", details: ["view": "\(tui.currentView)"])
-            await handleRefreshKey()
-        case Int32(97): // a - Toggle auto-refresh
-            Logger.shared.logUserAction("toggle_auto_refresh", details: ["current": tui.autoRefresh])
-            handleAutoRefreshToggle()
-        case Int32(99): // c - purge cache or cancel upload
-            Logger.shared.logUserAction("purge_cache")
-            await handleCachePurge()
         // NOTE: / key (Int32(47)) is now handled universally before specialized view routing
-        // Secondary Commands (Uppercase) - Actions
-        case Int32(67): // C - Create new resource or Clear completed operations
-            if tui.currentView == .swiftBackgroundOperations {
-                await handleClearCompletedOperations(screen: screen)
-            } else {
-                Logger.shared.logUserAction("create_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
-                await handleCreateResource()
-            }
+        // Context-Sensitive Actions (Uppercase letters)
+        case Int32(67): // C - Create new resource
+            Logger.shared.logUserAction("create_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
+            await handleCreateResource()
         case Int32(76): // L - View server logs
             if tui.currentView == .servers && !tui.currentView.isDetailView {
                 Logger.shared.logUserAction("view_server_logs", details: ["selectedIndex": tui.selectedIndex])
@@ -820,25 +693,9 @@ class InputHandler {
         case Int32(90): // Z - Resize selected server
             Logger.shared.logUserAction("resize_server", details: ["selectedIndex": tui.selectedIndex])
             await handleResizeServer(screen: screen)
-        case Int32(65): // A - Default to refresh interval cycling for dashboard and other views
+        case Int32(65): // A - Cycle refresh interval
             Logger.shared.logUserAction("cycle_refresh_interval", details: ["currentInterval": tui.baseRefreshInterval])
             tui.cycleRefreshInterval()
-        case Int32(82): // R - Context-sensitive: Routers navigation OR Restart server
-            if tui.currentView == .servers && !tui.currentView.isDetailView {
-                // Use R for restart in servers view
-                Logger.shared.logUserAction("restart_server", details: ["selectedIndex": tui.selectedIndex])
-                await handleRestartServer(screen: screen)
-            } else {
-                // Use R for routers navigation in all other views
-                if tui.currentView.isDetailView {
-                    Logger.shared.logNavigation("\(tui.currentView)", to: ".routers", details: ["action": "exit_detail"])
-                    tui.changeView(to: .routers, resetSelection: false)
-                    tui.selectedResource = nil
-                } else {
-                    Logger.shared.logNavigation("\(tui.currentView)", to: ".routers")
-                    tui.changeView(to: .routers)
-                }
-            }
         default:
             Logger.shared.logUserAction("unhandled_key", details: ["keyCode": ch, "view": "\(tui.currentView)"])
             break
@@ -848,24 +705,9 @@ class InputHandler {
         await handleFormInputs(ch, screen: screen)
     }
 
-    // MARK: - Navigation Helper Methods
+    // MARK: - Resource Action Methods
     // NOTE: Basic navigation (UP/DOWN/PAGE UP/PAGE DOWN/HOME/END/ESC) is now handled by NavigationInputHandler
     // View-specific navigation overrides should be handled in individual view handlers when needed
-
-    private func handleAutoRefreshToggle() {
-        guard let tui = tui else { return }
-
-        let oldValue = tui.autoRefresh
-        tui.autoRefresh.toggle()
-        let intervalText = tui.autoRefresh ? " (\(Int(tui.baseRefreshInterval))s interval)" : ""
-        tui.statusMessage = "Auto-refresh: \(tui.autoRefresh ? "ON" : "OFF")\(intervalText)"
-        tui.markSidebarDirty() // Update sidebar to show new auto-refresh status
-
-        Logger.shared.logUserAction("auto_refresh_toggled", details: [
-            "from": oldValue,
-            "to": tui.autoRefresh
-        ])
-    }
 
     private func handleCreateResource() async {
         guard let tui = tui else { return }
@@ -1204,6 +1046,8 @@ class InputHandler {
             await tui.resourceOperations.deleteSwiftObject(screen: screen)
         } else if tui.currentView == .swiftBackgroundOperations && !tui.currentView.isDetailView {
             await handleCancelBackgroundOperation(screen: screen)
+        } else if tui.currentView == .swiftBackgroundOperationDetail {
+            await handleCancelBackgroundOperationFromDetail(screen: screen)
         }
     }
 
@@ -2253,6 +2097,9 @@ class InputHandler {
         tui.detailScrollOffset = 0
     }
 
+    /// Handles DELETE key in background operations view with context-aware behavior
+    /// - If operation is active (running/queued): Cancel it
+    /// - If operation is inactive (completed/failed/cancelled): Remove it from history
     private func handleCancelBackgroundOperation(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
@@ -2265,68 +2112,165 @@ class InputHandler {
 
         let operation = operations[tui.selectedIndex]
 
-        // Only allow cancelling active operations
-        guard operation.status.isActive else {
-            tui.statusMessage = "Can only cancel running or queued operations"
-            await tui.draw(screen: screen)
-            return
+        // Context-aware behavior based on operation status
+        if operation.status.isActive {
+            // Active operation: Cancel it
+            let operationDesc = operation.displayName
+            let confirmed = await ViewUtils.confirmOperation(
+                title: "Cancel Operation",
+                message: "Cancel '\(operationDesc)'?",
+                details: [
+                    "Type: \(operation.type.displayName)",
+                    "Status: \(operation.status.displayName)",
+                    "Progress: \(operation.progressPercentage)%"
+                ],
+                screen: screen,
+                screenRows: tui.screenRows,
+                screenCols: tui.screenCols
+            )
+
+            guard confirmed else {
+                tui.statusMessage = "Cancellation aborted"
+                await tui.draw(screen: screen)
+                return
+            }
+
+            operation.cancel()
+            tui.statusMessage = "Operation cancelled: \(operation.displayName)"
+            Logger.shared.logUserAction("cancel_background_operation", details: [
+                "operationId": operation.id.uuidString,
+                "type": "\(operation.type)",
+                "objectName": operation.objectName ?? "unknown"
+            ])
+        } else {
+            // Inactive operation: Remove from history
+            let operationDesc = operation.displayName
+            let confirmed = await ViewUtils.confirmOperation(
+                title: "Remove Operation",
+                message: "Remove '\(operationDesc)' from history?",
+                details: [
+                    "Type: \(operation.type.displayName)",
+                    "Status: \(operation.status.displayName)"
+                ],
+                screen: screen,
+                screenRows: tui.screenRows,
+                screenCols: tui.screenCols
+            )
+
+            guard confirmed else {
+                tui.statusMessage = "Removal aborted"
+                await tui.draw(screen: screen)
+                return
+            }
+
+            tui.swiftBackgroundOps.removeOperation(id: operation.id)
+
+            // Reset selection immediately after removal
+            let remainingOps = tui.swiftBackgroundOps.getAllOperations()
+            if tui.selectedIndex >= remainingOps.count {
+                tui.selectedIndex = max(0, remainingOps.count - 1)
+            }
+
+            // Force full screen refresh to immediately show the removal
+            tui.renderOptimizer.markFullScreenDirty()
+
+            tui.statusMessage = "Removed operation: \(operation.displayName)"
+            Logger.shared.logUserAction("remove_background_operation", details: [
+                "operationId": operation.id.uuidString,
+                "type": "\(operation.type)",
+                "status": "\(operation.status)",
+                "objectName": operation.objectName ?? "unknown"
+            ])
         }
 
-        // Confirm cancellation
-        let operationDesc = operation.displayName
-        let confirmed = await ViewUtils.confirmOperation(
-            title: "Cancel Operation",
-            message: "Cancel '\(operationDesc)'?",
-            details: [
-                "Type: \(operation.type.displayName)",
-                "Status: \(operation.status.displayName)",
-                "Progress: \(operation.progressPercentage)%"
-            ],
-            screen: screen,
-            screenRows: tui.screenRows,
-            screenCols: tui.screenCols
-        )
-
-        guard confirmed else {
-            tui.statusMessage = "Cancellation aborted"
-            await tui.draw(screen: screen)
-            return
-        }
-
-        // Cancel the operation
-        operation.cancel()
-        tui.statusMessage = "Operation cancelled: \(operation.displayName)"
-        Logger.shared.logUserAction("cancel_background_operation", details: [
-            "operationId": operation.id.uuidString,
-            "type": "\(operation.type)",
-            "objectName": operation.objectName ?? "unknown"
-        ])
         await tui.draw(screen: screen)
     }
 
-    private func handleClearCompletedOperations(screen: OpaquePointer?) async {
+    /// Handles DELETE key in background operation detail view with context-aware behavior
+    /// - If operation is active (running/queued): Cancel it
+    /// - If operation is inactive (completed/failed/cancelled): Remove it from history and return to list
+    private func handleCancelBackgroundOperationFromDetail(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
-
-        let completedCount = tui.swiftBackgroundOps.completedCount
-        guard completedCount > 0 else {
-            tui.statusMessage = "No completed operations to clear"
+        guard let operation = tui.selectedResource as? SwiftBackgroundOperation else {
+            tui.statusMessage = "No operation selected"
             await tui.draw(screen: screen)
             return
         }
 
-        tui.swiftBackgroundOps.clearCompleted()
-        tui.statusMessage = "Cleared \(completedCount) completed operation(s)"
-        Logger.shared.logUserAction("clear_completed_operations", details: ["count": completedCount])
+        // Context-aware behavior based on operation status
+        if operation.status.isActive {
+            // Active operation: Cancel it
+            let operationDesc = operation.displayName
+            let confirmed = await ViewUtils.confirmOperation(
+                title: "Cancel Operation",
+                message: "Cancel '\(operationDesc)'?",
+                details: [
+                    "Type: \(operation.type.displayName)",
+                    "Status: \(operation.status.displayName)",
+                    "Progress: \(operation.progressPercentage)%"
+                ],
+                screen: screen,
+                screenRows: tui.screenRows,
+                screenCols: tui.screenCols
+            )
 
-        // Reset selection if needed
-        let remainingOps = tui.swiftBackgroundOps.getAllOperations()
-        if tui.selectedIndex >= remainingOps.count {
-            tui.selectedIndex = max(0, remainingOps.count - 1)
+            guard confirmed else {
+                tui.statusMessage = "Cancellation aborted"
+                await tui.draw(screen: screen)
+                return
+            }
+
+            operation.cancel()
+            tui.statusMessage = "Operation cancelled: \(operation.displayName)"
+            Logger.shared.logUserAction("cancel_background_operation_detail", details: [
+                "operationId": operation.id.uuidString,
+                "type": "\(operation.type)",
+                "objectName": operation.objectName ?? "unknown"
+            ])
+        } else {
+            // Inactive operation: Remove from history and return to list
+            let operationDesc = operation.displayName
+            let confirmed = await ViewUtils.confirmOperation(
+                title: "Remove Operation",
+                message: "Remove '\(operationDesc)' from history?",
+                details: [
+                    "Type: \(operation.type.displayName)",
+                    "Status: \(operation.status.displayName)"
+                ],
+                screen: screen,
+                screenRows: tui.screenRows,
+                screenCols: tui.screenCols
+            )
+
+            guard confirmed else {
+                tui.statusMessage = "Removal aborted"
+                await tui.draw(screen: screen)
+                return
+            }
+
+            tui.swiftBackgroundOps.removeOperation(id: operation.id)
+
+            // Reset selection immediately after removal
+            let remainingOps = tui.swiftBackgroundOps.getAllOperations()
+            if tui.selectedIndex >= remainingOps.count {
+                tui.selectedIndex = max(0, remainingOps.count - 1)
+            }
+
+            tui.statusMessage = "Removed operation: \(operation.displayName)"
+            Logger.shared.logUserAction("remove_background_operation_detail", details: [
+                "operationId": operation.id.uuidString,
+                "type": "\(operation.type)",
+                "status": "\(operation.status)",
+                "objectName": operation.objectName ?? "unknown"
+            ])
+
+            // Return to operations list
+            tui.changeView(to: .swiftBackgroundOperations, resetSelection: false)
+
+            // Force full screen refresh to immediately show the removal
+            tui.renderOptimizer.markFullScreenDirty()
         }
 
-        // Use SwiftTUI's clear function to clear the screen before redrawing
-        // This ensures proper clearing through the SwiftTUI abstraction layer
-        SwiftTUI.clear(WindowHandle(screen))
         await tui.draw(screen: screen)
     }
 
@@ -2366,6 +2310,35 @@ class InputHandler {
                 tui.userFeedback.dismissModal()
                 await tui.draw(screen: screen)
             }
+        }
+    }
+
+    // MARK: - Configuration Action Handler
+
+    /// Handle configuration actions for navigation mode and preferences
+    /// - Parameter action: The configuration action to execute
+    private func handleConfigAction(_ action: CommandMode.ConfigAction) {
+        guard let tui = tui else { return }
+
+        switch action {
+        case .setCommandMode(let mode):
+            NavigationPreferences.shared.setMode(mode)
+            tui.statusMessage = "Navigation mode set to: \(mode.displayName)"
+            Logger.shared.logUserAction("navigation_mode_changed", details: [
+                "mode": mode.rawValue
+            ])
+
+        case .toggleMode:
+            NavigationPreferences.shared.toggleMode()
+            let mode = NavigationPreferences.shared.mode
+            tui.statusMessage = "Navigation mode toggled to: \(mode.displayName)"
+            Logger.shared.logUserAction("navigation_mode_toggled", details: [
+                "mode": mode.rawValue
+            ])
+
+        case .showPreferences:
+            let status = NavigationPreferences.shared.statusDescription()
+            tui.statusMessage = "Current Settings - \(status.replacingOccurrences(of: "\n", with: " | "))"
         }
     }
 }

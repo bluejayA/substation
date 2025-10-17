@@ -5,40 +5,72 @@ import OSClient
 @MainActor
 struct UIUtils {
 
+    // MARK: - Help Text Formatting (Command-Only)
+
+    /// Format a command option for display in help text
+    /// - Parameters:
+    ///   - command: The command name (e.g., "create")
+    ///   - description: The description text (e.g., "details", "quit")
+    /// - Returns: Formatted help text showing command syntax
+    private static func formatHelp(command: String, description: String) -> String {
+        return ":\(command):\(description)"
+    }
+
     static func getDynamicHelpText(for currentView: ViewMode) -> String {
-        let baseCommands = "^c:quit UP/DOWN:select ?:help a:auto-refresh c:refresh"
-        let dashboardCommands = "^c:quit UP/DOWN:select a:auto-refresh A:interval c:refresh"
+        // Command-only mode: show only commands
+        let baseCommands = "^c:quit UP/DOWN:select ?:help :refresh"
+        let dashboardCommands = "^c:quit UP/DOWN:select :refresh"
+
+        // Helper to format action commands
+        let actionCmds = CommandActionHandler.shared.getActionsHelpText(for: currentView)
+        let actionSuffix = actionCmds.isEmpty ? "" : " \(actionCmds)"
 
         switch currentView {
         case .loading:
             return "Loading..."  // No commands available during loading
         case .dashboard:
-            return "\(dashboardCommands)"
+            return "\(dashboardCommands)\(actionSuffix)"
         case .servers:
-            return "\(baseCommands) SPACE:details C:create P:snapshot R:restart Z:resize S:start T:stop L:logs O:console DELETE:delete /:search ESC:back"
+            let create = formatHelp(command: "create", description: "create")
+            let restart = formatHelp(command: "restart", description: "restart")
+            let start = formatHelp(command: "start", description: "start")
+            let stop = formatHelp(command: "stop", description: "stop")
+            let delete = formatHelp(command: "delete", description: "delete")
+            return "\(baseCommands) SPACE:details \(create) P:snapshot \(restart) Z:resize \(start) \(stop) L:logs O:console \(delete) /:search ESC:back"
         case .networks:
-            return "\(baseCommands) SPACE:details C:create A:attach/detach DELETE:delete /:search ESC:back"
+            let create = formatHelp(command: "create", description: "create")
+            let manage = formatHelp(command: "manage", description: "manage")
+            let delete = formatHelp(command: "delete", description: "delete")
+            return "\(baseCommands) SPACE:details \(create) \(manage) \(delete) /:search ESC:back"
         case .volumes:
-            return "\(baseCommands) SPACE:details C:create DELETE:delete A:attach/detach B:backup P:snapshot /:search ESC:back"
+            let create = formatHelp(command: "create", description: "create")
+            let manage = formatHelp(command: "manage", description: "manage")
+            let delete = formatHelp(command: "delete", description: "delete")
+            return "\(baseCommands) SPACE:details \(create) \(delete) \(manage) B:backup P:snapshot /:search ESC:back"
         case .volumeArchives:
-            return "\(baseCommands) SPACE:details DELETE:delete /:search ESC:back"
+            let delete = formatHelp(command: "delete", description: "delete")
+            return "\(baseCommands) SPACE:details \(delete) /:search ESC:back"
         case .images:
-            return "\(baseCommands) SPACE:details DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :delete /:search ESC:back"
         case .flavors:
             return "\(baseCommands) SPACE:details /:search ESC:back"
         case .keyPairs:
-            return "\(baseCommands) SPACE:details C:create DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
         case .subnets:
-            return "\(baseCommands) SPACE:details C:create A:attach DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create :manage :delete /:search ESC:back"
         case .ports:
-            return "\(baseCommands) SPACE:details C:create M:manage P:allowed-address-pairs DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create :manage P:allowed-address-pairs :delete /:search ESC:back"
         case .floatingIPs:
-            return "\(baseCommands) SPACE:details C:create M:manage DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create :manage :delete /:search ESC:back"
         case .routers:
-            return "\(baseCommands) SPACE:details C:create DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
         case .healthDashboard:
-            return "^c:quit UP/DOWN:navigate a:auto-refresh SPACE:service-details ESC:back ?:help"
-        case .serverDetail, .networkDetail, .volumeDetail, .volumeArchiveDetail, .imageDetail, .flavorDetail, .keyPairDetail, .subnetDetail, .portDetail, .floatingIPDetail, .routerDetail, .healthDashboardServiceDetail:
+            return "^c:quit UP/DOWN:navigate SPACE:service-details ESC:back ?:help"
+        case .serverDetail:
+            return "\(baseCommands) :delete :start :stop :restart ESC:back"
+        case .networkDetail, .volumeDetail, .imageDetail, .keyPairDetail, .subnetDetail, .portDetail, .floatingIPDetail, .routerDetail, .serverGroupDetail, .securityGroupDetail:
+            return "\(baseCommands) :delete ESC:back"
+        case .volumeArchiveDetail, .flavorDetail, .healthDashboardServiceDetail:
             return "\(baseCommands) ESC:back"
         case .serverConsole:
             return "\(baseCommands) O:open-browser ESC:back"
@@ -75,37 +107,41 @@ struct UIUtils {
         case .floatingIPServerSelect:
             return "\(baseCommands) ENTER:attach ESC:cancel"
         case .serverGroups:
-            return "\(baseCommands) SPACE:details C:create DELETE:delete /:search ESC:back"
-        case .serverGroupDetail:
-            return "\(baseCommands) M:manage ESC:back"
+            return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
         case .serverGroupCreate:
             return "\(baseCommands) TAB:navigate LEFT/RIGHT:change SPACE:edit ENTER:create ESC:cancel"
         case .serverGroupManagement:
             return "\(baseCommands) TAB:operation SPACE:toggle ENTER:apply ESC:back"
         case .securityGroups:
-            return "\(baseCommands) SPACE:details C:create A:attach/detach M:manage-rules DELETE:delete /:search ESC:back"
-        case .securityGroupDetail:
-            return "\(baseCommands) ESC:back"
+            return "\(baseCommands) SPACE:details :create A:attach/detach :manage-rules :delete /:search ESC:back"
         case .securityGroupCreate:
             return "\(baseCommands) TAB:navigate ENTER:edit ESC:cancel"
         case .securityGroupRuleManagement:
-            return "\(baseCommands) TAB:mode SPACE:toggle ENTER:apply C:create E:edit DELETE:delete ESC:back"
+            return "\(baseCommands) TAB:mode SPACE:toggle ENTER:apply :create E:edit :delete ESC:back"
         case .help:
             return "\(baseCommands) ESC:back"
         case .about:
             return "\(baseCommands) ESC:back"
+        case .welcome:
+            return "\(baseCommands) UP/DOWN:scroll ESC:back"
+        case .tutorial:
+            return "\(baseCommands) UP/DOWN:scroll ESC:back"
+        case .shortcuts:
+            return "\(baseCommands) UP/DOWN:scroll ESC:back"
+        case .examples:
+            return "\(baseCommands) UP/DOWN:scroll ESC:back"
         case .advancedSearch:
             return "\(baseCommands) TAB:navigate ENTER:search /:filter ESC:back"
         case .barbican:
-            return "\(baseCommands) SPACE:details C:create DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
         case .barbicanSecrets:
-            return "\(baseCommands) SPACE:details C:create DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
         case .barbicanContainers:
-            return "\(baseCommands) SPACE:details C:create /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create /:search ESC:back"
         case .octavia:
-            return "\(baseCommands) SPACE:details C:create /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create /:search ESC:back"
         case .swift:
-            return "\(baseCommands) SPACE:details C:create U:upload D:download M:metadata W:web-access DELETE:delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create U:upload D:download :manage W:web-access :delete /:search ESC:back"
         case .barbicanSecretDetail:
             return "\(baseCommands) ESC:back"
         case .barbicanContainerDetail:
@@ -113,11 +149,11 @@ struct UIUtils {
         case .octaviaLoadBalancerDetail:
             return "\(baseCommands) ESC:back"
         case .swiftContainerDetail:
-            return "\(baseCommands) U:upload D:download M:metadata DELETE:delete ESC:back"
+            return "\(baseCommands) U:upload D:download M:metadata :delete ESC:back"
         case .swiftObjectDetail:
             return "\(baseCommands) ESC:back"
         case .swiftBackgroundOperationDetail:
-            return "\(baseCommands) UP/DOWN:scroll DELETE:cancel ESC:back"
+            return "\(baseCommands) UP/DOWN:scroll :cancel/remove ESC:back"
         case .barbicanSecretCreate:
             return "\(baseCommands) TAB/UP/DOWN:navigate ENTER:create ESC:cancel"
         case .barbicanContainerCreate:
@@ -159,13 +195,16 @@ struct UIUtils {
         case .portServerManagement:
             return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
         case .portAllowedAddressPairManagement:
-            return "\(baseCommands) A:add D:delete SPACE:edit ENTER:save ESC:back"
+            return "\(baseCommands) A:add :delete SPACE:edit ENTER:save ESC:back"
         case .subnetRouterManagement:
             return "\(baseCommands) TAB:mode SPACE:select ENTER:apply ESC:back"
         case .flavorSelection:
             return "\(baseCommands) TAB:switch-mode SPACE:select ENTER:confirm ESC:back"
         case .swiftBackgroundOperations:
-            return "\(baseCommands) DELETE:cancel C:clear-completed ESC:back"
+            return "\(baseCommands) M:metrics :cancel/remove ESC:back"
+        // Phase 4 Session 2 - Operations Management
+        case .performanceMetrics:
+            return "\(baseCommands) UP/DOWN:scroll ESC:back"
         }
     }
 
