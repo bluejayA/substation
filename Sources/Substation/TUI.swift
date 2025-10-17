@@ -811,31 +811,33 @@ final class TUI {
 
         Logger.shared.logInfo("Substation initialized successfully")
 
-        // Check for first run - show welcome message while loading instead of loading screen
+        // Check for first run - will show welcome as first view after loading
         let isFirstRun = WelcomeScreen.shared.isFirstRun()
 
-        if isFirstRun {
-            // First run: show welcome message as loading screen
-            Logger.shared.logInfo("First run detected - showing welcome message during data load")
-            currentView = .loading  // Set to loading to enable drawing
-            await performInitialDataLoadWithWelcome(screen: screen.pointer)
-            WelcomeScreen.shared.markWelcomeShown()
+        // Show loading screen for all users (first-time and existing)
+        if existingScreen == nil {
+            Logger.shared.logDebug("Rendering initial loading screen")
+            currentView = .loading
+            loadingProgress = 0
+            loadingMessage = "Initializing..."
+            await self.draw(screen: screen.pointer)
         } else {
-            // Existing user: show normal loading screen
-            if existingScreen == nil {
-                Logger.shared.logDebug("Rendering initial loading screen")
-                currentView = .loading
-                loadingProgress = 0
-                loadingMessage = "Initializing..."
-                await self.draw(screen: screen.pointer)
-            } else {
-                Logger.shared.logDebug("Skipping initial loading screen (already shown in App.swift)")
-                currentView = .loading
-            }
-
-            // Initial data fetch with loading progression
-            await performInitialDataLoadWithProgress(screen: screen.pointer)
+            Logger.shared.logDebug("Skipping initial loading screen (already shown in App.swift)")
+            currentView = .loading
         }
+
+        // Initial data fetch with loading progression
+        await performInitialDataLoadWithProgress(screen: screen.pointer)
+
+        // After loading completes, set initial view based on first run
+        if isFirstRun {
+            // First run: show welcome view instead of dashboard
+            Logger.shared.logInfo("First run detected - setting initial view to welcome")
+            currentView = .welcome
+            previousView = .welcome
+            WelcomeScreen.shared.markWelcomeShown()
+        }
+        // Existing users: currentView remains .dashboard (default)
 
         Logger.shared.logInfo("Starting main event loop")
 
@@ -1467,91 +1469,6 @@ final class TUI {
     /// Perform initial data load while displaying welcome view for first-time users
     /// Uses DetailView component with dynamic status updates during data load
     /// - Parameter screen: The screen pointer for rendering
-    private func performInitialDataLoadWithWelcome(screen: OpaquePointer?) async {
-        Logger.shared.logInfo("Starting initial data load with welcome view for first-time user")
-
-        // Helper function to draw welcome view with status
-        func drawWelcomeWithStatus(_ status: String, color: TextStyle = .accent) async {
-            SwiftTUI.clear(WindowHandle(screen))
-
-            // Get welcome sections
-            var sections = WelcomeScreen.shared.getWelcomeSections()
-
-            // Replace the last item in the last section with status message
-            if !sections.isEmpty {
-                var lastSection = sections.removeLast()
-                var items = lastSection.items
-
-                // Remove the old "Press any key" message
-                if !items.isEmpty {
-                    items.removeLast()  // Remove customComponent
-                    if !items.isEmpty && items.last!.isSpacerType {
-                        items.removeLast()  // Remove spacer before it
-                    }
-                }
-
-                // Add status message
-                items.append(.spacer)
-                items.append(.customComponent(Text(status).styled(color).bold()))
-
-                lastSection = DetailSection(
-                    title: lastSection.title,
-                    items: items,
-                    titleStyle: lastSection.titleStyle
-                )
-                sections.append(lastSection)
-            }
-
-            // Create and draw DetailView
-            let welcomeView = DetailView(
-                title: "Welcome to Substation!",
-                sections: sections,
-                helpText: nil,
-                scrollOffset: 0
-            )
-
-            await welcomeView.draw(
-                screen: screen,
-                startRow: 0,
-                startCol: 0,
-                width: screenCols,
-                height: screenRows
-            )
-
-            SwiftTUI.batchedRefresh(WindowHandle(screen))
-        }
-
-        // Step 1: Initial display
-        await drawWelcomeWithStatus("Loading OpenStack resources...")
-
-        // Step 2: Initialize project ID
-        Logger.shared.logInfo("Authenticating with OpenStack")
-        await drawWelcomeWithStatus("Status: Authenticating...")
-        await dataManager.initializeProjectID()
-
-        // Step 3: Load all data
-        Logger.shared.logInfo("Loading OpenStack resources")
-        await drawWelcomeWithStatus("Status: Loading resources...")
-        await dataManager.refreshAllData()
-
-        // Step 4: Complete
-        Logger.shared.logInfo("Initial data load completed")
-        await drawWelcomeWithStatus("Ready! Press any key to continue...", color: .success)
-
-        // Wait for user to press a key
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), false)
-        let _ = SwiftTUI.getInput(WindowHandle(screen))
-        let _ = SwiftTUI.setNodelay(WindowHandle(screen), true)
-
-        // Mark initial loading as complete and switch to dashboard
-        initialDataLoaded = true
-        currentView = .dashboard
-        previousView = .dashboard
-        needsRedraw = true
-        renderOptimizer.markFullScreenDirty()
-
-        Logger.shared.logInfo("Welcome view dismissed, transitioning to dashboard")
-    }
 
     // Colors are now managed semantically through SwiftTUI.drawStyledText(color: .semantic)
 
