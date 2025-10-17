@@ -35,6 +35,7 @@ final class ResourceRegistry: @unchecked Sendable {
         .barbicanSecrets: ["secrets", "secret", "barbican", "b"],
         .octavia: ["loadbalancers", "loadbalancer", "lb", "octavia", "o"],
         .swift: ["object storage", "swift", "objectstorage", "objects", "obj", "j"],
+        .swiftBackgroundOperations: ["operations", "ops", "background", "tasks"],
 
         // Utilities
         .about: ["about"],
@@ -373,7 +374,7 @@ final class ResourceRegistry: @unchecked Sendable {
             .compute: ["servers", "servergroups", "flavors", "keypairs"],
             .networking: ["networks", "subnets", "routers", "ports", "floatingips", "securitygroups"],
             .storage: ["volumes", "images", "archives"],
-            .services: ["secrets", "loadbalancers", "swift"],
+            .services: ["secrets", "loadbalancers", "swift", "operations"],
             .utilities: ["dashboard", "topology", "search", "health", "help", "about"]
         ]
     }
