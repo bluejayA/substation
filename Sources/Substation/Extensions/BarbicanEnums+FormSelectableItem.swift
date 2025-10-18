@@ -17,33 +17,6 @@ extension SecretPayloadContentType: FormSelectableItem, FormSelectorItem {
     }
 }
 
-// Legacy wrapper for backward compatibility
-struct SecretPayloadContentTypeWrapper: FormSelectableItem {
-    let type: SecretPayloadContentType
-
-    var id: String {
-        return type.rawValue
-    }
-
-    var sortKey: String {
-        return type.title
-    }
-
-    func matchesSearch(_ query: String) -> Bool {
-        return type.title.lowercased().contains(query.lowercased())
-    }
-}
-
-extension SecretPayloadContentType {
-    var wrapped: SecretPayloadContentTypeWrapper {
-        return SecretPayloadContentTypeWrapper(type: self)
-    }
-
-    static var wrappedAllCases: [SecretPayloadContentTypeWrapper] {
-        return allCases.map { $0.wrapped }
-    }
-}
-
 // MARK: - SecretPayloadContentEncoding Conformance
 
 extension SecretPayloadContentEncoding: FormSelectableItem, FormSelectorItem {
@@ -58,33 +31,6 @@ extension SecretPayloadContentEncoding: FormSelectableItem, FormSelectorItem {
     public func matchesSearch(_ query: String) -> Bool {
         return self.title.lowercased().contains(query.lowercased()) ||
                self.rawValue.lowercased().contains(query.lowercased())
-    }
-}
-
-// Legacy wrapper for backward compatibility
-struct SecretPayloadContentEncodingWrapper: FormSelectableItem {
-    let type: SecretPayloadContentEncoding
-
-    var id: String {
-        return type.rawValue
-    }
-
-    var sortKey: String {
-        return type.title
-    }
-
-    func matchesSearch(_ query: String) -> Bool {
-        return type.title.lowercased().contains(query.lowercased())
-    }
-}
-
-extension SecretPayloadContentEncoding {
-    var wrapped: SecretPayloadContentEncodingWrapper {
-        return SecretPayloadContentEncodingWrapper(type: self)
-    }
-
-    static var wrappedAllCases: [SecretPayloadContentEncodingWrapper] {
-        return allCases.map { $0.wrapped }
     }
 }
 
@@ -105,33 +51,6 @@ extension SecretType: FormSelectableItem, FormSelectorItem {
     }
 }
 
-// Legacy wrapper for backward compatibility
-struct SecretTypeWrapper: FormSelectableItem {
-    let type: SecretType
-
-    var id: String {
-        return type.rawValue
-    }
-
-    var sortKey: String {
-        return type.title
-    }
-
-    func matchesSearch(_ query: String) -> Bool {
-        return type.title.lowercased().contains(query.lowercased())
-    }
-}
-
-extension SecretType {
-    var wrapped: SecretTypeWrapper {
-        return SecretTypeWrapper(type: self)
-    }
-
-    static var wrappedAllCases: [SecretTypeWrapper] {
-        return allCases.map { $0.wrapped }
-    }
-}
-
 // MARK: - SecretAlgorithm Conformance
 
 extension SecretAlgorithm: FormSelectableItem, FormSelectorItem {
@@ -149,33 +68,6 @@ extension SecretAlgorithm: FormSelectableItem, FormSelectorItem {
     }
 }
 
-// Legacy wrapper for backward compatibility
-struct SecretAlgorithmWrapper: FormSelectableItem {
-    let type: SecretAlgorithm
-
-    var id: String {
-        return type.rawValue
-    }
-
-    var sortKey: String {
-        return type.title
-    }
-
-    func matchesSearch(_ query: String) -> Bool {
-        return type.title.lowercased().contains(query.lowercased())
-    }
-}
-
-extension SecretAlgorithm {
-    var wrapped: SecretAlgorithmWrapper {
-        return SecretAlgorithmWrapper(type: self)
-    }
-
-    static var wrappedAllCases: [SecretAlgorithmWrapper] {
-        return allCases.map { $0.wrapped }
-    }
-}
-
 // MARK: - SecretMode Conformance
 
 extension SecretMode: FormSelectableItem, FormSelectorItem {
@@ -190,33 +82,6 @@ extension SecretMode: FormSelectableItem, FormSelectorItem {
     public func matchesSearch(_ query: String) -> Bool {
         return self.title.lowercased().contains(query.lowercased()) ||
                self.rawValue.lowercased().contains(query.lowercased())
-    }
-}
-
-// Legacy wrapper for backward compatibility
-struct SecretModeWrapper: FormSelectableItem {
-    let type: SecretMode
-
-    var id: String {
-        return type.rawValue
-    }
-
-    var sortKey: String {
-        return type.title
-    }
-
-    func matchesSearch(_ query: String) -> Bool {
-        return type.title.lowercased().contains(query.lowercased())
-    }
-}
-
-extension SecretMode {
-    var wrapped: SecretModeWrapper {
-        return SecretModeWrapper(type: self)
-    }
-
-    static var wrappedAllCases: [SecretModeWrapper] {
-        return allCases.map { $0.wrapped }
     }
 }
 

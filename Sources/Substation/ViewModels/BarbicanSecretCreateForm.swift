@@ -97,7 +97,9 @@ struct BarbicanSecretCreateForm: FormViewModel {
     var fieldEditMode: Bool = false
     var payloadEditMode: Bool = false // Special mode for multi-line payload editing
 
-    // Legacy modes - keeping for backward compatibility during transition
+    // Legacy selection mode implementation (still actively used)
+    // TODO: Migrate to modern FormSelector pattern used by other forms
+    // Custom selection UI handles expiration date picker and enum field options
     var selectionMode: Bool = false // Special mode for selection windows (legacy)
     var selectionIndex: Int = 0 // Current selection index in selection mode
     var selectionConfirmed: Int? = nil // Index of item selected for confirmation
