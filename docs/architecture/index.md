@@ -50,10 +50,10 @@ Core technologies, dependencies, and development tools:
 
 **Performance:**
 
-- 60-80% API call reduction through intelligent caching
-- Multi-level cache (L1/L2/L3) with 98% hit rate
+- Designed for up to 60-80% API call reduction through intelligent caching
+- Multi-level cache (L1/L2/L3) targeting 98% hit rate
 - Actor-based concurrency (zero race conditions)
-- Target: < 200MB memory for 10K+ resources
+- Design target: < 200MB memory for 10K+ resources
 
 **Modularity:**
 

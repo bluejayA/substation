@@ -508,6 +508,141 @@ let rate = SwiftStorageHelpers.formatTransferRate(2_097_152.0, precision: 2)
 3. **Monitor concurrent operations**: Don't exceed recommended limits
 4. **Batch related operations**: Reduce API call overhead
 
+## Advanced Object Operations
+
+### Bulk Delete Operations
+
+Delete multiple objects in a single API request for improved efficiency:
+
+**Method Signature:**
+```swift
+public func bulkDelete(request: BulkDeleteRequest) async throws -> BulkDeleteResponse
+```
+
+**Features:**
+- Delete up to hundreds of objects in one operation
+- Single API call reduces network overhead
+- Returns detailed status including number deleted and errors
+- Supports both container-scoped and full-path deletion modes
+
+**Response Information:**
+- `numberDeleted`: Count of successfully deleted objects
+- `numberNotFound`: Count of objects that did not exist
+- `errors`: Array of errors for failed deletions
+- `responseStatus`: HTTP status of bulk operation
+- `responseBody`: Additional response details
+
+**Performance Benefits:**
+- Significantly faster than individual DELETE operations
+- Reduced API call overhead (1 call vs N calls)
+- Lower latency for large-scale cleanup operations
+- Efficient for container emptying before deletion
+
+**Usage in Substation:**
+- Select multiple objects in object list view
+- Press Del key to initiate bulk delete
+- Confirmation dialog shows object count
+- Progress tracked in status bar
+
+### Object Copy Operations
+
+Copy objects within the same container or across containers without downloading:
+
+**Method Signature:**
+```swift
+public func copyObject(request: CopySwiftObjectRequest) async throws
+```
+
+**Features:**
+- Server-side copy (no data transfer to client)
+- Copy within same container or across containers
+- Optional metadata preservation or replacement
+- Rename during copy operation
+
+**Request Parameters:**
+- `sourceContainer`: Source container name
+- `sourceObject`: Source object name
+- `destinationContainer`: Destination container name
+- `destinationObject`: Destination object name (can differ from source)
+- `metadata`: New metadata to apply (optional)
+- `freshMetadata`: If true, replace all metadata; if false, preserve existing
+
+**Metadata Handling:**
+- Default: Preserves source object metadata
+- `freshMetadata: false` + new metadata: Adds/updates specific keys
+- `freshMetadata: true`: Replaces all metadata with provided values
+
+**Performance Benefits:**
+- No bandwidth usage (server-side operation)
+- Instant copy regardless of object size
+- No temporary storage needed
+- Ideal for object versioning and backup workflows
+
+**Common Use Cases:**
+- Create backups before modification
+- Rename objects (copy + delete source)
+- Duplicate objects across containers
+- Create working copies for testing
+
+### Container Web Hosting
+
+Configure containers for static website hosting with public HTTP access:
+
+**ACL Configuration:**
+
+Containers support access control through `readACL` and `writeACL` headers:
+
+**Public Read Access:**
+```
+X-Container-Read: .r:*,.rlistings
+```
+- `.r:*` - Allow read access to all users
+- `.rlistings` - Enable directory-style listings
+
+**Specific Referrer Access:**
+```
+X-Container-Read: .r:.example.com
+```
+- Restrict access to specific domains
+
+**Project-Based Access:**
+```
+X-Container-Read: project-id:user-id
+```
+- Grant access to specific OpenStack users/projects
+
+**Web Hosting Configuration:**
+
+1. Set container read ACL for public access
+2. Upload index.html as default landing page
+3. Upload error.html for 404 handling (if supported)
+4. Upload static assets (CSS, JS, images)
+
+**Access Pattern:**
+```
+https://swift.example.com/v1/AUTH_project/container/object
+```
+
+**Common Web Hosting Scenarios:**
+- Static website hosting
+- CDN origin storage
+- Public file distribution
+- Documentation hosting
+- Asset delivery for applications
+
+**ACL Metadata in Response:**
+
+Container metadata responses include:
+- `readACL`: Current read access control list
+- `writeACL`: Current write access control list
+
+**Security Considerations:**
+- Public containers expose all objects to internet
+- No authentication required for reads
+- Consider object naming (no sensitive data in names)
+- Use temporary URLs for time-limited access
+- Monitor bandwidth usage for public containers
+
 ## See Also
 
 - [Object Storage Performance](../performance/object-storage.md) - Performance metrics and optimization

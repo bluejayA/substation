@@ -15,19 +15,20 @@ Default TTL values are tuned for typical environments, but you may need to adjus
 case .authentication:
     return 3600.0  // 1 hour - Keystone tokens last this long anyway
 
-case .serviceEndpoints:
+case .serviceEndpoints, .quotas:
     return 1800.0  // 30 minutes - these basically never change
 
-case .flavor, .flavorList, .image, .imageList:
-    return 900.0   // 15 minutes - admins add new ones occasionally
+case .flavor, .flavorList, .volumeType, .volumeTypeList:
+    return 900.0   // 15 minutes - admins add new types occasionally
 
-case .network, .networkList, .subnet, .subnetList,
-     .router, .routerList, .securityGroup, .securityGroupList:
-    return 300.0   // 5 minutes - network infrastructure is semi-stable
+case .keypair, .image, .network, .subnet, .router, .securityGroup:
+    return 300.0   // 5 minutes - moderately dynamic resources
 
-case .server, .serverDetail, .serverList,
-     .volume, .volumeList:
-    return 120.0   // 2 minutes - launch/delete happens constantly
+case .volumeSnapshot, .objectStorage:
+    return 180.0   // 3 minutes - storage operations moderately frequent
+
+case .server, .serverList, .port, .volume, .floatingIP:
+    return 120.0   // 2 minutes - highly dynamic (state changes frequently)
 ```
 
 ### When to Increase TTLs
@@ -103,43 +104,35 @@ case .network: return 180.0 // 3 minutes instead of 5
 
 **Default configuration**:
 
+The SearchEngine uses concurrent execution with automatic timeout handling:
+
 ```swift
-ParallelSearchEngine(
-    maxConcurrentSearches: 6,        // One per service
-    searchTimeoutSeconds: 5.0,       // 5 second hard limit
-    cacheManager: cacheManager,
-    logger: logger
-)
+// SearchEngine is configured with:
+// - Concurrent execution across multiple services
+// - 5 second timeout per service
+// - Automatic result aggregation
+// - Cache-backed search results
 ```
 
 ### Adjust for System Capabilities
 
-**Lower-end systems** (limited CPU/memory):
+**Note**: The SearchEngine is implemented as an actor with built-in concurrency control. Configuration is managed through the search query parameters rather than initialization.
+
+**Search query configuration**:
 
 ```swift
-ParallelSearchEngine(
-    maxConcurrentSearches: 4,        // Reduce to 4
-    searchTimeoutSeconds: 5.0
+let query = SearchQuery(
+    text: "server-name",
+    services: [.compute, .network, .storage],  // Specify which services to search
+    scope: .all                                 // or .currentProject for faster results
 )
 ```
 
-**High-performance systems** (ample resources):
+**For slower systems or networks**:
 
-```swift
-ParallelSearchEngine(
-    maxConcurrentSearches: 6,        // Default is fine
-    searchTimeoutSeconds: 3.0        // Reduce timeout for faster failure
-)
-```
-
-**Slow networks**:
-
-```swift
-ParallelSearchEngine(
-    maxConcurrentSearches: 6,
-    searchTimeoutSeconds: 10.0       // Increase timeout
-)
-```
+- Reduce the number of services in the search query
+- Use more specific search terms to reduce result set size
+- Leverage the cache by avoiding frequent unique queries
 
 ### Service Priority Tuning
 
@@ -162,12 +155,14 @@ Default service prioritization:
 
 ### Cache Size Configuration
 
-**Default targets**:
+**Design targets**:
 
 - Total application: < 200MB steady state
 - Cache system: < 100MB for 10k resources
 - Search index: < 50MB for full catalog
 - UI rendering: < 20MB framebuffer
+
+Note: Actual memory usage will vary based on your specific resource count and types.
 
 ### Adjust Memory Limits
 
@@ -288,10 +283,10 @@ OpenStackConfig(
 
 **Key metrics to watch**:
 
-- Cache hit rate (target: 80%+)
-- Memory usage (target: < 200MB)
-- API response time (target: < 2s)
-- Search performance (target: < 500ms)
+- Cache hit rate (design target: 80%+)
+- Memory usage (design target: < 200MB)
+- API response time (design target: < 2s uncached)
+- Search performance (design target: < 500ms)
 
 ### Set Up Performance Alerts
 
@@ -338,7 +333,7 @@ OpenStackConfig(
 
 **Adjust memory limits**:
 
-- Target < 200MB steady state
+- Design target: < 200MB steady state
 - Allow headroom for spikes
 - Monitor actual usage patterns
 - Adjust eviction threshold as needed
@@ -534,4 +529,4 @@ OpenStackConfig(
 - [Troubleshooting](troubleshooting.md) - Performance issue diagnosis
 - [Caching Concepts](../concepts/caching.md) - Deep dive into caching
 
-**Note**: All tuning recommendations are based on production experience with 10K+ resource environments. Start with defaults and adjust based on your specific needs and metrics.
+**Note**: All tuning recommendations and targets are based on design goals and testing with 10K+ resource environments. Actual performance will vary based on your specific OpenStack deployment, network conditions, and system resources. Start with defaults and adjust based on measured metrics in your environment.

@@ -161,7 +161,7 @@ OpenStack APIs are slow. This is a known issue. Years of discussion. Multiple su
 
 **What Substation Does**:
 
-- Caches aggressively (60-80% API reduction)
+- Caches aggressively (targeting up to 60-80% API reduction)
 - Parallelizes where possible (search, batch ops)
 - Uses HTTP/2 connection pooling
 - Implements exponential backoff retry

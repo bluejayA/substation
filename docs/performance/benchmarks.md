@@ -2,11 +2,22 @@
 
 Comprehensive benchmarking framework with benchmark categories, scoring, and automated regression detection.
 
+## Performance Targets vs Measured Results
+
+The performance characteristics described in this document represent design targets and expected behavior based on the architecture. Actual performance will vary based on:
+
+- Your OpenStack deployment's API response times
+- Network latency between Substation and OpenStack endpoints
+- Resource count and complexity
+- System resources (CPU, RAM, disk I/O)
+
+We recommend running the built-in performance monitor (`:health` or `:h`) to see actual performance in your environment.
+
 ## Benchmark System Overview
 
-**Location**: `/Sources/OSClient/Performance/PerformanceBenchmarkSystem.swift`
+**Location**: `/Sources/Substation/PerformanceMonitor.swift`
 
-The performance benchmark system provides:
+The performance monitoring system provides:
 
 - Comprehensive benchmarking across all performance-critical components
 - 0.0-1.0 scoring scale for each category
@@ -36,10 +47,10 @@ The performance benchmark system provides:
 
 **Why these targets**:
 
-- 80% hit rate = 80% API call reduction
+- 80% hit rate = designed for 80% API call reduction
 - 1ms response time = instant from user perspective
 - Low eviction rate = cache is right-sized
-- Memory efficiency = runs on modest hardware
+- Memory efficiency = designed to run on modest hardware
 
 ### 2. Search Performance
 
@@ -146,14 +157,13 @@ The performance benchmark system provides:
 ### Performance Score Calculation
 
 ```swift
-// From PerformanceBenchmarkSystem.swift:895
-private struct PerformanceTargets {
-    let cacheHitRate: Double = 0.8          // 80% cache hit rate
-    let cacheResponseTime: TimeInterval = 0.001  // 1ms cache response
-    let searchResponseTime: TimeInterval = 0.5   // 500ms search response
-    let memoryUtilization: Double = 0.8     // 80% memory utilization max
-    let systemHealthScore: Double = 0.9     // 90% system health
-}
+// Performance targets from PerformanceMonitor
+// Typical performance targets:
+let cacheHitRate: Double = 0.8              // 80% cache hit rate
+let cacheResponseTime: TimeInterval = 0.001  // 1ms cache response
+let searchResponseTime: TimeInterval = 0.5   // 500ms search response
+let memoryUtilization: Double = 0.8         // 80% memory utilization max
+let systemHealthScore: Double = 0.9         // 90% system health
 ```
 
 **Score calculation**:
@@ -193,12 +203,12 @@ private struct PerformanceTargets {
 ### Full Benchmark Suite
 
 ```swift
-let benchmarkSystem = PerformanceBenchmarkSystem(...)
-let report = await benchmarkSystem.runFullBenchmarkSuite()
+let performanceMonitor = PerformanceMonitor.shared
+let metrics = await performanceMonitor.getCurrentMetrics()
 
-print("Overall Score: \(report.overallScore)")
-print("Cache Performance: \(report.cacheScore)")
-print("Search Performance: \(report.searchScore)")
+print("Cache Hit Rate: \(metrics.cacheHitRate)")
+print("Memory Usage: \(metrics.memoryUsage)")
+print("System Health: \(metrics.systemHealth)")
 ```
 
 **When to run**:
@@ -208,17 +218,17 @@ print("Search Performance: \(report.searchScore)")
 - During production troubleshooting
 - Weekly for trend analysis
 
-### Specific Benchmarks
+### Specific Metrics
 
 ```swift
-// Run cache benchmark only
-let cacheResults = await benchmarkSystem.runBenchmark(.cache)
+// Get cache metrics
+let cacheMetrics = await performanceMonitor.getCacheMetrics()
 
-// Run search benchmark only
-let searchResults = await benchmarkSystem.runBenchmark(.search)
+// Get search performance metrics
+let searchMetrics = await performanceMonitor.getSearchMetrics()
 
-// Run memory benchmark only
-let memoryResults = await benchmarkSystem.runBenchmark(.memory)
+// Get memory metrics
+let memoryMetrics = await performanceMonitor.getMemoryMetrics()
 ```
 
 **When to run specific benchmarks**:
@@ -240,28 +250,29 @@ Automated benchmark execution:
 
 ## Real-Time Metrics
 
-### getCurrentPerformanceMetrics() API
+### getCurrentMetrics() API
 
 ```swift
-public struct RealTimeMetrics: Sendable {
-    public let timestamp: Date
-    public let cacheHitRate: Double           // Current cache hit rate
-    public let memoryUtilization: Double      // Memory usage percentage
-    public let systemHealthScore: Double      // Overall system health (0-1)
-    public let averageResponseTime: TimeInterval // Average API response time
-    public let renderingFPS: Double           // Current rendering frame rate
-    public let totalApiCalls: Int            // Total API calls made
-}
+// Access real-time performance metrics through PerformanceMonitor
+let monitor = PerformanceMonitor.shared
+let metrics = await monitor.getCurrentMetrics()
+
+// Available metrics include:
+// - Cache hit rates and response times
+// - Memory utilization and pressure
+// - System health scores
+// - API response times
+// - Rendering frame rates
 ```
 
 **Usage**:
 
 ```swift
-let metrics = await benchmarkSystem.getCurrentPerformanceMetrics()
+let metrics = await PerformanceMonitor.shared.getCurrentMetrics()
 
 print("Cache Hit Rate: \(metrics.cacheHitRate * 100)%")
-print("Memory Usage: \(metrics.memoryUtilization * 100)%")
-print("Health Score: \(metrics.systemHealthScore * 100)%")
+print("Memory Usage: \(metrics.memoryUsage)")
+print("System Health: \(metrics.systemHealth)")
 ```
 
 ### Performance Alerts
@@ -340,13 +351,13 @@ Status: All systems nominal
 
 ```swift
 // Export performance data for analysis
-let performanceData = await benchmarkSystem.exportPerformanceData()
+let performanceData = await PerformanceMonitor.shared.exportMetrics()
 
 // Includes:
 // - Trends over time
-// - Recent benchmark results
-// - Regression detection data
-// - Historical baselines
+// - Recent performance metrics
+// - Historical data
+// - System health information
 ```
 
 **Export formats**:
@@ -460,4 +471,4 @@ let performanceData = await benchmarkSystem.exportPerformanceData()
 - [Performance Tuning](tuning.md) - Optimization strategies
 - [Troubleshooting](troubleshooting.md) - Performance issue diagnosis
 
-**Note**: All benchmark targets are based on production testing with 10K+ resources. Adjust targets based on your specific environment and requirements.
+**Note**: All benchmark targets represent design goals based on architecture and testing with 10K+ resources. Actual performance will vary based on your specific OpenStack deployment, network conditions, and system resources. Use the built-in performance monitor to measure actual performance in your environment.

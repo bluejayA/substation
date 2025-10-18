@@ -4,14 +4,14 @@
 
 ### What is Substation?
 
-Substation is an terminal user interface (TUI) for OpenStack cloud management. It provides a powerful, keyboard-driven interface that allows operators to manage OpenStack resources efficiently from the terminal, with features like batch operations, real-time monitoring, and intelligent caching that reduces API calls by 60-80%.
+Substation is an terminal user interface (TUI) for OpenStack cloud management. It provides a powerful, keyboard-driven interface that allows operators to manage OpenStack resources efficiently from the terminal, with features like batch operations, real-time monitoring, and intelligent caching designed to reduce API calls by up to 60-80%.
 
 ### Why use Substation instead of Skyline/Horizon or the OpenStack CLI Directly?
 
 Substation offers several advantages:
 
 - **Terminal-native**: Designed specifically for terminal workflows, not adapted from web
-- **Performance**: 60-80% reduction in API calls through intelligent caching
+- **Performance**: Designed for up to 60-80% reduction in API calls through intelligent caching
 - **Batch operations**: Process hundreds of resources simultaneously
 - **Real-time updates**: Live status updates without manual refresh
 - **Keyboard-driven**: Maximum efficiency for power users
@@ -110,14 +110,16 @@ GET /servers/detail <- 200 (2134ms) <- OpenStack is slow
 
 **Solution:** If your OpenStack API is slow, Substation can't fix that. But caching helps minimize the pain.
 
-### How does Substation achieve 60-80% API call reduction?
+### How is Substation designed to achieve up to 60-80% API call reduction?
 
 Through a multi-level caching architecture (MemoryKit). For detailed information about the caching system, see the [Caching System Guide](../concepts/caching.md).
 
-**Quick Overview:**
+**Quick Overview (Design Targets):**
 
-1. **L1 Cache (Memory)**: < 1ms retrieval, 80% hit rate
-2. **L2 Cache (Larger Memory)**: ~5ms retrieval, 15% hit rate
+1. **L1 Cache (Memory)**: Target < 1ms retrieval, target 80% hit rate
+2. **L2 Cache (Larger Memory)**: Target ~5ms retrieval, target 15% hit rate
+
+**Note**: Actual cache hit rates will vary based on your usage patterns and resource churn rate.
 3. **L3 Cache (Disk)**: ~20ms retrieval, 3% hit rate
 4. **API Call**: 2+ seconds, 2% miss rate
 

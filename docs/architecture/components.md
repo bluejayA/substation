@@ -117,9 +117,7 @@ graph TB
         Cinder[CinderService]
         Glance[GlanceService]
         Keystone[KeystoneService]
-        Heat[HeatService]
         Barbican[BarbicanService]
-        Octavia[OctaviaService]
         Swift[SwiftService]
     end
 
@@ -163,9 +161,7 @@ graph TB
 | **CinderService** | Block storage | Volumes, snapshots, backups, volume types |
 | **GlanceService** | Image service | Images, snapshots, image upload/download |
 | **KeystoneService** | Identity | Users, projects, roles, domains, tokens |
-| **HeatService** | Orchestration | Stacks, templates, resources |
 | **BarbicanService** | Secrets | Secrets, certificates, containers |
-| **OctaviaService** | Load balancing | Load balancers, listeners, pools, members |
 | **SwiftService** | Object storage | Containers, objects, account metadata |
 
 ### Data Manager Pattern

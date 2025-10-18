@@ -12,17 +12,17 @@ Substation is built with a modular, layered architecture that emphasizes perform
 
 **Our Solution**: Cache everything aggressively, apologize never.
 
-- **Intelligent Caching** - 60-80% API call reduction through MemoryKit
+- **Intelligent Caching** - Designed for up to 60-80% API call reduction through MemoryKit
   - Multi-level hierarchy (L1/L2/L3) like a real computer
-  - Resource-specific TTLs (auth: 1hr, networks: 5min, servers: 2min)
+  - Resource-specific TTLs (auth: 1hr, endpoints/quotas: 30min, flavors: 15min, networks: 5min, snapshots: 3min, servers: 2min)
   - Automatic eviction before the OOM killer arrives
 - **Actor-based Concurrency** - Thread-safe operations because race conditions at 3 AM end careers
   - Strict Swift 6 concurrency (zero warnings or bust)
   - Parallel searches across 6 services simultaneously
   - No locks, no mutexes, just actors doing their thing
-- **Memory Efficiency** - Optimized for 10,000+ resources without crying
-  - Target: < 200MB steady state
-  - Cache system: < 100MB for 10K resources
+- **Memory Efficiency** - Designed for 10,000+ resources without crying
+  - Design target: < 200MB steady state
+  - Cache system target: < 100MB for 10K resources
   - Memory pressure handling built-in
 - **Lazy Loading** - Resources loaded on demand (why fetch what you don't need?)
 

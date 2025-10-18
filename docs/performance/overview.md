@@ -1,12 +1,16 @@
 # Performance Architecture Overview
 
-Substation implements a comprehensive performance architecture designed for high-throughput OpenStack operations. The system provides intelligent caching, parallel processing, and real-time performance monitoring.
+Substation implements a comprehensive performance architecture designed for high-throughput OpenStack operations. The system is designed to provide intelligent caching, parallel processing, and real-time performance monitoring.
 
-**Or**: How we made OpenStack management not suck, despite OpenStack's best efforts.
+**Or**: How we designed a system to make OpenStack management not suck, despite OpenStack's best efforts.
 
 **The Core Problem**: OpenStack APIs are slow. Like, "watching paint dry" slow. Like "is this thing even running?" slow.
 
 **Our Solution**: Cache everything aggressively, parallelize ruthlessly, and monitor obsessively.
+
+## Performance Targets vs Actual Results
+
+The performance characteristics described in this document represent design targets and expected behavior based on the architecture. Actual performance will vary based on your OpenStack deployment's API response times, network latency, resource count, and system resources. We recommend using the built-in performance monitor (`:health` or `:h`) to measure actual performance in your environment.
 
 ## Performance Architecture
 
@@ -67,13 +71,13 @@ The cache manager implements multi-level caching with resource-specific TTL stra
 
 - Multi-level cache hierarchy (L1/L2/L3)
 - Resource-specific TTL configuration
-- 60-80% API call reduction
+- Designed for up to 60-80% API call reduction
 - Memory pressure handling
 - Hit/miss tracking with real-time metrics
 
 ### 2. Parallel Search Engine
 
-**Location**: `/Sources/Substation/Search/ParallelSearchEngine.swift`
+**Location**: `/Sources/Substation/Search/SearchEngine.swift`
 
 High-performance search across multiple OpenStack services **simultaneously** because:
 
@@ -87,11 +91,11 @@ High-performance search across multiple OpenStack services **simultaneously** be
 - Result aggregation with relevance scoring
 - 5-second timeout with graceful degradation
 
-### 3. Performance Benchmark System
+### 3. Performance Monitoring System
 
-**Location**: `/Sources/OSClient/Performance/PerformanceBenchmarkSystem.swift`
+**Location**: `/Sources/Substation/PerformanceMonitor.swift`
 
-Comprehensive benchmarking framework with automated regression detection.
+Comprehensive performance monitoring with automated metrics collection and tracking.
 
 **Benchmark categories**:
 
@@ -105,7 +109,7 @@ Comprehensive benchmarking framework with automated regression detection.
 
 ### 4. Telemetry and Metrics Collection
 
-**Location**: `/Sources/Substation/Telemetry/`
+**Location**: `/Sources/OSClient/Enterprise/Telemetry/`
 
 Real-time performance monitoring with minimal overhead.
 
@@ -177,7 +181,7 @@ Substation does everything possible to mitigate this:
 
 But if the OpenStack API takes 5 seconds to list servers, we can't make it instant. The bottleneck is OpenStack, not Substation.
 
-**That said**: With our caching, 80% of operations are < 1ms. The 20% that hit the API? Those are slow because OpenStack is slow.
+**That said**: With our caching design, we target 80% of operations to be < 1ms. The remaining 20% that hit the API directly will reflect your OpenStack API's actual performance.
 
 ## Next Steps
 
@@ -188,6 +192,6 @@ But if the OpenStack API takes 5 seconds to list servers, we can't make it insta
 
 ---
 
-**Note**: All performance metrics and benchmarks are based on the actual implementation in `/Sources/OSClient/Performance/`, `/Sources/MemoryKit/`, and `/Sources/Substation/Telemetry/`. The system provides comprehensive performance monitoring and optimization capabilities designed for production OpenStack environments.
+**Note**: All performance metrics and benchmarks represent design targets based on the architecture implemented in `/Sources/Substation/PerformanceMonitor.swift`, `/Sources/MemoryKit/`, and `/Sources/OSClient/Enterprise/Telemetry/`. The system provides comprehensive performance monitoring and optimization capabilities designed for production OpenStack environments.
 
-**Measured on real OpenStack clusters with 10K+ resources. Your mileage may vary. But probably not by much.**
+**Targets are based on testing with real OpenStack clusters with 10K+ resources. Your actual performance will vary based on your specific deployment, network conditions, and system resources.**
