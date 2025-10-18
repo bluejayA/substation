@@ -1650,55 +1650,6 @@ class InputHandler {
         }
     }
 
-    private func handleSimpleBulkDelete(resourceIDs: [String], screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-
-        let itemCount = resourceIDs.count
-        var successCount = 0
-        var failCount = 0
-
-        for (index, resourceID) in resourceIDs.enumerated() {
-            tui.statusMessage = "Deleting \(index + 1)/\(itemCount)..."
-
-            do {
-                switch tui.currentView {
-                case .volumeArchives:
-                    try await tui.client.deleteVolumeBackup(backupId: resourceID)
-                case .barbicanSecrets, .barbican:
-                    try await tui.client.barbican.deleteSecret(id: resourceID)
-                case .swift:
-                    try await tui.client.swift.deleteContainer(containerName: resourceID)
-                case .swiftContainerDetail:
-                    guard let container = tui.selectedResource as? SwiftContainer, let containerName = container.name else {
-                        tui.statusMessage = "No container selected"
-                        return
-                    }
-                    try await tui.client.swift.deleteObject(containerName: containerName, objectName: resourceID)
-                case .flavors:
-                    // Flavors don't support deletion (managed by cloud admin)
-                    tui.statusMessage = "Flavors cannot be deleted"
-                    return
-                default:
-                    break
-                }
-                successCount += 1
-            } catch {
-                failCount += 1
-                Logger.shared.logError("Failed to delete resource \(resourceID): \(error)")
-            }
-        }
-
-        if failCount == 0 {
-            tui.statusMessage = "Successfully deleted \(successCount) items"
-        } else {
-            tui.statusMessage = "Deleted \(successCount) items (\(failCount) failed)"
-        }
-
-        tui.multiSelectMode = false
-        tui.multiSelectedResourceIDs.removeAll()
-        await tui.dataManager.refreshAllData()
-    }
-
     private func handleBulkDelete(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
@@ -1750,10 +1701,19 @@ class InputHandler {
             batchOperation = .keyPairBulkDelete(keyPairNames: Array(tui.multiSelectedResourceIDs))
         case .images:
             batchOperation = .imageBulkDelete(imageIDs: Array(tui.multiSelectedResourceIDs))
-        case .volumeArchives, .barbicanSecrets, .barbican, .swift, .swiftContainerDetail:
-            // These resources don't have BatchOperation support yet, handle them directly
-            await handleSimpleBulkDelete(resourceIDs: Array(tui.multiSelectedResourceIDs), screen: screen)
-            return
+        case .volumeArchives:
+            batchOperation = .volumeBackupBulkDelete(backupIDs: Array(tui.multiSelectedResourceIDs))
+        case .barbicanSecrets, .barbican:
+            batchOperation = .barbicanSecretBulkDelete(secretIDs: Array(tui.multiSelectedResourceIDs))
+        case .swift:
+            batchOperation = .swiftContainerBulkDelete(containerNames: Array(tui.multiSelectedResourceIDs))
+        case .swiftContainerDetail:
+            // Get container name from selected resource
+            guard let container = tui.selectedResource as? SwiftContainer, let containerName = container.name else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+            batchOperation = .swiftObjectBulkDelete(containerName: containerName, objectNames: Array(tui.multiSelectedResourceIDs))
         case .flavors:
             // Flavors don't support deletion
             tui.statusMessage = "Bulk operations not supported for flavors (cloud admin only)"
@@ -2266,42 +2226,39 @@ class InputHandler {
     }
 
     // MARK: - Modal Input Handler
+    /// Handle input for confirmation modals
+    /// Note: Only confirmation modals are currently used in the application.
+    /// Input, selection, and progress modal types are defined but unused - all input/selection
+    /// is handled through FormBuilder components instead.
     private func handleModalInput(_ ch: Int32, screen: OpaquePointer?) async {
         guard let tui = tui else { return }
         guard let modal = tui.userFeedback.currentModal else { return }
 
-        switch modal.type {
-        case .confirmation(_, _, _, _, _, let onConfirm, let onCancel):
-            switch ch {
-            case Int32(10), Int32(13): // ENTER - confirm
-                onConfirm()
-                await tui.draw(screen: screen)
+        // Only handle confirmation modals - other modal types are unused
+        guard case .confirmation(_, _, _, _, _, let onConfirm, let onCancel) = modal.type else {
+            return
+        }
 
-            case Int32(27): // ESC - cancel
-                onCancel()
-                await tui.draw(screen: screen)
+        switch ch {
+        case Int32(10), Int32(13): // ENTER - confirm
+            onConfirm()
+            await tui.draw(screen: screen)
 
-            case Int32(121), Int32(89): // 'y' or 'Y' - confirm
-                onConfirm()
-                await tui.draw(screen: screen)
+        case Int32(27): // ESC - cancel
+            onCancel()
+            await tui.draw(screen: screen)
 
-            case Int32(110), Int32(78): // 'n' or 'N' - cancel
-                onCancel()
-                await tui.draw(screen: screen)
+        case Int32(121), Int32(89): // 'y' or 'Y' - confirm
+            onConfirm()
+            await tui.draw(screen: screen)
 
-            default:
-                // Ignore other input for confirmation modals
-                break
-            }
+        case Int32(110), Int32(78): // 'n' or 'N' - cancel
+            onCancel()
+            await tui.draw(screen: screen)
 
-        case .input, .selection, .progress:
-            // TODO: Implement input handling for other modal types
-            // For now, ESC cancels any modal
-            if ch == Int32(27) {
-                tui.userFeedback.dismissModal()
-                await tui.draw(screen: screen)
-            }
+        default:
+            // Ignore other input for confirmation modals
+            break
         }
     }
-
 }

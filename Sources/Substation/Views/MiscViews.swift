@@ -240,6 +240,13 @@ struct MiscViews {
                     "DELETE: Delete selected security group",
                     "Rules control network access to resources",
                 ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected security groups",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
                 generalActions
             ]
 

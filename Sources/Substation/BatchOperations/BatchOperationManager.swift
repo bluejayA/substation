@@ -355,6 +355,14 @@ actor BatchOperationManager {
                 try await executeSwiftObjectDelete(operation, execution: execution)
                 resourceID = operation.resourceIdentifier
 
+            case (.volumeBackup, .delete):
+                try await executeVolumeBackupDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
+            case (.barbicanSecret, .delete):
+                try await executeBarbicanSecretDelete(operation, execution: execution)
+                resourceID = operation.resourceIdentifier
+
             default:
                 throw BatchOperationError.executionFailed("Unsupported operation: \(operation.action.rawValue) \(operation.type.rawValue)")
             }
@@ -631,6 +639,40 @@ actor BatchOperationManager {
         } catch let error as OpenStackError {
             if case .httpError(404, _) = error {
                 Logger.shared.logDebug("BatchOperationManager - Swift object \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
+    }
+
+    // MARK: - Volume Backup Executors
+
+    private func executeVolumeBackupDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        do {
+            try await client.deleteVolumeBackup(backupId: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Volume backup \(operation.resourceIdentifier) already deleted (404)")
+                return
+            }
+            throw error
+        }
+    }
+
+    // MARK: - Barbican Secret Executors
+
+    private func executeBarbicanSecretDelete(
+        _ operation: ResourceDependencyResolver.PlannedOperation,
+        execution: BatchOperationExecution
+    ) async throws {
+        do {
+            try await client.barbican.deleteSecret(id: operation.resourceIdentifier)
+        } catch let error as OpenStackError {
+            if case .httpError(404, _) = error {
+                Logger.shared.logDebug("BatchOperationManager - Barbican secret \(operation.resourceIdentifier) already deleted (404)")
                 return
             }
             throw error

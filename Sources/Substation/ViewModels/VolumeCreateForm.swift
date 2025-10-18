@@ -68,19 +68,6 @@ struct VolumeCreateForm {
     var snapshots: [VolumeSnapshot] = []
     var volumeTypes: [VolumeType] = []
 
-    // Computed property to determine source type from selected volume type
-    private var inferredSourceType: VolumeSourceType {
-        // If user explicitly selected an image or snapshot, use that
-        if selectedImageID != nil {
-            return .image
-        }
-        if selectedSnapshotID != nil {
-            return .snapshot
-        }
-        // Default to blank
-        return .blank
-    }
-
     // MARK: - Field Generation
 
     /// Generate FormField array for FormBuilder

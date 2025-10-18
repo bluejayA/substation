@@ -1417,35 +1417,28 @@ private class OpenStackMetricsCollector {
         return 3600.0 // 1 hour default
     }
 
+    /// Get actual resource counts from TUI cached resources
+    /// This provides real-time resource counts for performance monitoring
     private func getResourceCount() async -> PerformanceMonitor.OpenStackMetrics.ResourceCount {
-        guard dataManager != nil else {
-            // Return reasonable defaults if no data manager
+        guard let dataManager = dataManager, let tui = dataManager.tui else {
+            // Return zeros if no data manager or TUI available
             return PerformanceMonitor.OpenStackMetrics.ResourceCount(
-                servers: 10,
-                networks: 3,
-                volumes: 8,
-                images: 5,
-                flavors: 6,
-                securityGroups: 2
+                servers: 0,
+                networks: 0,
+                volumes: 0,
+                images: 0,
+                flavors: 0,
+                securityGroups: 0
             )
         }
 
-        // Try to get real resource counts
-        var serverCount = 0
-        var networkCount = 0
-        var volumeCount = 0
-        var imageCount = 0
-        var flavorCount = 0
-        var securityGroupCount = 0
-
-        // For now, return reasonable estimates based on typical OpenStack deployments
-        // TODO: Implement actual resource counting through proper client APIs
-        serverCount = 10
-        networkCount = 3
-        volumeCount = 8
-        imageCount = 5
-        flavorCount = 6
-        securityGroupCount = 2
+        // Get actual resource counts from TUI cached resources
+        let serverCount = tui.cachedServers.count
+        let networkCount = tui.cachedNetworks.count
+        let volumeCount = tui.cachedVolumes.count
+        let imageCount = tui.cachedImages.count
+        let flavorCount = tui.cachedFlavors.count
+        let securityGroupCount = tui.cachedSecurityGroups.count
 
         return PerformanceMonitor.OpenStackMetrics.ResourceCount(
             servers: serverCount,
