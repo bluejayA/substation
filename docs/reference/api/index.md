@@ -280,9 +280,9 @@ graph TB
 
 ### Caching
 
-Intelligent multi-level caching for 60-80% API call reduction:
+Intelligent multi-level caching designed for up to 60-80% API call reduction:
 
-- **L1 Cache**: In-memory, fastest (< 1ms)
+- **L1 Cache**: In-memory, target < 1ms retrieval
 - **L2 Cache**: Session-persistent
 - **L3 Cache**: Disk-backed, survives restarts
 
@@ -295,9 +295,11 @@ Different cache lifetimes for different resource types:
 | Resource | TTL | Why |
 |----------|-----|-----|
 | Auth tokens | 1 hour | Keystone token lifetime |
-| Flavors, Images | 15 minutes | Rarely change |
-| Networks | 5 minutes | Moderately dynamic |
-| Servers, Volumes | 2 minutes | Highly dynamic |
+| Service Endpoints, Quotas | 30 minutes | Semi-static infrastructure |
+| Flavors, Volume Types | 15 minutes | Rarely change |
+| Keypairs, Images, Networks | 5 minutes | Moderately dynamic |
+| Volume Snapshots, Object Storage | 3 minutes | Dynamic storage resources |
+| Servers, Volumes, Ports, Floating IPs | 2 minutes | Highly dynamic |
 
 See: [Performance Tuning](../../performance/tuning.md)
 

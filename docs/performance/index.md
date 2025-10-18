@@ -16,12 +16,12 @@ Comprehensive performance architecture, benchmarking, and optimization for Subst
 
 ## The 30-Second Summary
 
-**What Substation Does**:
+**What Substation Is Designed For**:
 
-- 60-80% API call reduction through intelligent caching
-- < 1ms cache retrieval (L1 cache, 80% of requests)
-- < 500ms cross-service search (6 services in parallel)
-- < 200MB memory usage (steady state)
+- Up to 60-80% API call reduction through intelligent caching
+- Target: < 1ms cache retrieval (L1 cache, targeting 80% cache hit rate)
+- Target: < 500ms cross-service search (6 services in parallel)
+- Target: < 200MB memory usage (steady state)
 - Zero-warning build with Swift 6 strict concurrency
 
 **What We Control**:
@@ -50,7 +50,7 @@ Comprehensive performance architecture, benchmarking, and optimization for Subst
 - System capabilities and limitations
 - What we control vs. what we don't
 
-**Read this first** if you want to understand how Substation achieves high performance.
+**Read this first** if you want to understand how Substation is designed to achieve high performance.
 
 ### [Performance Benchmarks](benchmarks.md)
 
@@ -189,10 +189,10 @@ graph TB
 Performance-related code is organized across multiple packages:
 
 - `/Sources/MemoryKit/` - Multi-level caching system
-- `/Sources/OSClient/Performance/` - Benchmark system, metrics
+- `/Sources/Substation/PerformanceMonitor.swift` - Performance monitoring and metrics
 - `/Sources/Substation/Search/` - Parallel search engine
-- `/Sources/Substation/Telemetry/` - Telemetry and metrics collection
+- `/Sources/OSClient/Enterprise/Telemetry/` - Telemetry and metrics collection
 
 ---
 
-**Note**: All performance metrics are based on real-world testing with 10K+ resource OpenStack environments. Your results may vary based on OpenStack performance, network conditions, and system resources.
+**Note**: All performance metrics represent design targets based on architecture and testing with 10K+ resource OpenStack environments. Actual performance will vary based on your OpenStack deployment's API response times, network conditions, and system resources. Use the built-in performance monitor (`:health` or `:h`) to measure actual performance in your environment.

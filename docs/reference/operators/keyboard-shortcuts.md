@@ -4,22 +4,27 @@ Complete keyboard shortcut reference and navigation guide for Substation. Master
 
 ## Navigation Philosophy
 
-Substation offers **two complementary navigation approaches**:
+Substation uses **command-driven navigation** as the modern, primary interface:
 
-1. **Command Input (Primary)** - Type `:` followed by the command name and press Enter
-   - **Discoverable**: Press `:` then Tab to see all available commands
-   - **Forgiving**: Fuzzy matching handles typos (`:servrs` suggests `:servers`)
-   - **Progressive**: Multiple aliases support learning (`:servers`, `:srv`, `:s`)
-   - **Context-Aware**: Commands like `:create` adapt to your current view
+**Command Input (`:command`)** - The primary navigation method
+- Type `:` to enter command mode
+- Type the command name (`:servers`, `:networks`, etc.)
+- Press Enter to navigate
+- Tab completion and fuzzy matching available
+- Discoverable (press `:` then Tab to see all commands)
+- Multiple aliases support learning (`:servers`, `:srv`, `:s`)
+- Context-aware commands like `:create` adapt to your current view
 
-2. **Single-Key Shortcuts (Alternative)** - Press a single key for instant action
-   - **Fast**: Muscle memory navigation for experienced users
-   - **Optional**: Power user feature for those who have memorized shortcuts
-   - **Legacy**: Traditional TUI navigation for vim/emacs users
+**Context Actions (Uppercase Keys)** - Secondary, view-specific actions
+- Uppercase keys (C, D, S, T, R, etc.) trigger actions
+- Only available in relevant views
+- Examples: `C` for Create, `S` for Start Server, `R` for Restart
 
-**For beginners**: Start with command input (`:` then Tab). It teaches you the commands as you go.
+**IMPORTANT**: Lowercase letter keys (a-z) do NOT navigate between views.
+They will display a helpful message: "Use commands for navigation (type : and press Tab for suggestions)"
 
-**For power users**: Graduate to single-key shortcuts once you've memorized the mappings.
+**Everyone uses command input** - It's fast, discoverable, and works everywhere.
+Press `:` then Tab to see all available commands. There are no "shortcuts to memorize" - the commands ARE the interface.
 
 ## Command Input (Primary Navigation)
 
@@ -63,24 +68,39 @@ Press `:` to enter command input - the primary way to navigate and execute actio
 | Command | Aliases | Action |
 |---------|---------|--------|
 | `:dashboard` | `:dash`, `:d` | Navigate to dashboard |
-| `:servers` | `:srv`, `:s`, `:nova` | Navigate to servers view |
-| `:networks` | `:net`, `:n`, `:neutron` | Navigate to networks view |
-| `:volumes` | `:vol`, `:v`, `:cinder` | Navigate to volumes view |
-| `:images` | `:img`, `:i`, `:glance` | Navigate to images view |
-| `:flavors` | `:flav`, `:f` | Navigate to flavors view |
-| `:securitygroups` | `:secgroups`, `:sg`, `:e` | Navigate to security groups |
-| `:servergroups` | `:srvgroups`, `:g` | Navigate to server groups |
-| `:subnets` | `:sub`, `:u` | Navigate to subnets view |
-| `:ports` | `:p` | Navigate to ports view |
-| `:routers` | `:rtr`, `:r` | Navigate to routers view |
-| `:floatingips` | `:fips`, `:l` | Navigate to floating IPs |
-| `:keypairs` | `:keys`, `:k` | Navigate to key pairs |
-| `:barbican` | `:secrets`, `:b` | Navigate to secrets |
-| `:octavia` | `:loadbalancers`, `:lbs`, `:o` | Navigate to load balancers |
-| `:swift` | `:objects`, `:j` | Navigate to object storage |
-| `:health` | `:h` | Navigate to health dashboard |
+| `:servers` | `:server`, `:srv`, `:s`, `:nova` | Navigate to servers view |
+| `:networks` | `:network`, `:net`, `:n`, `:neutron` | Navigate to networks view |
+| `:volumes` | `:volume`, `:vol`, `:v`, `:cinder` | Navigate to volumes view |
+| `:images` | `:image`, `:img`, `:i`, `:glance` | Navigate to images view |
+| `:flavors` | `:flavor`, `:flv`, `:f`, `:novaflavors`, `:novaflavor` | Navigate to flavors view |
+| `:securitygroups` | `:securitygroup`, `:secgroups`, `:secgroup`, `:sec`, `:e`, `:neutronsecuritygroups`, `:neutronsecuritygroup` | Navigate to security groups |
+| `:servergroups` | `:servergroup`, `:srvgrp`, `:sg`, `:g`, `:novaservergroups`, `:novaservergroup` | Navigate to server groups |
+| `:subnets` | `:subnet`, `:sub`, `:u`, `:neutronsubnets`, `:neutronsubnet` | Navigate to subnets view |
+| `:ports` | `:port`, `:p`, `:neutronports`, `:neutronport` | Navigate to ports view |
+| `:routers` | `:router`, `:rtr`, `:r`, `:neutronrouters`, `:neutronrouter` | Navigate to routers view |
+| `:floatingips` | `:floatingip`, `:fips`, `:fip`, `:floating`, `:l`, `:neutronfloatingips`, `:neutronfloatingip` | Navigate to floating IPs |
+| `:keypairs` | `:keypair`, `:keys`, `:key`, `:kp`, `:k`, `:novakeypairs`, `:novakeypair` | Navigate to key pairs |
+| `:barbican` | `:secrets`, `:secret`, `:b` | Navigate to secrets |
+| `:octavia` | `:loadbalancers`, `:loadbalancer`, `:lb`, `:o` | Navigate to load balancers |
+| `:swift` | `:objectstorage`, `:objects`, `:obj`, `:j` | Navigate to object storage |
+| `:operations` | `:ops`, `:background`, `:tasks` | Navigate to Swift background operations |
+| `:performance` | `:metrics`, `:perf`, `:stats` | Navigate to performance metrics |
+| `:health` | `:healthdashboard`, `:h` | Navigate to health dashboard |
 | `:search` | `:find`, `:z` | Navigate to advanced search |
+| `:archives` | `:archive`, `:arch`, `:m`, `:volumearchives`, `:volumearchive`, `:cinderbackups`, `:cinderbackup` | Navigate to volume archives |
 | `:help` | `:?` | Show help |
+| `:about` | - | Show about/version information |
+
+### Discovery Commands
+
+These commands help you learn Substation:
+
+| Command | Aliases | Action |
+|---------|---------|--------|
+| `:tutorial` | `:walkthrough` | Show interactive tutorial |
+| `:shortcuts` | `:cheatsheet` | Show keyboard shortcuts reference |
+| `:examples` | `:workflows` | Show example workflows |
+| `:welcome` | `:intro` | Show welcome screen |
 
 ### Action Commands (Context-Aware)
 
@@ -89,18 +109,28 @@ These commands adapt to your current view:
 | Command | Aliases | Action | Context |
 |---------|---------|--------|---------|
 | `:create` | `:new`, `:add` | Create resource | All resource lists |
-| `:delete` | `:remove`, `:rm` | Delete selected resource | All resources |
+| `:delete` | `:remove`, `:rm`, `:del` | Delete selected resource | All resources |
 | `:start` | `:boot`, `:power-on` | Start server | Server view |
 | `:stop` | `:shutdown`, `:power-off` | Stop server | Server view |
 | `:restart` | `:reboot` | Restart server | Server view |
-| `:attach` | `:connect` | Attach volume/network | Volume/Network view |
-| `:detach` | `:disconnect` | Detach volume/network | Volume/Network view |
-| `:snapshot` | `:snap` | Create snapshot | Server/Volume view |
-| `:resize` | - | Resize server | Server view |
-| `:console` | `:logs` | View console logs | Server view |
 | `:refresh` | `:reload` | Refresh current view | All views |
-| `:cache-purge` | `:clear-cache` | Purge all caches | All views |
+| `:clear-cache` | `:clearcache`, `:cc` | Purge all caches | All views |
+| `:manage` | `:edit` | Manage resource | Context-specific |
+
+### System Commands
+
+| Command | Aliases | Action | Context |
+|---------|---------|--------|---------|
 | `:quit` | `:exit`, `:q` | Quit Substation | Main view |
+| `:commands` | `:list` | Show available commands | All views |
+| `:help` | `:?` | Show help | All views |
+
+**Note:** The following action commands mentioned in earlier versions are NOT currently implemented:
+- `:attach` / `:connect` - Use `:manage` instead in Volume/Network views
+- `:detach` / `:disconnect` - Use `:manage` instead in Volume/Network views
+- `:snapshot` / `:snap` - Not available via command mode (use keyboard shortcuts)
+- `:resize` - Not available via command mode (use keyboard shortcuts)
+- `:console` / `:logs` - Not available via command mode (use keyboard shortcuts)
 
 ### Context Commands
 
@@ -140,33 +170,29 @@ Switch between OpenStack clouds defined in your `clouds.yaml`:
 
 Print this and tape it to your monitor (we won't judge).
 
-### Single-Key Shortcuts (Alternative Method)
+### Context Action Keys
 
-**Note**: These shortcuts are OPTIONAL. If you prefer, use command input (`:servers` instead of `s`).
+These uppercase keys trigger actions ONLY in relevant views:
 
-#### Navigation (View Switching)
+| Key | Action | Available In |
+|-----|--------|--------------|
+| `C` | Create new resource | All resource list views |
+| `Del` or `D` | Delete selected resource | All resource views (D only in Swift for download) |
+| `S` | Start server | Server views |
+| `T` | Stop server | Server views |
+| `R` | Restart server | Server views |
+| `M` | Manage resource | Security Groups, FloatingIPs, Ports, Networks, Volumes, Subnets, Swift |
+| `A` | Cycle auto-refresh interval | All views (5s/10s/30s/60s/off) |
+| `P` | Create snapshot | Server, Volume views; Manage port assignment in FloatingIP view |
+| `B` | Create backup | Volume views |
+| `L` | View server logs | Server views |
+| `O` | View server console | Server views |
+| `U` | Upload object | Swift views |
+| `W` | Web access management | Swift container views |
+| `Z` | Resize server | Server views |
+| `E` | Manage allowed address pairs | Port views |
 
-| Key | Command Equivalent | View | When You'll Need It |
-|-----|-------------------|------|---------------------|
-| `d` | `:dashboard` | Dashboard | First thing, every time. Start here. |
-| `s` | `:servers` | Servers | "Why is prod down?" |
-| `g` | `:servergroups` | Server Groups | Advanced anti-affinity wizardry |
-| `n` | `:networks` | Networks | "Can you see me now?" |
-| `e` | `:securitygroups` | Security Groups | Firewall archaeology and port spelunking |
-| `v` | `:volumes` | Volumes | "Where did my data go?" (Cinder storage) |
-| `i` | `:images` | Images | Finding that one CentOS 7 image from 2019 |
-| `f` | `:flavors` | Flavors | Size matters. Choose wisely. |
-| `h` | `:health` | Health Dashboard | "Is it us or them?" (usually them) |
-| `u` | `:subnets` | Subnets | CIDR math at 3 AM. Fun times. |
-| `p` | `:ports` | Ports | MAC address detective work |
-| `r` | `:routers` | Routers | Routing table archaeology |
-| `l` | `:floatingips` | Floating IPs | The IPs that mysteriously float away |
-| `b` | `:barbican` | Barbican (Secrets) | Where secrets hide |
-| `o` | `:octavia` | Octavia (Load Balancers) | Distributing the pain |
-| `j` | `:swift` | Swift (Object Storage) | Blob storage chaos |
-| `k` | `:keypairs` | Key Pairs | SSH key management |
-| `q` | `:ctx` | Configuration Profiles | Switch clouds/projects |
-| `z` | `:search` | Advanced Search | Cross-service grep for your cloud |
+**Note**: Lowercase letters (a-z) do NOT trigger navigation or actions. Use command mode instead (`:servers`, `:networks`, etc.)
 
 #### Global Actions
 
@@ -174,14 +200,13 @@ Print this and tape it to your monitor (we won't judge).
 |-----|-------------------|--------|-------|
 | `?` | `:help` | Show Help | Context-aware - changes based on current view |
 | `@` | - | About | Version info, credits |
-| `c` | `:cache-purge` | Cache Purge | The panic button. Clears ALL caches. Use sparingly. |
-| `r` | `:refresh` | Refresh | Refresh current view |
-| `a` | - | Auto-refresh Toggle | Cycle between 5s, 10s, 30s, 60s, off |
 | `/` | - | Search/Filter | Instant local filtering, no API calls |
 | `:` | - | Command Input | PRIMARY navigation method (see Command Input section) |
 | `Ctrl-X` | - | Multi-Select Mode | Toggle multi-select mode for bulk operations |
 | `Esc` | - | Back/Cancel | Works everywhere, exits everything |
 | `q` | `:quit` | Quit | From main view only |
+
+**Note**: Cache purge and refresh commands are NOT available as single-key shortcuts. Use `:clear-cache` or `:cc` for cache purge, and `:refresh` or `:reload` for refresh.
 
 #### List Navigation
 
@@ -227,7 +252,9 @@ Print this and tape it to your monitor (we won't judge).
 
 ## Context-Specific Shortcuts
 
-### Server View (`s`)
+**Note**: Section headers show old single-key references (like `s` for servers). These lowercase keys NO LONGER work for navigation. Use command mode instead: `:servers`, `:networks`, `:volumes`, etc.
+
+### Server View (`:servers`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -241,7 +268,7 @@ Print this and tape it to your monitor (we won't judge).
 | `Z` | Resize server | Change flavor |
 | `Ctrl-X` | Multi-select mode | Bulk operations on multiple servers |
 
-### Server Groups View (`g`)
+### Server Groups View (`:servergroups`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -249,37 +276,35 @@ Print this and tape it to your monitor (we won't judge).
 | `Del` | Delete server group | Must be empty first |
 | `Space` | View group members | See which servers are in group |
 
-### Networks View (`n`)
+### Networks View (`:networks`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Create network | Name, MTU, port security |
 | `Del` | Delete network | Must delete subnets first |
-| `A` | Manage network interfaces | Attach/detach from servers |
+| `M` | Manage network interfaces | Attach/detach from servers |
 
-### Security Groups View (`e`)
+### Security Groups View (`:securitygroups`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Create security group | Name and description |
 | `Del` | Delete security group | Can't delete 'default' |
-| `A` | Attach to servers | Apply to server instances |
 | `M` | Manage rules | Add/remove firewall rules |
 
-### Volumes View (`v`)
+### Volumes View (`:volumes`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Create volume | Size, type, bootable option |
 | `Del` | Delete volume | Must be detached first (or bulk delete in multi-select) |
-| `A` | Attach to server | Select server and device |
+| `M` | Attach to server | Select server and device |
 | `X` | Detach from server | Unmount first! |
 | `P` | Create snapshot | Volume backup |
-| `M` | Manage snapshots | View/restore snapshots |
-| `E` | Extend volume size | Can't shrink, only grow |
+| `B` | Create backup | Volume backup |
 | `Ctrl-X` | Multi-select mode | Bulk operations on multiple volumes |
 
-### Images View (`i`)
+### Images View (`:images`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -287,7 +312,7 @@ Print this and tape it to your monitor (we won't judge).
 | `Del` | Delete image | Admin only for public images |
 | `Space` | View image details | Size, format, properties |
 
-### Flavors View (`f`)
+### Flavors View (`:flavors`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -295,23 +320,25 @@ Print this and tape it to your monitor (we won't judge).
 | `Del` | Delete flavor | Admin only |
 | `Space` | View flavor specs | CPU, RAM, disk details |
 
-### Subnets View (`u`)
+### Subnets View (`:subnets`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Create subnet | CIDR, allocation pools, DNS |
 | `Del` | Delete subnet | Must be unused first |
-| `A` | Attach to router | Enable external routing |
+| `M` | Attach to router | Enable external routing |
 
-### Ports View (`p`)
+### Ports View (`:ports`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Create port | Manual port creation |
 | `Del` | Delete port | Detach from server first |
+| `E` | Manage allowed address pairs | Configure allowed address pairs |
+| `M` | Manage port server assignment | Assign to server |
 | `Space` | View port details | MAC, IPs, security groups |
 
-### Routers View (`r`)
+### Routers View (`:routers`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -320,16 +347,16 @@ Print this and tape it to your monitor (we won't judge).
 | `G` | Set gateway | Connect to external network |
 | `I` | Manage interfaces | Add/remove subnet connections |
 
-### Floating IPs View (`l`)
+### Floating IPs View (`:floatingips`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
 | `C` | Allocate floating IP | From external pool |
 | `Del` | Release floating IP | Returns to pool |
-| `A` | Associate to server | Attach to instance |
-| `D` | Disassociate | Detach from instance |
+| `M` | Manage floating IP server assignment | Attach to instance |
+| `P` | Manage floating IP port assignment | Attach to port |
 
-### Barbican View (`b`)
+### Barbican View (`:barbican`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -337,7 +364,7 @@ Print this and tape it to your monitor (we won't judge).
 | `Del` | Delete secret | Permanent deletion |
 | `Space` | View secret metadata | Metadata only, not payload |
 
-### Octavia View (`o`)
+### Octavia View (`:octavia`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -347,7 +374,7 @@ Print this and tape it to your monitor (we won't judge).
 | `P` | Manage pools | Backend server pools |
 | `M` | Manage members | Pool members |
 
-### Swift View (`j`)
+### Swift View (`:swift`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -355,16 +382,17 @@ Print this and tape it to your monitor (we won't judge).
 | `Del` | Delete container/object | Must be empty for containers |
 | `U` | Upload object | File upload to container |
 | `D` | Download object | Save object to disk |
+| `W` | Web access management | Configure web access for containers |
+| `M` | Manage container metadata | Edit container metadata |
 
-### Health Dashboard (`h`)
+### Health Dashboard (`:health`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
 | `↑/↓` | Navigate metrics | Scroll through metrics |
 | `Space` | View metric details | Detailed metric breakdown |
-| `r` | Refresh metrics | Update real-time data |
 
-### Advanced Search (`z`)
+### Advanced Search (`:search`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
@@ -414,20 +442,24 @@ Print this and tape it to your monitor (we won't judge).
 
 ### Command-Based Workflows
 
+**PRIMARY NAVIGATION METHOD**: All navigation uses command mode.
+
+Lowercase letters (s, n, v, etc.) do NOT navigate - use `:servers`, `:networks`, `:volumes` instead.
+
 **Server Management:**
 
 ```bash
 :servers          # Navigate to servers view
 ↑/↓               # Select a server
-:start            # Start the selected server
+S                 # Start the selected server (uppercase context action)
 ```
 
-**Alternative (single-key shortcuts):**
+**Alternative using command mode for actions:**
 
 ```bash
-s                 # Navigate to servers view
+:servers          # Navigate to servers view
 ↑/↓               # Select a server
-S                 # Start the selected server
+:start            # Start the selected server
 ```
 
 **Network Troubleshooting:**
@@ -443,16 +475,16 @@ Space             # View details
 
 ```bash
 :servers          # Navigate to servers view
-:create           # Open create form
+C                 # Open create form (uppercase context action)
 Tab               # Navigate form fields
 Enter             # Submit form
 ```
 
-**Alternative (single-key shortcuts):**
+**Alternative using command mode for actions:**
 
 ```bash
-s                 # Navigate to servers view
-C                 # Open create form
+:servers          # Navigate to servers view
+:create           # Open create form
 Tab               # Navigate form fields
 Enter             # Submit form
 ```
@@ -487,7 +519,7 @@ For vim users (muscle memory is real):
 | `Esc` | `Esc` | Exit/Cancel (works everywhere) |
 | `:q` | `q` | Quit (from main view) |
 
-**Note**: `:q` doesn't work, but `q` does. We're not *that* vim-like.
+**Note**: `:q` works! But `q` does too. We're somewhat vim-like, but view navigation uses full command names (`:servers`, not `s`).
 
 ## Hidden Gems and Pro Tips
 
@@ -500,11 +532,11 @@ Press `?` at any time:
 - Lists relevant keyboard shortcuts
 - Explains what you're looking at
 
-### Cache Management (`c`)
+### Cache Management (`:clear-cache` or `:cc`)
 
-Press `c` anywhere to purge ALL caches:
+Use `:clear-cache` or `:cc` to purge ALL caches:
 
-- Clears L1, L2, and L3 caches
+- Clears all cached data
 - Next operations slower while cache rebuilds
 - Use when data looks stale or wrong
 
@@ -514,6 +546,8 @@ Press `c` anywhere to purge ALL caches:
 - Data looks stale and wrong
 - Just launched 50 servers and they're not showing up
 - Debugging and need truth, not cached lies
+
+**Note**: There is NO single-key shortcut for cache purge. Use the command mode.
 
 ### Quick Filter (`/`)
 
@@ -531,10 +565,10 @@ Press `/` in any list:
 
 ### Navigation Shortcuts
 
-- **Double-tap navigation keys** to refresh that view
+- **Use command mode** - `:servers`, `:networks`, `:volumes` for view navigation
 - **Press `Esc` repeatedly** to bubble up to dashboard
 - **Press `?` when lost** for context-aware help
-- **Press `c` sparingly** - only when data is truly stale
+- **Use `:clear-cache` sparingly** - only when data is truly stale
 
 ## Search Behavior
 
@@ -561,7 +595,7 @@ Press `/` in any list:
 
 ## Auto-Refresh Configuration
 
-Press `a` to toggle auto-refresh intervals:
+Press `A` (uppercase) to cycle auto-refresh intervals:
 
 - **5 seconds** - Real-time monitoring (resource intensive)
 - **10 seconds** - Active monitoring (balanced)
@@ -628,45 +662,46 @@ Every operation can be performed without a mouse:
 
 **Solutions**:
 
-- Use `:refresh<Enter>` (or `:reload<Enter>`) to manually refresh
-- Use `:cache-purge<Enter>` (or `:cc<Enter>`) to purge cache (if data is stale)
-- Check auto-refresh setting (press `a`)
+- Use `:refresh` (or `:reload`) to manually refresh
+- Use `:clear-cache` (or `:cc`) to purge cache (if data is stale)
+- Check auto-refresh setting (press `A` - uppercase)
 
 ## Cheat Sheet
 
 ### Most Used Shortcuts
 
 ```
-Navigation:  d s n v i          (Dashboard, Servers, Networks, Volumes, Images)
-Actions:     C Del Space ? q    (Create, Delete, Details, Help, Quit)
-Search:      / z                (Local, Advanced)
-Commands:    : (then cmd name)  (Command input - :ctx, :servers, etc.)
-Refresh:     r c                (Refresh, Cache purge)
-Movement:    ↑↓ j k Page-Up/Dn  (List navigation)
-Bulk Ops:    Ctrl-X Space Del   (Multi-select, Select, Bulk delete)
-Cloud:       :ctx <cloud>       (Switch between clouds)
+Navigation:  :servers :networks :volumes :images  (Command mode - type : then command name)
+Actions:     C Del Space ? q                      (Create, Delete, Details, Help, Quit)
+Search:      / :search                            (Local, Advanced search)
+Commands:    : (then cmd name)                    (Command input - :ctx, :servers, :create, etc.)
+Refresh:     :refresh :clear-cache                (Refresh view, Cache purge)
+Movement:    ↑↓ j k Page-Up/Dn                     (List navigation)
+Bulk Ops:    Ctrl-X Space Del                     (Multi-select, Select, Bulk delete)
+Cloud:       :ctx <cloud>                         (Switch between clouds)
+Server Mgmt: S T R                                (Start, Stop, Restart - uppercase context actions)
 ```
 
 ### Emergency Shortcuts
 
 ```
-c       - Cache purge (when data is stale)
-Esc     - Get me out of here
-q       - Quit (from main view)
-?       - Help! (context-aware)
+:cc or :clear-cache - Cache purge (when data is stale)
+Esc                 - Get me out of here
+q                   - Quit (from main view)
+?                   - Help! (context-aware)
 ```
 
 ### Pro Tips
 
-1. **Double-tap navigation keys** to refresh that view
+1. **Use command mode for navigation** - `:servers`, `:networks`, `:volumes` (NOT lowercase letters)
 2. **Press `Esc` repeatedly** to bubble up to dashboard
 3. **Press `?` when lost** for context-aware help
-4. **Press `c` sparingly** - only when data is truly stale
-5. **Use `/` first** before `z` - local search is instant
-6. **Learn view keys** - Faster than any mouse
+4. **Use `:clear-cache` sparingly** - only when data is truly stale
+5. **Use `/` first** before `:search` - local search is instant
+6. **Learn uppercase context actions** - C for Create, S/T/R for server management
 7. **Use `Space` liberally** - Quick detail inspection
 8. **Vim keys work** - `j/k` for navigation, `g/G` for jumps
-9. **Command input Tab completion** - `:ctx <Tab>` shows all clouds
+9. **Command input Tab completion** - `:` then Tab shows all commands, `:ctx <Tab>` shows all clouds
 10. **Command history** - UP/DOWN arrows in command input recall previous commands
 
 ---

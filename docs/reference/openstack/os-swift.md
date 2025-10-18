@@ -23,6 +23,7 @@ public actor SwiftService: OpenStackService {
     public func uploadObject(...) async throws
     public func downloadObject(...) async throws -> Data
     public func getObjectMetadata(...) async throws -> SwiftObjectMetadataResponse
+    public func copyObject(...) async throws
 
     // Bulk operations
     public func bulkDelete(...) async throws -> BulkDeleteResponse
@@ -44,7 +45,9 @@ Key models:
 - `SwiftObject` - Object representation
 - `CreateSwiftContainerRequest` - Container creation
 - `UploadSwiftObjectRequest` - Object upload
-- `SwiftContainerMetadataResponse` - Container metadata
+- `CopySwiftObjectRequest` - Object copy
+- `BulkDeleteRequest` - Bulk delete operation
+- `SwiftContainerMetadataResponse` - Container metadata (includes ACLs)
 - `SwiftObjectMetadataResponse` - Object metadata
 
 ### 3. View Layer (`Sources/Substation/Views/SwiftViews.swift`)

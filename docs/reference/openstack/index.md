@@ -549,32 +549,31 @@ Substation uses intelligent cache TTL (Time-To-Live) strategies based on how fre
 | Resource Type | TTL | Rationale |
 |--------------|-----|-----------|
 | Authentication Tokens | 3600s (1 hour) | Keystone token lifetime |
-| Service Endpoints | 1800s (30 min) | Semi-static, rarely change |
-| Flavors | 900s (15 min) | Basically static in production |
-| Images | 900s (15 min) | Rarely change once uploaded |
-| Networks | 300s (5 min) | Moderately dynamic |
-| Subnets | 300s (5 min) | Moderately stable |
-| Routers | 300s (5 min) | Moderately stable |
-| Servers | 120s (2 min) | Highly dynamic (state changes) |
-| Volumes | 120s (2 min) | Highly dynamic (attach/detach) |
-| Ports | 120s (2 min) | Highly dynamic |
+| Service Endpoints, Quotas | 1800s (30 min) | Semi-static, rarely change |
+| Flavors, Volume Types | 900s (15 min) | Basically static in production |
+| Keypairs, Images | 300s (5 min) | Moderately dynamic |
+| Networks, Subnets, Routers | 300s (5 min) | Moderately stable |
 | Security Groups | 300s (5 min) | Change occasionally |
+| Volume Snapshots, Object Storage | 180s (3 min) | Dynamic storage resources |
+| Servers, Volumes, Ports, Floating IPs | 120s (2 min) | Highly dynamic (state changes) |
 
 **Why Different TTLs?**
 
-- **Flavors/Images**: Almost never change in production. Long TTL = fewer API calls.
-- **Servers/Volumes**: State changes frequently (building, active, error). Short TTL = fresher data.
-- **Networks**: Created occasionally, but stable once created. Medium TTL balances freshness and performance.
+- **Flavors/Volume Types**: Almost never change in production. Long TTL (15 min) = fewer API calls.
+- **Images/Networks**: Moderately dynamic. Medium TTL (5 min) balances freshness and performance.
+- **Volume Snapshots/Object Storage**: Storage operations are moderately frequent. Short TTL (3 min) = reasonably fresh data.
+- **Servers/Volumes/Ports/Floating IPs**: State changes frequently (building, active, error). Very short TTL (2 min) = fresher data.
 
 **Performance Impact:**
 
 With these TTLs, typical cache hit rates:
 
-- **80%+ for flavors/images** (very high, rarely need API)
-- **70-80% for networks/subnets** (good hit rate)
-- **60-70% for servers/volumes** (acceptable given dynamic nature)
+- **80%+ for flavors/volume types** (very high, rarely need API)
+- **70-80% for images/networks** (good hit rate)
+- **65-75% for snapshots/object storage** (good balance)
+- **60-70% for servers/volumes/ports** (acceptable given dynamic nature)
 
-**Overall**: 60-80% reduction in API calls compared to no caching.
+**Overall Design Target**: Up to 60-80% reduction in API calls compared to no caching (actual results vary based on usage patterns).
 
 ### Expected API Response Times
 

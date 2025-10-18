@@ -321,10 +321,21 @@ clouds:
     cache:
       enabled: true
       ttl:
-        servers: 120          # 2 minutes (highly dynamic)
-        networks: 300         # 5 minutes (moderately stable)
-        images: 900           # 15 minutes (rarely change)
-        flavors: 900          # 15 minutes (basically static)
+        authentication: 3600           # 1 hour (Keystone token lifetime)
+        serviceEndpoints: 1800         # 30 minutes (semi-static)
+        quotas: 1800                   # 30 minutes (semi-static)
+        flavors: 900                   # 15 minutes (basically static)
+        volumeTypes: 900               # 15 minutes (basically static)
+        keypairs: 300                  # 5 minutes (moderately dynamic)
+        images: 300                    # 5 minutes (moderately dynamic)
+        networks: 300                  # 5 minutes (moderately stable)
+        securityGroups: 300            # 5 minutes (moderately stable)
+        volumeSnapshots: 180           # 3 minutes (dynamic storage)
+        objectStorage: 180             # 3 minutes (dynamic storage)
+        servers: 120                   # 2 minutes (highly dynamic)
+        volumes: 120                   # 2 minutes (highly dynamic)
+        ports: 120                     # 2 minutes (highly dynamic)
+        floatingIPs: 120               # 2 minutes (highly dynamic)
 ```
 
 **When to Customize Cache TTL:**

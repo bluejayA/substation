@@ -46,6 +46,32 @@ Use `:health<Enter>` (or `:healthdashboard<Enter>` or `:h<Enter>`) in Substation
 - Memory usage and pressure indicators
 - Active telemetry alerts
 
+## OpenStack Compatibility
+
+### Tested Releases
+
+Substation is developed and tested against modern OpenStack releases (Stein and later).
+
+### Version Detection
+
+Substation does NOT enforce OpenStack version requirements. It will attempt to connect to any Keystone v3 endpoint and use available API features.
+
+### Older Releases
+
+If you're running older OpenStack releases:
+- **Queens to Stein**: Should work with most features
+- **Pike or older**: May have compatibility issues with newer API features
+- **Pre-Queens**: Not supported (requires Keystone v3)
+
+### Troubleshooting Version Issues
+
+If you encounter errors, check:
+1. Keystone API version (must be v3) - check your `auth_url` ends with `/v3`
+2. Service availability - some features require specific services (Swift, Barbican, etc.)
+3. API microversions - newer operations may not work on older OpenStack
+
+Use `--wiretap` flag to see detailed API communication for debugging.
+
 ## Common Issues
 
 ### Connection Problems
@@ -198,10 +224,12 @@ You can't fix OpenStack from Substation, but you can minimize the pain:
 #  but defaults are tuned for typical deployments)
 
 # Current defaults (optimized from testing):
-# - Servers: 120s (2 min) - highly dynamic
-# - Networks: 300s (5 min) - moderately stable
-# - Images: 900s (15 min) - rarely change
-# - Flavors: 900s (15 min) - basically static
+# - Authentication: 3600s (1 hour) - Keystone token lifetime
+# - Service Endpoints, Quotas: 1800s (30 min) - semi-static
+# - Flavors, Volume Types: 900s (15 min) - basically static
+# - Keypairs, Images, Networks, Security Groups: 300s (5 min) - moderately dynamic
+# - Volume Snapshots, Object Storage: 180s (3 min) - dynamic storage
+# - Servers, Volumes, Ports, Floating IPs: 120s (2 min) - highly dynamic
 ```
 
 **2. Low Cache Hit Rate**

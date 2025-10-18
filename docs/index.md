@@ -15,8 +15,8 @@ Substation is a comprehensive terminal user interface for OpenStack that provide
 
 ### Performance First (Because Slow Tools Cost Sleep)
 
-- **60-80% API call reduction** through multi-level caching
-- **Sub-second response times** for most operations
+- **Designed for up to 60-80% API call reduction** through multi-level caching
+- **Target: Sub-second response times** for most operations (actual performance depends on OpenStack deployment)
 - **Parallel search** across 6 OpenStack services simultaneously
 - **Real-time performance monitoring** with automatic regression detection
 
@@ -77,7 +77,9 @@ Substation is a comprehensive terminal user interface for OpenStack that provide
 
 - **OS**: macOS 13+ or Linux
 - **Terminal**: Any terminal with ncurses support
-- **OpenStack**: Queens or later (Caracal+ recommended)
+- **OpenStack**: Designed for Queens or later releases (Caracal+ recommended for full feature compatibility)
+  - Note: Version detection is not enforced - Substation will attempt to work with any Keystone v3 endpoint
+  - Older releases may have limited functionality or compatibility issues
 - **Memory**: 200MB+ (with 100MB cache for 10K resources)
 
 ## Getting Help

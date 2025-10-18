@@ -13,15 +13,14 @@ Substation provides full CRUD (Create, Read, Update, Delete) operations for all 
 - **Storage (Cinder)**: Volumes, snapshots, volume types, backups
 - **Images (Glance)**: Operating system images, snapshots
 - **Secrets (Barbican)**: Secrets, containers, certificates
-- **Load Balancing (Octavia)**: Load balancers, pools, listeners, health monitors
-- **Object Storage (Swift)**: Containers, objects, account management
+- **Object Storage (Swift)**: Containers, objects, account management, bulk delete, object copy, web hosting ACLs
 
 ### High-Performance Architecture
 
-- **60-80% API call reduction** through intelligent caching
-- **Sub-second response times** for most operations
+- **Designed for up to 60-80% API call reduction** through intelligent caching
+- **Target: Sub-second response times** for most operations (actual performance depends on OpenStack deployment)
 - **Actor-based concurrency** ensuring thread safety
-- **Memory-efficient** handling of 10,000+ resources
+- **Memory-efficient design** for handling 10,000+ resources
 - **Predictive prefetching** for common workflows
 - **Request coalescing** to minimize network overhead
 
@@ -370,6 +369,6 @@ See [Developer Documentation](../reference/developers/index.md) for implementati
 
 ### Roadmap
 
-- **Heat UI Views**: Complete UI implementation for orchestration
 - **Machine Learning**: Predictive analytics and anomaly detection
 - **Multi-Cloud**: Support for multiple cloud providers
+- **Enhanced Orchestration**: Heat/Octavia service support
