@@ -298,24 +298,30 @@ final class ResourceRegistryTests: XCTestCase {
         let commands = registry.allCommands()
 
         for command in commands {
-            let resolved = registry.resolve(command)
-            XCTAssertNotNil(resolved, "All listed commands should resolve: '\(command)'")
+            // Check if it resolves as a navigation command, action command, config command, or discovery command
+            let isNavigation = registry.resolve(command) != nil
+            let isAction = registry.isActionCommand(command)
+            let isConfig = registry.isConfigCommand(command)
+            let isDiscovery = registry.isDiscoveryCommand(command)
+
+            let resolves = isNavigation || isAction || isConfig || isDiscovery
+            XCTAssertTrue(resolves, "All listed commands should resolve: '\(command)'")
         }
     }
 
     func testNoAliasConflicts() {
-        // Verify each command resolves to exactly one ViewMode
-        let commands = registry.allCommands()
+        // Verify navigation commands resolve to exactly one ViewMode
+        let navigationCommands = registry.navigationCommands()
         var resolvedViews: [String: ViewMode] = [:]
 
-        for command in commands {
+        for command in navigationCommands {
             if let view = registry.resolve(command) {
                 resolvedViews[command] = view
             }
         }
 
-        // All commands should have resolved
-        XCTAssertEqual(resolvedViews.count, commands.count,
-                      "All commands should resolve to a view")
+        // All navigation commands should have resolved
+        XCTAssertEqual(resolvedViews.count, navigationCommands.count,
+                      "All navigation commands should resolve to a view")
     }
 }
