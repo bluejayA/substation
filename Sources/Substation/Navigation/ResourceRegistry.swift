@@ -160,6 +160,13 @@ final class ResourceRegistry: @unchecked Sendable {
         return resolveConfigCommand(command) != nil
     }
 
+    /// Check if a command is a discovery command
+    /// - Parameter command: The command string (without colon prefix)
+    /// - Returns: True if the command is a discovery command
+    func isDiscoveryCommand(_ command: String) -> Bool {
+        return discoveryCommands.contains(command.lowercased())
+    }
+
     /// Get all available commands (navigation + actions + config)
     func allCommands() -> [String] {
         let navigationCommands = Array(commandLookup.keys)
