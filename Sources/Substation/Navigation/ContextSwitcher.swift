@@ -358,12 +358,24 @@ final class ContextSwitcher: @unchecked Sendable {
         let projectDomain = auth.project_domain_name ?? "Default"
         let userDomain = auth.user_domain_name ?? "Default"
 
+        // Determine SSL verification setting from cloud configuration
+        let verifySSL: Bool
+        if let insecure = auth.insecure, insecure {
+            verifySSL = false
+        } else if let verify = auth.verify {
+            let verifyLower = verify.lowercased()
+            verifySSL = !(verifyLower == "false" || verifyLower == "0" || verifyLower == "no")
+        } else {
+            verifySSL = true
+        }
+
         // Build OSClient config
         let osConfig = OpenStackConfig(
             authURL: authURL,
             region: finalRegion,
             userDomainName: userDomain,
-            projectDomainName: projectDomain
+            projectDomainName: projectDomain,
+            verifySSL: verifySSL
         )
 
         // Determine credentials type
@@ -434,7 +446,8 @@ final class ContextSwitcher: @unchecked Sendable {
                         authURL: authURL,
                         region: detectedRegion,
                         userDomainName: userDomain,
-                        projectDomainName: projectDomain
+                        projectDomainName: projectDomain,
+                        verifySSL: verifySSL
                     )
 
                     client = try await OSClient.connect(

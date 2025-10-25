@@ -292,11 +292,26 @@ struct Substation {
             userDomain = cloudConfig.auth.user_domain_name ?? "Default"
         }
 
+        // Determine SSL verification setting from cloud configuration
+        // Check both 'verify' and 'insecure' fields
+        let verifySSL: Bool
+        if let insecure = cloudConfig.auth.insecure, insecure {
+            verifySSL = false
+        } else if let verify = cloudConfig.auth.verify {
+            // Handle string values: "False", "false", "0", "no" mean disable verification
+            let verifyLower = verify.lowercased()
+            verifySSL = !(verifyLower == "false" || verifyLower == "0" || verifyLower == "no")
+        } else {
+            // Default to true (verify SSL certificates)
+            verifySSL = true
+        }
+
         let config = OpenStackConfig(
             authURL: authURL,
             region: region ?? "auto-detect",
             userDomainName: userDomain,
-            projectDomainName: projectDomain
+            projectDomainName: projectDomain,
+            verifySSL: verifySSL
         )
 
         // Create credentials based on determined authentication method
@@ -533,7 +548,8 @@ struct Substation {
                             authURL: authURL,
                             region: region,
                             userDomainName: config.userDomainName,
-                            projectDomainName: config.projectDomainName
+                            projectDomainName: config.projectDomainName,
+                            verifySSL: config.verifySSL
                         )
                         client = try await OSClient.connect(config: reconnectConfig, credentials: credentials, logger: LoggerBridge())
                         Logger.shared.logInfo("Reconnected with detected region: \(region)")
