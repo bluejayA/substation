@@ -72,8 +72,20 @@ internal enum SharedResources {
         return formatter
     }
 
-    static func createURLSession(logger: any OpenStackClientLogger) -> (URLSession, EnhancedSecureURLSessionDelegate) {
-        let delegate = EnhancedSecureURLSessionDelegate(logger: logger)
+    static func createURLSession(logger: any OpenStackClientLogger, verifySSL: Bool = true) -> (URLSession, EnhancedSecureURLSessionDelegate) {
+        #if !canImport(Security)
+        // On Linux, swift-corelibs-foundation uses libcurl under the hood
+        // To disable SSL verification, we need to set the CURL_SSL_VERIFYPEER environment variable
+        if !verifySSL {
+            // Set libcurl environment variables to disable SSL verification
+            // Note: This affects all URLSession instances in the process
+            setenv("CURL_SSL_VERIFYPEER", "0", 1)
+            setenv("CURL_SSL_VERIFYHOST", "0", 1)
+            logger.logInfo("Disabled SSL verification via libcurl environment variables", context: [:])
+        }
+        #endif
+
+        let delegate = EnhancedSecureURLSessionDelegate(logger: logger, verifySSL: verifySSL)
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
@@ -86,21 +98,61 @@ internal enum SharedResources {
 
 // MARK: - Configuration and Credentials
 
+/// OpenStack configuration structure containing connection and authentication settings
+///
+/// This structure defines the configuration parameters required to connect to an OpenStack cloud environment,
+/// including authentication endpoints, regional settings, and SSL/TLS verification options.
 public struct OpenStackConfig: Sendable {
+    /// The authentication URL for the OpenStack Identity (Keystone) service
     public let authURL: URL
+
+    /// The region name to use for API endpoints (use "auto-detect" for automatic region detection)
     public let region: String
+
+    /// The domain name for user authentication (default: "default")
     public let userDomainName: String
+
+    /// The domain name for project scope (default: "default")
     public let projectDomainName: String
+
+    /// The timeout interval for API requests in seconds (default: 30.0)
     public let timeout: TimeInterval
+
+    /// The retry policy for failed API requests
     public let retryPolicy: RetryPolicy
 
+    /// Whether to verify SSL/TLS certificates (default: true)
+    ///
+    /// When set to false, SSL certificate validation is disabled, allowing connections to servers
+    /// with self-signed or untrusted certificates. This corresponds to the "verify: False" or
+    /// "insecure: true" options in clouds.yaml configuration files.
+    ///
+    /// - Note: On Linux (swift-corelibs-foundation), this is implemented using libcurl environment
+    ///   variables (CURL_SSL_VERIFYPEER and CURL_SSL_VERIFYHOST) which affect the entire process.
+    ///   On macOS/iOS, this is implemented using the Security framework's certificate validation.
+    ///
+    /// - Warning: Disabling SSL verification should only be used in development or testing environments
+    ///   as it makes connections vulnerable to man-in-the-middle attacks.
+    public let verifySSL: Bool
+
+    /// Initialize OpenStack configuration
+    ///
+    /// - Parameters:
+    ///   - authURL: The authentication URL for the OpenStack Identity service
+    ///   - region: The region name (default: "auto-detect")
+    ///   - userDomainName: The user domain name (default: "default")
+    ///   - projectDomainName: The project domain name (default: "default")
+    ///   - timeout: The request timeout in seconds (default: 30.0)
+    ///   - retryPolicy: The retry policy for failed requests (default: RetryPolicy())
+    ///   - verifySSL: Whether to verify SSL certificates (default: true)
     public init(
         authURL: URL,
         region: String = "auto-detect",
         userDomainName: String = "default",
         projectDomainName: String = "default",
         timeout: TimeInterval = 30.0,
-        retryPolicy: RetryPolicy = RetryPolicy()
+        retryPolicy: RetryPolicy = RetryPolicy(),
+        verifySSL: Bool = true
     ) {
         self.authURL = authURL
         self.region = region
@@ -108,6 +160,7 @@ public struct OpenStackConfig: Sendable {
         self.projectDomainName = projectDomainName
         self.timeout = timeout
         self.retryPolicy = retryPolicy
+        self.verifySSL = verifySSL
     }
 }
 
@@ -361,9 +414,11 @@ public final class CredentialEncryption: @unchecked Sendable {
 /// Enhanced URL session delegate with comprehensive certificate validation
 public final class EnhancedSecureURLSessionDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     private let logger: any OpenStackClientLogger
+    private let verifySSL: Bool
 
-    public init(logger: any OpenStackClientLogger = ConsoleLogger()) {
+    public init(logger: any OpenStackClientLogger = ConsoleLogger(), verifySSL: Bool = true) {
         self.logger = logger
+        self.verifySSL = verifySSL
         super.init()
     }
 
@@ -379,6 +434,15 @@ public final class EnhancedSecureURLSessionDelegate: NSObject, URLSessionDelegat
         guard let serverTrust = challenge.protectionSpace.serverTrust else {
             logger.logError("No server trust available", context: [:])
             completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // If SSL verification is disabled, skip validation and trust all certificates
+        if !verifySSL {
+            logger.logInfo("SSL verification disabled - accepting certificate without validation", context: [
+                "host": challenge.protectionSpace.host
+            ])
+            completionHandler(.useCredential, URLCredential(trust: serverTrust))
             return
         }
 
@@ -405,14 +469,13 @@ public final class EnhancedSecureURLSessionDelegate: NSObject, URLSessionDelegat
 
         completionHandler(.useCredential, URLCredential(trust: serverTrust))
         #else
-        // On Linux, rely on URLSession's default certificate validation
-        // This uses the system's certificate store and validates the chain properly
-        logger.logInfo("Using system certificate validation", context: [
-            "host": challenge.protectionSpace.host
+        // On Linux (swift-corelibs-foundation), the Security framework is not available
+        // SSL verification is handled via libcurl environment variables set in createURLSession
+        // Just use default handling here
+        logger.logInfo("Using system certificate validation (libcurl-based)", context: [
+            "host": challenge.protectionSpace.host,
+            "verifySSL": verifySSL
         ])
-
-        // Perform default handling which includes proper certificate validation
-        // This will validate against the system's CA bundle
         completionHandler(.performDefaultHandling, nil)
         #endif
     }
@@ -528,7 +591,7 @@ public actor OpenStackClientCore {
             logger: OpenStackClientLoggerAdapter(clientLogger: logger)
         ))
         self.tokenManager = CoreTokenManager(logger: logger)
-        let (session, delegate) = SharedResources.createURLSession(logger: logger)
+        let (session, delegate) = SharedResources.createURLSession(logger: logger, verifySSL: config.verifySSL)
         self.urlSession = session
         self.urlSessionDelegate = delegate
         self.microversionManager = MicroversionManager(logger: logger)
