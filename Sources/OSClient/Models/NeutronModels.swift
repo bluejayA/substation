@@ -221,6 +221,79 @@ public struct HostRoute: Codable, Sendable {
 
 // MARK: - Port Models
 
+/// Flexible value type that can decode from String, Bool, Int, or other JSON types
+/// This is used for dictionary values that may have mixed types in OpenStack responses
+public enum FlexibleValue: Codable, Sendable {
+    case string(String)
+    case bool(Bool)
+    case int(Int)
+    case double(Double)
+    case null
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+
+        if let value = try? container.decode(String.self) {
+            self = .string(value)
+            return
+        }
+
+        if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+            return
+        }
+
+        if let value = try? container.decode(Int.self) {
+            self = .int(value)
+            return
+        }
+
+        if let value = try? container.decode(Double.self) {
+            self = .double(value)
+            return
+        }
+
+        self = .null
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value):
+            try container.encode(value)
+        case .bool(let value):
+            try container.encode(value)
+        case .int(let value):
+            try container.encode(value)
+        case .double(let value):
+            try container.encode(value)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+
+    /// Convert the value to a string representation
+    public var stringValue: String {
+        switch self {
+        case .string(let value):
+            return value
+        case .bool(let value):
+            return String(value)
+        case .int(let value):
+            return String(value)
+        case .double(let value):
+            return String(value)
+        case .null:
+            return ""
+        }
+    }
+}
+
 public struct Port: Codable, Sendable, ResourceIdentifiable, Timestamped, Identifiable {
     public let id: String
     public let name: String?
@@ -239,7 +312,7 @@ public struct Port: Codable, Sendable, ResourceIdentifiable, Timestamped, Identi
     public let extraDhcpOpts: [DhcpOption]?
     public let bindingHostId: String?
     public let bindingProfile: [String: String]?
-    public let bindingVifDetails: [String: String]?
+    public let bindingVifDetails: [String: FlexibleValue]?
     public let bindingVifType: String?
     public let bindingVnicType: String?
     public let createdAt: Date?

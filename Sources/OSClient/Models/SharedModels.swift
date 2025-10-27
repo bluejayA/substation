@@ -47,12 +47,17 @@ public struct Link: Codable, Sendable {
 
 // MARK: - Status and State Enums
 
+/// Server status values from OpenStack Nova API
+///
+/// Represents all possible server states in OpenStack compute.
+/// See: https://docs.openstack.org/api-guide/compute/server_concepts.html
 public enum ServerStatus: String, Codable, CaseIterable, Sendable {
     case active = "ACTIVE"
     case build = "BUILD"
     case deleted = "DELETED"
     case error = "ERROR"
     case hardReboot = "HARD_REBOOT"
+    case migrating = "MIGRATING"
     case password = "PASSWORD"
     case paused = "PAUSED"
     case reboot = "REBOOT"
@@ -60,16 +65,19 @@ public enum ServerStatus: String, Codable, CaseIterable, Sendable {
     case rescue = "RESCUE"
     case resize = "RESIZE"
     case revertResize = "REVERT_RESIZE"
+    case shelved = "SHELVED"
+    case shelvedOffloaded = "SHELVED_OFFLOADED"
     case shutoff = "SHUTOFF"
+    case softDeleted = "SOFT_DELETED"
     case suspended = "SUSPENDED"
     case unknown = "UNKNOWN"
     case verify = "VERIFY_RESIZE"
 
     public var isTransitional: Bool {
         switch self {
-        case .build, .hardReboot, .password, .reboot, .rebuild, .rescue, .resize, .revertResize, .verify:
+        case .build, .hardReboot, .migrating, .password, .reboot, .rebuild, .rescue, .resize, .revertResize, .verify:
             return true
-        case .active, .deleted, .error, .paused, .shutoff, .suspended, .unknown:
+        case .active, .deleted, .error, .paused, .shelved, .shelvedOffloaded, .shutoff, .softDeleted, .suspended, .unknown:
             return false
         }
     }
