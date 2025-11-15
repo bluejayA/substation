@@ -277,6 +277,35 @@ public final class CloudConfigManager: @unchecked Sendable {
         return await credentialStorage.getAllKeys()
     }
 
+    // MARK: - Auth URL Utilities
+
+    /// Validates and normalizes an authentication URL
+    ///
+    /// This method validates that the provided auth URL string can be converted to a URL,
+    /// and ensures it has a path component. If the path is empty, it appends "/v3" to
+    /// ensure the URL points to the Keystone v3 API endpoint.
+    ///
+    /// - Parameters:
+    ///   - authURLString: The authentication URL string from the cloud configuration
+    ///   - cloudName: The name of the cloud (used for error messaging)
+    /// - Returns: A validated and normalized URL
+    /// - Throws: CloudConfigError.invalidConfiguration if the URL string is invalid
+    public static func validateAndNormalizeAuthURL(_ authURLString: String, cloudName: String) throws -> URL {
+        Logger.shared.logDebug("Validating auth URL: \(authURLString)")
+
+        guard var authURL = URL(string: authURLString) else {
+            Logger.shared.logError("Invalid auth_url in cloud configuration: \(authURLString)")
+            throw CloudConfigError.invalidConfiguration("Invalid auth_url for cloud '\(cloudName)': \(authURLString)")
+        }
+
+        if authURL.path.isEmpty {
+            Logger.shared.logDebug("Auth URL path empty, appending /v3")
+            authURL.appendPathComponent("v3")
+        }
+
+        return authURL
+    }
+
     /// Check if a cloud configuration has environment variable dependencies
     public func hasEnvironmentVariables(_ cloudName: String, path: String? = nil) async throws -> Bool {
         let configPath = path ?? defaultPath

@@ -221,10 +221,11 @@ struct Substation {
             exit(1)
         }
 
-        // Validate and convert configuration
-        Logger.shared.logDebug("Validating auth URL: \(cloudConfig.auth.auth_url)")
-        guard let authURL = URL(string: cloudConfig.auth.auth_url) else {
-            Logger.shared.logError("Invalid auth_url in cloud configuration: \(cloudConfig.auth.auth_url)")
+        // Validate and convert configuration using common utility method
+        let authURL: URL
+        do {
+            authURL = try CloudConfigManager.validateAndNormalizeAuthURL(cloudConfig.auth.auth_url, cloudName: selectedCloud)
+        } catch {
             printError("Invalid auth_url in cloud configuration: \(cloudConfig.auth.auth_url)")
             exit(1)
         }

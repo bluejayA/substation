@@ -323,16 +323,15 @@ final class ContextSwitcher: @unchecked Sendable {
     private func createOSClient(from config: CloudConfig, cloudName: String) async throws -> OSClient {
         let auth = config.auth
 
-        // Build auth URL
-        guard var authURL = URL(string: auth.auth_url) else {
+        // Build auth URL using common utility method
+        let authURL: URL
+        do {
+            authURL = try CloudConfigManager.validateAndNormalizeAuthURL(auth.auth_url, cloudName: cloudName)
+        } catch {
             throw ContextSwitchError.invalidConfiguration(
                 cloudName,
                 reason: "Invalid auth_url: \(auth.auth_url)"
             )
-        }
-
-        if authURL.path.isEmpty {
-            authURL.appendPathComponent("v3")
         }
 
         // Determine region
