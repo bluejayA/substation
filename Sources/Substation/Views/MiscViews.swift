@@ -923,86 +923,20 @@ struct MiscViews {
         ]
     }
 
+    /// Retrieves build information from compile-time embedded constants
+    ///
+    /// This method returns version metadata that was embedded into the binary
+    /// during compilation. This ensures version information is available even
+    /// in distributed binaries without access to the git repository.
+    ///
+    /// - Returns: A tuple containing version, build date, git commit hash, and configuration
     private static func getBuildInformation() -> (version: String, buildDate: String, gitCommit: String, configuration: String) {
-        // Get dynamic version from git tag or commit
-        let version = getGitVersion()
-
-        // Get actual build date from executable modification time
-        let buildDate = getExecutableBuildDate()
-
-        // Get configuration
-        #if DEBUG
-        let configuration = "Debug"
-        #else
-        let configuration = "Release"
-        #endif
-
-        // Get git commit hash dynamically
-        let gitCommit = getGitCommitHash()
-
-        return (version: version, buildDate: buildDate, gitCommit: gitCommit, configuration: configuration)
-    }
-
-    private static func getExecutableBuildDate() -> String {
-        // Try to get the modification date of the current executable
-        if let executablePath = ProcessInfo.processInfo.arguments.first,
-           let attributes = try? FileManager.default.attributesOfItem(atPath: executablePath),
-           let modificationDate = attributes[.modificationDate] as? Date {
-            return modificationDate.iso8601Formatted()
-        }
-
-        // Fallback to current date if we can't read the executable
-        return Date().iso8601Formatted()
-    }
-
-    private static func getGitVersion() -> String {
-        let task = Process()
-        let pipe = Pipe()
-
-        task.standardOutput = pipe
-        task.standardError = pipe
-        task.arguments = ["-c", "git describe --tags --always 2>/dev/null || git rev-parse --short HEAD 2>/dev/null || echo 'unknown'"]
-        task.executableURL = URL(fileURLWithPath: "/bin/sh")
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8) {
-                let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                return trimmed.isEmpty ? "unknown" : trimmed
-            }
-        } catch {
-            // If git command fails, return fallback
-        }
-
-        return "unknown"
-    }
-
-    private static func getGitCommitHash() -> String {
-        let task = Process()
-        let pipe = Pipe()
-
-        task.standardOutput = pipe
-        task.standardError = pipe
-        task.arguments = ["-c", "git rev-parse --short HEAD 2>/dev/null || echo 'Unknown'"]
-        task.executableURL = URL(fileURLWithPath: "/bin/sh")
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8) {
-                let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                return trimmed.isEmpty ? "Unknown" : trimmed
-            }
-        } catch {
-            // If git command fails, return a fallback
-        }
-
-        return "Unknown"
+        return (
+            version: BuildInfo.version,
+            buildDate: BuildInfo.buildDate,
+            gitCommit: BuildInfo.gitCommitHash,
+            configuration: BuildInfo.configuration
+        )
     }
 
     // MARK: - Simple Message Display

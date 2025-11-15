@@ -19,6 +19,11 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
     ],
     targets: [
+        .plugin(
+            name: "GenerateVersionInfo",
+            capability: .buildTool(),
+            path: "Plugins/GenerateVersionInfo"
+        ),
         .target(
             name: "MemoryKit",
             dependencies: [],
@@ -70,6 +75,9 @@ let package = Package(
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
                 .enableUpcomingFeature("ExistentialAny")
+            ],
+            plugins: [
+                "GenerateVersionInfo"
             ]
         ),
         .testTarget(
