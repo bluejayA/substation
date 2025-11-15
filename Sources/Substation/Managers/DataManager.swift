@@ -1459,16 +1459,10 @@ class DataManager {
         return try await keystone.listCatalog()
     }
 
-    /// Get raw service catalog with endpoints
-    func getRawCatalog() async throws -> [TokenCatalogEntry] {
+    /// Get service catalog with full endpoint information
+    func getCatalogWithEndpoints() async throws -> [TokenCatalogEntry] {
         let keystone = await client.keystone
-        let response: CatalogResponse = try await keystone.core.request(
-            service: "identity",
-            method: "GET",
-            path: "/auth/catalog",
-            expected: 200
-        )
-        return response.catalog
+        return try await keystone.listCatalogWithEndpoints()
     }
 
     /// Get OpenStack service catalog with health check information

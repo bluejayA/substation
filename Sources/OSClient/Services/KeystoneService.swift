@@ -14,7 +14,7 @@ public actor KeystoneService: OpenStackService {
 
     /// List projects
     public func listProjects(options: PaginationOptions = PaginationOptions()) async throws -> [Project] {
-        var path = "/v3/projects"
+        var path = "/projects"
 
         if !options.queryItems.isEmpty {
             let queryString = options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
@@ -35,7 +35,7 @@ public actor KeystoneService: OpenStackService {
         let response: ProjectDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/projects/\(id)",
+            path: "/projects/\(id)",
             expected: 200
         )
         return response.project
@@ -47,7 +47,7 @@ public actor KeystoneService: OpenStackService {
         let response: ProjectDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",
-            path: "/v3/projects",
+            path: "/projects",
             body: requestData,
             expected: 201
         )
@@ -60,7 +60,7 @@ public actor KeystoneService: OpenStackService {
         let response: ProjectDetailResponse = try await core.request(
             service: serviceName,
             method: "PATCH",
-            path: "/v3/projects/\(id)",
+            path: "/projects/\(id)",
             body: requestData,
             expected: 200
         )
@@ -72,7 +72,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/projects/\(id)",
+            path: "/projects/\(id)",
             expected: 204
         )
     }
@@ -86,7 +86,7 @@ public actor KeystoneService: OpenStackService {
             queryItems.append(URLQueryItem(name: "domain_id", value: domainId))
         }
 
-        var path = "/v3/users"
+        var path = "/users"
         if !queryItems.isEmpty {
             let queryString = queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
             path += "?" + queryString
@@ -106,7 +106,7 @@ public actor KeystoneService: OpenStackService {
         let response: UserDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/users/\(id)",
+            path: "/users/\(id)",
             expected: 200
         )
         return response.user
@@ -118,7 +118,7 @@ public actor KeystoneService: OpenStackService {
         let response: UserDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",
-            path: "/v3/users",
+            path: "/users",
             body: requestData,
             expected: 201
         )
@@ -131,7 +131,7 @@ public actor KeystoneService: OpenStackService {
         let response: UserDetailResponse = try await core.request(
             service: serviceName,
             method: "PATCH",
-            path: "/v3/users/\(id)",
+            path: "/users/\(id)",
             body: requestData,
             expected: 200
         )
@@ -143,7 +143,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/users/\(id)",
+            path: "/users/\(id)",
             expected: 204
         )
     }
@@ -154,7 +154,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "POST",
-            path: "/v3/users/\(id)/password",
+            path: "/users/\(id)/password",
             body: requestData,
             expected: 204
         )
@@ -169,7 +169,7 @@ public actor KeystoneService: OpenStackService {
             queryItems.append(URLQueryItem(name: "domain_id", value: domainId))
         }
 
-        var path = "/v3/groups"
+        var path = "/groups"
         if !queryItems.isEmpty {
             let queryString = queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
             path += "?" + queryString
@@ -189,7 +189,7 @@ public actor KeystoneService: OpenStackService {
         let response: GroupDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/groups/\(id)",
+            path: "/groups/\(id)",
             expected: 200
         )
         return response.group
@@ -201,7 +201,7 @@ public actor KeystoneService: OpenStackService {
         let response: GroupDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",
-            path: "/v3/groups",
+            path: "/groups",
             body: requestData,
             expected: 201
         )
@@ -214,7 +214,7 @@ public actor KeystoneService: OpenStackService {
         let response: GroupDetailResponse = try await core.request(
             service: serviceName,
             method: "PATCH",
-            path: "/v3/groups/\(id)",
+            path: "/groups/\(id)",
             body: requestData,
             expected: 200
         )
@@ -226,7 +226,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/groups/\(id)",
+            path: "/groups/\(id)",
             expected: 204
         )
     }
@@ -236,7 +236,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "PUT",
-            path: "/v3/groups/\(groupId)/users/\(userId)",
+            path: "/groups/\(groupId)/users/\(userId)",
             expected: 204
         )
     }
@@ -246,7 +246,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/groups/\(groupId)/users/\(userId)",
+            path: "/groups/\(groupId)/users/\(userId)",
             expected: 204
         )
     }
@@ -256,7 +256,7 @@ public actor KeystoneService: OpenStackService {
         let response: UserListResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/groups/\(groupId)/users",
+            path: "/groups/\(groupId)/users",
             expected: 200
         )
         return response.users
@@ -268,7 +268,7 @@ public actor KeystoneService: OpenStackService {
             try await core.requestVoid(
                 service: serviceName,
                 method: "HEAD",
-                path: "/v3/groups/\(groupId)/users/\(userId)",
+                path: "/groups/\(groupId)/users/\(userId)",
                 expected: 204
             )
             return true
@@ -281,7 +281,7 @@ public actor KeystoneService: OpenStackService {
 
     /// List roles
     public func listRoles(options: PaginationOptions = PaginationOptions()) async throws -> [Role] {
-        var path = "/v3/roles"
+        var path = "/roles"
 
         if !options.queryItems.isEmpty {
             let queryString = options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
@@ -302,7 +302,7 @@ public actor KeystoneService: OpenStackService {
         let response: RoleDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/roles/\(id)",
+            path: "/roles/\(id)",
             expected: 200
         )
         return response.role
@@ -314,7 +314,7 @@ public actor KeystoneService: OpenStackService {
         let response: RoleDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",
-            path: "/v3/roles",
+            path: "/roles",
             body: requestData,
             expected: 201
         )
@@ -327,7 +327,7 @@ public actor KeystoneService: OpenStackService {
         let response: RoleDetailResponse = try await core.request(
             service: serviceName,
             method: "PATCH",
-            path: "/v3/roles/\(id)",
+            path: "/roles/\(id)",
             body: requestData,
             expected: 200
         )
@@ -339,7 +339,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/roles/\(id)",
+            path: "/roles/\(id)",
             expected: 204
         )
     }
@@ -351,7 +351,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "PUT",
-            path: "/v3/projects/\(projectId)/users/\(userId)/roles/\(roleId)",
+            path: "/projects/\(projectId)/users/\(userId)/roles/\(roleId)",
             expected: 204
         )
     }
@@ -361,7 +361,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/projects/\(projectId)/users/\(userId)/roles/\(roleId)",
+            path: "/projects/\(projectId)/users/\(userId)/roles/\(roleId)",
             expected: 204
         )
     }
@@ -372,7 +372,7 @@ public actor KeystoneService: OpenStackService {
             try await core.requestVoid(
                 service: serviceName,
                 method: "HEAD",
-                path: "/v3/projects/\(projectId)/users/\(userId)/roles/\(roleId)",
+                path: "/projects/\(projectId)/users/\(userId)/roles/\(roleId)",
                 expected: 204
             )
             return true
@@ -386,7 +386,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "PUT",
-            path: "/v3/projects/\(projectId)/groups/\(groupId)/roles/\(roleId)",
+            path: "/projects/\(projectId)/groups/\(groupId)/roles/\(roleId)",
             expected: 204
         )
     }
@@ -396,7 +396,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/projects/\(projectId)/groups/\(groupId)/roles/\(roleId)",
+            path: "/projects/\(projectId)/groups/\(groupId)/roles/\(roleId)",
             expected: 204
         )
     }
@@ -424,7 +424,7 @@ public actor KeystoneService: OpenStackService {
             queryItems.append(URLQueryItem(name: "include_names", value: "true"))
         }
 
-        var path = "/v3/role_assignments"
+        var path = "/role_assignments"
         if !queryItems.isEmpty {
             let queryString = queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
             path += "?" + queryString
@@ -443,7 +443,7 @@ public actor KeystoneService: OpenStackService {
 
     /// List domains
     public func listDomains(options: PaginationOptions = PaginationOptions()) async throws -> [Domain] {
-        var path = "/v3/domains"
+        var path = "/domains"
 
         if !options.queryItems.isEmpty {
             let queryString = options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
@@ -464,7 +464,7 @@ public actor KeystoneService: OpenStackService {
         let response: DomainDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/domains/\(id)",
+            path: "/domains/\(id)",
             expected: 200
         )
         return response.domain
@@ -476,7 +476,7 @@ public actor KeystoneService: OpenStackService {
         let response: DomainDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",
-            path: "/v3/domains",
+            path: "/domains",
             body: requestData,
             expected: 201
         )
@@ -489,7 +489,7 @@ public actor KeystoneService: OpenStackService {
         let response: DomainDetailResponse = try await core.request(
             service: serviceName,
             method: "PATCH",
-            path: "/v3/domains/\(id)",
+            path: "/domains/\(id)",
             body: requestData,
             expected: 200
         )
@@ -501,7 +501,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/domains/\(id)",
+            path: "/domains/\(id)",
             expected: 204
         )
     }
@@ -535,12 +535,32 @@ public actor KeystoneService: OpenStackService {
         }
     }
 
+    /// List catalog with full endpoint information
+    /// - Returns: Array of TokenCatalogEntry containing service and endpoint details
+    public func listCatalogWithEndpoints(options: PaginationOptions = PaginationOptions()) async throws -> [TokenCatalogEntry] {
+        var path = "/auth/catalog"
+
+        if !options.queryItems.isEmpty {
+            let queryString = options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+            path += "?" + queryString
+        }
+
+        let response: CatalogResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: path,
+            expected: 200
+        )
+
+        return response.catalog
+    }
+
     /// Get service details
     public func getService(id: String) async throws -> Service {
         let response: ServiceDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/services/\(id)",
+            path: "/services/\(id)",
             expected: 200
         )
         return response.service
@@ -552,7 +572,7 @@ public actor KeystoneService: OpenStackService {
         let response: ServiceDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",
-            path: "/v3/services",
+            path: "/services",
             body: requestData,
             expected: 201
         )
@@ -565,7 +585,7 @@ public actor KeystoneService: OpenStackService {
         let response: ServiceDetailResponse = try await core.request(
             service: serviceName,
             method: "PATCH",
-            path: "/v3/services/\(id)",
+            path: "/services/\(id)",
             body: requestData,
             expected: 200
         )
@@ -577,7 +597,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/services/\(id)",
+            path: "/services/\(id)",
             expected: 204
         )
     }
@@ -594,7 +614,7 @@ public actor KeystoneService: OpenStackService {
             queryItems.append(URLQueryItem(name: "interface", value: interface))
         }
 
-        var path = "/v3/endpoints"
+        var path = "/endpoints"
         if !queryItems.isEmpty {
             let queryString = queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
             path += "?" + queryString
@@ -614,7 +634,7 @@ public actor KeystoneService: OpenStackService {
         let response: EndpointDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/endpoints/\(id)",
+            path: "/endpoints/\(id)",
             expected: 200
         )
         return response.endpoint
@@ -626,7 +646,7 @@ public actor KeystoneService: OpenStackService {
         let response: EndpointDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",
-            path: "/v3/endpoints",
+            path: "/endpoints",
             body: requestData,
             expected: 201
         )
@@ -639,7 +659,7 @@ public actor KeystoneService: OpenStackService {
         let response: EndpointDetailResponse = try await core.request(
             service: serviceName,
             method: "PATCH",
-            path: "/v3/endpoints/\(id)",
+            path: "/endpoints/\(id)",
             body: requestData,
             expected: 200
         )
@@ -651,7 +671,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/endpoints/\(id)",
+            path: "/endpoints/\(id)",
             expected: 204
         )
     }
@@ -663,7 +683,7 @@ public actor KeystoneService: OpenStackService {
         let response: TokenInfoResponse = try await core.request(
             service: serviceName,
             method: "GET",
-            path: "/v3/auth/tokens",
+            path: "/auth/tokens",
             headers: ["X-Auth-Token": token, "X-Subject-Token": token],
             expected: 200
         )
@@ -675,7 +695,7 @@ public actor KeystoneService: OpenStackService {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
-            path: "/v3/auth/tokens",
+            path: "/auth/tokens",
             headers: ["X-Subject-Token": token],
             expected: 204
         )
