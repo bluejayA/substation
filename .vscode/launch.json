@@ -6,8 +6,9 @@
             "args": [],
             "cwd": "${workspaceFolder:otui}",
             "name": "Debug substation",
-            "program": "${workspaceFolder:otui}/.build/debug/substation",
-            "preLaunchTask": "swift: Build Debug substation"
+            "preLaunchTask": "swift: Build Debug substation",
+            "target": "substation",
+            "configuration": "debug"
         },
         {
             "type": "swift",
@@ -15,8 +16,9 @@
             "args": [],
             "cwd": "${workspaceFolder:otui}",
             "name": "Release substation",
-            "program": "${workspaceFolder:otui}/.build/release/substation",
-            "preLaunchTask": "swift: Build Release substation"
+            "preLaunchTask": "swift: Build Release substation",
+            "target": "substation",
+            "configuration": "release"
         },
         {
             "type": "swift",
