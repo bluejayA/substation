@@ -6,8 +6,17 @@ public actor KeystoneService: OpenStackService {
     public let core: OpenStackClientCore
     public let serviceName = "identity"
 
-    public init(core: OpenStackClientCore) {
+    public init(core: OpenStackClientCore) async {
         self.core = core
+        // If the endpoint URL ends with /v3 remove it. Keystone service endpoints should not
+        // include the version in the base URL because all versions are provided in our API calls.
+        // keeping /v3 in the URL may lead to incorrect URL construction like /v3/v3/projects.
+        if let endpointURL = try? await self.core.getEndpoint(for: serviceName),
+           let url = URL(string: endpointURL),
+           url.path.hasSuffix("/v3") {
+            let baseURL = url.deletingLastPathComponent()
+            await self.core.updateServiceCatalog(service: serviceName, url: baseURL)
+        }
     }
 
     // MARK: - Project Operations
@@ -510,7 +519,7 @@ public actor KeystoneService: OpenStackService {
 
     /// List services
     public func listCatalog(options: PaginationOptions = PaginationOptions()) async throws -> [Service] {
-        var path = "/auth/catalog"
+        var path = "/v3/auth/catalog"
 
         if !options.queryItems.isEmpty {
             let queryString = options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
@@ -533,6 +542,26 @@ public actor KeystoneService: OpenStackService {
                 enabled: true
             )
         }
+    }
+
+    /// List catalog with full endpoint information
+    /// - Returns: Array of TokenCatalogEntry containing service and endpoint details
+    public func listCatalogWithEndpoints(options: PaginationOptions = PaginationOptions()) async throws -> [TokenCatalogEntry] {
+        var path = "/v3/auth/catalog"
+
+        if !options.queryItems.isEmpty {
+            let queryString = options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+            path += "?" + queryString
+        }
+
+        let response: CatalogResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: path,
+            expected: 200
+        )
+
+        return response.catalog
     }
 
     /// Get service details

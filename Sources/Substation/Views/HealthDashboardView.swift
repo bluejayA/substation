@@ -340,7 +340,7 @@ struct HealthDashboardView {
         var endpoints: [String] = []
         if let dataManager = dataManager {
             do {
-                let catalogEntries = try await dataManager.getRawCatalog()
+                let catalogEntries = try await dataManager.getCatalogWithEndpoints()
                 if let catalogEntry = catalogEntries.first(where: { entry in
                     let entryName = (entry.name ?? entry.type).lowercased()
                     return entryName == serviceName.lowercased() || entry.type.lowercased() == serviceName.lowercased()
@@ -445,7 +445,7 @@ struct HealthDashboardView {
 
         do {
             // Get the service catalog with endpoints
-            let catalogEntries = try await dataManager.getRawCatalog()
+            let catalogEntries = try await dataManager.getCatalogWithEndpoints()
 
             // Find the matching service by name (case-insensitive)
             if let catalogEntry = catalogEntries.first(where: { entry in
