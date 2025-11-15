@@ -961,7 +961,7 @@ struct MiscViews {
 
         task.standardOutput = pipe
         task.standardError = pipe
-        task.arguments = ["-c", "git describe --tags --always 2>/dev/null || git rev-parse --short HEAD 2>/dev/null || echo '0.0.1'"]
+        task.arguments = ["-c", "git describe --tags --always 2>/dev/null || git rev-parse --short HEAD 2>/dev/null || echo 'unknown'"]
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
 
         do {

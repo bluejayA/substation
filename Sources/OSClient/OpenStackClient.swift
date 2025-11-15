@@ -251,7 +251,7 @@ public final class OpenStackClient: @unchecked Sendable {
             if let existing = _keystone {
                 return existing
             }
-            let service = KeystoneService(core: core)
+            let service = await KeystoneService(core: core)
             _keystone = service
             return service
         }

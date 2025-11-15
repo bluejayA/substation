@@ -223,15 +223,10 @@ struct Substation {
 
         // Validate and convert configuration
         Logger.shared.logDebug("Validating auth URL: \(cloudConfig.auth.auth_url)")
-        guard var authURL = URL(string: cloudConfig.auth.auth_url) else {
+        guard let authURL = URL(string: cloudConfig.auth.auth_url) else {
             Logger.shared.logError("Invalid auth_url in cloud configuration: \(cloudConfig.auth.auth_url)")
             printError("Invalid auth_url in cloud configuration: \(cloudConfig.auth.auth_url)")
             exit(1)
-        }
-
-        if authURL.path.isEmpty {
-            Logger.shared.logDebug("Auth URL path empty, appending /v3")
-            authURL.appendPathComponent("v3")
         }
 
         // Handle region configuration
@@ -311,7 +306,8 @@ struct Substation {
             region: region ?? "auto-detect",
             userDomainName: userDomain,
             projectDomainName: projectDomain,
-            verifySSL: verifySSL
+            verifySSL: verifySSL,
+            interface: interface
         )
 
         // Create credentials based on determined authentication method

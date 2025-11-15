@@ -109,6 +109,9 @@ public struct OpenStackConfig: Sendable {
     /// The region name to use for API endpoints (use "auto-detect" for automatic region detection)
     public let region: String
 
+    /// The interface type to use for API endpoints (e.g., "public", "internal", "admin")
+    public let interface: String
+
     /// The domain name for user authentication (default: "default")
     public let userDomainName: String
 
@@ -152,8 +155,10 @@ public struct OpenStackConfig: Sendable {
         projectDomainName: String = "default",
         timeout: TimeInterval = 30.0,
         retryPolicy: RetryPolicy = RetryPolicy(),
-        verifySSL: Bool = true
+        verifySSL: Bool = true,
+        interface: String = "public"
     ) {
+        self.interface = interface
         self.authURL = authURL
         self.region = region
         self.userDomainName = userDomainName
@@ -574,7 +579,7 @@ public actor OpenStackClientCore {
     private let tokenManager: CoreTokenManager
     private let urlSession: URLSession
     private let urlSessionDelegate: EnhancedSecureURLSessionDelegate
-    private var serviceCatalog: [String: URL] = [:]
+    internal var serviceCatalog: [String: URL] = [:]
     private var currentProjectId: String?
     private var currentProjectName: String?
     private let microversionManager: MicroversionManager
@@ -776,7 +781,7 @@ public actor OpenStackClientCore {
             self.serviceCatalog = [:]
             for service in authResponse.token.catalog {
                 for endpoint in service.endpoints {
-                    if endpoint.region == config.region && endpoint.interface == "public" {
+                    if endpoint.region == config.region && endpoint.interface == config.interface {
                         serviceCatalog[service.type] = URL(string: endpoint.url)
                     }
                 }
@@ -1010,6 +1015,14 @@ public actor OpenStackClientCore {
     /// Clear microversion cache (useful for testing)
     public func clearMicroversionCache() async {
         await microversionManager.clearCache()
+    }
+
+    /// Update a service catalog entry
+    /// - Parameters:
+    ///   - service: The service name
+    ///   - url: The new URL for the service endpoint
+    public func updateServiceCatalog(service: String, url: URL) {
+        serviceCatalog[service] = url
     }
 
     private func performRequest<T: Decodable>(request: URLRequest, expected: Int) async throws -> T {
