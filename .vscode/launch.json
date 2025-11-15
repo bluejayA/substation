@@ -4,7 +4,7 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:otui}",
+            "cwd": "${workspaceFolder:substation}",
             "name": "Debug substation",
             "preLaunchTask": "swift: Build Debug substation",
             "target": "substation",
@@ -14,7 +14,7 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:otui}",
+            "cwd": "${workspaceFolder:substation}",
             "name": "Release substation",
             "preLaunchTask": "swift: Build Release substation",
             "target": "substation",
@@ -24,37 +24,57 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:otui}",
+            "cwd": "${workspaceFolder:substation}",
             "name": "Debug test-runner",
-            "program": "${workspaceFolder:otui}/.build/debug/test-runner",
+            "program": "${workspaceFolder:substation}/.build/debug/test-runner",
             "preLaunchTask": "swift: Build Debug test-runner"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:otui}",
+            "cwd": "${workspaceFolder:substation}",
             "name": "Release test-runner",
-            "program": "${workspaceFolder:otui}/.build/release/test-runner",
+            "program": "${workspaceFolder:substation}/.build/release/test-runner",
             "preLaunchTask": "swift: Build Release test-runner"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:otui}",
+            "cwd": "${workspaceFolder:substation}",
             "name": "Debug TestRouterDecoding",
-            "program": "${workspaceFolder:otui}/.build/debug/TestRouterDecoding",
+            "program": "${workspaceFolder:substation}/.build/debug/TestRouterDecoding",
             "preLaunchTask": "swift: Build Debug TestRouterDecoding"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:otui}",
+            "cwd": "${workspaceFolder:substation}",
             "name": "Release TestRouterDecoding",
-            "program": "${workspaceFolder:otui}/.build/release/TestRouterDecoding",
+            "program": "${workspaceFolder:substation}/.build/release/TestRouterDecoding",
             "preLaunchTask": "swift: Build Release TestRouterDecoding"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:substation}",
+            "name": "Debug generate-version-info",
+            "target": "generate-version-info",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug generate-version-info"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:substation}",
+            "name": "Release generate-version-info",
+            "target": "generate-version-info",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release generate-version-info"
         }
     ]
 }
