@@ -311,7 +311,7 @@ public struct Port: Codable, Sendable, ResourceIdentifiable, Timestamped, Identi
     public let allowedAddressPairs: [AddressPair]?
     public let extraDhcpOpts: [DhcpOption]?
     public let bindingHostId: String?
-    public let bindingProfile: [String: String]?
+    public let bindingProfile: [String: FlexibleValue]?
     public let bindingVifDetails: [String: FlexibleValue]?
     public let bindingVifType: String?
     public let bindingVnicType: String?
