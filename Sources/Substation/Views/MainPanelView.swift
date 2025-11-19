@@ -342,20 +342,9 @@ struct MainPanelView {
                 screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
                 height: mainHeight, cachedFlavors: tui.cachedFlavors, searchQuery: tui.searchQuery,
                 scrollOffset: tui.scrollOffset, selectedIndex: tui.selectedIndex)
-        case .keyPairs:
-            await KeyPairViews.drawDetailedKeyPairList(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, cachedKeyPairs: tui.cachedKeyPairs,
-                searchQuery: tui.searchQuery, scrollOffset: tui.scrollOffset,
-                selectedIndex: tui.selectedIndex, multiSelectMode: tui.multiSelectMode,
-                selectedItems: tui.multiSelectedResourceIDs)
-        case .keyPairDetail:
-            if let keyPair = tui.selectedResource as? KeyPair {
-                await KeyPairViews.drawKeyPairDetail(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, keyPair: keyPair,
-                    scrollOffset: tui.detailScrollOffset)
-            }
+        case .keyPairs, .keyPairDetail, .keyPairCreate:
+            // Handled by KeyPairs module via ViewRegistry (lines 269-281)
+            break
         case .serverDetail:
             if let server = tui.selectedResource as? Server {
                 await ServerViews.drawServerDetail(
@@ -493,11 +482,6 @@ struct MainPanelView {
                 screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
                 height: mainHeight, form: tui.volumeManagementForm,
                 resourceNameCache: tui.resourceNameCache)
-        case .keyPairCreate:
-            await KeyPairViews.drawKeyPairCreate(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, keyPairCreateForm: tui.keyPairCreateForm,
-                keyPairCreateFormState: tui.keyPairCreateFormState)
         case .volumeCreate:
             await VolumeViews.drawVolumeCreate(
                 screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
