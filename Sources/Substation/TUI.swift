@@ -45,6 +45,9 @@ final class TUI {
 
     // Phase 5.3: Advanced Search System - Now using static methods
 
+    // Module system
+    internal var moduleRegistry: ModuleRegistry?
+
     // Performance optimization
     internal var renderOptimizer = RenderOptimizer()
     var performanceMonitor: PerformanceMonitor
@@ -516,6 +519,22 @@ final class TUI {
         self.commandMode.contextSwitcher = self.contextSwitcher
 
         Logger.shared.logInfo("TUI initialization completed successfully")
+
+        // Initialize module system if enabled
+        if FeatureFlags.useModuleSystem {
+            Logger.shared.logInfo("Initializing module system...")
+            do {
+                try await ModuleRegistry.shared.initialize(with: self)
+                let allModules = ModuleRegistry.shared.allModules()
+                Logger.shared.logInfo("Module system initialized: \(allModules.count) modules loaded")
+            } catch {
+                Logger.shared.logError("Failed to initialize module system", context: ["error": String(describing: error)])
+                // Module system is optional, continue without it
+                self.moduleRegistry = nil
+            }
+        } else {
+            Logger.shared.logDebug("Module system disabled via FeatureFlags")
+        }
     }
 
     // MARK: - Enhanced Setup Methods
