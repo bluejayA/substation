@@ -97,6 +97,10 @@ final class PortsModule: OpenStackModule {
             detailViewMode: .portDetail
         )
 
+        // Register as data provider
+        let dataProvider = PortsDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -136,9 +140,9 @@ final class PortsModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedPorts: tui.resourceCache.ports,
-                    cachedNetworks: tui.resourceCache.networks,
-                    cachedServers: tui.resourceCache.servers,
+                    cachedPorts: tui.cacheManager.cachedPorts,
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
+                    cachedServers: tui.cacheManager.cachedServers,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -174,9 +178,9 @@ final class PortsModule: OpenStackModule {
                     width: width,
                     height: height,
                     port: port,
-                    cachedNetworks: tui.resourceCache.networks,
-                    cachedSubnets: tui.resourceCache.subnets,
-                    cachedSecurityGroups: tui.resourceCache.securityGroups,
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
+                    cachedSubnets: tui.cacheManager.cachedSubnets,
+                    cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups,
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
@@ -203,9 +207,9 @@ final class PortsModule: OpenStackModule {
                     height: height,
                     portCreateForm: tui.portCreateForm,
                     portCreateFormState: tui.portCreateFormState,
-                    cachedNetworks: tui.resourceCache.networks,
-                    cachedSecurityGroups: tui.resourceCache.securityGroups,
-                    cachedQoSPolicies: tui.resourceCache.qosPolicies
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
+                    cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups,
+                    cachedQoSPolicies: tui.cacheManager.cachedQoSPolicies
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -256,8 +260,8 @@ final class PortsModule: OpenStackModule {
                 guard let tui = tui else { return false }
                 // Port must have a network selected
                 let errors = tui.portCreateForm.validate(
-                    networks: tui.resourceCache.networks,
-                    securityGroups: tui.resourceCache.securityGroups
+                    networks: tui.cacheManager.cachedNetworks,
+                    securityGroups: tui.cacheManager.cachedSecurityGroups
                 )
                 return errors.isEmpty
             }
@@ -301,7 +305,7 @@ final class PortsModule: OpenStackModule {
 
                 await tui.dataManager.refreshAllData()
                 Logger.shared.logDebug("Ports refreshed successfully", context: [
-                    "portCount": tui.resourceCache.ports.count
+                    "portCount": tui.cacheManager.cachedPorts.count
                 ])
             },
             cacheKey: "ports",
@@ -339,7 +343,7 @@ final class PortsModule: OpenStackModule {
             // Ports are stored in ResourceCache, which manages its own lifecycle
             // We just log the cleanup
             Logger.shared.logDebug("PortsModule cleanup - cached ports will be managed by ResourceCache", context: [
-                "portCount": tui.resourceCache.ports.count
+                "portCount": tui.cacheManager.cachedPorts.count
             ])
         }
 
@@ -377,7 +381,7 @@ final class PortsModule: OpenStackModule {
         }
 
         // Check if ports are loaded
-        let portCount = tui.resourceCache.ports.count
+        let portCount = tui.cacheManager.cachedPorts.count
         metrics["portCount"] = portCount
         cachedPortCount = portCount
 
@@ -392,7 +396,7 @@ final class PortsModule: OpenStackModule {
         }
 
         // Analyze port distribution
-        let ports = tui.resourceCache.ports
+        let ports = tui.cacheManager.cachedPorts
         let activePorts = ports.filter { $0.status?.uppercased() == "ACTIVE" }
         let downPorts = ports.filter { $0.status?.uppercased() == "DOWN" }
         let boundPorts = ports.filter { $0.bindingHostId != nil && !$0.bindingHostId!.isEmpty }
@@ -480,7 +484,7 @@ final class PortsModule: OpenStackModule {
 
         // Check for duplicate port names if name is provided
         if let tui = tui, !form.portName.isEmpty {
-            let existingPorts = tui.resourceCache.ports
+            let existingPorts = tui.cacheManager.cachedPorts
             if existingPorts.contains(where: { $0.name == form.portName }) {
                 errors.append("A port with this name already exists")
             }
@@ -527,7 +531,7 @@ final class PortsModule: OpenStackModule {
             return ["error": "TUI reference is nil"]
         }
 
-        let ports = tui.resourceCache.ports
+        let ports = tui.cacheManager.cachedPorts
         var stats: [String: Any] = [:]
 
         stats["total"] = ports.count
@@ -546,6 +550,16 @@ final class PortsModule: OpenStackModule {
         stats["withFixedIPs"] = portsWithIPs.count
 
         return stats
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached ports
+    ///
+    /// Returns all ports from the cache manager.
+    /// Used for port listing, filtering, and selection operations.
+    var ports: [Port] {
+        return tui?.cacheManager.cachedPorts ?? []
     }
 }
 

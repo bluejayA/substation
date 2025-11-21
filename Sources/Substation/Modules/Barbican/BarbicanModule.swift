@@ -69,6 +69,10 @@ final class BarbicanModule: OpenStackModule {
             detailViewMode: .barbicanSecretDetail
         )
 
+        // Register as data provider
+        let dataProvider = BarbicanDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -96,7 +100,7 @@ final class BarbicanModule: OpenStackModule {
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
 
-                let secrets = tui.resourceCache.secrets
+                let secrets = tui.cacheManager.cachedSecrets
                 await BarbicanViews.drawBarbicanSecretList(
                     screen: screen,
                     startRow: startRow,
@@ -273,7 +277,7 @@ final class BarbicanModule: OpenStackModule {
         }
 
         // Check if secrets are loaded
-        let secretCount = tui.resourceCache.secrets.count
+        let secretCount = tui.cacheManager.cachedSecrets.count
         metrics["secretCount"] = secretCount
 
         // Check if Barbican service is accessible (inferred from cache)
@@ -291,6 +295,16 @@ final class BarbicanModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached secrets
+    ///
+    /// Returns all secrets from the cache manager.
+    /// Used for secret listing, filtering, and selection operations.
+    var secrets: [Secret] {
+        return tui?.cacheManager.cachedSecrets ?? []
     }
 }
 

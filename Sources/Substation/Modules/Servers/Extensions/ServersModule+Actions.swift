@@ -923,7 +923,7 @@ extension ServersModule {
             usleep(2_000_000) // Show success message for 2 seconds
 
             // Refresh image cache to include the new snapshot
-            await tui.dataManager.refreshImageData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "images", priority: .onDemand, forceRefresh: true)
 
             // Restore success status message after refresh (which may overwrite it)
             tui.statusMessage = "[SUCCESS] Snapshot '\(snapshotName)' created successfully for '\(serverName)' (ID: \(imageID))"
@@ -1086,7 +1086,7 @@ extension ServersModule {
             tui.networkInterfaceForm.pendingPortDetachments.removeAll()
 
             // Refresh server data
-            await tui.dataManager.refreshServerData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "servers", priority: .onDemand, forceRefresh: true)
         } else if !errors.isEmpty {
             tui.statusMessage = "All network interface operations failed"
         } else {

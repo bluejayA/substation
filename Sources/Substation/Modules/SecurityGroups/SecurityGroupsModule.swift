@@ -78,6 +78,10 @@ final class SecurityGroupsModule: OpenStackModule {
             detailViewMode: .securityGroupDetail
         )
 
+        // Register as data provider
+        let dataProvider = SecurityGroupsDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -115,7 +119,7 @@ final class SecurityGroupsModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedSecurityGroups: tui.resourceCache.securityGroups,
+                    cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -202,7 +206,7 @@ final class SecurityGroupsModule: OpenStackModule {
                     width: width,
                     height: height,
                     form: tui.securityGroupRuleManagementForm!,
-                    cachedSecurityGroups: tui.resourceCache.securityGroups
+                    cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -347,7 +351,7 @@ final class SecurityGroupsModule: OpenStackModule {
         }
 
         // Check if security groups are loaded
-        let securityGroupCount = tui.resourceCache.securityGroups.count
+        let securityGroupCount = tui.cacheManager.cachedSecurityGroups.count
         metrics["securityGroupCount"] = securityGroupCount
 
         // Check cache state
@@ -366,6 +370,16 @@ final class SecurityGroupsModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached security groups
+    ///
+    /// Returns all security groups from the cache manager.
+    /// Used for security group listing, filtering, and selection operations.
+    var securityGroups: [SecurityGroup] {
+        return tui?.cacheManager.cachedSecurityGroups ?? []
     }
 }
 

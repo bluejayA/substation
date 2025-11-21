@@ -65,12 +65,22 @@ extension RoutersModule {
                 guard let tui = tui else { return }
                 tui.changeView(to: .routerCreate)
                 tui.routerCreateForm = RouterCreateForm()
+                // Get availability zones from ServersModule via ModuleRegistry
+                var availabilityZones: [String] = []
+                if let serversModule = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                    availabilityZones = serversModule.availabilityZones
+                }
+                // Get external networks from NetworksModule via ModuleRegistry
+                var externalNetworks: [Network] = []
+                if let networksModule = ModuleRegistry.shared.module(for: "networks") as? NetworksModule {
+                    externalNetworks = networksModule.externalNetworks
+                }
                 tui.routerCreateFormState = FormBuilderState(fields: tui.routerCreateForm.buildFields(
                     selectedFieldId: nil,
                     activeFieldId: nil,
                     formState: FormBuilderState(fields: []),
-                    availabilityZones: tui.dataManager.availabilityZones,
-                    externalNetworks: tui.dataManager.externalNetworks
+                    availabilityZones: availabilityZones,
+                    externalNetworks: externalNetworks
                 ))
             },
             description: "Create a new router",
@@ -316,7 +326,18 @@ extension RoutersModule {
     internal func submitRouterCreation(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        let errors = tui.routerCreateForm.validateForm(availabilityZones: tui.dataManager.availabilityZones, externalNetworks: tui.dataManager.externalNetworks)
+        // Get availability zones from ServersModule via ModuleRegistry
+        var availabilityZones: [String] = []
+        if let serversModule = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+            availabilityZones = serversModule.availabilityZones
+        }
+        // Get external networks from NetworksModule via ModuleRegistry
+        var externalNetworks: [Network] = []
+        if let networksModule = ModuleRegistry.shared.module(for: "networks") as? NetworksModule {
+            externalNetworks = networksModule.externalNetworks
+        }
+
+        let errors = tui.routerCreateForm.validateForm(availabilityZones: availabilityZones, externalNetworks: externalNetworks)
         guard errors.isEmpty else {
             return
         }
@@ -331,7 +352,7 @@ extension RoutersModule {
             )
 
             Logger.shared.logInfo("Router '\(tui.routerCreateForm.getTrimmedName())' created successfully")
-            await tui.dataManager.refreshRouterData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "routers", priority: .onDemand, forceRefresh: true)
             tui.viewCoordinator.currentView = .routers
             tui.routerCreateForm = RouterCreateForm()
             tui.routerCreateFormState = FormBuilderState(fields: [])

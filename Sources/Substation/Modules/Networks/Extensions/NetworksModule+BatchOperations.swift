@@ -169,7 +169,7 @@ extension NetworksModule: BatchOperationProvider {
 
         // Check for potential external network deletion
         if let tui = tui {
-            let networks = tui.resourceCache.networks
+            let networks = tui.cacheManager.cachedNetworks
             for networkID in resourceIDs {
                 if let network = networks.first(where: { $0.id == networkID }) {
                     if network.external == true {

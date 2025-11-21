@@ -96,6 +96,10 @@ final class NetworksModule: OpenStackModule {
             detailViewMode: .networkDetail
         )
 
+        // Register as data provider
+        let dataProvider = NetworksDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -135,7 +139,7 @@ final class NetworksModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedNetworks: tui.resourceCache.networks,
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -291,7 +295,7 @@ final class NetworksModule: OpenStackModule {
 
                 await tui.dataManager.refreshAllData()
                 Logger.shared.logDebug("Networks refreshed successfully", context: [
-                    "networkCount": tui.resourceCache.networks.count
+                    "networkCount": tui.cacheManager.cachedNetworks.count
                 ])
             },
             cacheKey: "networks",
@@ -329,7 +333,7 @@ final class NetworksModule: OpenStackModule {
             // Networks are stored in ResourceCache, which manages its own lifecycle
             // We just log the cleanup
             Logger.shared.logDebug("NetworksModule cleanup - cached networks will be managed by ResourceCache", context: [
-                "networkCount": tui.resourceCache.networks.count
+                "networkCount": tui.cacheManager.cachedNetworks.count
             ])
         }
 
@@ -367,7 +371,7 @@ final class NetworksModule: OpenStackModule {
         }
 
         // Check if networks are loaded
-        let networkCount = tui.resourceCache.networks.count
+        let networkCount = tui.cacheManager.cachedNetworks.count
         metrics["networkCount"] = networkCount
         cachedNetworkCount = networkCount
 
@@ -382,7 +386,7 @@ final class NetworksModule: OpenStackModule {
         }
 
         // Analyze network distribution
-        let networks = tui.resourceCache.networks
+        let networks = tui.cacheManager.cachedNetworks
         let externalNetworks = networks.filter { $0.external == true }
         let sharedNetworks = networks.filter { $0.shared == true }
         let activeNetworks = networks.filter { $0.status?.lowercased() == "active" }
@@ -450,7 +454,7 @@ final class NetworksModule: OpenStackModule {
 
         // Check for duplicate network names
         if let tui = tui {
-            let existingNetworks = tui.resourceCache.networks
+            let existingNetworks = tui.cacheManager.cachedNetworks
             if existingNetworks.contains(where: { $0.name == form.networkName }) {
                 errors.append("A network with this name already exists")
             }
@@ -504,7 +508,7 @@ final class NetworksModule: OpenStackModule {
             return ["error": "TUI reference is nil"]
         }
 
-        let networks = tui.resourceCache.networks
+        let networks = tui.cacheManager.cachedNetworks
         var stats: [String: Any] = [:]
 
         stats["total"] = networks.count
@@ -522,6 +526,24 @@ final class NetworksModule: OpenStackModule {
         stats["withSubnets"] = networksWithSubnets.count
 
         return stats
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get external networks from cache
+    ///
+    /// Returns all networks marked as external from the cached networks.
+    /// External networks are used for floating IP allocation and router gateways.
+    var externalNetworks: [Network] {
+        return tui?.cacheManager.cachedNetworks.filter { $0.external == true } ?? []
+    }
+
+    /// Get all cached networks
+    ///
+    /// Returns all networks from the cache manager.
+    /// Used for network listing, filtering, and selection operations.
+    var networks: [Network] {
+        return tui?.cacheManager.cachedNetworks ?? []
     }
 }
 

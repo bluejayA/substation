@@ -463,21 +463,18 @@ struct VolumeViews {
     // MARK: - Pagination and Virtual Scrolling Navigation Helpers
 
     /// Handle navigation for paginated volume list
+    ///
+    /// Note: Pagination is now handled via VirtualScrollManager. This method
+    /// exists for backwards compatibility but defers to virtual scroll navigation.
+    /// - Parameters:
+    ///   - dataManager: The data manager (unused, kept for API compatibility)
+    ///   - direction: Navigation direction
+    /// - Returns: Always false - use handleVirtualScrollNavigation instead
     @MainActor
     static func handlePaginatedNavigation(dataManager: DataManager?, direction: NavigationDirection) async -> Bool {
-        guard let dataManager = dataManager, dataManager.isPaginationEnabled(for: "volumes") else {
-            return false
-        }
-
-        switch direction {
-        case .nextPage:
-            return await dataManager.nextPage(for: "volumes")
-        case .previousPage:
-            return await dataManager.previousPage(for: "volumes")
-        case .scrollUp, .scrollDown:
-            // Individual item scrolling handled differently for volumes
-            return false
-        }
+        // Pagination is now handled via VirtualScrollManager
+        // This method is kept for backwards compatibility but returns false
+        return false
     }
 
     /// Handle navigation for virtual scrolling volume list
@@ -503,23 +500,29 @@ struct VolumeViews {
         }
     }
 
-    /// Get current volume list status (pagination or virtual scrolling)
+    /// Get current volume list status (virtual scrolling)
+    ///
+    /// - Parameters:
+    ///   - dataManager: The data manager (unused, kept for API compatibility)
+    ///   - virtualScrollManager: The virtual scroll manager
+    /// - Returns: Status string from virtual scroll manager, or nil
     @MainActor
     static func getVolumeListStatus(dataManager: DataManager?, virtualScrollManager: VirtualScrollManager<Volume>?) -> String? {
         if let virtualScrollManager = virtualScrollManager {
             return "Virtual: \(virtualScrollManager.getScrollInfo())"
-        } else if let dataManager = dataManager, dataManager.isPaginationEnabled(for: "volumes") {
-            if let status = dataManager.getPaginationStatus(for: "volumes") {
-                return "Pages: \(status)"
-            }
         }
         return nil
     }
 
-    /// Check if enhanced scrolling (pagination or virtual) is available
+    /// Check if enhanced scrolling (virtual scroll) is available
+    ///
+    /// - Parameters:
+    ///   - dataManager: The data manager (unused, kept for API compatibility)
+    ///   - virtualScrollManager: The virtual scroll manager
+    /// - Returns: True if virtual scroll manager is available
     @MainActor
     static func hasEnhancedScrolling(dataManager: DataManager?, virtualScrollManager: VirtualScrollManager<Volume>?) -> Bool {
-        return virtualScrollManager != nil || (dataManager?.isPaginationEnabled(for: "volumes") == true)
+        return virtualScrollManager != nil
     }
 
     // Navigation direction enum for cleaner API

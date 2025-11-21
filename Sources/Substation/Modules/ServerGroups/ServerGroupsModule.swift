@@ -71,6 +71,10 @@ final class ServerGroupsModule: OpenStackModule {
             listViewMode: .serverGroups,
             detailViewMode: .serverGroupDetail
         )
+
+        // Register as data provider
+        let dataProvider = ServerGroupsDataProvider(module: self, tui: tui)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
     }
 
     // MARK: - View Registration
@@ -238,7 +242,7 @@ final class ServerGroupsModule: OpenStackModule {
         }
 
         // Check cache status
-        let cachedServerGroups = tui.resourceCache.serverGroups
+        let cachedServerGroups = tui.cacheManager.cachedServerGroups
         metrics["cached_server_groups"] = cachedServerGroups.count
 
         if cachedServerGroups.isEmpty {
@@ -254,6 +258,16 @@ final class ServerGroupsModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached server groups
+    ///
+    /// Returns all server groups from the cache manager.
+    /// Used for server group listing, filtering, and selection operations.
+    var serverGroups: [ServerGroup] {
+        return tui?.cacheManager.cachedServerGroups ?? []
     }
 }
 
@@ -309,7 +323,7 @@ extension ServerGroupsModule {
         width: Int32,
         height: Int32
     ) async {
-        let cachedServerGroups = tui.resourceCache.serverGroups
+        let cachedServerGroups = tui.cacheManager.cachedServerGroups
 
         await ServerGroupViews.drawDetailedServerGroupList(
             screen: screen,
@@ -346,7 +360,7 @@ extension ServerGroupsModule {
             return
         }
 
-        let cachedServers = tui.resourceCache.servers
+        let cachedServers = tui.cacheManager.cachedServers
 
         await ServerGroupViews.drawServerGroupDetail(
             screen: screen,

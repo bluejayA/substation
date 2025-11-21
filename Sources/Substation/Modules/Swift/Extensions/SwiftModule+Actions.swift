@@ -422,7 +422,7 @@ extension SwiftModule {
             tui.markNeedsRedraw()
 
             // Refresh object cache from server
-            await tui.dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
+            await self.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
 
             Logger.shared.logUserAction("object_deleted", details: [
                 "containerName": containerName,
@@ -527,7 +527,7 @@ extension SwiftModule {
         tui.markNeedsRedraw()
 
         // Refresh object cache from server
-        await tui.dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
+        await self.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
 
         Logger.shared.logUserAction("directory_deleted", details: [
             "containerName": containerName,

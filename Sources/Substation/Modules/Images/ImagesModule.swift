@@ -72,6 +72,10 @@ final class ImagesModule: OpenStackModule {
             detailViewMode: .imageDetail
         )
 
+        // Register as data provider
+        let dataProvider = ImagesDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -104,7 +108,7 @@ final class ImagesModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedImages: tui.resourceCache.images,
+                    cachedImages: tui.cacheManager.cachedImages,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -231,7 +235,7 @@ final class ImagesModule: OpenStackModule {
         }
 
         // Check if images are loaded
-        let imageCount = tui.resourceCache.images.count
+        let imageCount = tui.cacheManager.cachedImages.count
         metrics["imageCount"] = imageCount
 
         if imageCount == 0 {
@@ -248,6 +252,16 @@ final class ImagesModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached images
+    ///
+    /// Returns all images from the cache manager.
+    /// Used for image listing, filtering, and selection operations.
+    var images: [Image] {
+        return tui?.cacheManager.cachedImages ?? []
     }
 }
 

@@ -175,7 +175,7 @@ extension ServerGroupsModule {
             tui.statusMessage = "Server group '\(name)' created successfully"
 
             // Refresh server group cache and return to list
-            await tui.dataManager.refreshServerGroupData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "servergroups", priority: .onDemand, forceRefresh: true)
             tui.changeView(to: .serverGroups, resetSelection: false)
 
         } catch let error as OpenStackError {

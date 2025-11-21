@@ -101,6 +101,10 @@ final class SubnetsModule: OpenStackModule {
             detailViewMode: .subnetDetail
         )
 
+        // Register as data provider
+        let dataProvider = SubnetsDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -141,7 +145,7 @@ final class SubnetsModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedSubnets: tui.resourceCache.subnets,
+                    cachedSubnets: tui.cacheManager.cachedSubnets,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -194,7 +198,7 @@ final class SubnetsModule: OpenStackModule {
                     width: width,
                     height: height,
                     subnetCreateForm: tui.subnetCreateForm,
-                    cachedNetworks: tui.resourceCache.networks,
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
                     formState: tui.subnetCreateFormState
                 )
             },
@@ -274,7 +278,7 @@ final class SubnetsModule: OpenStackModule {
             formValidation: { [weak tui] in
                 guard let tui = tui else { return false }
                 // Subnet name, network, CIDR are required, IP version must be valid
-                let errors = tui.subnetCreateForm.validate(availableNetworks: tui.resourceCache.networks)
+                let errors = tui.subnetCreateForm.validate(availableNetworks: tui.cacheManager.cachedNetworks)
                 return errors.isEmpty
             }
         ))
@@ -332,7 +336,7 @@ final class SubnetsModule: OpenStackModule {
                 // Trigger a full data refresh which includes subnets
                 await tui.dataManager.refreshAllData()
                 Logger.shared.logDebug("Subnets refreshed successfully", context: [
-                    "subnetCount": tui.resourceCache.subnets.count
+                    "subnetCount": tui.cacheManager.cachedSubnets.count
                 ])
             },
             cacheKey: "subnets",
@@ -370,7 +374,7 @@ final class SubnetsModule: OpenStackModule {
             // Subnets are stored in ResourceCache, which manages its own lifecycle
             // We just log the cleanup
             Logger.shared.logDebug("SubnetsModule cleanup - cached subnets will be managed by ResourceCache", context: [
-                "subnetCount": tui.resourceCache.subnets.count
+                "subnetCount": tui.cacheManager.cachedSubnets.count
             ])
         }
 
@@ -409,7 +413,7 @@ final class SubnetsModule: OpenStackModule {
         }
 
         // Check if subnets are loaded
-        let subnetCount = tui.resourceCache.subnets.count
+        let subnetCount = tui.cacheManager.cachedSubnets.count
         metrics["subnetCount"] = subnetCount
 
         // Check for significant changes in subnet count
@@ -427,14 +431,14 @@ final class SubnetsModule: OpenStackModule {
         }
 
         // Check Networks module dependency
-        let networks = tui.resourceCache.networks
+        let networks = tui.cacheManager.cachedNetworks
         metrics["networkCount"] = networks.count
         if networks.isEmpty {
             Logger.shared.logWarning("Networks module has no data - subnets may not function correctly", context: [:])
         }
 
         // Analyze subnet distribution
-        let subnets = tui.resourceCache.subnets
+        let subnets = tui.cacheManager.cachedSubnets
         let ipv4Subnets = subnets.filter { $0.ipVersion == 4 }
         let ipv6Subnets = subnets.filter { $0.ipVersion == 6 }
         let dhcpEnabledSubnets = subnets.filter { $0.dhcpEnabled == true || $0.enableDhcp == true }
@@ -534,7 +538,7 @@ final class SubnetsModule: OpenStackModule {
         }
 
         // Check if network is selected
-        let networks = tui.resourceCache.networks
+        let networks = tui.cacheManager.cachedNetworks
         if networks.isEmpty {
             errors.append("No networks available - please create a network first")
         }
@@ -572,7 +576,7 @@ final class SubnetsModule: OpenStackModule {
             return ["error": "TUI reference is nil"]
         }
 
-        let subnets = tui.resourceCache.subnets
+        let subnets = tui.cacheManager.cachedSubnets
         var stats: [String: Any] = [:]
 
         stats["total"] = subnets.count
@@ -601,6 +605,16 @@ final class SubnetsModule: OpenStackModule {
         stats["totalAllocationPools"] = totalPools
 
         return stats
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached subnets
+    ///
+    /// Returns all subnets from the cache manager.
+    /// Used for subnet listing, filtering, and selection operations.
+    var subnets: [Subnet] {
+        return tui?.cacheManager.cachedSubnets ?? []
     }
 }
 

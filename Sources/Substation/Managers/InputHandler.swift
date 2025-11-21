@@ -1640,7 +1640,9 @@ class InputHandler {
         tui.changeView(to: .swiftContainerDetail, resetSelection: true)
 
         // Load objects for this container
-        await tui.dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
+        if let swiftModule = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
+            await swiftModule.fetchSwiftObjects(containerName: containerName, priority: "interactive")
+        }
 
         Logger.shared.logInfo("Container navigation complete, showing \(tui.cacheManager.cachedSwiftObjects?.count ?? 0) objects")
     }

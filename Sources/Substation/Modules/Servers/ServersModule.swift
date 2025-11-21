@@ -100,6 +100,10 @@ final class ServersModule: OpenStackModule {
             detailViewMode: .serverDetail
         )
 
+        // Register as data provider
+        let dataProvider = ServersDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         // ServersModule configuration completed
         Logger.shared.logInfo("ServersModule configuration completed", context: [:])
         lastHealthCheck = Date()
@@ -143,12 +147,12 @@ final class ServersModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedServers: tui.resourceCache.servers,
+                    cachedServers: tui.cacheManager.cachedServers,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
-                    cachedFlavors: tui.resourceCache.flavors,
-                    cachedImages: tui.resourceCache.images,
+                    cachedFlavors: tui.cacheManager.cachedFlavors,
+                    cachedImages: tui.cacheManager.cachedImages,
                     dataManager: tui.dataManager,
                     virtualScrollManager: nil,
                     multiSelectMode: tui.selectionManager.multiSelectMode,
@@ -183,9 +187,9 @@ final class ServersModule: OpenStackModule {
                     width: width,
                     height: height,
                     server: server,
-                    cachedVolumes: tui.resourceCache.volumes,
-                    cachedFlavors: tui.resourceCache.flavors,
-                    cachedImages: tui.resourceCache.images,
+                    cachedVolumes: tui.cacheManager.cachedVolumes,
+                    cachedFlavors: tui.cacheManager.cachedFlavors,
+                    cachedImages: tui.cacheManager.cachedImages,
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
@@ -217,9 +221,9 @@ final class ServersModule: OpenStackModule {
                     width: width,
                     height: height,
                     server: server,
-                    cachedVolumes: tui.resourceCache.volumes,
-                    cachedFlavors: tui.resourceCache.flavors,
-                    cachedImages: tui.resourceCache.images,
+                    cachedVolumes: tui.cacheManager.cachedVolumes,
+                    cachedFlavors: tui.cacheManager.cachedFlavors,
+                    cachedImages: tui.cacheManager.cachedImages,
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
@@ -392,7 +396,7 @@ final class ServersModule: OpenStackModule {
 
                 await tui.dataManager.refreshAllData()
                 Logger.shared.logDebug("Servers refreshed successfully", context: [
-                    "serverCount": tui.resourceCache.servers.count
+                    "serverCount": tui.cacheManager.cachedServers.count
                 ])
             },
             cacheKey: "servers",
@@ -430,7 +434,7 @@ final class ServersModule: OpenStackModule {
             // Servers are stored in ResourceCache, which manages its own lifecycle
             // We just log the cleanup
             Logger.shared.logDebug("ServersModule cleanup - cached servers will be managed by ResourceCache", context: [
-                "serverCount": tui.resourceCache.servers.count
+                "serverCount": tui.cacheManager.cachedServers.count
             ])
         }
 
@@ -468,7 +472,7 @@ final class ServersModule: OpenStackModule {
         }
 
         // Check if servers are loaded
-        let serverCount = tui.resourceCache.servers.count
+        let serverCount = tui.cacheManager.cachedServers.count
         metrics["serverCount"] = serverCount
         cachedServerCount = serverCount
 
@@ -483,7 +487,7 @@ final class ServersModule: OpenStackModule {
         }
 
         // Analyze server distribution
-        let servers = tui.resourceCache.servers
+        let servers = tui.cacheManager.cachedServers
         let activeServers = servers.filter { $0.status?.rawValue.lowercased() == "active" }
         let errorServers = servers.filter { $0.status?.rawValue.lowercased() == "error" }
         let buildingServers = servers.filter { $0.status?.rawValue.lowercased() == "build" }
@@ -556,7 +560,7 @@ final class ServersModule: OpenStackModule {
 
         // Check for duplicate server names
         if let tui = tui {
-            let existingServers = tui.resourceCache.servers
+            let existingServers = tui.cacheManager.cachedServers
             if existingServers.contains(where: { $0.name == form.serverName }) {
                 errors.append("A server with this name already exists")
             }
@@ -600,7 +604,7 @@ final class ServersModule: OpenStackModule {
             return ["error": "TUI reference is nil"]
         }
 
-        let servers = tui.resourceCache.servers
+        let servers = tui.cacheManager.cachedServers
         var stats: [String: Any] = [:]
 
         stats["total"] = servers.count
@@ -615,11 +619,29 @@ final class ServersModule: OpenStackModule {
         stats["withNetworks"] = serversWithNetworks.count
 
         // Volume attachments
-        let volumes = tui.resourceCache.volumes
+        let volumes = tui.cacheManager.cachedVolumes
         let attachedVolumes = volumes.filter { $0.attachments?.isEmpty == false }
         stats["attachedVolumes"] = attachedVolumes.count
 
         return stats
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get cached availability zones
+    ///
+    /// Returns all availability zones from the cache manager.
+    /// Availability zones are used for server placement during creation.
+    var availabilityZones: [String] {
+        return tui?.cacheManager.cachedAvailabilityZones ?? []
+    }
+
+    /// Get all cached servers
+    ///
+    /// Returns all servers from the cache manager.
+    /// Used for server listing, filtering, and selection operations.
+    var servers: [Server] {
+        return tui?.cacheManager.cachedServers ?? []
     }
 }
 

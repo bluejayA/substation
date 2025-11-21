@@ -142,7 +142,7 @@ extension KeyPairsModule {
         guard tui.viewCoordinator.currentView == .keyPairs else { return }
 
         let filteredKeyPairs = FilterUtils.filterKeyPairs(
-            tui.resourceCache.keyPairs,
+            tui.cacheManager.cachedKeyPairs,
             query: tui.searchQuery
         )
         guard tui.viewCoordinator.selectedIndex < filteredKeyPairs.count else {
@@ -183,7 +183,7 @@ extension KeyPairsModule {
             }
 
             // Refresh keypair cache
-            await tui.dataManager.refreshKeyPairData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "keypairs", priority: .onDemand, forceRefresh: true)
 
             // Clear screen to remove graphical artifacts from deleted keypair
             SwiftNCurses.clear(WindowHandle(screen))
@@ -236,7 +236,7 @@ extension KeyPairsModule {
         guard tui.viewCoordinator.currentView == .keyPairs else { return }
 
         let filteredKeyPairs = FilterUtils.filterKeyPairs(
-            tui.resourceCache.keyPairs,
+            tui.cacheManager.cachedKeyPairs,
             query: tui.searchQuery
         )
         guard tui.viewCoordinator.selectedIndex < filteredKeyPairs.count else {
@@ -452,7 +452,7 @@ extension KeyPairsModule {
             tui.statusMessage = "Key pair '\(keyPairName)' created successfully"
 
             // Refresh keypair cache and return to list
-            await tui.dataManager.refreshKeyPairData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "keypairs", priority: .onDemand, forceRefresh: true)
             tui.changeView(to: .keyPairs, resetSelection: false)
 
         } catch let error as OpenStackError {

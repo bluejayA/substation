@@ -256,7 +256,7 @@ extension RoutersModule: BatchOperationProvider {
 
         // Check for potential issues with routers in cache
         if let tui = tui {
-            let routers = tui.resourceCache.routers
+            let routers = tui.cacheManager.cachedRouters
             for routerID in resourceIDs {
                 if let router = routers.first(where: { $0.id == routerID }) {
                     // Warn about routers with external gateways

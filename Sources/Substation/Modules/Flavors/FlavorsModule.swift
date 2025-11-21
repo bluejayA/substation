@@ -55,12 +55,17 @@ final class FlavorsModule: OpenStackModule {
     /// Configure module after initialization
     /// Performs any necessary setup and validation
     func configure() async throws {
-        guard tui != nil else {
+        guard let tui = tui else {
             throw ModuleError.invalidState("TUI reference is nil")
         }
 
         // Flavors module is read-only and requires no special configuration
         // Data is loaded via standard data refresh handlers
+
+        // Register as data provider
+        let dataProvider = FlavorsDataProvider(module: self, tui: tui)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -187,7 +192,7 @@ final class FlavorsModule: OpenStackModule {
         }
 
         // Check cache status
-        let flavorCount = tui.resourceCache.flavors.count
+        let flavorCount = tui.cacheManager.cachedFlavors.count
         metrics["cached_flavors"] = flavorCount
 
         // Verify at least some flavors are available
@@ -231,7 +236,7 @@ final class FlavorsModule: OpenStackModule {
             startCol: startCol,
             width: width,
             height: height,
-            cachedFlavors: tui.resourceCache.flavors,
+            cachedFlavors: tui.cacheManager.cachedFlavors,
             searchQuery: tui.searchQuery,
             scrollOffset: tui.viewCoordinator.scrollOffset,
             selectedIndex: tui.viewCoordinator.selectedIndex
@@ -274,5 +279,39 @@ final class FlavorsModule: OpenStackModule {
             flavor: flavor,
             scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached flavors
+    ///
+    /// Returns all flavors from the cache manager.
+    /// Used for flavor listing, filtering, and server creation.
+    var flavors: [Flavor] {
+        return tui?.cacheManager.cachedFlavors ?? []
+    }
+
+    /// Get cached flavor recommendations
+    ///
+    /// Returns flavor recommendations organized by workload type from the cache manager.
+    /// Used for intelligent flavor selection during server creation.
+    var flavorRecommendations: [WorkloadType: [FlavorRecommendation]] {
+        return tui?.cacheManager.cachedFlavorRecommendations ?? [:]
+    }
+
+    /// Get the last time flavor recommendations were refreshed
+    ///
+    /// Returns the timestamp of the most recent recommendations generation.
+    /// Used to determine if cached recommendations are still valid.
+    var recommendationsRefreshTime: Date {
+        return tui?.cacheManager.lastRecommendationsRefresh ?? Date.distantPast
+    }
+
+    /// Set the recommendations refresh time
+    ///
+    /// Updates the timestamp indicating when recommendations were last generated.
+    /// - Parameter date: The refresh date
+    func setRecommendationsRefreshTime(_ date: Date) {
+        tui?.resourceCache.setRecommendationsRefreshTime(date)
     }
 }

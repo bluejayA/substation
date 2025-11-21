@@ -1024,18 +1024,20 @@ final class TUI {
             case .barbicanSecrets, .barbican:
                 if cacheManager.cachedSecrets.isEmpty {
                     Logger.shared.logInfo("Loading Barbican secrets data on view change")
-                    await dataManager.refreshSecretsData()
+                    let _ = await DataProviderRegistry.shared.fetchData(for: "secrets", priority: .onDemand, forceRefresh: true)
                 }
             case .images:
                 if cacheManager.cachedImages.isEmpty {
                     Logger.shared.logInfo("Loading images data on view change")
-                    await dataManager.refreshImageData()
+                    let _ = await DataProviderRegistry.shared.fetchData(for: "images", priority: .onDemand, forceRefresh: true)
                 }
             case .swiftContainerDetail:
                 // Load objects for the selected container using navigation state
                 if let containerName = viewCoordinator.swiftNavState.currentContainer {
                     Logger.shared.logInfo("Loading Swift objects for container: \(containerName)")
-                    await dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
+                    if let swiftModule = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
+                        await swiftModule.fetchSwiftObjects(containerName: containerName, priority: "interactive")
+                    }
                 }
             default:
                 break
@@ -1053,7 +1055,7 @@ final class TUI {
         // Ensure security groups are loaded when entering port creation view
         if newView == .portCreate && cacheManager.cachedSecurityGroups.isEmpty {
             Task {
-                await dataManager.refreshSecurityGroupData()
+                let _ = await DataProviderRegistry.shared.fetchData(for: "securitygroups", priority: .onDemand, forceRefresh: true)
             }
         }
     }

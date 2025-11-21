@@ -80,6 +80,10 @@ final class VolumesModule: OpenStackModule {
             detailViewMode: .volumeDetail
         )
 
+        // Register as data provider
+        let dataProvider = VolumesDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -348,9 +352,8 @@ final class VolumesModule: OpenStackModule {
         // Register volumes refresh handler
         handlers.append(ModuleDataRefreshRegistration(
             identifier: "volumes.list",
-            refreshHandler: { [weak tui] in
-                guard let tui = tui else { return }
-                await tui.dataManager.refreshVolumeData()
+            refreshHandler: {
+                let _ = await DataProviderRegistry.shared.fetchData(for: "volumes", priority: .onDemand, forceRefresh: true)
             },
             cacheKey: "volumes",
             refreshInterval: 30.0 // Refresh every 30 seconds
@@ -425,7 +428,7 @@ final class VolumesModule: OpenStackModule {
         }
 
         // Check if volumes are loaded
-        let volumeCount = tui.resourceCache.volumes.count
+        let volumeCount = tui.cacheManager.cachedVolumes.count
         metrics["volumeCount"] = volumeCount
 
         // Check if volumes cache is populated (indicates service availability)
@@ -433,8 +436,8 @@ final class VolumesModule: OpenStackModule {
         metrics["hasVolumesData"] = hasVolumesData
 
         // Check snapshot and backup counts
-        let snapshotCount = tui.resourceCache.volumeSnapshots.count
-        let backupCount = tui.resourceCache.volumeBackups.count
+        let snapshotCount = tui.cacheManager.cachedVolumeSnapshots.count
+        let backupCount = tui.cacheManager.cachedVolumeBackups.count
         metrics["snapshotCount"] = snapshotCount
         metrics["backupCount"] = backupCount
 
@@ -470,7 +473,7 @@ final class VolumesModule: OpenStackModule {
             startCol: startCol,
             width: width,
             height: height,
-            cachedVolumes: tui.resourceCache.volumes,
+            cachedVolumes: tui.cacheManager.cachedVolumes,
             searchQuery: tui.searchQuery,
             scrollOffset: tui.viewCoordinator.scrollOffset,
             selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -615,9 +618,9 @@ final class VolumesModule: OpenStackModule {
             startCol: startCol,
             width: width,
             height: height,
-            cachedVolumeSnapshots: tui.resourceCache.volumeSnapshots,
-            cachedVolumeBackups: tui.resourceCache.volumeBackups,
-            cachedImages: tui.resourceCache.images,
+            cachedVolumeSnapshots: tui.cacheManager.cachedVolumeSnapshots,
+            cachedVolumeBackups: tui.cacheManager.cachedVolumeBackups,
+            cachedImages: tui.cacheManager.cachedImages,
             searchQuery: tui.searchQuery,
             scrollOffset: tui.viewCoordinator.scrollOffset,
             selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -746,6 +749,40 @@ final class VolumesModule: OpenStackModule {
             },
             getItemID: { $0.id }
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached volumes
+    ///
+    /// Returns all volumes from the cache manager.
+    /// Used for volume listing, filtering, and selection operations.
+    var volumes: [Volume] {
+        return tui?.cacheManager.cachedVolumes ?? []
+    }
+
+    /// Get all cached volume types
+    ///
+    /// Returns all volume types from the cache manager.
+    /// Used for volume creation and type selection.
+    var volumeTypes: [VolumeType] {
+        return tui?.cacheManager.cachedVolumeTypes ?? []
+    }
+
+    /// Get all cached volume snapshots
+    ///
+    /// Returns all volume snapshots from the cache manager.
+    /// Used for snapshot listing and volume creation from snapshots.
+    var volumeSnapshots: [VolumeSnapshot] {
+        return tui?.cacheManager.cachedVolumeSnapshots ?? []
+    }
+
+    /// Get all cached volume backups
+    ///
+    /// Returns all volume backups from the cache manager.
+    /// Used for backup listing and volume restoration.
+    var volumeBackups: [VolumeBackup] {
+        return tui?.cacheManager.cachedVolumeBackups ?? []
     }
 }
 

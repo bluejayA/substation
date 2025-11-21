@@ -94,6 +94,10 @@ final class RoutersModule: OpenStackModule {
             detailViewMode: .routerDetail
         )
 
+        // Register as data provider
+        let dataProvider = RoutersDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -133,7 +137,7 @@ final class RoutersModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedRouters: tui.resourceCache.routers,
+                    cachedRouters: tui.cacheManager.cachedRouters,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -169,7 +173,7 @@ final class RoutersModule: OpenStackModule {
                     width: width,
                     height: height,
                     router: router,
-                    cachedSubnets: tui.resourceCache.subnets,
+                    cachedSubnets: tui.cacheManager.cachedSubnets,
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
@@ -196,8 +200,8 @@ final class RoutersModule: OpenStackModule {
                     height: height,
                     routerCreateForm: tui.routerCreateForm,
                     routerCreateFormState: tui.routerCreateFormState,
-                    availabilityZones: tui.resourceCache.availabilityZones,
-                    externalNetworks: tui.resourceCache.networks.filter { $0.external == true }
+                    availabilityZones: tui.cacheManager.cachedAvailabilityZones,
+                    externalNetworks: tui.cacheManager.cachedNetworks.filter { $0.external == true }
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -248,8 +252,8 @@ final class RoutersModule: OpenStackModule {
                 guard let tui = tui else { return false }
                 // Router name is required
                 let errors = tui.routerCreateForm.validateForm(
-                    availabilityZones: tui.resourceCache.availabilityZones,
-                    externalNetworks: tui.resourceCache.networks.filter { $0.external == true }
+                    availabilityZones: tui.cacheManager.cachedAvailabilityZones,
+                    externalNetworks: tui.cacheManager.cachedNetworks.filter { $0.external == true }
                 )
                 return errors.isEmpty
             }
@@ -293,7 +297,7 @@ final class RoutersModule: OpenStackModule {
 
                 await tui.dataManager.refreshAllData()
                 Logger.shared.logDebug("Routers refreshed successfully", context: [
-                    "routerCount": tui.resourceCache.routers.count
+                    "routerCount": tui.cacheManager.cachedRouters.count
                 ])
             },
             cacheKey: "routers",
@@ -331,7 +335,7 @@ final class RoutersModule: OpenStackModule {
             // Routers are stored in ResourceCache, which manages its own lifecycle
             // We just log the cleanup
             Logger.shared.logDebug("RoutersModule cleanup - cached routers will be managed by ResourceCache", context: [
-                "routerCount": tui.resourceCache.routers.count
+                "routerCount": tui.cacheManager.cachedRouters.count
             ])
         }
 
@@ -369,7 +373,7 @@ final class RoutersModule: OpenStackModule {
         }
 
         // Check if routers are loaded
-        let routerCount = tui.resourceCache.routers.count
+        let routerCount = tui.cacheManager.cachedRouters.count
         metrics["routerCount"] = routerCount
         cachedRouterCount = routerCount
 
@@ -384,7 +388,7 @@ final class RoutersModule: OpenStackModule {
         }
 
         // Analyze router distribution
-        let routers = tui.resourceCache.routers
+        let routers = tui.cacheManager.cachedRouters
         let activeRouters = routers.filter { $0.status?.lowercased() == "active" }
         let distributedRouters = routers.filter { $0.distributed == true }
         let haRouters = routers.filter { $0.ha == true }
@@ -464,7 +468,7 @@ final class RoutersModule: OpenStackModule {
 
         // Check for duplicate router names
         if let tui = tui {
-            let existingRouters = tui.resourceCache.routers
+            let existingRouters = tui.cacheManager.cachedRouters
             if existingRouters.contains(where: { $0.name == form.routerName }) {
                 errors.append("A router with this name already exists")
             }
@@ -500,7 +504,7 @@ final class RoutersModule: OpenStackModule {
             return ["error": "TUI reference is nil"]
         }
 
-        let routers = tui.resourceCache.routers
+        let routers = tui.cacheManager.cachedRouters
         var stats: [String: Any] = [:]
 
         stats["total"] = routers.count
@@ -529,6 +533,34 @@ final class RoutersModule: OpenStackModule {
         stats["totalStaticRoutes"] = totalStaticRoutes
 
         return stats
+    }
+
+    // MARK: - Router Detail Operations
+
+    /// Fetch detailed router information with interfaces
+    ///
+    /// Retrieves the full router details from the Neutron API including
+    /// interface information that may not be present in cached data.
+    ///
+    /// - Parameter id: The router ID
+    /// - Returns: Detailed router with interfaces
+    /// - Throws: ModuleError if TUI is not available, or OpenStack errors
+    func getDetailedRouter(id: String) async throws -> Router {
+        guard let tui = tui else {
+            throw ModuleError.invalidState("TUI reference is nil")
+        }
+        let neutronService = await tui.client.neutron
+        return try await neutronService.getRouter(id: id)
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached routers
+    ///
+    /// Returns all routers from the cache manager.
+    /// Used for router listing, filtering, and selection operations.
+    var routers: [Router] {
+        return tui?.cacheManager.cachedRouters ?? []
     }
 }
 

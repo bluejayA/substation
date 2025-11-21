@@ -940,24 +940,18 @@ struct ServerViews {
     // MARK: - Pagination and Virtual Scrolling Navigation Helpers
 
     /// Handle navigation for paginated server list
+    ///
+    /// Note: Pagination is now handled via VirtualScrollManager. This method
+    /// exists for backwards compatibility but defers to virtual scroll navigation.
+    /// - Parameters:
+    ///   - dataManager: The data manager (unused, kept for API compatibility)
+    ///   - direction: Navigation direction
+    /// - Returns: Always false - use handleVirtualScrollNavigation instead
     @MainActor
     static func handlePaginatedNavigation(dataManager: DataManager?, direction: NavigationDirection) async -> Bool {
-        guard let dataManager = dataManager, dataManager.isPaginationEnabled(for: "servers") else {
-            return false
-        }
-
-        switch direction {
-        case .nextPage:
-            return await dataManager.nextPage(for: "servers")
-        case .previousPage:
-            return await dataManager.previousPage(for: "servers")
-        case .scrollUp:
-            // For individual item scrolling, this would be handled differently
-            return false
-        case .scrollDown:
-            // For individual item scrolling, this would be handled differently
-            return false
-        }
+        // Pagination is now handled via VirtualScrollManager
+        // This method is kept for backwards compatibility but returns false
+        return false
     }
 
     /// Handle navigation for virtual scrolling server list
@@ -983,23 +977,29 @@ struct ServerViews {
         }
     }
 
-    /// Get current server list status (pagination or virtual scrolling)
+    /// Get current server list status (virtual scrolling)
+    ///
+    /// - Parameters:
+    ///   - dataManager: The data manager (unused, kept for API compatibility)
+    ///   - virtualScrollManager: The virtual scroll manager
+    /// - Returns: Status string from virtual scroll manager, or nil
     @MainActor
     static func getServerListStatus(dataManager: DataManager?, virtualScrollManager: VirtualScrollManager<Server>?) -> String? {
         if let virtualScrollManager = virtualScrollManager {
             return "Virtual: \(virtualScrollManager.getScrollInfo())"
-        } else if let dataManager = dataManager, dataManager.isPaginationEnabled(for: "servers") {
-            if let status = dataManager.getPaginationStatus(for: "servers") {
-                return "Pages: \(status)"
-            }
         }
         return nil
     }
 
-    /// Check if enhanced scrolling (pagination or virtual) is available
+    /// Check if enhanced scrolling (virtual scroll) is available
+    ///
+    /// - Parameters:
+    ///   - dataManager: The data manager (unused, kept for API compatibility)
+    ///   - virtualScrollManager: The virtual scroll manager
+    /// - Returns: True if virtual scroll manager is available
     @MainActor
     static func hasEnhancedScrolling(dataManager: DataManager?, virtualScrollManager: VirtualScrollManager<Server>?) -> Bool {
-        return virtualScrollManager != nil || (dataManager?.isPaginationEnabled(for: "servers") == true)
+        return virtualScrollManager != nil
     }
 
     // Navigation direction enum for cleaner API

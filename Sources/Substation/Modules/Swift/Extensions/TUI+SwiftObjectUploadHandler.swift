@@ -263,7 +263,9 @@ extension TUI {
 
             // Refresh object list for the current container
             if let currentContainer = viewCoordinator.swiftNavState.currentContainer {
-                await dataManager.fetchSwiftObjects(containerName: currentContainer, priority: "interactive", forceRefresh: true)
+                if let swiftModule = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
+                    await swiftModule.fetchSwiftObjects(containerName: currentContainer, priority: "interactive", forceRefresh: true)
+                }
             }
 
             // Show success
@@ -424,7 +426,9 @@ extension TUI {
 
             // Refresh object list for the current container
             if let currentContainer = viewCoordinator.swiftNavState.currentContainer {
-                await dataManager.fetchSwiftObjects(containerName: currentContainer, priority: "interactive", forceRefresh: true)
+                if let swiftModule = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
+                    await swiftModule.fetchSwiftObjects(containerName: currentContainer, priority: "interactive", forceRefresh: true)
+                }
             }
 
             // Show final status

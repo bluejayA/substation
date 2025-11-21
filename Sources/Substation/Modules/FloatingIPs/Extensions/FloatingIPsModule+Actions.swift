@@ -81,8 +81,13 @@ extension FloatingIPsModule {
                 guard let tui = tui else { return }
                 tui.changeView(to: .floatingIPCreate)
                 tui.floatingIPCreateForm = FloatingIPCreateForm()
+                // Get external networks from NetworksModule via ModuleRegistry
+                var externalNetworks: [Network] = []
+                if let networksModule = ModuleRegistry.shared.module(for: "networks") as? NetworksModule {
+                    externalNetworks = networksModule.externalNetworks
+                }
                 tui.floatingIPCreateFormState = FormBuilderState(fields: tui.floatingIPCreateForm.buildFields(
-                    externalNetworks: tui.dataManager.externalNetworks,
+                    externalNetworks: externalNetworks,
                     subnets: tui.cacheManager.cachedSubnets,
                     selectedFieldId: nil,
                     activeFieldId: nil,

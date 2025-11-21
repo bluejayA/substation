@@ -55,7 +55,7 @@ extension SubnetsModule {
                 tui.subnetCreateFormState = FormBuilderState(fields: tui.subnetCreateForm.buildFields(
                     selectedFieldId: nil,
                     activeFieldId: nil,
-                    cachedNetworks: tui.resourceCache.networks,
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
                     formState: FormBuilderState(fields: [])
                 ))
             },

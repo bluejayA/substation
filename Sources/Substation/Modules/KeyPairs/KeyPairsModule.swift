@@ -70,6 +70,10 @@ final class KeyPairsModule: OpenStackModule {
             detailViewMode: .keyPairDetail
         )
 
+        // Register as data provider
+        let dataProvider = KeyPairsDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         lastHealthCheck = Date()
     }
 
@@ -103,7 +107,7 @@ final class KeyPairsModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedKeyPairs: tui.resourceCache.keyPairs,
+                    cachedKeyPairs: tui.cacheManager.cachedKeyPairs,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
@@ -272,7 +276,7 @@ final class KeyPairsModule: OpenStackModule {
         }
 
         // Check if key pairs are loaded
-        let keyPairCount = tui.resourceCache.keyPairs.count
+        let keyPairCount = tui.cacheManager.cachedKeyPairs.count
         metrics["keyPairCount"] = keyPairCount
 
         // Check if key pairs data is available
@@ -290,6 +294,16 @@ final class KeyPairsModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached key pairs
+    ///
+    /// Returns all key pairs from the cache manager.
+    /// Used for key pair listing, filtering, and selection operations.
+    var keyPairs: [KeyPair] {
+        return tui?.cacheManager.cachedKeyPairs ?? []
     }
 }
 

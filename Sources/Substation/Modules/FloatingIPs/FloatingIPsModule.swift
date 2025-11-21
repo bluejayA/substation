@@ -68,6 +68,10 @@ final class FloatingIPsModule: OpenStackModule {
             detailViewMode: .floatingIPDetail
         )
 
+        // Register as data provider
+        let dataProvider = FloatingIPsDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
         // Module is ready to use
         lastHealthCheck = Date()
     }
@@ -104,13 +108,13 @@ final class FloatingIPsModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    cachedFloatingIPs: tui.resourceCache.floatingIPs,
+                    cachedFloatingIPs: tui.cacheManager.cachedFloatingIPs,
                     searchQuery: tui.searchQuery,
                     scrollOffset: tui.viewCoordinator.scrollOffset,
                     selectedIndex: tui.viewCoordinator.selectedIndex,
-                    cachedServers: tui.resourceCache.servers,
-                    cachedPorts: tui.resourceCache.ports,
-                    cachedNetworks: tui.resourceCache.networks,
+                    cachedServers: tui.cacheManager.cachedServers,
+                    cachedPorts: tui.cacheManager.cachedPorts,
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
                     multiSelectMode: tui.selectionManager.multiSelectMode,
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
@@ -138,9 +142,9 @@ final class FloatingIPsModule: OpenStackModule {
                     width: width,
                     height: height,
                     floatingIP: floatingIP,
-                    cachedServers: tui.resourceCache.servers,
-                    cachedPorts: tui.resourceCache.ports,
-                    cachedNetworks: tui.resourceCache.networks,
+                    cachedServers: tui.cacheManager.cachedServers,
+                    cachedPorts: tui.cacheManager.cachedPorts,
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
@@ -167,8 +171,8 @@ final class FloatingIPsModule: OpenStackModule {
                     height: height,
                     floatingIPCreateForm: tui.floatingIPCreateForm,
                     floatingIPCreateFormState: tui.floatingIPCreateFormState,
-                    cachedNetworks: tui.resourceCache.networks,
-                    cachedSubnets: tui.resourceCache.subnets
+                    cachedNetworks: tui.cacheManager.cachedNetworks,
+                    cachedSubnets: tui.cacheManager.cachedSubnets
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -284,14 +288,14 @@ final class FloatingIPsModule: OpenStackModule {
         }
 
         // Check if floating IPs are loaded
-        let floatingIPCount = tui.resourceCache.floatingIPs.count
+        let floatingIPCount = tui.cacheManager.cachedFloatingIPs.count
         metrics["floatingIPCount"] = floatingIPCount
 
         // Check Networks module dependency - networks are available in resource cache
         metrics["networksModuleLoaded"] = true
 
         // Check if networks are available (required for creating floating IPs)
-        let networkCount = tui.resourceCache.networks.count
+        let networkCount = tui.cacheManager.cachedNetworks.count
         metrics["networkCount"] = networkCount
         if networkCount == 0 {
             metrics["warning"] = "No networks available for floating IP creation"
@@ -307,6 +311,16 @@ final class FloatingIPsModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached floating IPs
+    ///
+    /// Returns all floating IPs from the cache manager.
+    /// Used for floating IP listing, filtering, and selection operations.
+    var floatingIPs: [FloatingIP] {
+        return tui?.cacheManager.cachedFloatingIPs ?? []
     }
 }
 

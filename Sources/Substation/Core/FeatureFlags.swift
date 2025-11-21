@@ -16,7 +16,7 @@ struct FeatureFlags {
         #endif
     }
 
-    /// Which modules are enabled (default: all 14 modules)
+    /// Which modules are enabled (default: all available modules)
     static var enabledModules: Set<String> {
         #if DEBUG
         if let enabled = ProcessInfo.processInfo.environment["ENABLED_MODULES"] {
@@ -29,13 +29,8 @@ struct FeatureFlags {
             return Set(stored)
         }
         #endif
-        // All 14 modules enabled by default
-        return [
-            "barbican", "swift", "keypairs", "servergroups",
-            "flavors", "images", "securitygroups", "networks",
-            "subnets", "volumes", "servers", "routers",
-            "floatingips", "ports"
-        ]
+        // All available modules enabled by default (dynamic from catalog)
+        return ModuleCatalog.allModuleIdentifiers
     }
 
     /// Clear all modules (for testing)

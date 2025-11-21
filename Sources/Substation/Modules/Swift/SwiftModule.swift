@@ -55,6 +55,10 @@ final class SwiftModule: OpenStackModule {
             listViewMode: .swift,
             detailViewMode: .swiftContainerDetail
         )
+
+        // Register as data provider
+        let dataProvider = SwiftDataProvider(module: self, tui: tui!)
+        DataProviderRegistry.shared.register(dataProvider, from: identifier)
     }
 
     // MARK: - View Registration
@@ -511,7 +515,7 @@ final class SwiftModule: OpenStackModule {
     /// Register data refresh handlers for Swift resources
     /// - Returns: Array of refresh handler registrations for containers and objects
     func registerDataRefreshHandlers() -> [ModuleDataRefreshRegistration] {
-        guard let tui = tui else {
+        guard tui != nil else {
             Logger.shared.logError("Cannot register data refresh handlers - TUI reference is nil", context: [:])
             return []
         }
@@ -520,13 +524,13 @@ final class SwiftModule: OpenStackModule {
             // Object list refresh for current container
             ModuleDataRefreshRegistration(
                 identifier: "swift.objects",
-                refreshHandler: { [weak tui] in
-                    guard let tui = tui else { return }
-                    guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
+                refreshHandler: { [weak self] in
+                    guard let self = self else { return }
+                    guard let containerName = self.tui?.viewCoordinator.swiftNavState.currentContainer else {
                         Logger.shared.logDebug("No container selected for object refresh")
                         return
                     }
-                    await tui.dataManager.fetchSwiftObjects(
+                    await self.fetchSwiftObjects(
                         containerName: containerName,
                         priority: "user-initiated",
                         forceRefresh: true
@@ -596,6 +600,41 @@ final class SwiftModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+
+    // MARK: - Computed Properties
+
+    /// Get all cached Swift containers
+    ///
+    /// Returns all Swift containers from the cache manager.
+    /// Used for container listing, filtering, and selection operations.
+    var swiftContainers: [SwiftContainer] {
+        return tui?.cacheManager.cachedSwiftContainers ?? []
+    }
+
+    /// Get cached Swift objects by container
+    ///
+    /// Returns all Swift objects organized by container name from the resource cache.
+    /// Used for object listing and management across multiple containers.
+    var swiftObjectsByContainer: [String: [SwiftObject]] {
+        return tui?.cacheManager.resourceCache.swiftObjectsByContainer ?? [:]
+    }
+
+    /// Get Swift objects for a specific container from cache
+    ///
+    /// - Parameter containerName: Name of the container
+    /// - Returns: Array of Swift objects, or nil if not cached
+    func getSwiftObjects(forContainer containerName: String) -> [SwiftObject]? {
+        return tui?.cacheManager.resourceCache.getSwiftObjects(forContainer: containerName)
+    }
+
+    /// Set Swift objects in cache for a specific container
+    ///
+    /// - Parameters:
+    ///   - objects: Array of Swift objects
+    ///   - containerName: Name of the container
+    func setSwiftObjects(_ objects: [SwiftObject], forContainer containerName: String) async {
+        await tui?.cacheManager.resourceCache.setSwiftObjects(objects, forContainer: containerName)
     }
 
     // MARK: - Private Render Methods
@@ -938,6 +977,47 @@ final class SwiftModule: OpenStackModule {
             operation: operation,
             scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
+    }
+
+    // MARK: - Swift Object Operations
+
+    /// Fetch Swift objects for a specific container
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    ///   - priority: Fetch priority
+    ///   - forceRefresh: Whether to bypass cache
+    public func fetchSwiftObjects(containerName: String, priority: String, forceRefresh: Bool = false) async {
+        guard let tui = tui else { return }
+
+        // Check if objects are already cached (unless forceRefresh is true)
+        if !forceRefresh {
+            if let cachedObjects = self.getSwiftObjects(forContainer: containerName) {
+                Logger.shared.logDebug("SwiftModule - Using cached Swift objects for container '\(containerName)' (\(cachedObjects.count) objects)")
+                return
+            }
+        }
+
+        Logger.shared.logDebug("SwiftModule - Fetching Swift objects for container '\(containerName)' (\(priority) priority)...")
+
+        do {
+            let apiStart = Date().timeIntervalSinceReferenceDate
+            let objects = try await tui.client.swift.listObjects(containerName: containerName)
+            let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
+            Logger.shared.logDebug("SwiftModule - Fetched \(objects.count) Swift objects in \(String(format: "%.2f", apiDuration))s")
+            await self.setSwiftObjects(objects, forContainer: containerName)
+        } catch let error as OpenStackError {
+            switch error {
+            case .httpError(403, _):
+                Logger.shared.logDebug("Swift object access requires permissions (HTTP 403)")
+            case .httpError(404, _):
+                Logger.shared.logDebug("Swift container not found (HTTP 404)")
+            default:
+                Logger.shared.logError("Failed to fetch Swift objects: \(error)")
+            }
+        } catch {
+            Logger.shared.logError("Failed to fetch Swift objects: \(error)")
+        }
     }
 }
 

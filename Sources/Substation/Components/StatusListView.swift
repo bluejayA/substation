@@ -97,16 +97,6 @@ struct StatusListView<T: Sendable> {
                 multiSelectMode: multiSelectMode,
                 selectedItems: selectedItems
             )
-        } else if let dataManager = dataManager, dataManager.isPaginationEnabled(for: title.lowercased()) {
-            await renderWithPagination(
-                components: &components,
-                dataManager: dataManager,
-                selectedIndex: selectedIndex,
-                height: height,
-                resourceKey: title.lowercased(),
-                multiSelectMode: multiSelectMode,
-                selectedItems: selectedItems
-            )
         } else {
             await renderTraditional(
                 components: &components,
@@ -169,40 +159,6 @@ struct StatusListView<T: Sendable> {
             let scrollInfo = virtualScrollManager.getScrollInfo()
             components.append(Text("Virtual: \(scrollInfo)").info()
                 .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-        }
-    }
-
-    private func renderWithPagination(
-        components: inout [any Component],
-        dataManager: DataManager,
-        selectedIndex: Int,
-        height: Int32,
-        resourceKey: String,
-        multiSelectMode: Bool = false,
-        selectedItems: Set<String> = []
-    ) async {
-        let paginatedItems: [T] = await dataManager.getPaginatedItems(for: resourceKey, type: T.self)
-
-        if paginatedItems.isEmpty {
-            components.append(Text("No items found").info()
-                .padding(EdgeInsets(top: 2, leading: 2, bottom: 0, trailing: 0)))
-        } else {
-            let maxVisibleItems = max(1, Int(height) - 10)
-            let endIndex = min(paginatedItems.count, maxVisibleItems)
-
-            for i in 0..<endIndex {
-                let item = paginatedItems[i]
-                let isSelected = i == selectedIndex
-                let itemID = getItemID(item)
-                let isMultiSelected = multiSelectMode && selectedItems.contains(itemID)
-                let itemComponent = createItemComponent(item: item, isSelected: isSelected, isMultiSelected: isMultiSelected, multiSelectMode: multiSelectMode)
-                components.append(itemComponent)
-            }
-
-            if let paginationStatus = dataManager.getPaginationStatus(for: resourceKey) {
-                components.append(Text("Paginated: \(paginationStatus)").info()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0)))
-            }
         }
     }
 

@@ -673,7 +673,7 @@ extension VolumesModule {
             tui.statusMessage = "Volume snapshot '\(snapshotName)' created successfully"
 
             // Refresh volume data
-            await tui.dataManager.refreshVolumeData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "volumes", priority: .onDemand, forceRefresh: true)
 
             // Return to volumes view
             tui.changeView(to: .volumes)
@@ -873,7 +873,7 @@ extension VolumesModule {
         // Clear selection and reload snapshots
         tui.selectedSnapshotsForDeletion.removeAll()
         if tui.selectedVolumeForSnapshots != nil {
-            await tui.dataManager.refreshVolumeData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "volumes", priority: .onDemand, forceRefresh: true)
         }
 
         // Update status message
@@ -997,7 +997,7 @@ extension VolumesModule {
                 operation.progress = 1.0
 
                 // Refresh volume cache
-                await tui.dataManager.refreshVolumeData()
+                let _ = await DataProviderRegistry.shared.fetchData(for: "volumes", priority: .onDemand, forceRefresh: true)
 
             } catch let error as OpenStackError {
                 let baseMsg = "Failed to create volume '\(volumeNameBase)'"

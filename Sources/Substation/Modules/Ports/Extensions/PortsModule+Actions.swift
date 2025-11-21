@@ -102,9 +102,9 @@ extension PortsModule {
                     selectedFieldId: nil,
                     activeFieldId: nil,
                     formState: FormBuilderState(fields: []),
-                    networks: tui.resourceCache.networks,
-                    securityGroups: tui.resourceCache.securityGroups,
-                    qosPolicies: tui.resourceCache.qosPolicies
+                    networks: tui.cacheManager.cachedNetworks,
+                    securityGroups: tui.cacheManager.cachedSecurityGroups,
+                    qosPolicies: tui.cacheManager.cachedQoSPolicies
                 ))
             },
             description: "Create a new port",
@@ -465,7 +465,7 @@ extension PortsModule {
             tui.statusMessage = "Port '\(portName)' created successfully"
 
             // Refresh port cache and return to list
-            await tui.dataManager.refreshPortData()
+            let _ = await DataProviderRegistry.shared.fetchData(for: "ports", priority: .onDemand, forceRefresh: true)
             tui.changeView(to: .ports, resetSelection: false)
 
         } catch let error as OpenStackError {
