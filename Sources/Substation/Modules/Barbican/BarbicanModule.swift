@@ -31,7 +31,7 @@ final class BarbicanModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -58,6 +58,17 @@ final class BarbicanModule: OpenStackModule {
 
         // Barbican module is ready to use immediately
         // No additional configuration required
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .barbicanSecrets,
+            detailViewMode: .barbicanSecretDetail
+        )
+
         lastHealthCheck = Date()
     }
 
@@ -94,11 +105,11 @@ final class BarbicanModule: OpenStackModule {
                     height: height,
                     secrets: secrets,
                     searchQuery: tui.searchQuery ?? "",
-                    scrollOffset: tui.scrollOffset,
-                    selectedIndex: tui.selectedIndex,
+                    scrollOffset: tui.viewCoordinator.scrollOffset,
+                    selectedIndex: tui.viewCoordinator.selectedIndex,
                     filterCache: tui.resourceNameCache,
-                    multiSelectMode: tui.multiSelectMode,
-                    selectedItems: tui.multiSelectedResourceIDs
+                    multiSelectMode: tui.selectionManager.multiSelectMode,
+                    selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -115,7 +126,7 @@ final class BarbicanModule: OpenStackModule {
             title: "Secret Details",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let secret = tui.selectedResource as? Secret else { return }
+                guard let secret = tui.viewCoordinator.selectedResource as? Secret else { return }
 
                 await BarbicanViews.drawBarbicanSecretDetail(
                     screen: screen,
@@ -124,7 +135,7 @@ final class BarbicanModule: OpenStackModule {
                     width: width,
                     height: height,
                     secret: secret,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -280,5 +291,45 @@ final class BarbicanModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension BarbicanModule: ActionProvider {
+    /// Actions available in the list view for secrets
+    ///
+    /// Includes create, delete, refresh, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .clearCache]
+    }
+
+    /// The view mode for creating a new secret
+    var createViewMode: ViewMode? {
+        .barbicanSecretCreate
+    }
+
+    /// Execute an action for the selected secret
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteSecret(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

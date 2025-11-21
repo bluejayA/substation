@@ -34,7 +34,7 @@ final class ImagesModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -61,6 +61,17 @@ final class ImagesModule: OpenStackModule {
 
         // Images module is ready to use immediately
         // No additional configuration required
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .images,
+            detailViewMode: .imageDetail
+        )
+
         lastHealthCheck = Date()
     }
 
@@ -95,10 +106,10 @@ final class ImagesModule: OpenStackModule {
                     height: height,
                     cachedImages: tui.resourceCache.images,
                     searchQuery: tui.searchQuery,
-                    scrollOffset: tui.scrollOffset,
-                    selectedIndex: tui.selectedIndex,
-                    multiSelectMode: tui.multiSelectMode,
-                    selectedItems: tui.multiSelectedResourceIDs
+                    scrollOffset: tui.viewCoordinator.scrollOffset,
+                    selectedIndex: tui.viewCoordinator.selectedIndex,
+                    multiSelectMode: tui.selectionManager.multiSelectMode,
+                    selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -115,7 +126,7 @@ final class ImagesModule: OpenStackModule {
             title: "Image Details",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let image = tui.selectedResource as? Image else { return }
+                guard let image = tui.viewCoordinator.selectedResource as? Image else { return }
 
                 await ImageViews.drawImageDetail(
                     screen: screen,
@@ -124,7 +135,7 @@ final class ImagesModule: OpenStackModule {
                     width: width,
                     height: height,
                     image: image,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -237,5 +248,40 @@ final class ImagesModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension ImagesModule: ActionProvider {
+    /// Actions available in the list view for images
+    ///
+    /// Images module is read-only so no create action. Includes delete, refresh, and cache management.
+    var listViewActions: [ActionType] {
+        [.delete, .refresh, .clearCache]
+    }
+
+    /// The view mode for creating a new image
+    ///
+    /// Returns nil as Images module is read-only.
+    var createViewMode: ViewMode? {
+        nil
+    }
+
+    /// Execute an action for the selected image
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .delete:
+            await deleteImage(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

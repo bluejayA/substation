@@ -25,11 +25,11 @@ class InputHandler {
         }
 
         // Update last activity time to prevent auto-refresh during active navigation
-        tui.lastUserActivityTime = Date()
+        tui.refreshManager.lastUserActivityTime = Date()
 
         Logger.shared.logUserAction("input_received", details: [
             "keyCode": ch,
-            "currentView": "\(tui.currentView)",
+            "currentView": "\(tui.viewCoordinator.currentView)",
             "fieldEditMode": tui.securityGroupCreateForm.fieldEditMode || tui.subnetCreateForm.fieldEditMode || tui.barbicanSecretCreateForm.fieldEditMode
         ])
 
@@ -39,139 +39,20 @@ class InputHandler {
             return
         }
 
-        // ServerCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to server create handler when in server create view
-        if tui.currentView == .serverCreate {
-            await tui.handleServerCreateInput(ch, screen: screen)
-            return
-        }
-
-        // KeyPairCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to key pair create handler when in key pair create view
-        if tui.currentView == .keyPairCreate {
-            await tui.handleKeyPairCreateInput(ch, screen: screen)
-            return
-        }
-
-        // VolumeCreateForm now uses FormBuilder which handles its own input state
-        // Delegate all input to volume create handler when in volume create view
-        if tui.currentView == .volumeCreate {
-            await tui.handleVolumeCreateInput(ch, screen: screen)
-            return
-        }
-
-        // Swift container create form
-        if tui.currentView == .swiftContainerCreate {
-            await tui.handleSwiftContainerCreateInput(ch, screen: screen)
-            return
-        }
-
-        // Swift container metadata form
-        if tui.currentView == .swiftContainerMetadata {
-            await tui.handleSwiftContainerMetadataInput(ch, screen: screen)
-            return
-        }
-
-        // Swift container web access form
-        if tui.currentView == .swiftContainerWebAccess {
-            await tui.handleSwiftContainerWebAccessInput(ch, screen: screen)
-            return
-        }
-
-        // Swift object metadata form
-        if tui.currentView == .swiftObjectMetadata {
-            await tui.handleSwiftObjectMetadataInput(ch, screen: screen)
-            return
-        }
-
-        // Swift directory metadata form
-        if tui.currentView == .swiftDirectoryMetadata {
-            await tui.handleSwiftDirectoryMetadataInput(ch, screen: screen)
-            return
-        }
-
-        // Swift object upload form
-        if tui.currentView == .swiftObjectUpload {
-            await tui.handleSwiftObjectUploadInput(ch, screen: screen)
-            return
-        }
-
-        // Swift container download form
-        if tui.currentView == .swiftContainerDownload {
-            await tui.handleSwiftContainerDownloadInput(ch, screen: screen)
-            return
-        }
-
-        // Swift object download form
-        if tui.currentView == .swiftObjectDownload {
-            await tui.handleSwiftObjectDownloadInput(ch, screen: screen)
-            return
-        }
-
-        // Swift directory download form
-        if tui.currentView == .swiftDirectoryDownload {
-            await tui.handleSwiftDirectoryDownloadInput(ch, screen: screen)
-            return
-        }
-
-        // NetworkCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to network create handler when in network create view
-        if tui.currentView == .networkCreate {
-            await tui.handleNetworkCreateInput(ch, screen: screen)
-            return
-        }
-
-        // PortCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to port create handler when in port create view
-        if tui.currentView == .portCreate {
-            await tui.handlePortCreateInput(ch, screen: screen)
-            return
-        }
-
-        // SubnetCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to subnet create handler when in subnet create view
-        if tui.currentView == .subnetCreate {
-            await tui.handleSubnetCreateInput(ch, screen: screen)
-            return
-        }
-
-        // SecurityGroupCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to security group create handler when in security group create view
-        if tui.currentView == .securityGroupCreate {
-            await tui.handleSecurityGroupCreateInput(ch, screen: screen)
-            return
-        }
-
-        // FloatingIPCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to floating IP create handler when in floating IP create view
-        if tui.currentView == .floatingIPCreate {
-            await tui.handleFloatingIPCreateInput(ch, screen: screen)
-            return
-        }
-
-        // RouterCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to router create handler when in router create view
-        if tui.currentView == .routerCreate {
-            await tui.handleRouterCreateInput(ch, screen: screen)
-            return
-        }
-
-        // ServerGroupCreateForm uses FormBuilder which handles its own input state
-        // Delegate all input to server group create handler when in server group create view
-        if tui.currentView == .serverGroupCreate {
-            await tui.handleServerGroupCreateInput(ch, screen: screen)
-            return
-        }
-
-        // If we're in barbican secret create mode, delegate ALL input to the form handler
-        if tui.currentView == .barbicanSecretCreate {
-            Logger.shared.logDebug("ROUTING: barbicanSecretCreate input ch=\(ch), payloadEditMode=\(tui.barbicanSecretCreateForm.payloadEditMode)")
-            await handleBarbicanSecretCreateInput(ch, screen: screen)
-            return
+        // Check ViewRegistry for module-handled views first
+        // This allows modules to handle their own input through registered handlers
+        if let registration = ViewRegistry.shared.handler(for: tui.viewCoordinator.currentView),
+           let inputHandler = registration.inputHandler {
+            // Module has registered an input handler - delegate to it
+            // The module's handler will call back to specific TUI handlers as needed
+            let handled = await inputHandler(ch, screen)
+            if handled {
+                return
+            }
         }
 
         // Advanced Search view input handling
-        if tui.currentView == .advancedSearch {
+        if tui.viewCoordinator.currentView == .advancedSearch {
             let handled = AdvancedSearchView.handleInput(ch)
             if handled {
                 return
@@ -180,9 +61,9 @@ class InputHandler {
         }
 
         // Health Dashboard view input handling
-        if tui.currentView == .healthDashboard {
+        if tui.viewCoordinator.currentView == .healthDashboard {
             let telemetryActor = await tui.getTelemetryActor()
-            let handled = await HealthDashboardView.handleInput(ch, navigationState: tui.healthDashboardNavState, telemetryActor: telemetryActor, dataManager: tui.dataManager)
+            let handled = await HealthDashboardView.handleInput(ch, navigationState: tui.viewCoordinator.healthDashboardNavState, telemetryActor: telemetryActor, dataManager: tui.dataManager)
             if handled {
                 tui.forceRedraw()
                 return
@@ -192,81 +73,17 @@ class InputHandler {
 
         // UNIVERSAL SEARCH: Handle / key for all views before specialized routing
         if ch == Int32(47) { // / - search or filter
-            Logger.shared.logUserAction("search_filter_prompt", details: ["view": "\(tui.currentView)"])
+            Logger.shared.logUserAction("search_filter_prompt", details: ["view": "\(tui.viewCoordinator.currentView)"])
             if let input = ViewUtils.prompt("Search: ", screen: screen, screenRows: tui.screenRows), !input.isEmpty {
-                Logger.shared.logUserAction("search_applied", details: ["query": input, "view": "\(tui.currentView)"])
+                Logger.shared.logUserAction("search_applied", details: ["query": input, "view": "\(tui.viewCoordinator.currentView)"])
                 tui.searchQuery = input
-                tui.scrollOffset = 0
-                tui.selectedIndex = 0
+                tui.viewCoordinator.scrollOffset = 0
+                tui.viewCoordinator.selectedIndex = 0
             } else {
-                Logger.shared.logUserAction("search_cleared", details: ["view": "\(tui.currentView)"])
+                Logger.shared.logUserAction("search_cleared", details: ["view": "\(tui.viewCoordinator.currentView)"])
                 tui.searchQuery = nil
             }
             return
-        }
-
-        // Route to specialized view handlers
-        // ESC navigation is now handled by NavigationInputHandler via isDetailView check
-        switch tui.currentView {
-        case .serverSecurityGroups:
-            await tui.handleSecurityGroupInput(ch, screen: screen)
-            return
-        case .securityGroupRuleManagement:
-            await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
-            return
-        case .serverResize:
-            await tui.handleServerResizeInput(ch, screen: screen)
-            return
-        case .serverSnapshotManagement:
-            await tui.handleSnapshotManagementInput(ch, screen: screen)
-            return
-        case .volumeSnapshotManagement:
-            await tui.handleVolumeSnapshotManagementInput(ch, screen: screen)
-            return
-        case .volumeBackupManagement:
-            await tui.handleVolumeBackupManagementInput(ch, screen: screen)
-            return
-        case .serverNetworkInterfaces:
-            await tui.handleNetworkInterfaceInput(ch, screen: screen)
-            return
-        case .volumeManagement:
-            await tui.handleVolumeManagementInput(ch, screen: screen)
-            return
-        case .networkServerAttachment:
-            await tui.handleNetworkServerAttachmentInput(ch, screen: screen)
-            return
-        case .securityGroupServerAttachment:
-            await tui.handleSecurityGroupServerAttachmentInput(ch, screen: screen)
-            return
-        case .securityGroupServerManagement:
-            await tui.handleSecurityGroupServerManagementInput(ch, screen: screen)
-            return
-        case .networkServerManagement:
-            await tui.handleNetworkServerManagementInput(ch, screen: screen)
-            return
-        case .volumeServerManagement:
-            await tui.handleVolumeServerManagementInput(ch, screen: screen)
-            return
-        case .floatingIPServerManagement:
-            await tui.handleFloatingIPServerManagementInput(ch, screen: screen)
-            return
-        case .floatingIPPortManagement:
-            await tui.handleFloatingIPPortManagementInput(ch, screen: screen)
-            return
-        case .portServerManagement:
-            await tui.handlePortServerManagementInput(ch, screen: screen)
-            return
-        case .portAllowedAddressPairManagement:
-            await tui.handleAllowedAddressPairManagementInput(ch, screen: screen)
-            return
-        case .flavorSelection:
-            await tui.handleFlavorSelectionInput(ch, screen: screen)
-            return
-        case .subnetRouterManagement:
-            await tui.handleSubnetRouterManagementInput(ch, screen: screen)
-            return
-        default:
-            break
         }
 
         await handleMainInput(ch, screen: screen)
@@ -278,9 +95,9 @@ class InputHandler {
 
         Logger.shared.logUserAction("main_input_handling", details: [
             "keyCode": ch,
-            "view": "\(tui.currentView)",
-            "selectedIndex": tui.selectedIndex,
-            "scrollOffset": tui.scrollOffset
+            "view": "\(tui.viewCoordinator.currentView)",
+            "selectedIndex": tui.viewCoordinator.selectedIndex,
+            "scrollOffset": tui.viewCoordinator.scrollOffset
         ])
 
         // PRIORITY 1: Handle unified input if it's active
@@ -380,7 +197,7 @@ class InputHandler {
 
                 case .executeAction(let actionType):
                     // Execute an action in the current context
-                    let success = await CommandActionHandler.shared.executeAction(actionType, in: tui.currentView, tui: tui, screen: screen)
+                    let success = await CommandActionHandler.shared.executeAction(actionType, in: tui.viewCoordinator.currentView, tui: tui, screen: screen)
                     if success {
                         tui.statusMessage = "Executed action: \(actionType.rawValue)"
                     }
@@ -498,72 +315,72 @@ class InputHandler {
             tui.running = false
 
         case Int32(24): // CTRL-X - Toggle multi-select mode
-            if !tui.currentView.isDetailView && tui.currentView.supportsMultiSelect {
+            if !tui.viewCoordinator.currentView.isDetailView && tui.viewCoordinator.currentView.supportsMultiSelect {
                 Logger.shared.logUserAction("toggle_multi_select_mode", details: [
-                    "view": "\(tui.currentView)",
-                    "wasEnabled": tui.multiSelectMode
+                    "view": "\(tui.viewCoordinator.currentView)",
+                    "wasEnabled": tui.selectionManager.multiSelectMode
                 ])
                 handleToggleMultiSelectMode()
             }
         case Int32(87): // W - Web Access
-            if tui.currentView == .swift && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_container_web_access", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_container_web_access", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManageContainerWebAccess(screen: screen)
             }
         case Int32(77): // M - Manage things or Performance Metrics
-            if tui.currentView == .swiftBackgroundOperations && !tui.currentView.isDetailView {
+            if tui.viewCoordinator.currentView == .swiftBackgroundOperations && !tui.viewCoordinator.currentView.isDetailView {
                 Logger.shared.logUserAction("show_performance_metrics", details: ["view": "swiftBackgroundOperations"])
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".performanceMetrics")
-                tui.scrollOffset = 0 // Reset scroll when entering metrics view
+                Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".performanceMetrics")
+                tui.viewCoordinator.scrollOffset = 0 // Reset scroll when entering metrics view
                 tui.changeView(to: .performanceMetrics, resetSelection: false)
-            } else if tui.currentView == .swift && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_container_metadata", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_container_metadata", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManageContainerMetadata(screen: screen)
-            } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_tree_item_metadata", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .swiftContainerDetail && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_tree_item_metadata", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleSwiftTreeItemMetadata(screen: screen)
-            } else if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .securityGroups && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManageSecurityGroupRules(screen: screen)
-            } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_floating_ip_server_assignment", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .floatingIPs && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_floating_ip_server_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManageFloatingIPServerAssignment(screen: screen)
-            } else if tui.currentView == .ports && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_port_server_assignment", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .ports && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_port_server_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManagePortServerAssignment(screen: screen)
-            } else if tui.currentView == .networks && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_network_to_server", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .networks && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_network_to_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManageNetworkInterfaceAttachmentToServer(screen: screen)
-            } else if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_security_group", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .securityGroups && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_security_group", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleAttachSecurityGroup(screen: screen)
-            } else if tui.currentView == .volumes && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_volume", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_volume", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleAttachVolume(screen: screen)
-            } else if tui.currentView == .subnets && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_subnet_router", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .subnets && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_subnet_router", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleAttachSubnetRouter(screen: screen)
             }
         case Int32(69): // E - Manage allowed address pairs for ports (SHIFT-E)
-            if tui.currentView == .ports && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_port_allowed_address_pairs", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .ports && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_port_allowed_address_pairs", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManagePortAllowedAddressPairs(screen: screen)
             }
         case Int32(85): // U - Upload object to container (SHIFT-U)
-            if tui.currentView == .swift && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("upload_object_to_container", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("upload_object_to_container", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleUploadObjectToContainer(screen: screen)
-            } else if tui.currentView == .swiftContainerDetail {
+            } else if tui.viewCoordinator.currentView == .swiftContainerDetail {
                 // From container detail view (inside a container), also allow upload
-                Logger.shared.logUserAction("upload_object_to_container_from_detail", details: ["container": tui.swiftNavState.currentContainer ?? "unknown"])
+                Logger.shared.logUserAction("upload_object_to_container_from_detail", details: ["container": tui.viewCoordinator.swiftNavState.currentContainer ?? "unknown"])
                 await handleUploadObjectToContainer(screen: screen)
             }
         case Int32(68): // D - Download container or object (SHIFT-D)
-            if tui.currentView == .swift && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("download_container", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("download_container", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleDownloadContainer(screen: screen)
-            } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("download_object", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .swiftContainerDetail && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("download_object", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleDownloadObject(screen: screen)
             }
         case Int32(259), Int32(258), Int32(338), Int32(339), Int32(262), Int32(360), Int32(27): // Navigation keys
@@ -571,7 +388,7 @@ class InputHandler {
             if let navigationHandler = navigationHandler {
                 // For swiftBackgroundOperations, pass the actual count of operations
                 let maxIndex: Int?
-                if tui.currentView == .swiftBackgroundOperations {
+                if tui.viewCoordinator.currentView == .swiftBackgroundOperations {
                     maxIndex = max(0, tui.swiftBackgroundOps.getAllOperations().count - 1)
                 } else {
                     maxIndex = nil
@@ -585,34 +402,34 @@ class InputHandler {
             // If not handled centrally, fall through to view-specific handling
             break
         case Int32(32): // SPACEBAR - Toggle item selection in multi-select mode or show details
-            if tui.multiSelectMode && !tui.currentView.isDetailView {
+            if tui.selectionManager.multiSelectMode && !tui.viewCoordinator.currentView.isDetailView {
                 Logger.shared.logUserAction("toggle_multi_select_item", details: [
-                    "view": "\(tui.currentView)",
-                    "selectedIndex": tui.selectedIndex
+                    "view": "\(tui.viewCoordinator.currentView)",
+                    "selectedIndex": tui.viewCoordinator.selectedIndex
                 ])
                 await handleMultiSelectToggle()
-            } else if !tui.currentView.isDetailView {
+            } else if !tui.viewCoordinator.currentView.isDetailView {
                 // Special handling for Swift hierarchical navigation
-                if tui.currentView == .swift {
+                if tui.viewCoordinator.currentView == .swift {
                     Logger.shared.logUserAction("swift_navigate_into_container", details: [
-                        "selectedIndex": tui.selectedIndex
+                        "selectedIndex": tui.viewCoordinator.selectedIndex
                     ])
                     await handleSwiftContainerNavigation()
-                } else if tui.currentView == .swiftContainerDetail {
+                } else if tui.viewCoordinator.currentView == .swiftContainerDetail {
                     Logger.shared.logUserAction("swift_navigate_into_item", details: [
-                        "selectedIndex": tui.selectedIndex,
-                        "currentPath": tui.swiftNavState.currentPathString
+                        "selectedIndex": tui.viewCoordinator.selectedIndex,
+                        "currentPath": tui.viewCoordinator.swiftNavState.currentPathString
                     ])
                     await handleSwiftTreeItemNavigation()
-                } else if tui.currentView == .swiftBackgroundOperations {
+                } else if tui.viewCoordinator.currentView == .swiftBackgroundOperations {
                     Logger.shared.logUserAction("open_operation_detail", details: [
-                        "selectedIndex": tui.selectedIndex
+                        "selectedIndex": tui.viewCoordinator.selectedIndex
                     ])
                     await handleOpenOperationDetail()
                 } else {
                     Logger.shared.logUserAction("open_detail_view", details: [
-                        "view": "\(tui.currentView)",
-                        "selectedIndex": tui.selectedIndex
+                        "view": "\(tui.viewCoordinator.currentView)",
+                        "selectedIndex": tui.viewCoordinator.selectedIndex
                     ])
                     tui.openDetailView()
                 }
@@ -620,75 +437,77 @@ class InputHandler {
         // NOTE: / key (Int32(47)) is now handled universally before specialized view routing
         // Context-Sensitive Actions (Uppercase letters)
         case Int32(67): // C - Create new resource
-            Logger.shared.logUserAction("create_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
+            Logger.shared.logUserAction("create_action", details: ["view": "\(tui.viewCoordinator.currentView)", "selectedIndex": tui.viewCoordinator.selectedIndex])
             await handleCreateResource()
         case Int32(76): // L - View server logs
-            if tui.currentView == .servers && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("view_server_logs", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("view_server_logs", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleViewServerLogs(screen: screen)
             }
         case Int32(79): // O - View server console or open console in browser
-            if tui.currentView == .servers && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("view_server_console", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("view_server_console", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleViewServerConsole(screen: screen)
-            } else if tui.currentView == .serverConsole {
+            } else if tui.viewCoordinator.currentView == .serverConsole {
                 Logger.shared.logUserAction("open_console_in_browser")
                 await handleOpenConsoleInBrowser()
             }
         case Int32(66): // B - Create backup (volume)
-            if tui.currentView == .volumes && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("create_volume_backup", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("create_volume_backup", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleVolumeBackup(screen: screen)
             }
         case Int32(80): // P - Create snapshot or Manage floating IP port assignment
-            if tui.currentView == .servers && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("create_snapshot", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("create_snapshot", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleCreateSnapshot(screen: screen)
-            } else if tui.currentView == .volumes && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("create_volume_snapshot", details: ["selectedIndex": tui.selectedIndex])
-                await tui.resourceOperations.createVolumeSnapshot(screen: screen)
-            } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("manage_floating_ip_port_assignment", details: ["selectedIndex": tui.selectedIndex])
+            } else if tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("create_volume_snapshot", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                if let module = ModuleRegistry.shared.module(for: "volumes") as? VolumesModule {
+                    await module.createVolumeSnapshot(screen: screen)
+                }
+            } else if tui.viewCoordinator.currentView == .floatingIPs && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("manage_floating_ip_port_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleManageFloatingIPPortAssignment(screen: screen)
             }
         case Int32(82): // R - Restart server
-            if tui.currentView == .servers && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("restart_server", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("restart_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleRestartServer(screen: screen)
             }
         case Int32(83): // S - Start server
-            if tui.currentView == .servers && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("start_server", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("start_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleStartServer(screen: screen)
             }
         case Int32(84): // T - Stop server
-            if tui.currentView == .servers && !tui.currentView.isDetailView {
-                Logger.shared.logUserAction("stop_server", details: ["selectedIndex": tui.selectedIndex])
+            if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+                Logger.shared.logUserAction("stop_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
                 await handleStopServer(screen: screen)
             }
         case Int32(63): // ? - Show help
-            if tui.currentView != .help {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".help")
-                tui.helpScrollOffset = 0 // Reset scroll when entering help
+            if tui.viewCoordinator.currentView != .help {
+                Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".help")
+                tui.viewCoordinator.helpScrollOffset = 0 // Reset scroll when entering help
                 tui.changeView(to: .help, resetSelection: false)
             }
         case Int32(64): // @ - Show about page
-            if tui.currentView != .about {
-                Logger.shared.logNavigation("\(tui.currentView)", to: ".about")
-                tui.helpScrollOffset = 0 // Reset scroll when entering about
+            if tui.viewCoordinator.currentView != .about {
+                Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".about")
+                tui.viewCoordinator.helpScrollOffset = 0 // Reset scroll when entering about
                 tui.changeView(to: .about, resetSelection: false)
             }
         case Int32(127), Int32(330): // DELETE key - Delete resources
-            Logger.shared.logUserAction("delete_action", details: ["view": "\(tui.currentView)", "selectedIndex": tui.selectedIndex])
+            Logger.shared.logUserAction("delete_action", details: ["view": "\(tui.viewCoordinator.currentView)", "selectedIndex": tui.viewCoordinator.selectedIndex])
             await handleDeleteKey(screen: screen)
         case Int32(90): // Z - Resize selected server
-            Logger.shared.logUserAction("resize_server", details: ["selectedIndex": tui.selectedIndex])
+            Logger.shared.logUserAction("resize_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
             await handleResizeServer(screen: screen)
         case Int32(65): // A - Cycle refresh interval
-            Logger.shared.logUserAction("cycle_refresh_interval", details: ["currentInterval": tui.baseRefreshInterval])
+            Logger.shared.logUserAction("cycle_refresh_interval", details: ["currentInterval": tui.refreshManager.baseRefreshInterval])
             tui.cycleRefreshInterval()
         default:
-            Logger.shared.logUserAction("unhandled_key", details: ["keyCode": ch, "view": "\(tui.currentView)"])
+            Logger.shared.logUserAction("unhandled_key", details: ["keyCode": ch, "view": "\(tui.viewCoordinator.currentView)"])
             break
         }
 
@@ -703,28 +522,28 @@ class InputHandler {
     private func handleCreateResource() async {
         guard let tui = tui else { return }
 
-        Logger.shared.logUserAction("create_resource_initiated", details: ["view": "\(tui.currentView)"])
+        Logger.shared.logUserAction("create_resource_initiated", details: ["view": "\(tui.viewCoordinator.currentView)"])
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
             // Navigate to server creation
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".serverCreate")
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".serverCreate")
             tui.changeView(to: .serverCreate)
 
             // Reset form and populate with cached data
             var form = ServerCreateForm()
-            form.images = tui.cachedImages
-            form.volumes = tui.cachedVolumes
-            form.flavors = tui.cachedFlavors
-            form.networks = tui.cachedNetworks
-            form.securityGroups = tui.cachedSecurityGroups
-            form.keyPairs = tui.cachedKeyPairs
-            form.serverGroups = tui.cachedServerGroups
+            form.images = tui.cacheManager.cachedImages
+            form.volumes = tui.cacheManager.cachedVolumes
+            form.flavors = tui.cacheManager.cachedFlavors
+            form.networks = tui.cacheManager.cachedNetworks
+            form.securityGroups = tui.cacheManager.cachedSecurityGroups
+            form.keyPairs = tui.cacheManager.cachedKeyPairs
+            form.serverGroups = tui.cacheManager.cachedServerGroups
             tui.serverCreateForm = form
 
             // Initialize FormBuilderState with form fields
             tui.serverCreateFormState = FormBuilderState(fields: form.buildFields(selectedFieldId: nil))
-        } else if tui.currentView == .networks && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".networkCreate")
+        } else if tui.viewCoordinator.currentView == .networks && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".networkCreate")
             tui.changeView(to: .networkCreate)
             tui.networkCreateForm = NetworkCreateForm() // Reset form
 
@@ -734,8 +553,8 @@ class InputHandler {
                 activeFieldId: nil,
                 formState: FormBuilderState(fields: [])
             ))
-        } else if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".securityGroupCreate")
+        } else if tui.viewCoordinator.currentView == .securityGroups && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".securityGroupCreate")
             tui.changeView(to: .securityGroupCreate)
             tui.securityGroupCreateForm = SecurityGroupCreateForm() // Reset form
 
@@ -745,8 +564,8 @@ class InputHandler {
                 activeFieldId: nil,
                 formState: FormBuilderState(fields: [])
             ))
-        } else if tui.currentView == .subnets && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".subnetCreate")
+        } else if tui.viewCoordinator.currentView == .subnets && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".subnetCreate")
             tui.changeView(to: .subnetCreate)
             tui.subnetCreateForm = SubnetCreateForm() // Reset form
 
@@ -754,11 +573,11 @@ class InputHandler {
             tui.subnetCreateFormState = FormBuilderState(fields: tui.subnetCreateForm.buildFields(
                 selectedFieldId: nil,
                 activeFieldId: nil,
-                cachedNetworks: tui.cachedNetworks,
+                cachedNetworks: tui.cacheManager.cachedNetworks,
                 formState: FormBuilderState(fields: [])
             ))
-        } else if tui.currentView == .keyPairs && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".keyPairCreate")
+        } else if tui.viewCoordinator.currentView == .keyPairs && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".keyPairCreate")
             tui.changeView(to: .keyPairCreate)
             tui.keyPairCreateForm = KeyPairCreateForm() // Reset form
 
@@ -768,24 +587,26 @@ class InputHandler {
                 activeFieldId: nil,
                 formState: FormBuilderState(fields: [])
             ))
-        } else if tui.currentView == .volumes && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".volumeCreate")
+        } else if tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".volumeCreate")
             tui.changeView(to: .volumeCreate)
             // Load all snapshots for volume creation
-            await tui.actions.loadAllVolumeSnapshots()
+            if let module = ModuleRegistry.shared.module(for: "volumes") as? VolumesModule {
+                _ = await module.loadAllVolumeSnapshots()
+            }
             // Reset form and populate cached data
             tui.volumeCreateForm = VolumeCreateForm()
-            tui.volumeCreateForm.images = tui.cachedImages
-            tui.volumeCreateForm.snapshots = tui.cachedVolumeSnapshots
-            tui.volumeCreateForm.volumeTypes = tui.cachedVolumeTypes
+            tui.volumeCreateForm.images = tui.cacheManager.cachedImages
+            tui.volumeCreateForm.snapshots = tui.cacheManager.cachedVolumeSnapshots
+            tui.volumeCreateForm.volumeTypes = tui.cacheManager.cachedVolumeTypes
             // Initialize form state
             tui.volumeCreateFormState = FormBuilderState(fields: tui.volumeCreateForm.buildFields(
                 selectedFieldId: nil,
                 activeFieldId: nil,
                 formState: nil
             ))
-        } else if tui.currentView == .ports && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".portCreate")
+        } else if tui.viewCoordinator.currentView == .ports && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".portCreate")
             tui.changeView(to: .portCreate)
             tui.portCreateForm = PortCreateForm() // Reset form
 
@@ -794,24 +615,24 @@ class InputHandler {
                 selectedFieldId: nil,
                 activeFieldId: nil,
                 formState: FormBuilderState(fields: []),
-                networks: tui.cachedNetworks,
-                securityGroups: tui.cachedSecurityGroups,
-                qosPolicies: tui.cachedQoSPolicies
+                networks: tui.cacheManager.cachedNetworks,
+                securityGroups: tui.cacheManager.cachedSecurityGroups,
+                qosPolicies: tui.cacheManager.cachedQoSPolicies
             ))
-        } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".floatingIPCreate")
+        } else if tui.viewCoordinator.currentView == .floatingIPs && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".floatingIPCreate")
             tui.changeView(to: .floatingIPCreate)
             tui.floatingIPCreateForm = FloatingIPCreateForm()
-            let externalNetworks = tui.cachedNetworks.filter { $0.external == true }
+            let externalNetworks = tui.cacheManager.cachedNetworks.filter { $0.external == true }
             tui.floatingIPCreateFormState = FormBuilderState(
                 fields: tui.floatingIPCreateForm.buildFields(
                     externalNetworks: externalNetworks,
-                    subnets: tui.cachedSubnets,
+                    subnets: tui.cacheManager.cachedSubnets,
                     selectedFieldId: nil
                 )
             )
-        } else if tui.currentView == .routers && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".routerCreate")
+        } else if tui.viewCoordinator.currentView == .routers && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".routerCreate")
             tui.changeView(to: .routerCreate)
             tui.routerCreateForm = RouterCreateForm()
             tui.routerCreateFormState = FormBuilderState(
@@ -819,12 +640,12 @@ class InputHandler {
                     selectedFieldId: nil,
                     activeFieldId: nil,
                     formState: nil,
-                    availabilityZones: tui.cachedAvailabilityZones,
-                    externalNetworks: tui.cachedNetworks
+                    availabilityZones: tui.cacheManager.cachedAvailabilityZones,
+                    externalNetworks: tui.cacheManager.cachedNetworks
                 )
             )
-        } else if tui.currentView == .serverGroups && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".serverGroupCreate")
+        } else if tui.viewCoordinator.currentView == .serverGroups && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".serverGroupCreate")
             tui.changeView(to: .serverGroupCreate)
             tui.serverGroupCreateForm = ServerGroupCreateForm() // Reset form
 
@@ -834,8 +655,8 @@ class InputHandler {
                 activeFieldId: nil,
                 formState: FormBuilderState(fields: [])
             ))
-        } else if (tui.currentView == .barbicanSecrets || tui.currentView == .barbican) && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".barbicanSecretCreate")
+        } else if (tui.viewCoordinator.currentView == .barbicanSecrets || tui.viewCoordinator.currentView == .barbican) && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".barbicanSecretCreate")
             tui.changeView(to: .barbicanSecretCreate)
             tui.barbicanSecretCreateForm = BarbicanSecretCreateForm() // Reset form
             tui.barbicanSecretCreateFormState = FormBuilderState(fields: tui.barbicanSecretCreateForm.buildFields(
@@ -843,11 +664,11 @@ class InputHandler {
                 activeFieldId: nil,
                 formState: FormBuilderState(fields: [])
             ))
-        } else if tui.currentView == .octavia && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".octaviaLoadBalancerCreate")
+        } else if tui.viewCoordinator.currentView == .octavia && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".octaviaLoadBalancerCreate")
             tui.changeView(to: .octaviaLoadBalancerCreate)
-        } else if tui.currentView == .swift && !tui.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.currentView)", to: ".swiftContainerCreate")
+        } else if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".swiftContainerCreate")
             tui.changeView(to: .swiftContainerCreate)
 
             // Initialize Swift container create form
@@ -866,7 +687,7 @@ class InputHandler {
     private func handleRefreshKey() async {
         guard let tui = tui else { return }
 
-        Logger.shared.logUserAction("refresh_initiated", details: ["view": "\(tui.currentView)"])
+        Logger.shared.logUserAction("refresh_initiated", details: ["view": "\(tui.viewCoordinator.currentView)"])
         let startTime = Date()
 
         // Full data refresh
@@ -874,18 +695,18 @@ class InputHandler {
         await tui.dataManager.refreshAllData()
         let refreshDuration = Date().timeIntervalSince(refreshStart)
         Logger.shared.logPerformance("full_data_refresh", duration: refreshDuration)
-        tui.lastRefresh = Date()
+        tui.refreshManager.lastRefresh = Date()
 
         // Request refresh for health dashboard if on that view
-        if tui.currentView == .healthDashboard {
-            tui.healthDashboardNavState.requestRefresh()
+        if tui.viewCoordinator.currentView == .healthDashboard {
+            tui.viewCoordinator.healthDashboardNavState.requestRefresh()
         }
 
         tui.statusMessage = "Data refreshed"
 
         let duration = Date().timeIntervalSince(startTime)
         Logger.shared.logPerformance("refresh_completed", duration: duration, context: [
-            "view": "\(tui.currentView)",
+            "view": "\(tui.viewCoordinator.currentView)",
             "refreshType": "full_data"
         ])
     }
@@ -897,7 +718,7 @@ class InputHandler {
         let startTime = Date()
 
         await tui.dataManager.purgeCache()
-        tui.lastRefresh = Date()
+        tui.refreshManager.lastRefresh = Date()
 
         let duration = Date().timeIntervalSince(startTime)
         Logger.shared.logPerformance("cache_purge_and_refresh", duration: duration)
@@ -907,9 +728,9 @@ class InputHandler {
     private func handleToggleMultiSelectMode() {
         guard let tui = tui else { return }
 
-        tui.multiSelectMode.toggle()
-        if !tui.multiSelectMode {
-            tui.multiSelectedResourceIDs.removeAll()
+        tui.selectionManager.multiSelectMode.toggle()
+        if !tui.selectionManager.multiSelectMode {
+            tui.selectionManager.multiSelectedResourceIDs.removeAll()
             tui.statusMessage = "Multi-select mode OFF"
         } else {
             tui.statusMessage = "Multi-select mode ON - Use SPACE to select items, CTRL-X to exit, DELETE to bulk delete"
@@ -922,74 +743,74 @@ class InputHandler {
         let resourceID = getSelectedResourceID()
         guard !resourceID.isEmpty else { return }
 
-        if tui.multiSelectedResourceIDs.contains(resourceID) {
-            tui.multiSelectedResourceIDs.remove(resourceID)
+        if tui.selectionManager.multiSelectedResourceIDs.contains(resourceID) {
+            tui.selectionManager.multiSelectedResourceIDs.remove(resourceID)
             Logger.shared.logUserAction("deselect_resource", details: ["resourceID": resourceID])
         } else {
-            tui.multiSelectedResourceIDs.insert(resourceID)
+            tui.selectionManager.multiSelectedResourceIDs.insert(resourceID)
             Logger.shared.logUserAction("select_resource", details: ["resourceID": resourceID])
         }
 
-        tui.statusMessage = "\(tui.multiSelectedResourceIDs.count) items selected"
+        tui.statusMessage = "\(tui.selectionManager.multiSelectedResourceIDs.count) items selected"
     }
 
     private func getSelectedResourceID() -> String {
         guard let tui = tui else { return "" }
 
-        switch tui.currentView {
+        switch tui.viewCoordinator.currentView {
         case .servers:
-            guard tui.selectedIndex < tui.cachedServers.count else { return "" }
-            return tui.cachedServers[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedServers.count else { return "" }
+            return tui.cacheManager.cachedServers[tui.viewCoordinator.selectedIndex].id
         case .volumes:
-            guard tui.selectedIndex < tui.cachedVolumes.count else { return "" }
-            return tui.cachedVolumes[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedVolumes.count else { return "" }
+            return tui.cacheManager.cachedVolumes[tui.viewCoordinator.selectedIndex].id
         case .networks:
-            guard tui.selectedIndex < tui.cachedNetworks.count else { return "" }
-            return tui.cachedNetworks[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedNetworks.count else { return "" }
+            return tui.cacheManager.cachedNetworks[tui.viewCoordinator.selectedIndex].id
         case .subnets:
-            guard tui.selectedIndex < tui.cachedSubnets.count else { return "" }
-            return tui.cachedSubnets[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSubnets.count else { return "" }
+            return tui.cacheManager.cachedSubnets[tui.viewCoordinator.selectedIndex].id
         case .routers:
-            guard tui.selectedIndex < tui.cachedRouters.count else { return "" }
-            return tui.cachedRouters[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedRouters.count else { return "" }
+            return tui.cacheManager.cachedRouters[tui.viewCoordinator.selectedIndex].id
         case .ports:
             // Ports are sorted in the view, so we need to use the filtered/sorted list
-            let filteredPorts = FilterUtils.filterPorts(tui.cachedPorts, query: tui.searchQuery)
-            guard tui.selectedIndex < filteredPorts.count else { return "" }
-            return filteredPorts[tui.selectedIndex].id
+            let filteredPorts = FilterUtils.filterPorts(tui.cacheManager.cachedPorts, query: tui.searchQuery)
+            guard tui.viewCoordinator.selectedIndex < filteredPorts.count else { return "" }
+            return filteredPorts[tui.viewCoordinator.selectedIndex].id
         case .floatingIPs:
-            guard tui.selectedIndex < tui.cachedFloatingIPs.count else { return "" }
-            return tui.cachedFloatingIPs[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedFloatingIPs.count else { return "" }
+            return tui.cacheManager.cachedFloatingIPs[tui.viewCoordinator.selectedIndex].id
         case .securityGroups:
-            guard tui.selectedIndex < tui.cachedSecurityGroups.count else { return "" }
-            return tui.cachedSecurityGroups[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSecurityGroups.count else { return "" }
+            return tui.cacheManager.cachedSecurityGroups[tui.viewCoordinator.selectedIndex].id
         case .serverGroups:
-            guard tui.selectedIndex < tui.cachedServerGroups.count else { return "" }
-            return tui.cachedServerGroups[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedServerGroups.count else { return "" }
+            return tui.cacheManager.cachedServerGroups[tui.viewCoordinator.selectedIndex].id
         case .keyPairs:
-            guard tui.selectedIndex < tui.cachedKeyPairs.count else { return "" }
-            return tui.cachedKeyPairs[tui.selectedIndex].name ?? ""
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedKeyPairs.count else { return "" }
+            return tui.cacheManager.cachedKeyPairs[tui.viewCoordinator.selectedIndex].name ?? ""
         case .images:
-            guard tui.selectedIndex < tui.cachedImages.count else { return "" }
-            return tui.cachedImages[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedImages.count else { return "" }
+            return tui.cacheManager.cachedImages[tui.viewCoordinator.selectedIndex].id
         case .volumeArchives:
-            guard tui.selectedIndex < tui.cachedVolumeBackups.count else { return "" }
-            return tui.cachedVolumeBackups[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedVolumeBackups.count else { return "" }
+            return tui.cacheManager.cachedVolumeBackups[tui.viewCoordinator.selectedIndex].id
         case .barbicanSecrets, .barbican:
-            guard tui.selectedIndex < tui.cachedSecrets.count else { return "" }
-            return tui.cachedSecrets[tui.selectedIndex].secretRef ?? ""
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSecrets.count else { return "" }
+            return tui.cacheManager.cachedSecrets[tui.viewCoordinator.selectedIndex].secretRef ?? ""
         case .swift:
-            guard tui.selectedIndex < tui.cachedSwiftContainers.count else { return "" }
-            return tui.cachedSwiftContainers[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else { return "" }
+            return tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex].id
         case .swiftContainerDetail:
-            guard let objects = tui.cachedSwiftObjects else { return "" }
+            guard let objects = tui.cacheManager.cachedSwiftObjects else { return "" }
             // Build tree structure to match what's displayed
-            let currentPath = tui.swiftNavState.currentPathString
+            let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
             let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
             // Apply search filter if present
             let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery?.isEmpty ?? true ? nil : tui.searchQuery)
-            guard tui.selectedIndex < filteredItems.count else { return "" }
-            return filteredItems[tui.selectedIndex].id
+            guard tui.viewCoordinator.selectedIndex < filteredItems.count else { return "" }
+            return filteredItems[tui.viewCoordinator.selectedIndex].id
         default:
             return ""
         }
@@ -1000,44 +821,74 @@ class InputHandler {
         guard let tui = tui else { return }
 
         // Handle bulk delete in multi-select mode
-        if tui.multiSelectMode && !tui.multiSelectedResourceIDs.isEmpty {
+        if tui.selectionManager.multiSelectMode && !tui.selectionManager.multiSelectedResourceIDs.isEmpty {
             await handleBulkDelete(screen: screen)
             return
         }
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteServer(screen: screen)
-        } else if tui.currentView == .keyPairs && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteKeyPair(screen: screen)
-        } else if tui.currentView == .images && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteImage(screen: screen)
-        } else if tui.currentView == .volumes && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteVolume(screen: screen)
-        } else if tui.currentView == .networks && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteNetwork(screen: screen)
-        } else if tui.currentView == .subnets && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteSubnet(screen: screen)
-        } else if tui.currentView == .routers && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteRouter(screen: screen)
-        } else if tui.currentView == .ports && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deletePort(screen: screen)
-        } else if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteFloatingIP(screen: screen)
-        } else if tui.currentView == .serverGroups && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteServerGroup(screen: screen)
-        } else if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteSecurityGroup(screen: screen)
-        } else if (tui.currentView == .barbicanSecrets || tui.currentView == .barbican) && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteSecret(screen: screen)
-        } else if tui.currentView == .volumeArchives && !tui.currentView.isDetailView {
-            await tui.actions.deleteVolumeArchive(screen: screen)
-        } else if tui.currentView == .swift && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteSwiftContainer(screen: screen)
-        } else if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
-            await tui.resourceOperations.deleteSwiftObject(screen: screen)
-        } else if tui.currentView == .swiftBackgroundOperations && !tui.currentView.isDetailView {
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.deleteServer(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .keyPairs && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "keyPairs") as? KeyPairsModule {
+                await module.deleteKeyPair(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .images && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "images") as? ImagesModule {
+                await module.deleteImage(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "volumes") as? VolumesModule {
+                await module.deleteVolume(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .networks && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "networks") as? NetworksModule {
+                await module.deleteNetwork(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .subnets && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "subnets") as? SubnetsModule {
+                await module.deleteSubnet(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .routers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "routers") as? RoutersModule {
+                await module.deleteRouter(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .ports && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "ports") as? PortsModule {
+                await module.deletePort(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .floatingIPs && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "floatingIPs") as? FloatingIPsModule {
+                await module.deleteFloatingIP(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .serverGroups && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "serverGroups") as? ServerGroupsModule {
+                await module.deleteServerGroup(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .securityGroups && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "securityGroups") as? SecurityGroupsModule {
+                await module.deleteSecurityGroup(screen: screen)
+            }
+        } else if (tui.viewCoordinator.currentView == .barbicanSecrets || tui.viewCoordinator.currentView == .barbican) && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "barbican") as? BarbicanModule {
+                await module.deleteSecret(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .volumeArchives && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "volumes") as? VolumesModule {
+                await module.deleteVolumeArchive(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
+                await module.deleteSwiftContainer(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .swiftContainerDetail && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
+                await module.deleteSwiftObject(screen: screen)
+            }
+        } else if tui.viewCoordinator.currentView == .swiftBackgroundOperations && !tui.viewCoordinator.currentView.isDetailView {
             await handleCancelBackgroundOperation(screen: screen)
-        } else if tui.currentView == .swiftBackgroundOperationDetail {
+        } else if tui.viewCoordinator.currentView == .swiftBackgroundOperationDetail {
             await handleCancelBackgroundOperationFromDetail(screen: screen)
         }
     }
@@ -1045,39 +896,47 @@ class InputHandler {
     private func handleRestartServer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
-            await tui.actions.restartServer(screen: screen)
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.restartServer(screen: screen)
+            }
         }
     }
 
     private func handleResizeServer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
-            await tui.actions.resizeServer(screen: screen)
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.resizeServer(screen: screen)
+            }
         }
     }
 
     private func handleViewServerLogs(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
-            await tui.actions.viewServerLogs(screen: screen)
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.viewServerLogs(screen: screen)
+            }
         }
     }
 
     private func handleViewServerConsole(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
-            await tui.actions.viewServerConsole(screen: screen)
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.viewServerConsole(screen: screen)
+            }
         }
     }
 
     private func handleOpenConsoleInBrowser() async {
         guard let tui = tui else { return }
 
-        if let console = tui.selectedResource as? RemoteConsole {
+        if let console = tui.viewCoordinator.selectedResource as? RemoteConsole {
             if console.type.lowercased() == "novnc" {
                 await openURLInBrowser(console.url)
                 tui.statusMessage = "Opening console in default browser..."
@@ -1104,58 +963,74 @@ class InputHandler {
     private func handleStartServer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
-            await tui.actions.startServer(screen: screen)
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.startServer(screen: screen)
+            }
         }
     }
 
     private func handleStopServer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .servers && !tui.currentView.isDetailView {
-            await tui.actions.stopServer(screen: screen)
+        if tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.stopServer(screen: screen)
+            }
         }
     }
 
     private func handleAttachSecurityGroup(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-            await tui.actions.attachSecurityGroupToServers(screen: screen)
+        if tui.viewCoordinator.currentView == .securityGroups && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "securitygroups") as? SecurityGroupsModule {
+                await module.manageSecurityGroupToServers(screen: screen)
+            }
         }
     }
 
     private func handleManageNetworkInterfaceAttachmentToServer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .networks && !tui.currentView.isDetailView {
-            await tui.actions.manageNetworkToServers(screen: screen)
+        if tui.viewCoordinator.currentView == .networks && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "networks") as? NetworksModule {
+                await module.manageNetworkToServers(screen: screen)
+            }
         }
     }
 
     private func handleCreateSnapshot(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if (tui.currentView == .servers && !tui.currentView.isDetailView) || tui.currentView == .serverDetail {
-            await tui.resourceOperations.createServerSnapshot(screen: screen)
-        } else if (tui.currentView == .volumes && !tui.currentView.isDetailView) || tui.currentView == .volumeDetail {
-            await tui.resourceOperations.createVolumeSnapshot(screen: screen)
+        if (tui.viewCoordinator.currentView == .servers && !tui.viewCoordinator.currentView.isDetailView) || tui.viewCoordinator.currentView == .serverDetail {
+            if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
+                await module.createServerSnapshot(screen: screen)
+            }
+        } else if (tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView) || tui.viewCoordinator.currentView == .volumeDetail {
+            if let module = ModuleRegistry.shared.module(for: "volumes") as? VolumesModule {
+                await module.createVolumeSnapshot(screen: screen)
+            }
         }
     }
 
     private func handleVolumeBackup(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if (tui.currentView == .volumes && !tui.currentView.isDetailView) || tui.currentView == .volumeDetail {
-            await tui.actions.createVolumeBackup(screen: screen)
+        if (tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView) || tui.viewCoordinator.currentView == .volumeDetail {
+            if let module = ModuleRegistry.shared.module(for: "volumes") as? VolumesModule {
+                await module.createVolumeBackup(screen: screen)
+            }
         }
     }
 
     private func handleAttachVolume(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .volumes && !tui.currentView.isDetailView {
-            await tui.actions.attachVolumeToServers(screen: screen)
+        if tui.viewCoordinator.currentView == .volumes && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "volumes") as? VolumesModule {
+                await module.attachVolumeToServers(screen: screen)
+            }
         }
     }
 
@@ -1164,21 +1039,23 @@ class InputHandler {
     private func handleManageSecurityGroupRules(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .securityGroups && !tui.currentView.isDetailView {
-            await tui.actions.manageSecurityGroupRules(screen: screen)
+        if tui.viewCoordinator.currentView == .securityGroups && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "securitygroups") as? SecurityGroupsModule {
+                await module.manageSecurityGroupRules(screen: screen)
+            }
         }
     }
 
     private func handleManageContainerMetadata(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .swift && !tui.currentView.isDetailView {
-            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+        if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
             guard let containerName = container.name else {
                 tui.statusMessage = "Invalid container"
                 return
@@ -1212,27 +1089,27 @@ class InputHandler {
     private func handleSwiftTreeItemMetadata(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
-            guard let containerName = tui.swiftNavState.currentContainer else {
+        if tui.viewCoordinator.currentView == .swiftContainerDetail && !tui.viewCoordinator.currentView.isDetailView {
+            guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            guard let allObjects = tui.cachedSwiftObjects else {
+            guard let allObjects = tui.cacheManager.cachedSwiftObjects else {
                 tui.statusMessage = "No objects loaded"
                 return
             }
 
             // Build tree from objects
-            let currentPath = tui.swiftNavState.currentPathString
+            let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
             let treeItems = SwiftTreeItem.buildTree(from: allObjects, currentPath: currentPath)
 
-            guard tui.selectedIndex < treeItems.count else {
+            guard tui.viewCoordinator.selectedIndex < treeItems.count else {
                 tui.statusMessage = "No item selected"
                 return
             }
 
-            let selectedItem = treeItems[tui.selectedIndex]
+            let selectedItem = treeItems[tui.viewCoordinator.selectedIndex]
 
             switch selectedItem {
             case .object(let object):
@@ -1297,13 +1174,13 @@ class InputHandler {
     private func handleManageContainerWebAccess(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .swift && !tui.currentView.isDetailView {
-            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+        if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
             guard let containerName = container.name else {
                 tui.statusMessage = "Invalid container"
                 return
@@ -1344,138 +1221,60 @@ class InputHandler {
 
     // MARK: - Form Input Handling
     private func handleFormInputs(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
+        guard tui != nil else { return }
 
-        // NOTE: ServerCreate, KeyPairCreate, VolumeCreate, NetworkCreate, SecurityGroupCreate are handled earlier with early return
-        // to prevent the main input handler from interfering with text input
-
-        // Handle server group management form navigation
-        if tui.currentView == .serverGroupManagement {
-            await handleServerGroupManagementInput(ch, screen: screen)
-        }
-
-    }
-
-    // MARK: - Specialized Form Input Handlers (delegate to TUI for now)
-    private func handleServerCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleServerCreateInput(ch, screen: screen)
-    }
-
-    private func handleKeyPairCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleKeyPairCreateInput(ch, screen: screen)
-    }
-
-    private func handleVolumeCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleVolumeCreateInput(ch, screen: screen)
-    }
-
-    private func handleNetworkCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleNetworkCreateInput(ch, screen: screen)
-    }
-
-    private func handleSecurityGroupCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleSecurityGroupCreateInput(ch, screen: screen)
-    }
-
-    private func handleSubnetCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleSubnetCreateInput(ch, screen: screen)
-    }
-
-    private func handleSecurityGroupInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleSecurityGroupInput(ch, screen: screen)
-    }
-
-    private func handleNetworkInterfaceInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleNetworkInterfaceInput(ch, screen: screen)
-    }
-
-    private func handleVolumeManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleVolumeManagementInput(ch, screen: screen)
-    }
-
-    private func handleShowPerformanceStats() {
-        guard let tui = tui else { return }
-
-        // Get performance data and display it
-        let dashboard = tui.performanceMonitor.getDashboardData()
-        let systemMetrics = dashboard.systemMetrics
-        let appMetrics = dashboard.applicationMetrics
-        let openStackMetrics = dashboard.openStackMetrics
-
-        let statusMessage = """
-        Performance: Score=\(String(format: "%.0f", dashboard.performanceScore * 100))% | \
-        CPU=\(String(format: "%.1f", systemMetrics.cpuUsage * 100))% | \
-        Memory=\(ByteCountFormatter.string(fromByteCount: systemMetrics.memoryUsage, countStyle: .memory)) | \
-        FPS=\(String(format: "%.0f", appMetrics.frameRate)) | \
-        API=\(String(format: "%.2f", openStackMetrics.apiResponseTime))s | \
-        Alerts=\(dashboard.activeAlertsCount)
-        """
-
-        tui.statusMessage = statusMessage
-    }
-
-    private func handleRouterCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleRouterCreateInput(ch, screen: screen)
-    }
-
-    private func handleServerGroupCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleServerGroupCreateInput(ch, screen: screen)
-    }
-
-    private func handleServerGroupManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleServerGroupManagementInput(ch, screen: screen)
+        // NOTE: Module-handled views (forms, create views, management views) are now
+        // delegated via ViewRegistry at the start of handleInput()
     }
 
     // MARK: - Floating IP Action Methods
     private func handleManageFloatingIPServerAssignment(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
-            await tui.actions.manageFloatingIPServerAssignment(screen: screen)
+        if tui.viewCoordinator.currentView == .floatingIPs && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "floatingips") as? FloatingIPsModule {
+                await module.manageFloatingIPServerAssignment(screen: screen)
+            }
         }
     }
 
     private func handleManageFloatingIPPortAssignment(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .floatingIPs && !tui.currentView.isDetailView {
-            await tui.actions.manageFloatingIPPortAssignment(screen: screen)
+        if tui.viewCoordinator.currentView == .floatingIPs && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "floatingips") as? FloatingIPsModule {
+                await module.manageFloatingIPPortAssignment(screen: screen)
+            }
         }
     }
 
     private func handleManagePortServerAssignment(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .ports && !tui.currentView.isDetailView {
-            await tui.actions.managePortServerAssignment(screen: screen)
+        if tui.viewCoordinator.currentView == .ports && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "ports") as? PortsModule {
+                await module.managePortServerAssignment(screen: screen)
+            }
         }
     }
 
     private func handleManagePortAllowedAddressPairs(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .ports && !tui.currentView.isDetailView {
-            await tui.actions.managePortAllowedAddressPairs(screen: screen)
+        if tui.viewCoordinator.currentView == .ports && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "ports") as? PortsModule {
+                await module.managePortAllowedAddressPairs(screen: screen)
+            }
         }
     }
 
     private func handleAttachSubnetRouter(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .subnets && !tui.currentView.isDetailView {
-            await tui.actions.manageSubnetRouterAttachment(screen: screen)
+        if tui.viewCoordinator.currentView == .subnets && !tui.viewCoordinator.currentView.isDetailView {
+            if let module = ModuleRegistry.shared.module(for: "routers") as? RoutersModule {
+                await module.manageSubnetRouterAttachment(screen: screen)
+            }
         }
     }
 
@@ -1484,23 +1283,23 @@ class InputHandler {
 
         let containerName: String
 
-        if tui.currentView == .swift && !tui.currentView.isDetailView {
+        if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
             // Called from container list - get selected container
-            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
             guard let name = container.name else {
                 tui.statusMessage = "Invalid container"
                 return
             }
             containerName = name
 
-        } else if tui.currentView == .swiftContainerDetail {
+        } else if tui.viewCoordinator.currentView == .swiftContainerDetail {
             // Called from inside a container - use current container from navigation state
-            guard let currentContainer = tui.swiftNavState.currentContainer else {
+            guard let currentContainer = tui.viewCoordinator.swiftNavState.currentContainer else {
                 tui.statusMessage = "No container context"
                 return
             }
@@ -1531,13 +1330,13 @@ class InputHandler {
     private func handleDownloadContainer(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .swift && !tui.currentView.isDetailView {
-            guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+        if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            let container = tui.cachedSwiftContainers[tui.selectedIndex]
+            let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
             guard let containerName = container.name else {
                 tui.statusMessage = "Invalid container"
                 return
@@ -1565,30 +1364,30 @@ class InputHandler {
     private func handleDownloadObject(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        if tui.currentView == .swiftContainerDetail && !tui.currentView.isDetailView {
-            guard let containerName = tui.swiftNavState.currentContainer else {
+        if tui.viewCoordinator.currentView == .swiftContainerDetail && !tui.viewCoordinator.currentView.isDetailView {
+            guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            guard let allObjects = tui.cachedSwiftObjects else {
+            guard let allObjects = tui.cacheManager.cachedSwiftObjects else {
                 tui.statusMessage = "No objects loaded"
                 return
             }
 
             // Build tree from objects
-            let currentPath = tui.swiftNavState.currentPathString
+            let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
             let treeItems = SwiftTreeItem.buildTree(from: allObjects, currentPath: currentPath)
 
             // Apply search filter if present
             let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery?.isEmpty ?? true ? nil : tui.searchQuery)
 
-            guard tui.selectedIndex < filteredItems.count else {
+            guard tui.viewCoordinator.selectedIndex < filteredItems.count else {
                 tui.statusMessage = "No item selected"
                 return
             }
 
-            let selectedItem = filteredItems[tui.selectedIndex]
+            let selectedItem = filteredItems[tui.viewCoordinator.selectedIndex]
 
             switch selectedItem {
             case .object(let object):
@@ -1653,8 +1452,8 @@ class InputHandler {
     private func handleBulkDelete(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
 
-        let itemCount = tui.multiSelectedResourceIDs.count
-        let resourceType = tui.currentView.title
+        let itemCount = tui.selectionManager.multiSelectedResourceIDs.count
+        let resourceType = tui.viewCoordinator.currentView.title
 
         // Show confirmation modal
         let confirmed = await ConfirmationModal.show(
@@ -1672,48 +1471,48 @@ class InputHandler {
         }
 
         Logger.shared.logUserAction("bulk_delete_initiated", details: [
-            "view": "\(tui.currentView)",
+            "view": "\(tui.viewCoordinator.currentView)",
             "count": itemCount
         ])
 
         let batchOperation: BatchOperationType
 
-        switch tui.currentView {
+        switch tui.viewCoordinator.currentView {
         case .servers:
-            batchOperation = .serverBulkDelete(serverIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .serverBulkDelete(serverIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .volumes:
-            batchOperation = .volumeBulkDelete(volumeIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .volumeBulkDelete(volumeIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .networks:
-            batchOperation = .networkBulkDelete(networkIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .networkBulkDelete(networkIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .subnets:
-            batchOperation = .subnetBulkDelete(subnetIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .subnetBulkDelete(subnetIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .routers:
-            batchOperation = .routerBulkDelete(routerIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .routerBulkDelete(routerIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .ports:
-            batchOperation = .portBulkDelete(portIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .portBulkDelete(portIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .floatingIPs:
-            batchOperation = .floatingIPBulkDelete(floatingIPIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .floatingIPBulkDelete(floatingIPIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .securityGroups:
-            batchOperation = .securityGroupBulkDelete(securityGroupIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .securityGroupBulkDelete(securityGroupIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .serverGroups:
-            batchOperation = .serverGroupBulkDelete(serverGroupIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .serverGroupBulkDelete(serverGroupIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .keyPairs:
-            batchOperation = .keyPairBulkDelete(keyPairNames: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .keyPairBulkDelete(keyPairNames: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .images:
-            batchOperation = .imageBulkDelete(imageIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .imageBulkDelete(imageIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .volumeArchives:
-            batchOperation = .volumeBackupBulkDelete(backupIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .volumeBackupBulkDelete(backupIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .barbicanSecrets, .barbican:
-            batchOperation = .barbicanSecretBulkDelete(secretIDs: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .barbicanSecretBulkDelete(secretIDs: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .swift:
-            batchOperation = .swiftContainerBulkDelete(containerNames: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .swiftContainerBulkDelete(containerNames: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .swiftContainerDetail:
             // Get container name from selected resource
-            guard let container = tui.selectedResource as? SwiftContainer, let containerName = container.name else {
+            guard let container = tui.viewCoordinator.selectedResource as? SwiftContainer, let containerName = container.name else {
                 tui.statusMessage = "No container selected"
                 return
             }
-            batchOperation = .swiftObjectBulkDelete(containerName: containerName, objectNames: Array(tui.multiSelectedResourceIDs))
+            batchOperation = .swiftObjectBulkDelete(containerName: containerName, objectNames: Array(tui.selectionManager.multiSelectedResourceIDs))
         case .flavors:
             // Flavors don't support deletion
             tui.statusMessage = "Bulk operations not supported for flavors (cloud admin only)"
@@ -1734,8 +1533,8 @@ class InputHandler {
         tui.swiftBackgroundOps.addOperation(backgroundOp)
 
         // Exit multi-select mode immediately
-        tui.multiSelectMode = false
-        tui.multiSelectedResourceIDs.removeAll()
+        tui.selectionManager.multiSelectMode = false
+        tui.selectionManager.multiSelectedResourceIDs.removeAll()
 
         // Show status message and stay on current view
         tui.statusMessage = "Started bulk delete of \(itemCount) \(resourceType) in background"
@@ -1780,150 +1579,13 @@ class InputHandler {
             await tui.dataManager.refreshAllData()
 
             Logger.shared.logUserAction("bulk_delete_completed", details: [
-                "view": "\(tui.currentView)",
+                "view": "\(tui.viewCoordinator.currentView)",
                 "successful": result.successfulOperations,
                 "failed": result.failedOperations
             ])
         }
 
         backgroundOp.task = task
-    }
-
-
-
-
-    private func handleServerResizeInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleServerResizeInput(ch, screen: screen)
-    }
-
-    private func handleVolumeSnapshotManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleVolumeSnapshotManagementInput(ch, screen: screen)
-    }
-
-    private func handleVolumeBackupManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-        await tui.handleVolumeBackupManagementInput(ch, screen: screen)
-    }
-
-    // MARK: - Barbican Secret Input Handling
-    private func handleBarbicanSecretCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard let tui = tui else { return }
-
-        // Handle payload edit mode with optimized certificate processing
-        if tui.barbicanSecretCreateForm.payloadEditMode {
-            Logger.shared.logDebug("PAYLOAD EDIT MODE: ch=\(ch)")
-            if ch == Int32(27) { // ESC - Exit payload edit mode
-                tui.barbicanSecretCreateForm.exitEditMode()
-                return
-            }
-            if let character = UnicodeScalar(UInt32(ch))?.description.first {
-                await handleOptimizedPayloadInput(character)
-            }
-            return
-        }
-
-        // Handle regular form navigation
-        await tui.handleBarbicanSecretCreateInput(ch, screen: screen)
-    }
-
-    private var lastInputTime = Date()
-    private var rapidInputCount = 0
-    private var isInPasteSequence = false
-    private let rapidInputThreshold = 1
-    private var payloadBufferTimer: AnyObject?
-    private var instantFlushTimer: AnyObject?
-    private var publicKeyBufferTimer: AnyObject?
-
-    private func handleOptimizedPayloadInput(_ char: Character) async {
-        guard let tui = tui else { return }
-
-        // Add character to buffer first
-        if isValidCertificateCharacter(char) {
-            tui.barbicanSecretCreateForm.addToPayloadBuffer(char)
-            Logger.shared.logDebug("BUFFER: Added char '\(char)', buffer size now: \(tui.barbicanSecretCreateForm.payloadBuffer.count)")
-        }
-
-        // Always use delayed flush to improve performance for any rapid input
-        // Cancel any existing timer and set a new one
-        if let timer = payloadBufferTimer {
-            invalidateTimer(timer)
-        }
-        Logger.shared.logDebug("TIMER: Setting 100ms flush timer")
-        payloadBufferTimer = createCompatibleTimer(interval: 0.1, repeats: false, action: { [weak self] in
-            Task { @MainActor in
-                Logger.shared.logDebug("TIMER: 100ms timer fired, flushing...")
-                self?.flushPayloadBuffer()
-            }
-        })
-    }
-
-
-    private func readAllAvailableInput(startingWith firstChar: Character, tui: TUI) async {
-        // Add the first character
-        if isValidCertificateCharacter(firstChar) {
-            tui.barbicanSecretCreateForm.addToPayloadBuffer(firstChar)
-        }
-
-        Logger.shared.logInfo("BULK READ: Starting bulk accumulation mode")
-
-        // Set a longer delay to accumulate more characters before flushing
-        if let timer = instantFlushTimer {
-            invalidateTimer(timer)
-        }
-        instantFlushTimer = createCompatibleTimer(interval: 0.2, repeats: false, action: { [weak self] in
-            Task { @MainActor in
-                self?.flushPayloadBuffer()
-                self?.isInPasteSequence = false
-                guard let self = self, let tui = self.tui else { return }
-                tui.barbicanSecretCreateForm.isPasteMode = false
-                Logger.shared.logInfo("BULK READ: Completed paste operation")
-            }
-        })
-    }
-
-    private func isValidCertificateCharacter(_ char: Character) -> Bool {
-        // Accept ALL Unicode scalars for maximum certificate compatibility
-        // This includes all printable ASCII, control characters, and extended Unicode
-        if let scalar = char.unicodeScalars.first {
-            let value = scalar.value
-            // Accept characters 1-255 (all printable + control characters)
-            // This covers all PEM certificate requirements:
-            // - Base64 characters: A-Z, a-z, 0-9, +, /, =
-            // - Structural characters: -, newlines, spaces
-            // - Headers/footers: BEGIN/END markers
-            return value >= 1 && value <= 255
-        }
-        return false
-    }
-
-    @MainActor
-    private func flushPayloadBuffer() {
-        guard let tui = tui else { return }
-
-        Logger.shared.logInfo("FLUSH: Starting payload buffer flush")
-        let startTime = Date()
-
-        // Flush buffer immediately and exit paste mode
-        tui.barbicanSecretCreateForm.flushPayloadBuffer()
-
-        let flushTime = Date().timeIntervalSince(startTime)
-        Logger.shared.logInfo("FLUSH: Completed in \(String(format: "%.3f", flushTime))s")
-
-        // Clear all timers
-        if let timer = payloadBufferTimer {
-            invalidateTimer(timer)
-        }
-        payloadBufferTimer = nil
-        if let timer = instantFlushTimer {
-            invalidateTimer(timer)
-        }
-        instantFlushTimer = nil
-
-        // Reset paste sequence tracking
-        isInPasteSequence = false
-        rapidInputCount = 0
     }
 
     // MARK: - Mouse/Scroll Input Filtering
@@ -1958,12 +1620,12 @@ class InputHandler {
     private func handleSwiftContainerNavigation() async {
         guard let tui = tui else { return }
 
-        guard tui.selectedIndex < tui.cachedSwiftContainers.count else {
+        guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
             tui.statusMessage = "No container selected"
             return
         }
 
-        let container = tui.cachedSwiftContainers[tui.selectedIndex]
+        let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
         guard let containerName = container.name else {
             tui.statusMessage = "Invalid container"
             return
@@ -1972,7 +1634,7 @@ class InputHandler {
         Logger.shared.logInfo("Navigating into container: \(containerName)")
 
         // Update navigation state
-        tui.swiftNavState.navigateIntoContainer(containerName)
+        tui.viewCoordinator.swiftNavState.navigateIntoContainer(containerName)
 
         // Change to container detail view
         tui.changeView(to: .swiftContainerDetail, resetSelection: true)
@@ -1980,19 +1642,19 @@ class InputHandler {
         // Load objects for this container
         await tui.dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
 
-        Logger.shared.logInfo("Container navigation complete, showing \(tui.cachedSwiftObjects?.count ?? 0) objects")
+        Logger.shared.logInfo("Container navigation complete, showing \(tui.cacheManager.cachedSwiftObjects?.count ?? 0) objects")
     }
 
     /// Handle SPACEBAR navigation when in container detail view (tree items)
     private func handleSwiftTreeItemNavigation() async {
         guard let tui = tui else { return }
 
-        guard let objects = tui.cachedSwiftObjects else {
+        guard let objects = tui.cacheManager.cachedSwiftObjects else {
             tui.statusMessage = "No objects loaded"
             return
         }
 
-        let currentPath = tui.swiftNavState.currentPathString
+        let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
 
         // Build tree structure
         let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
@@ -2000,34 +1662,34 @@ class InputHandler {
         // Apply search filter if present
         let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery?.isEmpty ?? true ? nil : tui.searchQuery)
 
-        guard tui.selectedIndex < filteredItems.count else {
+        guard tui.viewCoordinator.selectedIndex < filteredItems.count else {
             tui.statusMessage = "No item selected"
             return
         }
 
-        let selectedItem = filteredItems[tui.selectedIndex]
+        let selectedItem = filteredItems[tui.viewCoordinator.selectedIndex]
 
         switch selectedItem {
         case .directory(let directoryName, _, _):
             // Navigate into directory
             Logger.shared.logInfo("Navigating into directory: \(directoryName)")
-            tui.swiftNavState.navigateIntoDirectory(directoryName)
+            tui.viewCoordinator.swiftNavState.navigateIntoDirectory(directoryName)
 
             // Reset selection to top
-            tui.selectedIndex = 0
-            tui.scrollOffset = 0
+            tui.viewCoordinator.selectedIndex = 0
+            tui.viewCoordinator.scrollOffset = 0
 
             // Stay in the same view (swiftContainerDetail)
             tui.markNeedsRedraw()
 
-            Logger.shared.logInfo("Directory navigation complete, new path: \(tui.swiftNavState.currentPathString)")
+            Logger.shared.logInfo("Directory navigation complete, new path: \(tui.viewCoordinator.swiftNavState.currentPathString)")
 
         case .object(let object):
             // Open object detail view
             Logger.shared.logInfo("Opening object detail: \(object.name ?? "unknown")")
-            tui.selectedResource = object
+            tui.viewCoordinator.selectedResource = object
             tui.changeView(to: .swiftObjectDetail, resetSelection: false)
-            tui.detailScrollOffset = 0
+            tui.viewCoordinator.detailScrollOffset = 0
         }
     }
 
@@ -2037,15 +1699,15 @@ class InputHandler {
         guard let tui = tui else { return }
 
         let operations = tui.swiftBackgroundOps.getAllOperations()
-        guard tui.selectedIndex < operations.count else {
+        guard tui.viewCoordinator.selectedIndex < operations.count else {
             tui.statusMessage = "No operation selected"
             return
         }
 
-        let operation = operations[tui.selectedIndex]
-        tui.selectedResource = operation
+        let operation = operations[tui.viewCoordinator.selectedIndex]
+        tui.viewCoordinator.selectedResource = operation
         tui.changeView(to: .swiftBackgroundOperationDetail, resetSelection: false)
-        tui.detailScrollOffset = 0
+        tui.viewCoordinator.detailScrollOffset = 0
     }
 
     /// Handles DELETE key in background operations view with context-aware behavior
@@ -2055,13 +1717,13 @@ class InputHandler {
         guard let tui = tui else { return }
 
         let operations = tui.swiftBackgroundOps.getAllOperations()
-        guard tui.selectedIndex < operations.count else {
+        guard tui.viewCoordinator.selectedIndex < operations.count else {
             tui.statusMessage = "No operation selected"
             await tui.draw(screen: screen)
             return
         }
 
-        let operation = operations[tui.selectedIndex]
+        let operation = operations[tui.viewCoordinator.selectedIndex]
 
         // Context-aware behavior based on operation status
         if operation.status.isActive {
@@ -2118,12 +1780,12 @@ class InputHandler {
 
             // Reset selection immediately after removal
             let remainingOps = tui.swiftBackgroundOps.getAllOperations()
-            if tui.selectedIndex >= remainingOps.count {
-                tui.selectedIndex = max(0, remainingOps.count - 1)
+            if tui.viewCoordinator.selectedIndex >= remainingOps.count {
+                tui.viewCoordinator.selectedIndex = max(0, remainingOps.count - 1)
             }
 
             // Force full screen refresh to immediately show the removal
-            tui.renderOptimizer.markFullScreenDirty()
+            tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
 
             tui.statusMessage = "Removed operation: \(operation.displayName)"
             Logger.shared.logUserAction("remove_background_operation", details: [
@@ -2142,7 +1804,7 @@ class InputHandler {
     /// - If operation is inactive (completed/failed/cancelled): Remove it from history and return to list
     private func handleCancelBackgroundOperationFromDetail(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
-        guard let operation = tui.selectedResource as? SwiftBackgroundOperation else {
+        guard let operation = tui.viewCoordinator.selectedResource as? SwiftBackgroundOperation else {
             tui.statusMessage = "No operation selected"
             await tui.draw(screen: screen)
             return
@@ -2203,8 +1865,8 @@ class InputHandler {
 
             // Reset selection immediately after removal
             let remainingOps = tui.swiftBackgroundOps.getAllOperations()
-            if tui.selectedIndex >= remainingOps.count {
-                tui.selectedIndex = max(0, remainingOps.count - 1)
+            if tui.viewCoordinator.selectedIndex >= remainingOps.count {
+                tui.viewCoordinator.selectedIndex = max(0, remainingOps.count - 1)
             }
 
             tui.statusMessage = "Removed operation: \(operation.displayName)"
@@ -2219,7 +1881,7 @@ class InputHandler {
             tui.changeView(to: .swiftBackgroundOperations, resetSelection: false)
 
             // Force full screen refresh to immediately show the removal
-            tui.renderOptimizer.markFullScreenDirty()
+            tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
         }
 
         await tui.draw(screen: screen)

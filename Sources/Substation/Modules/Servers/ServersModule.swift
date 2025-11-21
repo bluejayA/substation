@@ -51,7 +51,7 @@ final class ServersModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -84,11 +84,21 @@ final class ServersModule: OpenStackModule {
     /// The module will load even if Nova is temporarily unavailable to allow
     /// for graceful degradation in multi-cloud or degraded environments.
     func configure() async throws {
-        guard let tui = tui else {
+        guard tui != nil else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
         Logger.shared.logInfo("ServersModule configuration started", context: [:])
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .servers,
+            detailViewMode: .serverDetail
+        )
 
         // ServersModule configuration completed
         Logger.shared.logInfo("ServersModule configuration completed", context: [:])
@@ -135,14 +145,14 @@ final class ServersModule: OpenStackModule {
                     height: height,
                     cachedServers: tui.resourceCache.servers,
                     searchQuery: tui.searchQuery,
-                    scrollOffset: tui.scrollOffset,
-                    selectedIndex: tui.selectedIndex,
+                    scrollOffset: tui.viewCoordinator.scrollOffset,
+                    selectedIndex: tui.viewCoordinator.selectedIndex,
                     cachedFlavors: tui.resourceCache.flavors,
                     cachedImages: tui.resourceCache.images,
                     dataManager: tui.dataManager,
                     virtualScrollManager: nil,
-                    multiSelectMode: tui.multiSelectMode,
-                    selectedItems: tui.multiSelectedResourceIDs
+                    multiSelectMode: tui.selectionManager.multiSelectMode,
+                    selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -159,7 +169,7 @@ final class ServersModule: OpenStackModule {
             title: "Server Details",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let server = tui.selectedResource as? Server else {
+                guard let server = tui.viewCoordinator.selectedResource as? Server else {
                     let surface = SwiftNCurses.surface(from: screen)
                     let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                     await SwiftNCurses.render(Text("No server selected").error(), on: surface, in: bounds)
@@ -176,7 +186,7 @@ final class ServersModule: OpenStackModule {
                     cachedVolumes: tui.resourceCache.volumes,
                     cachedFlavors: tui.resourceCache.flavors,
                     cachedImages: tui.resourceCache.images,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -193,7 +203,7 @@ final class ServersModule: OpenStackModule {
             title: "Create Server",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let server = tui.selectedResource as? Server else {
+                guard let server = tui.viewCoordinator.selectedResource as? Server else {
                     let surface = SwiftNCurses.surface(from: screen)
                     let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                     await SwiftNCurses.render(Text("No server selected").error(), on: surface, in: bounds)
@@ -210,7 +220,7 @@ final class ServersModule: OpenStackModule {
                     cachedVolumes: tui.resourceCache.volumes,
                     cachedFlavors: tui.resourceCache.flavors,
                     cachedImages: tui.resourceCache.images,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -227,7 +237,7 @@ final class ServersModule: OpenStackModule {
             title: "Server Console",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let server = tui.selectedResource as? Server else {
+                guard tui.viewCoordinator.selectedResource is Server else {
                     let surface = SwiftNCurses.surface(from: screen)
                     let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                     await SwiftNCurses.render(Text("No server selected").error(), on: surface, in: bounds)
@@ -338,7 +348,7 @@ final class ServersModule: OpenStackModule {
                 // Console view is read-only with navigation controls
                 await tui.inputHandler.handleInput(ch, screen: screen)
             },
-            formValidation: { [weak tui] in
+            formValidation: {
                 // Console view doesn't require validation
                 return true
             }
@@ -610,5 +620,61 @@ final class ServersModule: OpenStackModule {
         stats["attachedVolumes"] = attachedVolumes.count
 
         return stats
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension ServersModule: ActionProvider {
+    /// Actions available in the list view for servers
+    ///
+    /// Includes create, delete, refresh, lifecycle controls, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .start, .stop, .restart, .clearCache]
+    }
+
+    /// Actions available in the detail view for servers
+    ///
+    /// Includes delete, lifecycle controls, refresh, and cache management.
+    var detailViewActions: [ActionType] {
+        [.delete, .start, .stop, .restart, .refresh, .clearCache]
+    }
+
+    /// The view mode for creating a new server
+    var createViewMode: ViewMode? {
+        .serverCreate
+    }
+
+    /// Execute an action for the selected server
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteServer(screen: screen)
+            return true
+        case .start:
+            await startServer(screen: screen)
+            return true
+        case .stop:
+            await stopServer(screen: screen)
+            return true
+        case .restart:
+            await restartServer(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

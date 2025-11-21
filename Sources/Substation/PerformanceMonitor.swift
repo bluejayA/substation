@@ -1433,12 +1433,12 @@ private class OpenStackMetricsCollector {
         }
 
         // Get actual resource counts from TUI cached resources
-        let serverCount = tui.cachedServers.count
-        let networkCount = tui.cachedNetworks.count
-        let volumeCount = tui.cachedVolumes.count
-        let imageCount = tui.cachedImages.count
-        let flavorCount = tui.cachedFlavors.count
-        let securityGroupCount = tui.cachedSecurityGroups.count
+        let serverCount = tui.cacheManager.cachedServers.count
+        let networkCount = tui.cacheManager.cachedNetworks.count
+        let volumeCount = tui.cacheManager.cachedVolumes.count
+        let imageCount = tui.cacheManager.cachedImages.count
+        let flavorCount = tui.cacheManager.cachedFlavors.count
+        let securityGroupCount = tui.cacheManager.cachedSecurityGroups.count
 
         return PerformanceMonitor.OpenStackMetrics.ResourceCount(
             servers: serverCount,

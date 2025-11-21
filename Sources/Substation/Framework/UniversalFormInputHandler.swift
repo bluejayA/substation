@@ -223,7 +223,7 @@ final class UniversalFormInputHandler {
     ) async {
         guard let tui = tui else { return }
 
-        tui.needsRedraw = true
+        tui.renderCoordinator.needsRedraw = true
 
         if isFieldActive {
             // Deactivate field

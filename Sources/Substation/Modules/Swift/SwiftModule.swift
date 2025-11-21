@@ -16,9 +16,10 @@ final class SwiftModule: OpenStackModule {
     let version: String = "1.0.0"
     let dependencies: [String] = []
 
-    // MARK: - Private Properties
+    // MARK: - Internal Properties
 
-    private weak var tui: TUI?
+    /// Weak reference to TUI to prevent retain cycles
+    internal weak var tui: TUI?
 
     // MARK: - Initialization
 
@@ -44,6 +45,16 @@ final class SwiftModule: OpenStackModule {
         // Module configured successfully
         // Swift service availability will be checked during actual API calls
         Logger.shared.logInfo("SwiftModule configuration completed", context: [:])
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .swift,
+            detailViewMode: .swiftContainerDetail
+        )
     }
 
     // MARK: - View Registration
@@ -511,7 +522,7 @@ final class SwiftModule: OpenStackModule {
                 identifier: "swift.objects",
                 refreshHandler: { [weak tui] in
                     guard let tui = tui else { return }
-                    guard let containerName = tui.swiftNavState.currentContainer else {
+                    guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
                         Logger.shared.logDebug("No container selected for object refresh")
                         return
                     }
@@ -535,9 +546,9 @@ final class SwiftModule: OpenStackModule {
 
         // Clear any cached Swift data
         if let tui = tui {
-            tui.cachedSwiftContainers = []
+            tui.cacheManager.cachedSwiftContainers = []
             // Reset navigation state
-            tui.swiftNavState.reset()
+            tui.viewCoordinator.swiftNavState.reset()
         }
 
         Logger.shared.logInfo("SwiftModule cleanup completed", context: [:])
@@ -561,7 +572,7 @@ final class SwiftModule: OpenStackModule {
         }
 
         // Check if we have Swift containers loaded
-        let containerCount = tui.cachedSwiftContainers.count
+        let containerCount = tui.cacheManager.cachedSwiftContainers.count
         metrics["cached_containers"] = containerCount
         metrics["service_available"] = containerCount > 0
 
@@ -569,15 +580,15 @@ final class SwiftModule: OpenStackModule {
             errors.append("No Swift containers loaded - service may be unavailable")
         }
 
-        if let currentContainer = tui.swiftNavState.currentContainer,
-           let objects = tui.cachedSwiftObjects {
+        if let currentContainer = tui.viewCoordinator.swiftNavState.currentContainer,
+           let objects = tui.cacheManager.cachedSwiftObjects {
             metrics["cached_objects"] = objects.count
             metrics["current_container"] = currentContainer
         }
 
         // Navigation state metrics
-        metrics["navigation_depth"] = tui.swiftNavState.depth
-        metrics["is_at_container_list"] = tui.swiftNavState.isAtContainerList
+        metrics["navigation_depth"] = tui.viewCoordinator.swiftNavState.depth
+        metrics["is_at_container_list"] = tui.viewCoordinator.swiftNavState.isAtContainerList
 
         return ModuleHealthStatus(
             isHealthy: errors.isEmpty,
@@ -598,7 +609,7 @@ final class SwiftModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        let containers = tui.cachedSwiftContainers
+        let containers = tui.cacheManager.cachedSwiftContainers
         let searchQuery = tui.searchQuery ?? ""
 
         await SwiftViews.drawSwiftContainerList(
@@ -609,12 +620,12 @@ final class SwiftModule: OpenStackModule {
             height: height,
             containers: containers,
             searchQuery: searchQuery,
-            scrollOffset: tui.scrollOffset,
-            selectedIndex: tui.selectedIndex,
+            scrollOffset: tui.viewCoordinator.scrollOffset,
+            selectedIndex: tui.viewCoordinator.selectedIndex,
             dataManager: tui.dataManager,
             virtualScrollManager: nil,
-            multiSelectMode: tui.multiSelectMode,
-            selectedItems: tui.multiSelectedResourceIDs
+            multiSelectMode: tui.selectionManager.multiSelectMode,
+            selectedItems: tui.selectionManager.multiSelectedResourceIDs
         )
     }
 
@@ -627,15 +638,23 @@ final class SwiftModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let container = tui.selectedResource as? SwiftContainer else {
+        guard let container = tui.viewCoordinator.selectedResource as? SwiftContainer else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             await SwiftNCurses.render(Text("No container selected").error(), on: surface, in: bounds)
             return
         }
 
-        // TODO: Metadata fetching not yet implemented
-        let metadata: SwiftContainerMetadataResponse? = nil
+        // Fetch container metadata from the Swift service
+        var metadata: SwiftContainerMetadataResponse? = nil
+        if let containerName = container.name {
+            do {
+                metadata = try await tui.client.swift.getContainerMetadata(containerName: containerName)
+            } catch {
+                Logger.shared.logDebug("Failed to fetch container metadata: \(error.localizedDescription)")
+                // Continue without metadata - the view will handle nil gracefully
+            }
+        }
 
         await SwiftViews.drawSwiftContainerDetail(
             screen: screen,
@@ -645,7 +664,7 @@ final class SwiftModule: OpenStackModule {
             height: height,
             container: container,
             metadata: metadata,
-            scrollOffset: tui.detailScrollOffset
+            scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
     }
 
@@ -658,22 +677,33 @@ final class SwiftModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let object = tui.selectedResource as? SwiftObject else {
+        guard let object = tui.viewCoordinator.selectedResource as? SwiftObject else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             await SwiftNCurses.render(Text("No object selected").error(), on: surface, in: bounds)
             return
         }
 
-        guard let containerName = tui.swiftNavState.currentContainer else {
+        guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             await SwiftNCurses.render(Text("No container context").error(), on: surface, in: bounds)
             return
         }
 
-        // TODO: Metadata fetching not yet implemented
-        let metadata: SwiftObjectMetadataResponse? = nil
+        // Fetch object metadata from the Swift service
+        var metadata: SwiftObjectMetadataResponse? = nil
+        if let objectName = object.name {
+            do {
+                metadata = try await tui.client.swift.getObjectMetadata(
+                    containerName: containerName,
+                    objectName: objectName
+                )
+            } catch {
+                Logger.shared.logDebug("Failed to fetch object metadata: \(error.localizedDescription)")
+                // Continue without metadata - the view will handle nil gracefully
+            }
+        }
 
         await SwiftViews.drawSwiftObjectDetail(
             screen: screen,
@@ -684,7 +714,7 @@ final class SwiftModule: OpenStackModule {
             object: object,
             containerName: containerName,
             metadata: metadata,
-            scrollOffset: tui.detailScrollOffset
+            scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
     }
 
@@ -868,13 +898,18 @@ final class SwiftModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        // TODO: Background operations view not yet implemented
-        let surface = SwiftNCurses.surface(from: screen)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftNCurses.render(
-            Text("Background operations view not yet implemented").warning(),
-            on: surface,
-            in: bounds
+        // Get all background operations from the manager
+        let operations = tui.swiftBackgroundOps.getAllOperations()
+
+        await SwiftBackgroundOperationsView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            operations: operations,
+            scrollOffset: tui.viewCoordinator.scrollOffset,
+            selectedIndex: tui.viewCoordinator.selectedIndex
         )
     }
 
@@ -887,13 +922,68 @@ final class SwiftModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        // TODO: Background operation detail view not yet implemented
-        let surface = SwiftNCurses.surface(from: screen)
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftNCurses.render(
-            Text("Background operation detail view not yet implemented").warning(),
-            on: surface,
-            in: bounds
+        guard let operation = tui.viewCoordinator.selectedResource as? SwiftBackgroundOperation else {
+            let surface = SwiftNCurses.surface(from: screen)
+            let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+            await SwiftNCurses.render(Text("No operation selected").error(), on: surface, in: bounds)
+            return
+        }
+
+        await SwiftBackgroundOperationDetailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height,
+            operation: operation,
+            scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension SwiftModule: ActionProvider {
+    /// Actions available in the list view for Swift containers
+    ///
+    /// Includes create, delete, refresh, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .clearCache]
+    }
+
+    /// Actions available in the detail view for Swift containers
+    ///
+    /// Includes delete, refresh, and cache management.
+    var detailViewActions: [ActionType] {
+        [.delete, .refresh, .clearCache]
+    }
+
+    /// The view mode for creating a new container
+    var createViewMode: ViewMode? {
+        .swiftContainerCreate
+    }
+
+    /// Execute an action for the selected Swift resource
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteSwiftContainer(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

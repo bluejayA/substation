@@ -25,7 +25,7 @@ final class ServerGroupsModule: OpenStackModule {
     // MARK: - TUI Reference
 
     /// Reference to TUI system
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     // MARK: - Initialization
 
@@ -61,6 +61,16 @@ final class ServerGroupsModule: OpenStackModule {
         }
 
         // Module is ready - no additional configuration needed
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .serverGroups,
+            detailViewMode: .serverGroupDetail
+        )
     }
 
     // MARK: - View Registration
@@ -245,7 +255,49 @@ final class ServerGroupsModule: OpenStackModule {
             metrics: metrics
         )
     }
+}
 
+// MARK: - ActionProvider Conformance
+
+extension ServerGroupsModule: ActionProvider {
+    /// Actions available in the list view for server groups
+    ///
+    /// Includes create, delete, refresh, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .clearCache]
+    }
+
+    /// The view mode for creating a new server group
+    var createViewMode: ViewMode? {
+        .serverGroupCreate
+    }
+
+    /// Execute an action for the selected server group
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteServerGroup(screen: screen)
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+extension ServerGroupsModule {
     // MARK: - View Rendering Methods
 
     /// Render server groups list view
@@ -267,10 +319,10 @@ final class ServerGroupsModule: OpenStackModule {
             height: height,
             cachedServerGroups: cachedServerGroups,
             searchQuery: tui.searchQuery,
-            scrollOffset: tui.scrollOffset,
-            selectedIndex: tui.selectedIndex,
-            multiSelectMode: tui.multiSelectMode,
-            selectedItems: tui.multiSelectedResourceIDs
+            scrollOffset: tui.viewCoordinator.scrollOffset,
+            selectedIndex: tui.viewCoordinator.selectedIndex,
+            multiSelectMode: tui.selectionManager.multiSelectMode,
+            selectedItems: tui.selectionManager.multiSelectedResourceIDs
         )
     }
 
@@ -283,7 +335,7 @@ final class ServerGroupsModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let serverGroup = tui.selectedResource as? ServerGroup else {
+        guard let serverGroup = tui.viewCoordinator.selectedResource as? ServerGroup else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol + 2, y: startRow + 2, width: width - 4, height: 1)
             await SwiftNCurses.render(
@@ -304,7 +356,7 @@ final class ServerGroupsModule: OpenStackModule {
             height: height,
             serverGroup: serverGroup,
             cachedServers: cachedServers,
-            scrollOffset: tui.detailScrollOffset
+            scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
     }
 

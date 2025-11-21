@@ -23,8 +23,16 @@ final class TUI {
     internal lazy var formInputHandler: FormInputHandler = FormInputHandler(tui: self)
     internal lazy var universalFormInputHandler: UniversalFormInputHandler = UniversalFormInputHandler(tui: self)
     internal lazy var resourceOperations: ResourceOperations = ResourceOperations(tui: self)
-    internal lazy var actions: Actions = Actions(tui: self)
     internal lazy var uiHelpers: UIHelpers = UIHelpers(tui: self)
+
+    // Selection state management
+    internal let selectionManager: SelectionManager = SelectionManager()
+
+    // View coordination management
+    internal let viewCoordinator: ViewCoordinator = ViewCoordinator()
+
+    // Refresh management
+    internal let refreshManager: RefreshManager
 
     // Simplified services for code quality
     internal lazy var errorHandler = OperationErrorHandler(enhancedHandler: enhancedErrorHandler)
@@ -34,6 +42,9 @@ final class TUI {
     internal let memoryContainer: SubstationMemoryContainer
     internal lazy var resourceCache: OpenStackResourceCache = memoryContainer.openStackResourceCache
     internal let userFeedback: UserFeedbackSystem
+
+    // Cache management (MemoryKit-backed)
+    internal var cacheManager: CacheManager!
 
     // Phase 4.3: Professional User Experience Components
     internal let progressIndicator: ProgressIndicator
@@ -46,53 +57,21 @@ final class TUI {
     // Phase 5.3: Advanced Search System - Now using static methods
 
     // Module system
-    internal var moduleRegistry: ModuleRegistry?
+    internal let moduleOrchestrator: ModuleOrchestrator
 
-    // Performance optimization
-    internal var renderOptimizer = RenderOptimizer()
-    var performanceMonitor: PerformanceMonitor
+    // Render coordination - manages rendering optimization, performance monitoring, and UI caching
+    internal let renderCoordinator: RenderCoordinator
 
     // Notification observers
     private var notificationObservers: [any NSObjectProtocol] = []
 
-    // Virtual list controllers for optimization
-    private var virtualListControllers: [String: VirtualListController] = [:]
-    internal var searchControllers: [String: ListSearchController] = [:]
-
 
     // Session tracking
     private var sessionMetrics = SessionMetrics()
-    internal var currentView: ViewMode = .loading
-    internal var previousView: ViewMode = .loading
     internal var running = true
 
     // Phase 2: Render state tracking to prevent background interference
     internal var isFloatingIPViewRendering = false
-    internal var scrollOffset = 0
-    internal var helpScrollOffset = 0
-    internal var detailScrollOffset = 0  // For scrolling within detail views
-    internal var quotaScrollOffset = 0   // For scrolling within quota panel on dashboard
-    internal var selectedIndex = 0  // Currently selected item in lists
-    internal var selectedResource: Any? = nil  // The selected resource for detail view
-    internal var previousSelectedResourceName: String? = nil  // Name of the resource before transitioning to a sub-view
-    internal var selectedServers: Set<String> = Set<String>()  // Selected server IDs for network attachment
-    internal var attachedServerIds: Set<String> = Set<String>()  // Server IDs that have the selected resource attached
-    internal var attachmentMode: AttachmentMode = .attach  // Current attachment mode (attach/detach)
-    // Multi-select mode state
-    internal var multiSelectMode: Bool = false  // Whether multi-select mode is enabled
-    internal var multiSelectedResourceIDs: Set<String> = Set<String>()  // IDs of selected resources in multi-select mode
-    // Floating IP server management (single-select)
-    internal var selectedServerId: String? = nil  // Selected server ID for floating IP management
-    internal var attachedServerId: String? = nil  // Server ID that has the selected floating IP attached
-    // Floating IP port management (single-select)
-    internal var selectedPortId: String? = nil  // Selected port ID for floating IP management
-    internal var attachedPortId: String? = nil  // Port ID that has the selected floating IP attached
-    // Subnet router management (single-select)
-    internal var selectedRouterId: String? = nil  // Selected router ID for subnet management
-    internal var attachedRouterIds: Set<String> = []  // Router IDs that have the selected subnet attached
-
-    // Search result navigation
-    internal var searchSelectedResourceId: String? = nil  // Resource ID selected from search to view in detail
 
     // Floating IP server selection state
     internal var searchQuery: String?
@@ -103,12 +82,6 @@ final class TUI {
     internal var showUnifiedInput: Bool = true // Always show the input bar
     internal lazy var commandMode: CommandMode = CommandMode()
     internal lazy var contextSwitcher: ContextSwitcher = ContextSwitcher(cloudConfigManager: CloudConfigManager())
-
-    // Health Dashboard navigation state
-    internal lazy var healthDashboardNavState: HealthDashboardView.NavigationState = HealthDashboardView.NavigationState()
-
-    // Swift navigation state for hierarchical object storage browsing
-    internal lazy var swiftNavState: SwiftNavigationState = SwiftNavigationState()
 
     // Background operations tracking
     internal lazy var swiftBackgroundOps: SwiftBackgroundOperationsManager = SwiftBackgroundOperationsManager()
@@ -128,166 +101,8 @@ final class TUI {
     internal var screenRows: Int32 = 0
     internal var screenCols: Int32 = 0
     internal var resourceCounts = ResourceCounts()
-    internal var lastRefresh = Date()
-    internal var autoRefresh = true // Enabled by default to show live state changes
-    // Use system-aware default refresh interval based on CPU cores
-    internal var baseRefreshInterval: TimeInterval = SystemCapabilities.optimalRefreshInterval()
-    private let availableIntervals: [TimeInterval] = [3.0, 5.0, 7.0, 10.0, 15.0, 30.0]
-    private var fastRefreshUntil: Date? = nil // Temporary fast refresh after operations
-    internal var lastUserActivityTime = Date() // Track last user input for smart refresh
-    private let activityCooldownPeriod: TimeInterval = 3.0 // Wait 3s after activity before auto-refresh
-
-    private var refreshInterval: TimeInterval {
-        // Use fast refresh (3s) temporarily after operations to show state transitions
-        if let until = fastRefreshUntil, Date() < until {
-            return 3.0
-        }
-        // Use very fast refresh rate for floating IP view to show state changes immediately
-        if currentView == .floatingIPs || currentView == .floatingIPServerSelect {
-            return 1.0  // 1 second for immediate updates on floating IP changes
-        }
-        return baseRefreshInterval  // 10 seconds for other views
-    }
-
-    // Smart redraw optimization
-    internal var needsRedraw = true
-    internal var lastDrawTime: Date = Date()
-    internal var redrawThrottleInterval: TimeInterval = 0.032 // ~30fps
-    internal var lastPerformanceLog: Date = Date()
-    internal var performanceLogInterval: TimeInterval = 30.0 // Log every 30 seconds
-
-    // Advanced rendering optimization
-    internal var previousScrollOffset = 0
-
-    // Performance tracking for scroll operations
-    internal var lastScrollTime: Date = Date()
-    internal var scrollEventCount = 0
-    internal var scrollBatchTimer: Timer?
-
-    // Adaptive event loop state
-    private var lastInputTime: Date = Date()
-    private var consecutiveIdlePolls: Int = 0
-    private var currentSleepInterval: UInt64 = 5_000_000 // Start at 5ms
 
     // MARK: - Resource Cache Accessors (MemoryKit-backed)
-
-    // Computed properties that access the MemoryKit-backed resource cache
-    internal var cachedServers: [Server] {
-        get { resourceCache.servers }
-        set { Task { await resourceCache.setServers(newValue) } }
-    }
-    internal var cachedServerGroups: [ServerGroup] {
-        get { resourceCache.serverGroups }
-        set { Task { await resourceCache.setServerGroups(newValue) } }
-    }
-    internal var cachedNetworks: [Network] {
-        get { resourceCache.networks }
-        set { Task { await resourceCache.setNetworks(newValue) } }
-    }
-    internal var cachedVolumes: [Volume] {
-        get { resourceCache.volumes }
-        set { Task { await resourceCache.setVolumes(newValue) } }
-    }
-    internal var cachedImages: [Image] {
-        get { resourceCache.images }
-        set { Task { await resourceCache.setImages(newValue) } }
-    }
-    internal var cachedVolumeTypes: [VolumeType] {
-        get { resourceCache.volumeTypes }
-        set { Task { await resourceCache.setVolumeTypes(newValue) } }
-    }
-    internal var cachedPorts: [Port] {
-        get { resourceCache.ports }
-        set { Task { await resourceCache.setPorts(newValue) } }
-    }
-    internal var cachedRouters: [Router] {
-        get { resourceCache.routers }
-        set { Task { await resourceCache.setRouters(newValue) } }
-    }
-    internal var cachedFloatingIPs: [FloatingIP] {
-        get { resourceCache.floatingIPs }
-        set { Task { await resourceCache.setFloatingIPs(newValue) } }
-    }
-    internal var cachedFlavors: [Flavor] {
-        get { resourceCache.flavors }
-        set { Task { await resourceCache.setFlavors(newValue) } }
-    }
-    internal var cachedSubnets: [Subnet] {
-        get { resourceCache.subnets }
-        set { Task { await resourceCache.setSubnets(newValue) } }
-    }
-    internal var cachedSecurityGroups: [SecurityGroup] {
-        get { resourceCache.securityGroups }
-        set { Task { await resourceCache.setSecurityGroups(newValue) } }
-    }
-    internal var cachedKeyPairs: [KeyPair] {
-        get { resourceCache.keyPairs }
-        set { Task { await resourceCache.setKeyPairs(newValue) } }
-    }
-    internal var cachedQoSPolicies: [QoSPolicy] {
-        get { resourceCache.qosPolicies }
-        set { Task { await resourceCache.setQoSPolicies(newValue) } }
-    }
-    internal var cachedAvailabilityZones: [String] {
-        get { resourceCache.availabilityZones }
-        set { Task { await resourceCache.setAvailabilityZones(newValue) } }
-    }
-    internal var cachedSecrets: [Secret] {
-        get { resourceCache.secrets }
-        set { Task { await resourceCache.setSecrets(newValue) } }
-    }
-    internal var cachedLoadBalancers: [LoadBalancer] {
-        get { resourceCache.loadBalancers }
-        set { Task { await resourceCache.setLoadBalancers(newValue) } }
-    }
-    internal var cachedSwiftContainers: [SwiftContainer] {
-        get { resourceCache.swiftContainers }
-        set { Task { await resourceCache.setSwiftContainers(newValue) } }
-    }
-    internal var cachedSwiftObjects: [SwiftObject]? {
-        get {
-            // Use navigation state instead of selectedResource to avoid race conditions
-            guard let containerName = swiftNavState.currentContainer else {
-                return nil
-            }
-            return resourceCache.getSwiftObjects(forContainer: containerName)
-        }
-        set {
-            // Use navigation state instead of selectedResource
-            guard let containerName = swiftNavState.currentContainer,
-                  let objects = newValue else {
-                return
-            }
-            Task { await resourceCache.setSwiftObjects(objects, forContainer: containerName) }
-        }
-    }
-
-    // Cached flavor recommendations for all workload types
-    internal var cachedFlavorRecommendations: [WorkloadType: [FlavorRecommendation]] {
-        get { resourceCache.flavorRecommendations }
-        set { Task { await resourceCache.setFlavorRecommendations(newValue) } }
-    }
-    internal var lastRecommendationsRefresh: Date {
-        resourceCache.recommendationsRefreshTime
-    }
-
-    // Quota data
-    internal var cachedComputeQuotas: ComputeQuotaSet? {
-        get { resourceCache.computeQuotas }
-        set { Task { await resourceCache.setComputeQuotas(newValue) } }
-    }
-    internal var cachedNetworkQuotas: NetworkQuotaSet? {
-        get { resourceCache.networkQuotas }
-        set { Task { await resourceCache.setNetworkQuotas(newValue) } }
-    }
-    internal var cachedVolumeQuotas: VolumeQuotaSet? {
-        get { resourceCache.volumeQuotas }
-        set { Task { await resourceCache.setVolumeQuotas(newValue) } }
-    }
-    internal var cachedComputeLimits: ComputeQuotaSet? {
-        get { resourceCache.computeLimits }
-        set { Task { await resourceCache.setComputeLimits(newValue) } }
-    }
 
     // Resource name cache for UUID resolution
     internal var resourceNameCache: ResourceNameCache
@@ -342,14 +157,6 @@ final class TUI {
     internal var allowedAddressPairForm: AllowedAddressPairManagementForm?
 
     // Volume snapshot list state
-    internal var cachedVolumeSnapshots: [VolumeSnapshot] {
-        get { resourceCache.volumeSnapshots }
-        set { Task { await resourceCache.setVolumeSnapshots(newValue) } }
-    }
-    internal var cachedVolumeBackups: [VolumeBackup] {
-        get { resourceCache.volumeBackups }
-        set { Task { await resourceCache.setVolumeBackups(newValue) } }
-    }
     internal var selectedVolumeForSnapshots: Volume? = nil
     internal var selectedSnapshotsForDeletion: Set<String> = []
 
@@ -469,6 +276,13 @@ final class TUI {
         Logger.shared.logDebug("Creating resource name cache")
         self.resourceNameCache = self.memoryContainer.createResourceNameCache()
 
+        // Initialize CacheManager with MemoryKit integration
+        Logger.shared.logDebug("Creating cache manager")
+        self.cacheManager = CacheManager(
+            memoryContainer: self.memoryContainer,
+            resourceNameCache: self.resourceNameCache
+        )
+
         Logger.shared.logDebug("Initializing user feedback system")
         self.userFeedback = UserFeedbackSystem()
 
@@ -498,9 +312,18 @@ final class TUI {
             client: self.client
         )
 
-        // Initialize PerformanceMonitor without dataManager initially
-        Logger.shared.logDebug("Initializing performance monitor")
-        self.performanceMonitor = PerformanceMonitor()
+        // Initialize RenderCoordinator (manages render optimization, performance monitoring, and UI caching)
+        Logger.shared.logDebug("Initializing render coordinator")
+        self.renderCoordinator = RenderCoordinator()
+
+        // Initialize ModuleOrchestrator
+        Logger.shared.logDebug("Initializing module orchestrator")
+        self.moduleOrchestrator = ModuleOrchestrator()
+
+        // Initialize RefreshManager with system-aware default interval
+        Logger.shared.logDebug("Initializing refresh manager")
+        self.refreshManager = RefreshManager(baseRefreshInterval: SystemCapabilities.optimalRefreshInterval())
+        self.refreshManager.getCurrentView = { [weak self] in self?.viewCoordinator.currentView ?? .loading }
 
         // Setup enhanced features
         Logger.shared.logDebug("Setting up enhanced features")
@@ -520,20 +343,35 @@ final class TUI {
 
         Logger.shared.logInfo("TUI initialization completed successfully")
 
-        // Initialize module system if enabled
-        if FeatureFlags.useModuleSystem {
-            Logger.shared.logInfo("Initializing module system...")
-            do {
-                try await ModuleRegistry.shared.initialize(with: self)
-                let allModules = ModuleRegistry.shared.allModules()
-                Logger.shared.logInfo("Module system initialized: \(allModules.count) modules loaded")
-            } catch {
-                Logger.shared.logError("Failed to initialize module system", context: ["error": String(describing: error)])
-                // Module system is optional, continue without it
-                self.moduleRegistry = nil
-            }
-        } else {
-            Logger.shared.logDebug("Module system disabled via FeatureFlags")
+        // Set swiftNavState reference on cacheManager for Swift object storage
+        self.cacheManager.swiftNavState = self.viewCoordinator.swiftNavState
+
+        // Wire up ViewCoordinator callbacks
+        self.viewCoordinator.markNeedsRedraw = { [weak self] in
+            self?.markNeedsRedraw()
+        }
+        self.viewCoordinator.markViewTransition = { [weak self] in
+            self?.markViewTransition()
+        }
+        self.viewCoordinator.getStatusMessage = { [weak self] in
+            self?.statusMessage
+        }
+        self.viewCoordinator.setStatusMessage = { [weak self] message in
+            self?.statusMessage = message
+        }
+        self.viewCoordinator.getSearchQuery = { [weak self] in
+            self?.searchQuery
+        }
+        self.viewCoordinator.setSearchQuery = { [weak self] query in
+            self?.searchQuery = query
+        }
+
+        // Initialize module system
+        do {
+            try await self.moduleOrchestrator.initialize(with: self)
+        } catch {
+            // Module system initialization failed, but we can continue
+            // The orchestrator has already logged the error
         }
     }
 
@@ -657,87 +495,73 @@ final class TUI {
     @MainActor
     private func handleAnimationOptimization() {
         // Reduce animation refresh rates
-        renderOptimizer.reduceAnimationFrequency()
+        renderCoordinator.reduceAnimationFrequency()
         userFeedback.setStatusMessage("Animations optimized for performance", type: .info)
     }
 
     @MainActor
     private func handleRenderingOptimization() {
         // Optimize rendering frequency
-        renderOptimizer.optimizeRenderingFrequency()
+        renderCoordinator.optimizeRenderingFrequency()
         userFeedback.setStatusMessage("Rendering optimized", type: .info)
     }
 
     @MainActor
     private func handleUICacheClearing() {
         // Clear UI caches
-        virtualListControllers.removeAll()
-        searchControllers.removeAll()
+        renderCoordinator.handleUICacheClearing()
         Task { await memoryContainer.clearAllCaches() }
         userFeedback.setStatusMessage("UI caches cleared", type: .info)
     }
 
     // MARK: - Smart Redraw Optimization
 
-    // Mark screen as needing redraw
+    /// Mark screen as needing redraw
     internal func markNeedsRedraw() {
-        needsRedraw = true
-        renderOptimizer.markMainPanelDirty()
+        renderCoordinator.markNeedsRedraw()
     }
 
-    // Check if redraw is needed and throttle if necessary
+    /// Check if redraw is needed and throttle if necessary
     internal func shouldRedraw() -> Bool {
-        return renderOptimizer.shouldRender(force: needsRedraw)
+        return renderCoordinator.shouldRedraw()
     }
 
-    // Force immediate redraw (for important updates)
+    /// Force immediate redraw (for important updates)
     internal func forceRedraw() {
-        needsRedraw = true
-        renderOptimizer.markFullScreenDirty()
-        lastDrawTime = Date(timeIntervalSince1970: 0) // Force past throttle
+        renderCoordinator.forceRedraw()
     }
 
-    // Mark specific UI components as dirty
+    /// Mark specific UI components as dirty
     internal func markHeaderDirty() {
-        renderOptimizer.markHeaderDirty()
+        renderCoordinator.markHeaderDirty()
     }
 
     internal func markSidebarDirty() {
-        renderOptimizer.markSidebarDirty()
+        renderCoordinator.markSidebarDirty()
     }
 
     internal func markStatusBarDirty() {
-        renderOptimizer.markStatusBarDirty()
+        renderCoordinator.markStatusBarDirty()
     }
 
-    // Mark scroll operations for optimized rendering
+    /// Mark scroll operations for optimized rendering
     internal func markScrollOperation() {
-        renderOptimizer.markMainPanelDirty()
-        needsRedraw = true
+        renderCoordinator.markScrollOperation()
     }
 
-    // Mark view transition for full screen redraw
+    /// Mark view transition for full screen redraw
     internal func markViewTransition() {
-        renderOptimizer.markViewTransitionDirty()
-        needsRedraw = true
+        renderCoordinator.markViewTransition()
     }
 
     // Cycle through available refresh intervals
     internal func cycleRefreshInterval() {
-        guard let currentIndex = availableIntervals.firstIndex(of: baseRefreshInterval) else {
-            baseRefreshInterval = availableIntervals[0]
-            markSidebarDirty()
-            return
-        }
-
-        let nextIndex = (currentIndex + 1) % availableIntervals.count
-        baseRefreshInterval = availableIntervals[nextIndex]
-        statusMessage = "Refresh interval set to \(Int(baseRefreshInterval)) seconds"
+        let message = refreshManager.cycleRefreshInterval()
+        statusMessage = message
         markSidebarDirty() // Update sidebar to show new interval
 
         Logger.shared.logUserAction("refresh_interval_changed", details: [
-            "newInterval": baseRefreshInterval,
-            "availableIntervals": availableIntervals
+            "newInterval": refreshManager.baseRefreshInterval
         ])
     }
 
@@ -801,13 +625,13 @@ final class TUI {
         // Show loading screen for all users (first-time and existing)
         if existingScreen == nil {
             Logger.shared.logDebug("Rendering initial loading screen")
-            currentView = .loading
+            viewCoordinator.currentView = .loading
             loadingProgress = 0
             loadingMessage = "Initializing..."
             await self.draw(screen: screen.pointer)
         } else {
             Logger.shared.logDebug("Skipping initial loading screen (already shown in App.swift)")
-            currentView = .loading
+            viewCoordinator.currentView = .loading
         }
 
         // Initial data fetch with loading progression
@@ -817,11 +641,11 @@ final class TUI {
         if isFirstRun {
             // First run: show welcome view instead of dashboard
             Logger.shared.logInfo("First run detected - setting initial view to welcome")
-            currentView = .welcome
-            previousView = .welcome
+            viewCoordinator.currentView = .welcome
+            viewCoordinator.previousView = .welcome
             WelcomeScreen.shared.markWelcomeShown()
         }
-        // Existing users: currentView remains .dashboard (default)
+        // Existing users: viewCoordinator.currentView remains .dashboard (default)
 
         Logger.shared.logInfo("Starting main event loop")
 
@@ -851,8 +675,7 @@ final class TUI {
                 await self.draw(screen: screen.pointer)
 
                 // Reset adaptive polling after resize
-                consecutiveIdlePolls = 0
-                currentSleepInterval = 5_000_000
+                renderCoordinator.markInputReceived()
                 continue
             }
 
@@ -865,42 +688,26 @@ final class TUI {
                 markNeedsRedraw()
 
                 // Reset adaptive polling for responsive input
-                lastInputTime = Date()
-                consecutiveIdlePolls = 0
-                currentSleepInterval = 5_000_000 // 5ms for active periods
+                renderCoordinator.markInputReceived()
                 inputEventCount += 1
             } else {
                 // No input - apply intelligent backoff strategy
                 let idleStart = Date()
-                consecutiveIdlePolls += 1
+                renderCoordinator.incrementIdlePolls()
+                renderCoordinator.updateAdaptiveSleepInterval()
 
-                // Exponential backoff with caps:
-                // 0-5 polls: 5ms (responsive for immediate input)
-                // 6-15 polls: 10ms (short idle)
-                // 16-30 polls: 20ms (medium idle)
-                // 31+ polls: 30ms (long idle, saves CPU)
-                if consecutiveIdlePolls <= 5 {
-                    currentSleepInterval = 5_000_000 // 5ms
-                } else if consecutiveIdlePolls <= 15 {
-                    currentSleepInterval = 10_000_000 // 10ms
-                } else if consecutiveIdlePolls <= 30 {
-                    currentSleepInterval = 20_000_000 // 20ms
-                } else {
-                    currentSleepInterval = 30_000_000 // 30ms max for deep idle
-                }
-
-                try? await Task.sleep(nanoseconds: currentSleepInterval)
+                try? await Task.sleep(nanoseconds: renderCoordinator.getCurrentSleepInterval())
                 totalIdleTime += Date().timeIntervalSince(idleStart)
             }
 
             // Auto-refresh check - skip if user is actively navigating
-            let timeSinceActivity = Date().timeIntervalSince(lastUserActivityTime)
-            let timeSinceRefresh = Date().timeIntervalSince(lastRefresh)
-            let isUserActive = timeSinceActivity < activityCooldownPeriod
+            let timeSinceActivity = refreshManager.timeSinceActivity()
+            let timeSinceRefresh = refreshManager.timeSinceRefresh()
+            let isUserActive = refreshManager.isUserActive()
 
-            if autoRefresh && timeSinceRefresh > refreshInterval && !isUserActive {
+            if refreshManager.autoRefresh && timeSinceRefresh > refreshManager.refreshInterval && !isUserActive {
                 Logger.shared.logUserAction("auto_refresh_triggered", details: [
-                    "interval": refreshInterval,
+                    "interval": refreshManager.refreshInterval,
                     "timeSinceLastRefresh": timeSinceRefresh,
                     "timeSinceActivity": timeSinceActivity
                 ])
@@ -910,16 +717,16 @@ final class TUI {
                 await dataManager.refreshAllData()
                 let refreshDuration = Date().timeIntervalSince(refreshStart)
                 Logger.shared.logPerformance("auto_refresh", duration: refreshDuration)
-                lastRefresh = Date()
+                refreshManager.markRefreshCompleted()
 
                 // Queue redraw after data is ready (non-blocking)
                 markNeedsRedraw()
 
                 // Request refresh for health dashboard if on that view
-                if currentView == .healthDashboard {
-                    healthDashboardNavState.requestRefresh()
+                if viewCoordinator.currentView == .healthDashboard {
+                    viewCoordinator.healthDashboardNavState.requestRefresh()
                 }
-            } else if autoRefresh && isUserActive && timeSinceRefresh > refreshInterval {
+            } else if refreshManager.autoRefresh && isUserActive && timeSinceRefresh > refreshManager.refreshInterval {
                 Logger.shared.logDebug("Auto-refresh deferred - user active (\(String(format: "%.1f", timeSinceActivity))s ago)")
 
                 // Update sidebar to show new last refresh time
@@ -929,15 +736,15 @@ final class TUI {
                 forceRedraw()
 
                 // Reset adaptive polling to be responsive after refresh
-                consecutiveIdlePolls = 0
-                currentSleepInterval = 5_000_000
+                renderCoordinator.markInputReceived()
             }
 
             // Periodic performance logging with adaptive polling metrics
-            if Date().timeIntervalSince(lastPerformanceLog) > performanceLogInterval {
+            if Date().timeIntervalSince(renderCoordinator.lastPerformanceLog) > renderCoordinator.performanceLogInterval {
                 let totalRunTime = Date().timeIntervalSince(loopStartTime)
                 let cpuUtilization = totalRunTime > 0 ? ((totalRunTime - totalIdleTime) / totalRunTime) * 100 : 0
-                let avgSleepInterval = currentSleepInterval / 1_000_000 // Convert to ms
+                let avgSleepInterval = renderCoordinator.getCurrentSleepInterval() / 1_000_000 // Convert to ms
+                let idlePolls = renderCoordinator.getConsecutiveIdlePolls()
 
                 Logger.shared.logPerformance("event_loop_summary", duration: totalRunTime, context: [
                     "iterations": loopIterations,
@@ -949,10 +756,10 @@ final class TUI {
                     "cpuUtilization_percent": String(format: "%.1f", cpuUtilization),
                     "totalIdleTime_s": String(format: "%.2f", totalIdleTime),
                     "currentSleepInterval_ms": avgSleepInterval,
-                    "consecutiveIdlePolls": consecutiveIdlePolls,
-                    "idlePollingState": consecutiveIdlePolls <= 5 ? "active" : consecutiveIdlePolls <= 15 ? "short_idle" : consecutiveIdlePolls <= 30 ? "medium_idle" : "deep_idle"
+                    "consecutiveIdlePolls": idlePolls,
+                    "idlePollingState": idlePolls <= 5 ? "active" : idlePolls <= 15 ? "short_idle" : idlePolls <= 30 ? "medium_idle" : "deep_idle"
                 ])
-                lastPerformanceLog = Date()
+                renderCoordinator.lastPerformanceLog = Date()
             }
 
             if !running { break }
@@ -960,19 +767,19 @@ final class TUI {
             // Periodic redraw for header clock (once per minute to reduce CPU)
             // Clock updates are not critical for user experience
             let now = Date()
-            if now.timeIntervalSince(lastDrawTime) >= 60.0 {
+            if now.timeIntervalSince(renderCoordinator.lastDrawTime) >= 60.0 {
                 markHeaderDirty()  // Only redraw header instead of full screen
-                lastDrawTime = now
+                renderCoordinator.lastDrawTime = now
 
                 // Keep polling responsive during regular UI updates
-                if consecutiveIdlePolls > 15 {
-                    consecutiveIdlePolls = 10
-                    currentSleepInterval = 10_000_000
+                if renderCoordinator.getConsecutiveIdlePolls() > 15 {
+                    renderCoordinator.setConsecutiveIdlePolls(10)
+                    renderCoordinator.setCurrentSleepInterval(10_000_000)
                 }
             }
 
             // Only draw if something changed - provides responsive updates while reducing CPU
-            if needsRedraw {
+            if renderCoordinator.needsRedraw {
                 let drawStart = Date()
                 do {
                     try await withThrowingTaskGroup(of: Void.self) { group in
@@ -983,17 +790,17 @@ final class TUI {
                     }
                 } catch OpenStackError.authenticationFailed {
                     Logger.shared.logError("Draw cycle failed: Authentication session expired")
-                    autoRefresh = false
+                    refreshManager.autoRefresh = false
                     statusMessage = "Session expired. Please restart the application."
                     // Switch back to dashboard view
-                    currentView = .dashboard
+                    viewCoordinator.currentView = .dashboard
                     forceRedraw()
                 } catch {
                     Logger.shared.logError("Draw cycle failed with error: \(error)")
                     statusMessage = "Error: \(error)"
                 }
                 drawTime += Date().timeIntervalSince(drawStart)
-                needsRedraw = false
+                renderCoordinator.markDrawCompleted()
             }
 
             loopIterations += 1
@@ -1016,7 +823,7 @@ final class TUI {
     // Main async input handler - delegates to InputHandler which uses NavigationInputHandler for common keys
     internal func handleInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Ignore input during loading screen
-        if currentView == .loading {
+        if viewCoordinator.currentView == .loading {
             return
         }
         await inputHandler.handleInput(ch, screen: screen)
@@ -1024,22 +831,22 @@ final class TUI {
 
     // Helper to get max index based on current view (simplified for sync performance)
     private func getMaxIndexForCurrentView() -> Int {
-        switch currentView {
-        case .servers: return cachedServers.count
-        case .volumes: return cachedVolumes.count
-        case .networks: return cachedNetworks.count
-        case .images: return cachedImages.count
-        case .flavors: return cachedFlavors.count
-        case .floatingIPs: return cachedFloatingIPs.count
-        case .routers: return cachedRouters.count
-        case .securityGroups: return cachedSecurityGroups.count
-        case .keyPairs: return cachedKeyPairs.count
-        case .ports: return cachedPorts.count
-        case .subnets: return cachedSubnets.count
-        case .serverGroups: return cachedServerGroups.count
-        case .barbicanSecrets: return cachedSecrets.count
-        case .swift: return cachedSwiftContainers.count
-        case .swiftContainerDetail: return cachedSwiftObjects?.count ?? 0
+        switch viewCoordinator.currentView {
+        case .servers: return cacheManager.cachedServers.count
+        case .volumes: return cacheManager.cachedVolumes.count
+        case .networks: return cacheManager.cachedNetworks.count
+        case .images: return cacheManager.cachedImages.count
+        case .flavors: return cacheManager.cachedFlavors.count
+        case .floatingIPs: return cacheManager.cachedFloatingIPs.count
+        case .routers: return cacheManager.cachedRouters.count
+        case .securityGroups: return cacheManager.cachedSecurityGroups.count
+        case .keyPairs: return cacheManager.cachedKeyPairs.count
+        case .ports: return cacheManager.cachedPorts.count
+        case .subnets: return cacheManager.cachedSubnets.count
+        case .serverGroups: return cacheManager.cachedServerGroups.count
+        case .barbicanSecrets: return cacheManager.cachedSecrets.count
+        case .swift: return cacheManager.cachedSwiftContainers.count
+        case .swiftContainerDetail: return cacheManager.cachedSwiftObjects?.count ?? 0
         default: return 0
         }
     }
@@ -1062,27 +869,27 @@ final class TUI {
 
     internal func getMaxSelectionIndex() -> Int {
         return UIUtils.getMaxSelectionIndex(
-            for: currentView,
-            cachedServers: cachedServers,
-            cachedNetworks: cachedNetworks,
-            cachedVolumes: cachedVolumes,
-            cachedImages: cachedImages,
-            cachedFlavors: cachedFlavors,
-            cachedKeyPairs: cachedKeyPairs,
-            cachedSubnets: cachedSubnets,
-            cachedPorts: cachedPorts,
-            cachedRouters: cachedRouters,
-            cachedFloatingIPs: cachedFloatingIPs,
-            cachedServerGroups: cachedServerGroups,
-            cachedSecurityGroups: cachedSecurityGroups,
-            cachedSecrets: cachedSecrets,
-            cachedVolumeSnapshots: cachedVolumeSnapshots,
-            cachedVolumeBackups: cachedVolumeBackups,
-            cachedSwiftContainers: cachedSwiftContainers,
-            cachedSwiftObjects: cachedSwiftObjects,
+            for: viewCoordinator.currentView,
+            cachedServers: cacheManager.cachedServers,
+            cachedNetworks: cacheManager.cachedNetworks,
+            cachedVolumes: cacheManager.cachedVolumes,
+            cachedImages: cacheManager.cachedImages,
+            cachedFlavors: cacheManager.cachedFlavors,
+            cachedKeyPairs: cacheManager.cachedKeyPairs,
+            cachedSubnets: cacheManager.cachedSubnets,
+            cachedPorts: cacheManager.cachedPorts,
+            cachedRouters: cacheManager.cachedRouters,
+            cachedFloatingIPs: cacheManager.cachedFloatingIPs,
+            cachedServerGroups: cacheManager.cachedServerGroups,
+            cachedSecurityGroups: cacheManager.cachedSecurityGroups,
+            cachedSecrets: cacheManager.cachedSecrets,
+            cachedVolumeSnapshots: cacheManager.cachedVolumeSnapshots,
+            cachedVolumeBackups: cacheManager.cachedVolumeBackups,
+            cachedSwiftContainers: cacheManager.cachedSwiftContainers,
+            cachedSwiftObjects: cacheManager.cachedSwiftObjects,
             searchQuery: searchQuery,
             resourceResolver: resourceResolver,
-            swiftNavState: swiftNavState
+            swiftNavState: viewCoordinator.swiftNavState
         )
     }
 
@@ -1091,7 +898,7 @@ final class TUI {
         // The DetailView itself handles bounds checking and shows "End of details" when appropriate
         // This allows scrolling to work for all detail views without needing specific calculations
 
-        if currentView.isDetailView {
+        if viewCoordinator.currentView.isDetailView {
             // Allow scrolling up to 200 lines - DetailView will handle the actual limit
             // This is much simpler than trying to calculate exact line counts for each view type
             return 200
@@ -1102,7 +909,7 @@ final class TUI {
 
     internal func calculateMaxQuotaScrollOffset() -> Int {
         // Check if we're in vertical layout mode for dashboard
-        if currentView == .dashboard {
+        if viewCoordinator.currentView == .dashboard {
             let mainWidth = screenCols - LayoutUtilities.shared.calculateSidebarWidth(screenCols: screenCols) - 2  // Account for sidebar + separator
             let mainHeight = screenRows - 4  // Account for header/footer
             let minWidthForGrid = Int32(120)
@@ -1125,7 +932,7 @@ final class TUI {
         var totalQuotaItems = 0
 
         // Count compute quota items
-        if let computeLimits = cachedComputeLimits {
+        if let computeLimits = cacheManager.cachedComputeLimits {
             totalQuotaItems += 1 // Section header
             if computeLimits.instances != nil {
                 totalQuotaItems += 1
@@ -1140,7 +947,7 @@ final class TUI {
         }
 
         // Count network quota items
-        if cachedNetworkQuotas != nil {
+        if cacheManager.cachedNetworkQuotas != nil {
             totalQuotaItems += 1 // Section header
             // NetworkQuotaSet has non-optional Int properties, so we always count them
             totalQuotaItems += 1 // network
@@ -1150,7 +957,7 @@ final class TUI {
         }
 
         // Count volume quota items
-        if cachedVolumeQuotas != nil {
+        if cacheManager.cachedVolumeQuotas != nil {
             totalQuotaItems += 1 // Section header
             // VolumeQuotaSet has non-optional Int properties, so we always count them
             totalQuotaItems += 1 // volumes
@@ -1166,7 +973,7 @@ final class TUI {
     }
 
     internal func getSelectedImage() -> Image? {
-        let filteredImages = cachedImages.filter { image in
+        let filteredImages = cacheManager.cachedImages.filter { image in
             if searchQuery?.isEmpty ?? true {
                 return true
             }
@@ -1177,29 +984,29 @@ final class TUI {
                    id.localizedCaseInsensitiveContains(query)
         }
 
-        guard selectedIndex < filteredImages.count else { return nil }
-        return filteredImages[selectedIndex]
+        guard viewCoordinator.selectedIndex < filteredImages.count else { return nil }
+        return filteredImages[viewCoordinator.selectedIndex]
     }
 
     // MARK: - View Management
     internal func changeView(to newView: ViewMode, resetSelection: Bool = true, preserveStatus: Bool = false) {
-        if currentView != newView && currentView != .help {
-            previousView = currentView
+        if viewCoordinator.currentView != newView && viewCoordinator.currentView != .help {
+            viewCoordinator.previousView = viewCoordinator.currentView
         }
-        currentView = newView
+        viewCoordinator.currentView = newView
 
         if resetSelection {
-            selectedIndex = 0
-            scrollOffset = 0
-            detailScrollOffset = 0
-            quotaScrollOffset = 0
-            selectedResource = nil
+            viewCoordinator.selectedIndex = 0
+            viewCoordinator.scrollOffset = 0
+            viewCoordinator.detailScrollOffset = 0
+            viewCoordinator.quotaScrollOffset = 0
+            viewCoordinator.selectedResource = nil
         }
 
         // Special handling for flavor selection view to synchronize highlighting with selection
         if newView == .flavorSelection && serverCreateForm.flavorSelectionMode == .workloadBased {
             if !serverCreateForm.flavorRecommendations.isEmpty && serverCreateForm.selectedRecommendationIndex < serverCreateForm.flavorRecommendations.count {
-                selectedIndex = serverCreateForm.selectedRecommendationIndex
+                viewCoordinator.selectedIndex = serverCreateForm.selectedRecommendationIndex
             }
         }
 
@@ -1215,18 +1022,18 @@ final class TUI {
         Task {
             switch newView {
             case .barbicanSecrets, .barbican:
-                if cachedSecrets.isEmpty {
+                if cacheManager.cachedSecrets.isEmpty {
                     Logger.shared.logInfo("Loading Barbican secrets data on view change")
                     await dataManager.refreshSecretsData()
                 }
             case .images:
-                if cachedImages.isEmpty {
+                if cacheManager.cachedImages.isEmpty {
                     Logger.shared.logInfo("Loading images data on view change")
                     await dataManager.refreshImageData()
                 }
             case .swiftContainerDetail:
                 // Load objects for the selected container using navigation state
-                if let containerName = swiftNavState.currentContainer {
+                if let containerName = viewCoordinator.swiftNavState.currentContainer {
                     Logger.shared.logInfo("Loading Swift objects for container: \(containerName)")
                     await dataManager.fetchSwiftObjects(containerName: containerName, priority: "interactive")
                 }
@@ -1237,14 +1044,14 @@ final class TUI {
 
         // Initialize view-specific state
         if newView == .healthDashboard {
-            HealthDashboardView.resetNavigationState(healthDashboardNavState)
+            HealthDashboardView.resetNavigationState(viewCoordinator.healthDashboardNavState)
         }
 
         // Force full screen redraw for view transitions to prevent artifacts
         markViewTransition()
 
         // Ensure security groups are loaded when entering port creation view
-        if newView == .portCreate && cachedSecurityGroups.isEmpty {
+        if newView == .portCreate && cacheManager.cachedSecurityGroups.isEmpty {
             Task {
                 await dataManager.refreshSecurityGroupData()
             }
@@ -1253,61 +1060,61 @@ final class TUI {
 
     // MARK: - Detail View Management
     internal func openDetailView() {
-        guard !currentView.isDetailView else { return }
+        guard !viewCoordinator.currentView.isDetailView else { return }
 
         let filteredResources: [Any]
         let targetDetailView: ViewMode
 
-        switch currentView {
+        switch viewCoordinator.currentView {
         case .servers:
-            filteredResources = FilterUtils.filterServers(cachedServers, query: searchQuery)
+            filteredResources = FilterUtils.filterServers(cacheManager.cachedServers, query: searchQuery)
             targetDetailView = .serverDetail
         case .serverGroups:
-            filteredResources = FilterUtils.filterServerGroups(cachedServerGroups, query: searchQuery)
+            filteredResources = FilterUtils.filterServerGroups(cacheManager.cachedServerGroups, query: searchQuery)
             targetDetailView = .serverGroupDetail
         case .networks:
-            filteredResources = FilterUtils.filterNetworks(cachedNetworks, query: searchQuery)
+            filteredResources = FilterUtils.filterNetworks(cacheManager.cachedNetworks, query: searchQuery)
             targetDetailView = .networkDetail
         case .securityGroups:
-            filteredResources = FilterUtils.filterSecurityGroups(cachedSecurityGroups, query: searchQuery)
+            filteredResources = FilterUtils.filterSecurityGroups(cacheManager.cachedSecurityGroups, query: searchQuery)
             targetDetailView = .securityGroupDetail
         case .volumes:
-            filteredResources = FilterUtils.filterVolumes(cachedVolumes, query: searchQuery)
+            filteredResources = FilterUtils.filterVolumes(cacheManager.cachedVolumes, query: searchQuery)
             targetDetailView = .volumeDetail
         case .images:
-            filteredResources = FilterUtils.filterImages(cachedImages, query: searchQuery)
+            filteredResources = FilterUtils.filterImages(cacheManager.cachedImages, query: searchQuery)
             targetDetailView = .imageDetail
         case .flavors:
-            filteredResources = FilterUtils.filterFlavors(cachedFlavors, query: searchQuery)
+            filteredResources = FilterUtils.filterFlavors(cacheManager.cachedFlavors, query: searchQuery)
             targetDetailView = .flavorDetail
         case .subnets:
-            filteredResources = FilterUtils.filterSubnets(cachedSubnets, query: searchQuery)
+            filteredResources = FilterUtils.filterSubnets(cacheManager.cachedSubnets, query: searchQuery)
             targetDetailView = .subnetDetail
         case .ports:
-            filteredResources = FilterUtils.filterPorts(cachedPorts, query: searchQuery)
+            filteredResources = FilterUtils.filterPorts(cacheManager.cachedPorts, query: searchQuery)
             targetDetailView = .portDetail
         case .routers:
-            filteredResources = FilterUtils.filterRouters(cachedRouters, query: searchQuery)
+            filteredResources = FilterUtils.filterRouters(cacheManager.cachedRouters, query: searchQuery)
             targetDetailView = .routerDetail
         case .keyPairs:
-            filteredResources = FilterUtils.filterKeyPairs(cachedKeyPairs, query: searchQuery)
+            filteredResources = FilterUtils.filterKeyPairs(cacheManager.cachedKeyPairs, query: searchQuery)
             targetDetailView = .keyPairDetail
         case .floatingIPs:
-            filteredResources = FilterUtils.filterFloatingIPs(cachedFloatingIPs, query: searchQuery)
+            filteredResources = FilterUtils.filterFloatingIPs(cacheManager.cachedFloatingIPs, query: searchQuery)
             targetDetailView = .floatingIPDetail
         case .healthDashboard:
             // Use the selected service from health dashboard navigation state
-            if let selectedService = healthDashboardNavState.selectedService {
-                selectedResource = selectedService
+            if let selectedService = viewCoordinator.healthDashboardNavState.selectedService {
+                viewCoordinator.selectedResource = selectedService
                 changeView(to: .healthDashboardServiceDetail, resetSelection: false)
-                detailScrollOffset = 0
+                viewCoordinator.detailScrollOffset = 0
                 return
             } else {
                 return // No service selected
             }
         case .barbicanSecrets:
             // Apply the same filtering logic as used in UIUtils.swift
-            let filteredSecrets = searchQuery?.isEmpty ?? true ? cachedSecrets : cachedSecrets.filter { secret in
+            let filteredSecrets = searchQuery?.isEmpty ?? true ? cacheManager.cachedSecrets : cacheManager.cachedSecrets.filter { secret in
                 (secret.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false) ||
                 (secret.secretType?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false)
             }
@@ -1316,11 +1123,11 @@ final class TUI {
         case .volumeArchives:
             // Build unified archive list (snapshots + backups + server backups)
             var archives: [Any] = []
-            archives.append(contentsOf: cachedVolumeSnapshots)
-            archives.append(contentsOf: cachedVolumeBackups)
+            archives.append(contentsOf: cacheManager.cachedVolumeSnapshots)
+            archives.append(contentsOf: cacheManager.cachedVolumeBackups)
 
             // Add server backups (images with image_type == "snapshot")
-            let serverBackups = cachedImages.filter { image in
+            let serverBackups = cacheManager.cachedImages.filter { image in
                 if let properties = image.properties,
                    let imageType = properties["image_type"],
                    imageType == "snapshot" {
@@ -1359,14 +1166,14 @@ final class TUI {
             targetDetailView = .volumeArchiveDetail
         case .swift:
             // Filter Swift containers based on search query
-            let filteredContainers = searchQuery?.isEmpty ?? true ? cachedSwiftContainers : cachedSwiftContainers.filter { container in
+            let filteredContainers = searchQuery?.isEmpty ?? true ? cacheManager.cachedSwiftContainers : cacheManager.cachedSwiftContainers.filter { container in
                 container.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
             }
             filteredResources = filteredContainers
             targetDetailView = .swiftContainerDetail
         case .swiftContainerDetail:
             // When in container detail view, navigating opens object detail
-            if let objects = cachedSwiftObjects {
+            if let objects = cacheManager.cachedSwiftObjects {
                 let filteredObjects = searchQuery?.isEmpty ?? true ? objects : objects.filter { object in
                     object.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
                 }
@@ -1392,20 +1199,20 @@ final class TUI {
         }
 
         // Check if we have resources and a valid selection
-        guard !filteredResources.isEmpty && selectedIndex < filteredResources.count else { return }
+        guard !filteredResources.isEmpty && viewCoordinator.selectedIndex < filteredResources.count else { return }
 
         // Set the selected resource and change to detail view
-        selectedResource = filteredResources[selectedIndex]
+        viewCoordinator.selectedResource = filteredResources[viewCoordinator.selectedIndex]
         changeView(to: targetDetailView, resetSelection: false)
-        detailScrollOffset = 0 // Reset detail scroll when opening
+        viewCoordinator.detailScrollOffset = 0 // Reset detail scroll when opening
     }    // Immediate refresh for better real-time feedback after operations
 
     internal func refreshAfterOperation() {
         Task {
             // Enable fast refresh for next 60 seconds to show state transitions
-            fastRefreshUntil = Date().addingTimeInterval(60.0)
+            refreshManager.refreshAfterOperation()
             await dataManager.refreshAllData()
-            lastRefresh = Date()
+            refreshManager.markRefreshCompleted()
             markNeedsRedraw()
         }
     }
@@ -1438,10 +1245,9 @@ final class TUI {
 
         // Mark initial loading as complete and switch to dashboard
         initialDataLoaded = true
-        currentView = .dashboard
-        previousView = .dashboard
-        needsRedraw = true
-        renderOptimizer.markFullScreenDirty()
+        viewCoordinator.currentView = .dashboard
+        viewCoordinator.previousView = .dashboard
+        renderCoordinator.forceRedraw()
 
         Logger.shared.logInfo("Initial data load completed, transitioning to dashboard")
     }
@@ -1459,15 +1265,15 @@ final class TUI {
         let drawStartTime = Date()
 
         Logger.shared.logDebug("Starting optimized screen draw", context: [
-            "view": "\(currentView)",
+            "view": "\(viewCoordinator.currentView)",
             "screenSize": "\(screenCols)x\(screenRows)"
         ])
 
         // Get optimized render plan
-        var renderPlan = renderOptimizer.getRenderPlan(screenRows: screenRows, screenCols: screenCols)
+        var renderPlan = renderCoordinator.getRenderPlan(screenRows: screenRows, screenCols: screenCols)
 
         // Override render plan for loading screen - only show main panel
-        if currentView == .loading {
+        if viewCoordinator.currentView == .loading {
             renderPlan = RenderPlan(
                 shouldClearScreen: true,
                 renderHeader: false,
@@ -1494,7 +1300,7 @@ final class TUI {
 
         if renderPlan.renderSidebar {
             let start = Date()
-            await SidebarView.draw(screen: screen, screenCols: screenCols, screenRows: screenRows, currentView: currentView, tui: self)
+            await SidebarView.draw(screen: screen, screenCols: screenCols, screenRows: screenRows, currentView: viewCoordinator.currentView, tui: self)
             componentTimings["sidebar"] = Date().timeIntervalSince(start)
         }
 
@@ -1551,14 +1357,13 @@ final class TUI {
         SwiftNCurses.batchedRefresh(WindowHandle(screen))
 
         // Mark render as clean
-        renderOptimizer.markClean()
-        needsRedraw = false
+        renderCoordinator.markDrawCompleted()
 
         let totalDrawDuration = Date().timeIntervalSince(drawStartTime)
 
         // Log detailed draw performance with component breakdown
         var logContext = [
-            "view": "\(currentView)",
+            "view": "\(viewCoordinator.currentView)",
             "total_ms": String(format: "%.1f", totalDrawDuration * 1000),
             "render_plan": renderPlan.description
         ]
@@ -1605,7 +1410,7 @@ final class TUI {
 
     internal func generateFlavorRecommendations(for workloadType: WorkloadType, screen: OpaquePointer?) async {
         // Check if we have cached recommendations for this workload type
-        if let cachedRecs = cachedFlavorRecommendations[workloadType], !cachedRecs.isEmpty {
+        if let cachedRecs = cacheManager.cachedFlavorRecommendations[workloadType], !cachedRecs.isEmpty {
             Logger.shared.logDebug("Using cached flavor recommendations for \(workloadType.displayName)")
             serverCreateForm.flavorRecommendations = cachedRecs
             statusMessage = "Loaded \(cachedRecs.count) cached recommendations for \(workloadType.displayName)"
@@ -1654,7 +1459,7 @@ final class TUI {
             serverCreateForm.setFlavorRecommendations(sortedRecommendations)
 
             // Cache the generated recommendations for future use
-            cachedFlavorRecommendations[workloadType] = sortedRecommendations
+            cacheManager.cachedFlavorRecommendations[workloadType] = sortedRecommendations
             Logger.shared.logDebug("Cached \(sortedRecommendations.count) recommendations for \(workloadType.displayName)")
 
             statusMessage = "Generated \(recommendations.count) flavor recommendations for \(workloadType.displayName)"
@@ -1873,3 +1678,7 @@ private struct SessionMetrics {
     var connectionErrors = 0
     var frameCount = 0
 }
+
+
+
+

@@ -69,6 +69,14 @@ final class ModuleRegistry {
         for handler in dataHandlers {
             DataRefreshRegistry.shared.register(handler)
         }
+
+        // Register actions
+        let actions = module.registerActions()
+        ActionRegistry.shared.register(actions)
+
+        if !actions.isEmpty {
+            Logger.shared.logDebug("[ModuleRegistry] Registered \(actions.count) actions for \(module.identifier)", context: [:])
+        }
     }
 
     /// Get module by identifier

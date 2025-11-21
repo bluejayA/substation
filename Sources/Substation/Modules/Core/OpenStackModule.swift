@@ -34,9 +34,21 @@ protocol OpenStackModule {
     /// Register data refresh handlers
     func registerDataRefreshHandlers() -> [ModuleDataRefreshRegistration]
 
+    /// Register actions that can be performed on resources
+    func registerActions() -> [ModuleActionRegistration]
+
     /// Cleanup when module is unloaded
     func cleanup() async
 
     /// Module health check for monitoring
     func healthCheck() async -> ModuleHealthStatus
+}
+
+// MARK: - Default Implementations
+
+extension OpenStackModule {
+    /// Default implementation returns empty array for modules without actions
+    func registerActions() -> [ModuleActionRegistration] {
+        return []
+    }
 }

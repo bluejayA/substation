@@ -68,183 +68,48 @@ final class CommandActionHandler: @unchecked Sendable {
 
         // Execute the actual action
         switch action {
-        case .create:
-            return await executeCreateAction(in: context, tui: tui, screen: screen)
-        case .delete:
-            return await executeDeleteAction(in: context, tui: tui, screen: screen)
         case .refresh:
-            return await executeRefreshAction(tui: tui)
-        case .start:
-            return await executeStartAction(in: context, tui: tui, screen: screen)
-        case .stop:
-            return await executeStopAction(in: context, tui: tui, screen: screen)
-        case .restart:
-            return await executeRestartAction(in: context, tui: tui, screen: screen)
-        case .manage:
-            return await executeManageAction(in: context, tui: tui, screen: screen)
+            // Global action - handled directly
+            tui.statusMessage = "Refreshing data..."
+            await tui.dataManager.refreshAllData()
+            tui.refreshAfterOperation()
+            tui.statusMessage = "Data refreshed"
+            return true
         case .clearCache:
+            // Global action - handled directly
             return await executeClearCacheAction(tui: tui, screen: screen)
+        default:
+            // Module-specific actions - delegate to provider
+            return await executeViaProvider(action, in: context, tui: tui, screen: screen)
         }
     }
 
     // MARK: - Action Execution Implementation
 
-    /// Execute create action for the current context
-    private func executeCreateAction(in context: ViewMode, tui: TUI, screen: OpaquePointer?) async
-        -> Bool
-    {
-        // Most create operations are handled by navigating to the create view
-        switch context {
-        case .servers:
-            tui.changeView(to: .serverCreate)
-        case .networks:
-            tui.changeView(to: .networkCreate)
-        case .volumes:
-            tui.changeView(to: .volumeCreate)
-        case .keyPairs:
-            tui.changeView(to: .keyPairCreate)
-        case .subnets:
-            tui.changeView(to: .subnetCreate)
-        case .ports:
-            tui.changeView(to: .portCreate)
-        case .floatingIPs:
-            tui.changeView(to: .floatingIPCreate)
-        case .routers:
-            tui.changeView(to: .routerCreate)
-        case .serverGroups:
-            tui.changeView(to: .serverGroupCreate)
-        case .securityGroups:
-            tui.changeView(to: .securityGroupCreate)
-        case .barbicanSecrets:
-            await tui.resourceOperations.createSecret(screen: screen)
-        case .swift:
-            tui.changeView(to: .swiftContainerCreate)
-        default:
-            tui.statusMessage = "Create not supported in \(context.title)"
-            return false
+    /// Execute action via module provider
+    ///
+    /// Delegates action execution to the registered module provider.
+    /// Handles global actions (refresh, clearCache) directly.
+    ///
+    /// - Parameters:
+    ///   - action: The action to execute
+    ///   - context: The current view mode
+    ///   - tui: The TUI instance
+    ///   - screen: Screen pointer for dialogs
+    /// - Returns: True if the action was executed
+    private func executeViaProvider(
+        _ action: ActionType,
+        in context: ViewMode,
+        tui: TUI,
+        screen: OpaquePointer?
+    ) async -> Bool {
+        // Look up provider from registry
+        if let provider = ActionProviderRegistry.shared.provider(for: context) {
+            return await provider.executeAction(action, screen: screen, tui: tui)
         }
-        tui.statusMessage = "Opening create form..."
-        return true
-    }
 
-    /// Execute delete action for the current context
-    private func executeDeleteAction(in context: ViewMode, tui: TUI, screen: OpaquePointer?) async
-        -> Bool
-    {
-        switch context {
-        case .servers, .serverDetail:
-            await tui.resourceOperations.deleteServer(screen: screen)
-        case .networks, .networkDetail:
-            await tui.resourceOperations.deleteNetwork(screen: screen)
-        case .volumes, .volumeDetail:
-            await tui.resourceOperations.deleteVolume(screen: screen)
-        case .images, .imageDetail:
-            await tui.resourceOperations.deleteImage(screen: screen)
-        case .keyPairs, .keyPairDetail:
-            await tui.resourceOperations.deleteKeyPair(screen: screen)
-        case .subnets, .subnetDetail:
-            await tui.resourceOperations.deleteSubnet(screen: screen)
-        case .ports, .portDetail:
-            await tui.resourceOperations.deletePort(screen: screen)
-        case .floatingIPs, .floatingIPDetail:
-            await tui.resourceOperations.deleteFloatingIP(screen: screen)
-        case .routers, .routerDetail:
-            await tui.resourceOperations.deleteRouter(screen: screen)
-        case .serverGroups, .serverGroupDetail:
-            await tui.resourceOperations.deleteServerGroup(screen: screen)
-        case .securityGroups, .securityGroupDetail:
-            await tui.resourceOperations.deleteSecurityGroup(screen: screen)
-        case .barbicanSecrets:
-            await tui.resourceOperations.deleteSecret(screen: screen)
-        case .swift, .swiftContainerDetail:
-            await tui.resourceOperations.deleteSwiftContainer(screen: screen)
-        case .volumeArchives, .volumeArchiveDetail:
-            // Archives are handled by the selected resource type
-            // This would need special handling in the actual delete flow
-            tui.statusMessage = "Delete for archives - use detail view"
-            return false
-        default:
-            tui.statusMessage = "Delete not supported in \(context.title)"
-            return false
-        }
-        return true
-    }
-
-    /// Execute refresh action
-    private func executeRefreshAction(tui: TUI) async -> Bool {
-        tui.statusMessage = "Refreshing data..."
-        await tui.dataManager.refreshAllData()
-        tui.refreshAfterOperation()
-        tui.statusMessage = "Data refreshed"
-        return true
-    }
-
-    /// Execute start action (servers only)
-    private func executeStartAction(in context: ViewMode, tui: TUI, screen: OpaquePointer?) async
-        -> Bool
-    {
-        guard context == .servers || context == .serverDetail else {
-            tui.statusMessage = "Start action only available for servers"
-            return false
-        }
-        await tui.actions.startServer(screen: screen)
-        return true
-    }
-
-    /// Execute stop action (servers only)
-    private func executeStopAction(in context: ViewMode, tui: TUI, screen: OpaquePointer?) async
-        -> Bool
-    {
-        guard context == .servers || context == .serverDetail else {
-            tui.statusMessage = "Stop action only available for servers"
-            return false
-        }
-        await tui.actions.stopServer(screen: screen)
-        return true
-    }
-
-    /// Execute restart action (servers only)
-    private func executeRestartAction(in context: ViewMode, tui: TUI, screen: OpaquePointer?) async
-        -> Bool
-    {
-        guard context == .servers || context == .serverDetail else {
-            tui.statusMessage = "Restart action only available for servers"
-            return false
-        }
-        await tui.actions.restartServer(screen: screen)
-        return true
-    }
-
-    /// Execute manage action for the current context
-    private func executeManageAction(in context: ViewMode, tui: TUI, screen: OpaquePointer?) async
-        -> Bool
-    {
-        switch context {
-        case .networks:
-            await tui.actions.manageNetworkToServers(screen: screen)
-        case .volumes:
-            await tui.actions.manageVolumeToServers(screen: screen)
-        case .subnets:
-            await tui.actions.manageSubnetRouterAttachment(screen: screen)
-        case .ports:
-            await tui.actions.managePortServerAssignment(screen: screen)
-        case .floatingIPs:
-            await tui.actions.manageFloatingIPServerAssignment(screen: screen)
-        case .serverGroups:
-            // Server groups don't have a manage method - they're managed through server detail
-            tui.statusMessage = "Server group management - use server detail view"
-            return false
-        case .securityGroups:
-            await tui.actions.manageSecurityGroupToServers(screen: screen)
-        case .swift, .swiftContainerDetail:
-            // Swift management could open metadata or web access forms
-            tui.statusMessage = "Swift management coming soon"
-            return false
-        default:
-            tui.statusMessage = "Manage not supported in \(context.title)"
-            return false
-        }
-        return true
+        tui.statusMessage = "\(action.rawValue.capitalized) not supported in \(context.title)"
+        return false
     }
 
     /// Execute clear-cache action to purge all application caches
@@ -306,73 +171,34 @@ final class CommandActionHandler: @unchecked Sendable {
     /// - Parameter context: The current view mode
     /// - Returns: Array of available action types
     func getAvailableActions(for context: ViewMode) -> [ActionType] {
-        switch context {
-        // List views with create/delete/refresh
-        case .servers:
-            return [.create, .delete, .refresh, .start, .stop, .restart, .clearCache]
-        case .networks:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .volumes:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .images:
-            return [.delete, .refresh, .clearCache]
-        case .keyPairs:
-            return [.create, .delete, .refresh, .clearCache]
-        case .subnets:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .ports:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .floatingIPs:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .routers:
-            return [.create, .delete, .refresh, .clearCache]
-        case .serverGroups:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .securityGroups:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .barbicanSecrets:
-            return [.create, .delete, .refresh, .clearCache]
-        case .swift:
-            return [.create, .delete, .refresh, .manage, .clearCache]
-        case .volumeArchives:
-            return [.delete, .refresh, .clearCache]
-
-        // Detail views with limited actions
-        case .serverDetail:
-            return [.delete, .start, .stop, .restart, .refresh, .clearCache]
-        case .networkDetail, .volumeDetail, .imageDetail, .subnetDetail, .portDetail,
-            .floatingIPDetail, .routerDetail, .serverGroupDetail, .securityGroupDetail:
-            return [.delete, .refresh, .clearCache]
-        case .keyPairDetail:
-            return [.delete, .refresh, .clearCache]
-        case .swiftContainerDetail:
-            return [.delete, .refresh, .manage, .clearCache]
-
-        // Views with no actions
-        case .loading, .serverCreate, .networkCreate, .volumeCreate, .keyPairCreate, .subnetCreate,
-            .portCreate, .floatingIPCreate, .routerCreate, .serverGroupCreate, .securityGroupCreate,
-            .barbicanSecretCreate, .swiftContainerCreate, .help, .about, .welcome, .tutorial, .shortcuts,
-            .examples, .advancedSearch, .serverConsole, .serverResize, .serverSecurityGroups,
-            .serverNetworkInterfaces, .serverGroupManagement, .volumeManagement, .floatingIPServerSelect,
-            .serverSnapshotManagement, .volumeSnapshotManagement, .volumeBackupManagement,
-            .networkServerAttachment, .securityGroupServerAttachment,
-            .securityGroupServerManagement, .networkServerManagement, .volumeServerManagement,
-            .floatingIPServerManagement, .floatingIPPortManagement, .portServerManagement,
-            .portAllowedAddressPairManagement, .subnetRouterManagement,
-            .securityGroupRuleManagement, .flavorSelection:
-            return []
-
-        // Service views
-        case .volumeArchiveDetail, .flavorDetail, .flavors, .healthDashboardServiceDetail,
-            .barbican, .octavia, .barbicanSecretDetail,
-            .octaviaLoadBalancerDetail, .swiftObjectDetail,
-            .swiftBackgroundOperationDetail, .octaviaLoadBalancerCreate,
-            .swiftObjectUpload, .swiftContainerDownload, .swiftObjectDownload,
-            .swiftDirectoryDownload, .swiftContainerMetadata, .swiftObjectMetadata,
-            .swiftDirectoryMetadata, .swiftContainerWebAccess, .swiftBackgroundOperations,
-            .performanceMetrics, .dashboard, .healthDashboard:
-            return [.refresh, .clearCache]
+        // Check if there's a registered provider for this view mode
+        if let provider = ActionProviderRegistry.shared.provider(for: context) {
+            // Return list or detail actions based on view type
+            if ActionProviderRegistry.shared.isDetailView(context) {
+                return provider.detailViewActions
+            } else {
+                return provider.listViewActions
+            }
         }
+
+        // Dynamic fallback based on view mode characteristics
+        let viewName = String(describing: context)
+
+        // Form/create views have no actions
+        if viewName.contains("Create") || viewName.contains("Management") ||
+           viewName.contains("Selection") || viewName.contains("Attachment") {
+            return []
+        }
+
+        // Loading and help views have no actions
+        if viewName == "loading" || viewName == "help" || viewName == "about" ||
+           viewName == "welcome" || viewName == "tutorial" || viewName == "shortcuts" ||
+           viewName == "examples" {
+            return []
+        }
+
+        // Default: basic refresh and cache actions for unregistered views
+        return [.refresh, .clearCache]
     }
 
     // MARK: - Help Text Generation

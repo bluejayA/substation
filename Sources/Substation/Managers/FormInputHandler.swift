@@ -115,7 +115,7 @@ final class FormInputHandler: NavigationHandlerProtocol {
 
         case Int32(10), Int32(13): // ENTER - Deactivate field or submit form
             guard let tui = tui else { return true }
-            tui.needsRedraw = true
+            tui.renderCoordinator.needsRedraw = true
             if isFieldActive {
                 formState.deactivateCurrentField()
                 formState = updateFormState(formState)

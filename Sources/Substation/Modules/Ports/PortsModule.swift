@@ -45,7 +45,7 @@ final class PortsModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -78,7 +78,7 @@ final class PortsModule: OpenStackModule {
     /// The module will load even if Neutron is temporarily unavailable to allow
     /// for graceful degradation in multi-cloud or degraded environments.
     func configure() async throws {
-        guard let tui = tui else {
+        guard tui != nil else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -86,6 +86,17 @@ final class PortsModule: OpenStackModule {
 
         // PortsModule configuration completed
         Logger.shared.logInfo("PortsModule configuration completed", context: [:])
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .ports,
+            detailViewMode: .portDetail
+        )
+
         lastHealthCheck = Date()
     }
 
@@ -129,10 +140,10 @@ final class PortsModule: OpenStackModule {
                     cachedNetworks: tui.resourceCache.networks,
                     cachedServers: tui.resourceCache.servers,
                     searchQuery: tui.searchQuery,
-                    scrollOffset: tui.scrollOffset,
-                    selectedIndex: tui.selectedIndex,
-                    multiSelectMode: tui.multiSelectMode,
-                    selectedItems: tui.multiSelectedResourceIDs
+                    scrollOffset: tui.viewCoordinator.scrollOffset,
+                    selectedIndex: tui.viewCoordinator.selectedIndex,
+                    multiSelectMode: tui.selectionManager.multiSelectMode,
+                    selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -149,7 +160,7 @@ final class PortsModule: OpenStackModule {
             title: "Port Details",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let port = tui.selectedResource as? Port else {
+                guard let port = tui.viewCoordinator.selectedResource as? Port else {
                     let surface = SwiftNCurses.surface(from: screen)
                     let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                     await SwiftNCurses.render(Text("No port selected").error(), on: surface, in: bounds)
@@ -166,7 +177,7 @@ final class PortsModule: OpenStackModule {
                     cachedNetworks: tui.resourceCache.networks,
                     cachedSubnets: tui.resourceCache.subnets,
                     cachedSecurityGroups: tui.resourceCache.securityGroups,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -535,5 +546,48 @@ final class PortsModule: OpenStackModule {
         stats["withFixedIPs"] = portsWithIPs.count
 
         return stats
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension PortsModule: ActionProvider {
+    /// Actions available in the list view for ports
+    ///
+    /// Includes create, delete, refresh, manage, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .manage, .clearCache]
+    }
+
+    /// The view mode for creating a new port
+    var createViewMode: ViewMode? {
+        .portCreate
+    }
+
+    /// Execute an action for the selected port
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deletePort(screen: screen)
+            return true
+        case .manage:
+            await managePortServerAssignment(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

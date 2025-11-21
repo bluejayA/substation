@@ -505,8 +505,8 @@ final class ContextSwitcher: @unchecked Sendable {
         Logger.shared.logInfo("Refreshing view after context switch")
 
         // Store current view state
-        let selectedIndex = tui.selectedIndex
-        let scrollOffset = tui.scrollOffset
+        let selectedIndex = tui.viewCoordinator.selectedIndex
+        let scrollOffset = tui.viewCoordinator.scrollOffset
 
         // Trigger data reload for current view
         // This will fetch fresh data from the new cloud
@@ -514,8 +514,8 @@ final class ContextSwitcher: @unchecked Sendable {
         await tui.dataManager.forceFullRefresh()
 
         // Restore view state (with bounds checking)
-        tui.selectedIndex = selectedIndex
-        tui.scrollOffset = scrollOffset
+        tui.viewCoordinator.selectedIndex = selectedIndex
+        tui.viewCoordinator.scrollOffset = scrollOffset
 
         // Force UI redraw to show new data
         tui.forceRedraw()

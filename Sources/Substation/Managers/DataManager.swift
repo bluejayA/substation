@@ -49,7 +49,7 @@ class DataManager {
         self.tui = tui
 
         // Clear router cache to force refresh with interface data
-        tui.cachedRouters.removeAll()
+        tui.cacheManager.cachedRouters.removeAll()
         Logger.shared.logInfo("DataManager - Cleared router cache for interface data enhancement", context: [:])
     }
 
@@ -297,7 +297,7 @@ class DataManager {
             let servers = try await client.listServers(forceRefresh: true)
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(servers.count) servers in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedServers = servers
+            tui.cacheManager.cachedServers = servers
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -319,7 +319,7 @@ class DataManager {
             let serverGroups = try await client.listServerGroups(forceRefresh: true)
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(serverGroups.count) server groups in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedServerGroups = serverGroups
+            tui.cacheManager.cachedServerGroups = serverGroups
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -343,7 +343,7 @@ class DataManager {
             let networks = try await client.listNetworks(forceRefresh: true)
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(networks.count) networks in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedNetworks = networks
+            tui.cacheManager.cachedNetworks = networks
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -364,7 +364,7 @@ class DataManager {
             let volumes = try await client.listVolumes()
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(volumes.count) volumes in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedVolumes = volumes
+            tui.cacheManager.cachedVolumes = volumes
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -386,7 +386,7 @@ class DataManager {
             let flavors = try await client.listFlavors(forceRefresh: true)
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(flavors.count) flavors in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedFlavors = flavors
+            tui.cacheManager.cachedFlavors = flavors
 
             // Generate flavor recommendations in background after flavors are fetched
             await generateFlavorRecommendationsInBackground(priority: priority)
@@ -407,8 +407,8 @@ class DataManager {
 
         // Smart caching: skip if recently fetched (unless critical priority)
         let now = Date()
-        if priority == "background" && now.timeIntervalSince(lastImagesRefresh) < expensiveResourceCacheInterval && !tui.cachedImages.isEmpty {
-            Logger.shared.logDebug("DataManager - Skipping images fetch (cached \(tui.cachedImages.count) images, last refresh \(String(format: "%.1f", now.timeIntervalSince(lastImagesRefresh)))s ago)")
+        if priority == "background" && now.timeIntervalSince(lastImagesRefresh) < expensiveResourceCacheInterval && !tui.cacheManager.cachedImages.isEmpty {
+            Logger.shared.logDebug("DataManager - Skipping images fetch (cached \(tui.cacheManager.cachedImages.count) images, last refresh \(String(format: "%.1f", now.timeIntervalSince(lastImagesRefresh)))s ago)")
             return
         }
 
@@ -450,8 +450,8 @@ class DataManager {
                 )
             }
 
-            tui.cachedImages = mappedImages
-            Logger.shared.logInfo("DataManager - Cached \(tui.cachedImages.count) images")
+            tui.cacheManager.cachedImages = mappedImages
+            Logger.shared.logInfo("DataManager - Cached \(tui.cacheManager.cachedImages.count) images")
             lastImagesRefresh = now
         } catch is TimeoutError {
             Logger.shared.logWarning("DataManager - Images fetch timed out after \((priority == "background") ? 20.0 : 30.0)s, skipping to prevent blocking")
@@ -474,8 +474,8 @@ class DataManager {
 
         // Smart caching: skip if recently fetched (unless critical priority)
         let now = Date()
-        if priority == "background" && now.timeIntervalSince(lastPortsRefresh) < expensiveResourceCacheInterval && !tui.cachedPorts.isEmpty {
-            Logger.shared.logDebug("DataManager - Skipping ports fetch (cached \(tui.cachedPorts.count) ports, last refresh \(String(format: "%.1f", now.timeIntervalSince(lastPortsRefresh)))s ago)")
+        if priority == "background" && now.timeIntervalSince(lastPortsRefresh) < expensiveResourceCacheInterval && !tui.cacheManager.cachedPorts.isEmpty {
+            Logger.shared.logDebug("DataManager - Skipping ports fetch (cached \(tui.cacheManager.cachedPorts.count) ports, last refresh \(String(format: "%.1f", now.timeIntervalSince(lastPortsRefresh)))s ago)")
             return
         }
 
@@ -492,7 +492,7 @@ class DataManager {
 
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(ports.count) ports in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedPorts = ports
+            tui.cacheManager.cachedPorts = ports
             lastPortsRefresh = now
         } catch is TimeoutError {
             Logger.shared.logWarning("DataManager - Ports fetch timed out after \((priority == "background") ? 10.0 : 12.0)s, skipping to prevent blocking")
@@ -543,9 +543,9 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logInfo("DataManager - Fetched \(floatingIPs.count) floating IPs in \(String(format: "%.2f", apiDuration))s")
 
-            let oldCount = tui.cachedFloatingIPs.count
-            let oldIPs = tui.cachedFloatingIPs
-            tui.cachedFloatingIPs = floatingIPs
+            let oldCount = tui.cacheManager.cachedFloatingIPs.count
+            let oldIPs = tui.cacheManager.cachedFloatingIPs
+            tui.cacheManager.cachedFloatingIPs = floatingIPs
             lastFloatingIPsRefresh = now
 
             // Log any changes in floating IP status
@@ -581,7 +581,7 @@ class DataManager {
             let subnets = try await client.listSubnets(forceRefresh: true)
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(subnets.count) subnets in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedSubnets = subnets
+            tui.cacheManager.cachedSubnets = subnets
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -603,7 +603,7 @@ class DataManager {
             let keyPairs = try await client.listKeyPairs(forceRefresh: true)
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(keyPairs.count) key pairs in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedKeyPairs = keyPairs
+            tui.cacheManager.cachedKeyPairs = keyPairs
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -624,7 +624,7 @@ class DataManager {
             let volumeTypes = try await client.listVolumeTypes()
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(volumeTypes.count) volume types in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedVolumeTypes = volumeTypes
+            tui.cacheManager.cachedVolumeTypes = volumeTypes
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -657,7 +657,7 @@ class DataManager {
                 ])
             }
 
-            tui.cachedRouters = routers
+            tui.cacheManager.cachedRouters = routers
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -675,8 +675,8 @@ class DataManager {
 
         // Smart caching: skip if recently fetched (unless critical priority)
         let now = Date()
-        if priority == "background" && now.timeIntervalSince(lastSecurityGroupsRefresh) < expensiveResourceCacheInterval && !tui.cachedSecurityGroups.isEmpty {
-            Logger.shared.logDebug("DataManager - Skipping security groups fetch (cached \(tui.cachedSecurityGroups.count) groups, last refresh \(String(format: "%.1f", now.timeIntervalSince(lastSecurityGroupsRefresh)))s ago)")
+        if priority == "background" && now.timeIntervalSince(lastSecurityGroupsRefresh) < expensiveResourceCacheInterval && !tui.cacheManager.cachedSecurityGroups.isEmpty {
+            Logger.shared.logDebug("DataManager - Skipping security groups fetch (cached \(tui.cacheManager.cachedSecurityGroups.count) groups, last refresh \(String(format: "%.1f", now.timeIntervalSince(lastSecurityGroupsRefresh)))s ago)")
             return
         }
 
@@ -693,7 +693,7 @@ class DataManager {
 
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(securityGroups.count) security groups in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedSecurityGroups = securityGroups
+            tui.cacheManager.cachedSecurityGroups = securityGroups
             lastSecurityGroupsRefresh = now
         } catch is TimeoutError {
             Logger.shared.logWarning("DataManager - Security groups fetch timed out after \((priority == "background") ? 10.0 : 12.0)s, skipping to prevent blocking")
@@ -717,7 +717,7 @@ class DataManager {
             let secrets = try await client.barbican.listSecrets()
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(secrets.count) secrets in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedSecrets = secrets
+            tui.cacheManager.cachedSecrets = secrets
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -740,7 +740,7 @@ class DataManager {
             let availabilityZones = try await client.listAvailabilityZones()
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(availabilityZones.count) availability zones in \(String(format: "%.2f", apiDuration))s")
-            tui.cachedAvailabilityZones = availabilityZones.map { $0.zoneName }
+            tui.cacheManager.cachedAvailabilityZones = availabilityZones.map { $0.zoneName }
         } catch let error as OpenStackError {
             switch error {
             case .httpError(403, _):
@@ -768,7 +768,7 @@ class DataManager {
                     let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
                     Logger.shared.logDebug("DataManager - Fetched compute quotas in \(String(format: "%.2f", apiDuration))s")
                     await MainActor.run {
-                        tui.cachedComputeQuotas = computeQuotas
+                        tui.cacheManager.cachedComputeQuotas = computeQuotas
                     }
                 } catch let error as OpenStackError {
                     switch error {
@@ -795,7 +795,7 @@ class DataManager {
                     let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
                     Logger.shared.logDebug("DataManager - Fetched network quotas in \(String(format: "%.2f", apiDuration))s")
                     await MainActor.run {
-                        tui.cachedNetworkQuotas = networkQuotas
+                        tui.cacheManager.cachedNetworkQuotas = networkQuotas
                     }
                 } catch let error as OpenStackError {
                     switch error {
@@ -822,7 +822,7 @@ class DataManager {
                     let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
                     Logger.shared.logDebug("DataManager - Fetched volume quotas in \(String(format: "%.2f", apiDuration))s")
                     await MainActor.run {
-                        tui.cachedVolumeQuotas = volumeQuotas
+                        tui.cacheManager.cachedVolumeQuotas = volumeQuotas
                     }
                 } catch let error as OpenStackError {
                     switch error {
@@ -849,7 +849,7 @@ class DataManager {
                     let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
                     Logger.shared.logDebug("DataManager - Fetched compute limits in \(String(format: "%.2f", apiDuration))s")
                     await MainActor.run {
-                        tui.cachedComputeLimits = computeLimits
+                        tui.cacheManager.cachedComputeLimits = computeLimits
                     }
                 } catch let error as OpenStackError {
                     switch error {
@@ -889,21 +889,21 @@ class DataManager {
     func purgeCache() async {
         guard let tui = tui else { return }
 
-        tui.cachedServers.removeAll()
-        tui.cachedNetworks.removeAll()
-        tui.cachedVolumes.removeAll()
-        tui.cachedImages.removeAll()
-        tui.cachedVolumeTypes.removeAll()
-        tui.cachedPorts.removeAll()
-        tui.cachedRouters.removeAll()
-        tui.cachedFlavors.removeAll()
-        tui.cachedSubnets.removeAll()
-        tui.cachedSecurityGroups.removeAll()
-        tui.cachedKeyPairs.removeAll()
-        tui.cachedComputeLimits = nil
-        tui.cachedComputeQuotas = nil
-        tui.cachedNetworkQuotas = nil
-        tui.cachedVolumeQuotas = nil
+        tui.cacheManager.cachedServers.removeAll()
+        tui.cacheManager.cachedNetworks.removeAll()
+        tui.cacheManager.cachedVolumes.removeAll()
+        tui.cacheManager.cachedImages.removeAll()
+        tui.cacheManager.cachedVolumeTypes.removeAll()
+        tui.cacheManager.cachedPorts.removeAll()
+        tui.cacheManager.cachedRouters.removeAll()
+        tui.cacheManager.cachedFlavors.removeAll()
+        tui.cacheManager.cachedSubnets.removeAll()
+        tui.cacheManager.cachedSecurityGroups.removeAll()
+        tui.cacheManager.cachedKeyPairs.removeAll()
+        tui.cacheManager.cachedComputeLimits = nil
+        tui.cacheManager.cachedComputeQuotas = nil
+        tui.cacheManager.cachedNetworkQuotas = nil
+        tui.cacheManager.cachedVolumeQuotas = nil
         await tui.resourceNameCache.clearAsync()
 
         Logger.shared.logInfo("DataManager - Cache purged")
@@ -922,8 +922,8 @@ class DataManager {
 
         // Skip if recently generated (cache for 30 minutes)
         let now = Date()
-        if priority == "background" && now.timeIntervalSince(tui.lastRecommendationsRefresh) < 1800 && !tui.cachedFlavorRecommendations.isEmpty {
-            Logger.shared.logDebug("DataManager - Skipping flavor recommendations generation (cached \(tui.cachedFlavorRecommendations.count) workload types)")
+        if priority == "background" && now.timeIntervalSince(tui.cacheManager.lastRecommendationsRefresh) < 1800 && !tui.cacheManager.cachedFlavorRecommendations.isEmpty {
+            Logger.shared.logDebug("DataManager - Skipping flavor recommendations generation (cached \(tui.cacheManager.cachedFlavorRecommendations.count) workload types)")
             return
         }
 
@@ -973,7 +973,7 @@ class DataManager {
         }
 
         // Update cache
-        tui.cachedFlavorRecommendations = newRecommendations
+        tui.cacheManager.cachedFlavorRecommendations = newRecommendations
         tui.resourceCache.setRecommendationsRefreshTime(now)
 
         let generateDuration = Date().timeIntervalSinceReferenceDate - generateStart
@@ -1130,11 +1130,11 @@ class DataManager {
 
     // Computed properties for easier access
     var availabilityZones: [String] {
-        return tui?.cachedAvailabilityZones ?? []
+        return tui?.cacheManager.cachedAvailabilityZones ?? []
     }
 
     var externalNetworks: [Network] {
-        return tui?.cachedNetworks.filter { $0.external == true } ?? []
+        return tui?.cacheManager.cachedNetworks.filter { $0.external == true } ?? []
     }
 
     // MARK: - Pagination Management
@@ -1185,22 +1185,22 @@ class DataManager {
 
         switch resourceType {
         case "servers":
-            serverPaginationManager = PaginationManager<Server>.forServers(data: tui.cachedServers, config: config)
+            serverPaginationManager = PaginationManager<Server>.forServers(data: tui.cacheManager.cachedServers, config: config)
             await serverPaginationManager?.initialLoad()
         case "networks":
-            networkPaginationManager = PaginationManager<Network>.forNetworks(data: tui.cachedNetworks, config: config)
+            networkPaginationManager = PaginationManager<Network>.forNetworks(data: tui.cacheManager.cachedNetworks, config: config)
             await networkPaginationManager?.initialLoad()
         case "volumes":
-            volumePaginationManager = PaginationManager<Volume>.forVolumes(data: tui.cachedVolumes, config: config)
+            volumePaginationManager = PaginationManager<Volume>.forVolumes(data: tui.cacheManager.cachedVolumes, config: config)
             await volumePaginationManager?.initialLoad()
         case "ports":
-            portPaginationManager = PaginationManager<Port>.forPorts(data: tui.cachedPorts, config: config)
+            portPaginationManager = PaginationManager<Port>.forPorts(data: tui.cacheManager.cachedPorts, config: config)
             await portPaginationManager?.initialLoad()
         case "images":
-            imagePaginationManager = PaginationManager<Image>.forImages(data: tui.cachedImages, config: config)
+            imagePaginationManager = PaginationManager<Image>.forImages(data: tui.cacheManager.cachedImages, config: config)
             await imagePaginationManager?.initialLoad()
         case "securityGroups":
-            securityGroupPaginationManager = PaginationManager<SecurityGroup>.forSecurityGroups(data: tui.cachedSecurityGroups, config: config)
+            securityGroupPaginationManager = PaginationManager<SecurityGroup>.forSecurityGroups(data: tui.cacheManager.cachedSecurityGroups, config: config)
             await securityGroupPaginationManager?.initialLoad()
         default:
             Logger.shared.logWarning("DataManager - Unknown resource type for pagination: \(resourceType)")
@@ -1258,17 +1258,17 @@ class DataManager {
         let allItems: [T]
         switch (resourceType, type) {
         case ("servers", is Server.Type):
-            allItems = (tui.cachedServers as? [T]) ?? []
+            allItems = (tui.cacheManager.cachedServers as? [T]) ?? []
         case ("networks", is Network.Type):
-            allItems = (tui.cachedNetworks as? [T]) ?? []
+            allItems = (tui.cacheManager.cachedNetworks as? [T]) ?? []
         case ("volumes", is Volume.Type):
-            allItems = (tui.cachedVolumes as? [T]) ?? []
+            allItems = (tui.cacheManager.cachedVolumes as? [T]) ?? []
         case ("ports", is Port.Type):
-            allItems = (tui.cachedPorts as? [T]) ?? []
+            allItems = (tui.cacheManager.cachedPorts as? [T]) ?? []
         case ("images", is Image.Type):
-            allItems = (tui.cachedImages as? [T]) ?? []
+            allItems = (tui.cacheManager.cachedImages as? [T]) ?? []
         case ("securityGroups", is SecurityGroup.Type):
-            allItems = (tui.cachedSecurityGroups as? [T]) ?? []
+            allItems = (tui.cacheManager.cachedSecurityGroups as? [T]) ?? []
         default:
             allItems = []
         }
@@ -1388,22 +1388,22 @@ class DataManager {
         guard let tui = tui else { return }
 
         if paginationEnabled.contains("servers"), let manager = serverPaginationManager {
-            await manager.updateFromFilterCache(tui.cachedServers)
+            await manager.updateFromFilterCache(tui.cacheManager.cachedServers)
         }
         if paginationEnabled.contains("networks"), let manager = networkPaginationManager {
-            await manager.updateFromFilterCache(tui.cachedNetworks)
+            await manager.updateFromFilterCache(tui.cacheManager.cachedNetworks)
         }
         if paginationEnabled.contains("volumes"), let manager = volumePaginationManager {
-            await manager.updateFromFilterCache(tui.cachedVolumes)
+            await manager.updateFromFilterCache(tui.cacheManager.cachedVolumes)
         }
         if paginationEnabled.contains("ports"), let manager = portPaginationManager {
-            await manager.updateFromFilterCache(tui.cachedPorts)
+            await manager.updateFromFilterCache(tui.cacheManager.cachedPorts)
         }
         if paginationEnabled.contains("images"), let manager = imagePaginationManager {
-            await manager.updateFromFilterCache(tui.cachedImages)
+            await manager.updateFromFilterCache(tui.cacheManager.cachedImages)
         }
         if paginationEnabled.contains("securityGroups"), let manager = securityGroupPaginationManager {
-            await manager.updateFromFilterCache(tui.cachedSecurityGroups)
+            await manager.updateFromFilterCache(tui.cacheManager.cachedSecurityGroups)
         }
     }
 
@@ -1412,34 +1412,34 @@ class DataManager {
         guard let tui = tui else { return }
 
         // Check each resource type and enable pagination if over threshold
-        if tui.cachedServers.count > threshold && !paginationEnabled.contains("servers") {
+        if tui.cacheManager.cachedServers.count > threshold && !paginationEnabled.contains("servers") {
             await enablePagination(for: "servers")
-            Logger.shared.logInfo("DataManager - Auto-enabled pagination for servers (\(tui.cachedServers.count) items > \(threshold))")
+            Logger.shared.logInfo("DataManager - Auto-enabled pagination for servers (\(tui.cacheManager.cachedServers.count) items > \(threshold))")
         }
 
-        if tui.cachedNetworks.count > threshold && !paginationEnabled.contains("networks") {
+        if tui.cacheManager.cachedNetworks.count > threshold && !paginationEnabled.contains("networks") {
             await enablePagination(for: "networks")
-            Logger.shared.logInfo("DataManager - Auto-enabled pagination for networks (\(tui.cachedNetworks.count) items > \(threshold))")
+            Logger.shared.logInfo("DataManager - Auto-enabled pagination for networks (\(tui.cacheManager.cachedNetworks.count) items > \(threshold))")
         }
 
-        if tui.cachedVolumes.count > threshold && !paginationEnabled.contains("volumes") {
+        if tui.cacheManager.cachedVolumes.count > threshold && !paginationEnabled.contains("volumes") {
             await enablePagination(for: "volumes")
-            Logger.shared.logInfo("DataManager - Auto-enabled pagination for volumes (\(tui.cachedVolumes.count) items > \(threshold))")
+            Logger.shared.logInfo("DataManager - Auto-enabled pagination for volumes (\(tui.cacheManager.cachedVolumes.count) items > \(threshold))")
         }
 
-        if tui.cachedPorts.count > threshold && !paginationEnabled.contains("ports") {
+        if tui.cacheManager.cachedPorts.count > threshold && !paginationEnabled.contains("ports") {
             await enablePagination(for: "ports")
-            Logger.shared.logInfo("DataManager - Auto-enabled pagination for ports (\(tui.cachedPorts.count) items > \(threshold))")
+            Logger.shared.logInfo("DataManager - Auto-enabled pagination for ports (\(tui.cacheManager.cachedPorts.count) items > \(threshold))")
         }
 
-        if tui.cachedImages.count > threshold && !paginationEnabled.contains("images") {
+        if tui.cacheManager.cachedImages.count > threshold && !paginationEnabled.contains("images") {
             await enablePagination(for: "images")
-            Logger.shared.logInfo("DataManager - Auto-enabled pagination for images (\(tui.cachedImages.count) items > \(threshold))")
+            Logger.shared.logInfo("DataManager - Auto-enabled pagination for images (\(tui.cacheManager.cachedImages.count) items > \(threshold))")
         }
 
-        if tui.cachedSecurityGroups.count > threshold && !paginationEnabled.contains("securityGroups") {
+        if tui.cacheManager.cachedSecurityGroups.count > threshold && !paginationEnabled.contains("securityGroups") {
             await enablePagination(for: "securityGroups")
-            Logger.shared.logInfo("DataManager - Auto-enabled pagination for securityGroups (\(tui.cachedSecurityGroups.count) items > \(threshold))")
+            Logger.shared.logInfo("DataManager - Auto-enabled pagination for securityGroups (\(tui.cacheManager.cachedSecurityGroups.count) items > \(threshold))")
         }
     }
 
@@ -1611,7 +1611,7 @@ class DataManager {
             let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
             Logger.shared.logDebug("DataManager - Fetched \(containers.count) Swift containers in \(String(format: "%.2f", apiDuration))s")
             await MainActor.run {
-                tui.cachedSwiftContainers = containers
+                tui.cacheManager.cachedSwiftContainers = containers
             }
         } catch let error as OpenStackError {
             switch error {

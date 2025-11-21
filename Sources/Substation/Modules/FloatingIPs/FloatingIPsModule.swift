@@ -32,7 +32,8 @@ final class FloatingIPsModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    /// Note: Internal access to allow extension in separate file to access this property
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -53,9 +54,19 @@ final class FloatingIPsModule: OpenStackModule {
     /// This method performs any necessary setup for the Floating IPs module.
     /// Verifies that the Networks dependency is available and functional.
     func configure() async throws {
-        guard let tui = tui else {
+        guard tui != nil else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .floatingIPs,
+            detailViewMode: .floatingIPDetail
+        )
 
         // Module is ready to use
         lastHealthCheck = Date()
@@ -95,13 +106,13 @@ final class FloatingIPsModule: OpenStackModule {
                     height: height,
                     cachedFloatingIPs: tui.resourceCache.floatingIPs,
                     searchQuery: tui.searchQuery,
-                    scrollOffset: tui.scrollOffset,
-                    selectedIndex: tui.selectedIndex,
+                    scrollOffset: tui.viewCoordinator.scrollOffset,
+                    selectedIndex: tui.viewCoordinator.selectedIndex,
                     cachedServers: tui.resourceCache.servers,
                     cachedPorts: tui.resourceCache.ports,
                     cachedNetworks: tui.resourceCache.networks,
-                    multiSelectMode: tui.multiSelectMode,
-                    selectedItems: tui.multiSelectedResourceIDs
+                    multiSelectMode: tui.selectionManager.multiSelectMode,
+                    selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -118,7 +129,7 @@ final class FloatingIPsModule: OpenStackModule {
             title: "Floating IP Details",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let floatingIP = tui.selectedResource as? FloatingIP else { return }
+                guard let floatingIP = tui.viewCoordinator.selectedResource as? FloatingIP else { return }
 
                 await FloatingIPViews.drawFloatingIPDetail(
                     screen: screen,
@@ -130,7 +141,7 @@ final class FloatingIPsModule: OpenStackModule {
                     cachedServers: tui.resourceCache.servers,
                     cachedPorts: tui.resourceCache.ports,
                     cachedNetworks: tui.resourceCache.networks,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -296,5 +307,48 @@ final class FloatingIPsModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension FloatingIPsModule: ActionProvider {
+    /// Actions available in the list view for floating IPs
+    ///
+    /// Includes create, delete, refresh, manage, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .manage, .clearCache]
+    }
+
+    /// The view mode for creating a new floating IP
+    var createViewMode: ViewMode? {
+        .floatingIPCreate
+    }
+
+    /// Execute an action for the selected floating IP
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteFloatingIP(screen: screen)
+            return true
+        case .manage:
+            await manageFloatingIPServerAssignment(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

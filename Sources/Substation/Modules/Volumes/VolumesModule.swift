@@ -35,7 +35,7 @@ final class VolumesModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -60,7 +60,7 @@ final class VolumesModule: OpenStackModule {
     /// Performs verification that the Cinder service is available in the service catalog.
     /// Does not throw if service is temporarily unavailable to allow graceful degradation.
     func configure() async throws {
-        guard let tui = tui else {
+        guard tui != nil else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -69,6 +69,16 @@ final class VolumesModule: OpenStackModule {
         // Log successful configuration
         // Note: Service availability will be verified during actual API calls
         Logger.shared.logInfo("VolumesModule configuration completed", context: [:])
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .volumes,
+            detailViewMode: .volumeDetail
+        )
 
         lastHealthCheck = Date()
     }
@@ -462,12 +472,12 @@ final class VolumesModule: OpenStackModule {
             height: height,
             cachedVolumes: tui.resourceCache.volumes,
             searchQuery: tui.searchQuery,
-            scrollOffset: tui.scrollOffset,
-            selectedIndex: tui.selectedIndex,
+            scrollOffset: tui.viewCoordinator.scrollOffset,
+            selectedIndex: tui.viewCoordinator.selectedIndex,
             dataManager: tui.dataManager,
             virtualScrollManager: nil,
-            multiSelectMode: tui.multiSelectMode,
-            selectedItems: tui.multiSelectedResourceIDs
+            multiSelectMode: tui.selectionManager.multiSelectMode,
+            selectedItems: tui.selectionManager.multiSelectedResourceIDs
         )
     }
 
@@ -480,7 +490,7 @@ final class VolumesModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let volume = tui.selectedResource as? Volume else {
+        guard let volume = tui.viewCoordinator.selectedResource as? Volume else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             await SwiftNCurses.render(Text("No volume selected").error(), on: surface, in: bounds)
@@ -494,7 +504,7 @@ final class VolumesModule: OpenStackModule {
             width: width,
             height: height,
             volume: volume,
-            scrollOffset: tui.detailScrollOffset
+            scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
     }
 
@@ -526,7 +536,7 @@ final class VolumesModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let volume = tui.selectedResource as? Volume else {
+        guard let volume = tui.viewCoordinator.selectedResource as? Volume else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             await SwiftNCurses.render(Text("No volume selected").error(), on: surface, in: bounds)
@@ -609,10 +619,10 @@ final class VolumesModule: OpenStackModule {
             cachedVolumeBackups: tui.resourceCache.volumeBackups,
             cachedImages: tui.resourceCache.images,
             searchQuery: tui.searchQuery,
-            scrollOffset: tui.scrollOffset,
-            selectedIndex: tui.selectedIndex,
-            multiSelectMode: tui.multiSelectMode,
-            selectedItems: tui.multiSelectedResourceIDs
+            scrollOffset: tui.viewCoordinator.scrollOffset,
+            selectedIndex: tui.viewCoordinator.selectedIndex,
+            multiSelectMode: tui.selectionManager.multiSelectMode,
+            selectedItems: tui.selectionManager.multiSelectedResourceIDs
         )
     }
 
@@ -625,7 +635,7 @@ final class VolumesModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let archiveItem = tui.selectedResource as? VolumeArchiveItem else {
+        guard let archiveItem = tui.viewCoordinator.selectedResource as? VolumeArchiveItem else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             await SwiftNCurses.render(Text("No archive item selected").error(), on: surface, in: bounds)
@@ -641,7 +651,7 @@ final class VolumesModule: OpenStackModule {
                 width: width,
                 height: height,
                 snapshot: snapshot,
-                scrollOffset: tui.detailScrollOffset
+                scrollOffset: tui.viewCoordinator.detailScrollOffset
             )
         case .volumeBackup(let backup):
             await VolumeArchiveViews.drawVolumeBackupDetail(
@@ -651,7 +661,7 @@ final class VolumesModule: OpenStackModule {
                 width: width,
                 height: height,
                 backup: backup,
-                scrollOffset: tui.detailScrollOffset
+                scrollOffset: tui.viewCoordinator.detailScrollOffset
             )
         case .serverBackup(_):
             let surface = SwiftNCurses.surface(from: screen)
@@ -736,5 +746,48 @@ final class VolumesModule: OpenStackModule {
             },
             getItemID: { $0.id }
         )
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension VolumesModule: ActionProvider {
+    /// Actions available in the list view for volumes
+    ///
+    /// Includes create, delete, refresh, manage, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .manage, .clearCache]
+    }
+
+    /// The view mode for creating a new volume
+    var createViewMode: ViewMode? {
+        .volumeCreate
+    }
+
+    /// Execute an action for the selected volume
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteVolume(screen: screen)
+            return true
+        case .manage:
+            await manageVolumeToServers(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

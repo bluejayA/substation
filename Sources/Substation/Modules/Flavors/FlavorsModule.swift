@@ -233,8 +233,8 @@ final class FlavorsModule: OpenStackModule {
             height: height,
             cachedFlavors: tui.resourceCache.flavors,
             searchQuery: tui.searchQuery,
-            scrollOffset: tui.scrollOffset,
-            selectedIndex: tui.selectedIndex
+            scrollOffset: tui.viewCoordinator.scrollOffset,
+            selectedIndex: tui.viewCoordinator.selectedIndex
         )
     }
 
@@ -254,7 +254,7 @@ final class FlavorsModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let flavor = tui.selectedResource as? Flavor else {
+        guard let flavor = tui.viewCoordinator.selectedResource as? Flavor else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol + 2, y: startRow + 2, width: width - 4, height: 1)
             await SwiftNCurses.render(
@@ -272,7 +272,7 @@ final class FlavorsModule: OpenStackModule {
             width: width,
             height: height,
             flavor: flavor,
-            scrollOffset: tui.detailScrollOffset
+            scrollOffset: tui.viewCoordinator.detailScrollOffset
         )
     }
 }

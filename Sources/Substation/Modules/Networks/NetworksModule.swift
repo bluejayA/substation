@@ -44,7 +44,7 @@ final class NetworksModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -77,7 +77,7 @@ final class NetworksModule: OpenStackModule {
     /// The module will load even if Neutron is temporarily unavailable to allow
     /// for graceful degradation in multi-cloud or degraded environments.
     func configure() async throws {
-        guard let tui = tui else {
+        guard tui != nil else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -85,6 +85,17 @@ final class NetworksModule: OpenStackModule {
 
         // NetworksModule configuration completed
         Logger.shared.logInfo("NetworksModule configuration completed", context: [:])
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .networks,
+            detailViewMode: .networkDetail
+        )
+
         lastHealthCheck = Date()
     }
 
@@ -126,12 +137,12 @@ final class NetworksModule: OpenStackModule {
                     height: height,
                     cachedNetworks: tui.resourceCache.networks,
                     searchQuery: tui.searchQuery,
-                    scrollOffset: tui.scrollOffset,
-                    selectedIndex: tui.selectedIndex,
+                    scrollOffset: tui.viewCoordinator.scrollOffset,
+                    selectedIndex: tui.viewCoordinator.selectedIndex,
                     dataManager: tui.dataManager,
                     virtualScrollManager: nil,
-                    multiSelectMode: tui.multiSelectMode,
-                    selectedItems: tui.multiSelectedResourceIDs
+                    multiSelectMode: tui.selectionManager.multiSelectMode,
+                    selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -148,7 +159,7 @@ final class NetworksModule: OpenStackModule {
             title: "Network Details",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let network = tui.selectedResource as? Network else {
+                guard let network = tui.viewCoordinator.selectedResource as? Network else {
                     let surface = SwiftNCurses.surface(from: screen)
                     let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                     await SwiftNCurses.render(Text("No network selected").error(), on: surface, in: bounds)
@@ -162,7 +173,7 @@ final class NetworksModule: OpenStackModule {
                     width: width,
                     height: height,
                     network: network,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -511,5 +522,48 @@ final class NetworksModule: OpenStackModule {
         stats["withSubnets"] = networksWithSubnets.count
 
         return stats
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension NetworksModule: ActionProvider {
+    /// Actions available in the list view for networks
+    ///
+    /// Includes create, delete, refresh, manage, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .manage, .clearCache]
+    }
+
+    /// The view mode for creating a new network
+    var createViewMode: ViewMode? {
+        .networkCreate
+    }
+
+    /// Execute an action for the selected network
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteNetwork(screen: screen)
+            return true
+        case .manage:
+            await manageNetworkToServers(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

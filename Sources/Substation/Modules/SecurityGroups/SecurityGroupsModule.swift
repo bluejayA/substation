@@ -34,7 +34,7 @@ final class SecurityGroupsModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -59,7 +59,7 @@ final class SecurityGroupsModule: OpenStackModule {
     /// This method performs any necessary setup for the Security Groups module.
     /// Verifies that the Neutron network service is available for security group operations.
     func configure() async throws {
-        guard let tui = tui else {
+        guard tui != nil else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -67,6 +67,17 @@ final class SecurityGroupsModule: OpenStackModule {
 
         // SecurityGroupsModule configuration completed
         Logger.shared.logInfo("SecurityGroupsModule configuration completed", context: [:])
+
+        // Register as batch operation provider
+        BatchOperationRegistry.shared.register(self)
+
+        // Register as action provider
+        ActionProviderRegistry.shared.register(
+            self,
+            listViewMode: .securityGroups,
+            detailViewMode: .securityGroupDetail
+        )
+
         lastHealthCheck = Date()
     }
 
@@ -106,10 +117,10 @@ final class SecurityGroupsModule: OpenStackModule {
                     height: height,
                     cachedSecurityGroups: tui.resourceCache.securityGroups,
                     searchQuery: tui.searchQuery,
-                    scrollOffset: tui.scrollOffset,
-                    selectedIndex: tui.selectedIndex,
-                    multiSelectMode: tui.multiSelectMode,
-                    selectedItems: tui.multiSelectedResourceIDs
+                    scrollOffset: tui.viewCoordinator.scrollOffset,
+                    selectedIndex: tui.viewCoordinator.selectedIndex,
+                    multiSelectMode: tui.selectionManager.multiSelectMode,
+                    selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -126,7 +137,7 @@ final class SecurityGroupsModule: OpenStackModule {
             title: "Security Group Details",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard let securityGroup = tui.selectedResource as? SecurityGroup else {
+                guard let securityGroup = tui.viewCoordinator.selectedResource as? SecurityGroup else {
                     let surface = SwiftNCurses.surface(from: screen)
                     let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                     await SwiftNCurses.render(Text("No security group selected").error(), on: surface, in: bounds)
@@ -141,7 +152,7 @@ final class SecurityGroupsModule: OpenStackModule {
                     height: height,
                     securityGroup: securityGroup,
                     selectedRuleIndex: nil,
-                    scrollOffset: tui.detailScrollOffset
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
             inputHandler: { [weak tui] ch, screen in
@@ -355,5 +366,48 @@ final class SecurityGroupsModule: OpenStackModule {
             errors: errors,
             metrics: metrics
         )
+    }
+}
+
+// MARK: - ActionProvider Conformance
+
+extension SecurityGroupsModule: ActionProvider {
+    /// Actions available in the list view for security groups
+    ///
+    /// Includes create, delete, refresh, manage, and cache management.
+    var listViewActions: [ActionType] {
+        [.create, .delete, .refresh, .manage, .clearCache]
+    }
+
+    /// The view mode for creating a new security group
+    var createViewMode: ViewMode? {
+        .securityGroupCreate
+    }
+
+    /// Execute an action for the selected security group
+    ///
+    /// - Parameters:
+    ///   - action: The action type to execute
+    ///   - screen: Screen pointer for confirmation dialogs
+    ///   - tui: The TUI instance for state management
+    /// - Returns: Boolean indicating if the action was handled
+    func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
+        switch action {
+        case .create:
+            if let createMode = createViewMode {
+                tui.changeView(to: createMode)
+                tui.statusMessage = "Opening create form..."
+                return true
+            }
+            return false
+        case .delete:
+            await deleteSecurityGroup(screen: screen)
+            return true
+        case .manage:
+            await manageSecurityGroupToServers(screen: screen)
+            return true
+        default:
+            return false
+        }
     }
 }

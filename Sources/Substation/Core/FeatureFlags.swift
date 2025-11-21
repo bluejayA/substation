@@ -24,6 +24,11 @@ struct FeatureFlags {
             let moduleList = enabled.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
             return Set(moduleList)
         }
+        #else
+        if let stored = UserDefaults.standard.array(forKey: "enabledModules") as? [String] {
+            return Set(stored)
+        }
+        #endif
         // All 14 modules enabled by default
         return [
             "barbican", "swift", "keypairs", "servergroups",
@@ -31,18 +36,6 @@ struct FeatureFlags {
             "subnets", "volumes", "servers", "routers",
             "floatingips", "ports"
         ]
-        #else
-        if let stored = UserDefaults.standard.array(forKey: "enabledModules") as? [String] {
-            return Set(stored)
-        }
-        // All modules enabled in release builds too
-        return [
-            "barbican", "swift", "keypairs", "servergroups",
-            "flavors", "images", "securitygroups", "networks",
-            "subnets", "volumes", "servers", "routers",
-            "floatingips", "ports"
-        ]
-        #endif
     }
 
     /// Clear all modules (for testing)
