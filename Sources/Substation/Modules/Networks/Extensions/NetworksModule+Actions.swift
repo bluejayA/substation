@@ -216,7 +216,8 @@ extension NetworksModule {
             tui.networkCreateForm = NetworkCreateForm()
             tui.networkCreateFormState = FormBuilderState(fields: [])
 
-            await tui.dataManager.refreshAllData()
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
             tui.changeView(to: .networks, resetSelection: false)
 
         } catch let error as OpenStackError {

@@ -54,6 +54,11 @@ final class ViewCoordinator {
     /// Swift object storage navigation state
     lazy var swiftNavState: SwiftNavigationState = SwiftNavigationState()
 
+    // MARK: - Loading States
+
+    /// Flag indicating Swift objects are being loaded
+    var isLoadingSwiftObjects: Bool = false
+
     // MARK: - Callbacks
 
     /// Callback to mark the screen as needing redraw

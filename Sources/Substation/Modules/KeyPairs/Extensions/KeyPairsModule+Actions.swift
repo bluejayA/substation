@@ -174,16 +174,24 @@ extension KeyPairsModule {
             try await client.deleteKeyPair(name: keyPairName)
             tui.statusMessage = "Key pair '\(keyPairName)' deleted successfully"
 
+            // Optimistic cache update - immediately remove deleted key pair from cache
+            // This prevents the deleted item from appearing as an artifact before the refresh completes
+            let updatedKeyPairs = tui.cacheManager.cachedKeyPairs.filter { $0.name != keyPairName }
+            tui.cacheManager.cachedKeyPairs = updatedKeyPairs
+
             // Adjust selection if we deleted the last item
-            let newKeyPairCount = filteredKeyPairs.count - 1
+            let newKeyPairCount = FilterUtils.filterKeyPairs(
+                updatedKeyPairs,
+                query: tui.searchQuery
+            ).count
             if tui.viewCoordinator.selectedIndex >= newKeyPairCount && newKeyPairCount > 0 {
                 tui.viewCoordinator.selectedIndex = newKeyPairCount - 1
             } else if newKeyPairCount == 0 {
                 tui.viewCoordinator.selectedIndex = 0
             }
 
-            // Refresh keypair cache
-            let _ = await DataProviderRegistry.shared.fetchData(for: "keypairs", priority: .onDemand, forceRefresh: true)
+            // Trigger accelerated refresh to confirm actual state from server
+            tui.refreshAfterOperation()
 
             // Clear screen to remove graphical artifacts from deleted keypair
             SwiftNCurses.clear(WindowHandle(screen))
@@ -451,8 +459,8 @@ extension KeyPairsModule {
 
             tui.statusMessage = "Key pair '\(keyPairName)' created successfully"
 
-            // Refresh keypair cache and return to list
-            let _ = await DataProviderRegistry.shared.fetchData(for: "keypairs", priority: .onDemand, forceRefresh: true)
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
             tui.changeView(to: .keyPairs, resetSelection: false)
 
         } catch let error as OpenStackError {

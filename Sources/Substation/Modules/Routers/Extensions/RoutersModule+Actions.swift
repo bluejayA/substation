@@ -352,7 +352,10 @@ extension RoutersModule {
             )
 
             Logger.shared.logInfo("Router '\(tui.routerCreateForm.getTrimmedName())' created successfully")
-            let _ = await DataProviderRegistry.shared.fetchData(for: "routers", priority: .onDemand, forceRefresh: true)
+
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
+
             tui.viewCoordinator.currentView = .routers
             tui.routerCreateForm = RouterCreateForm()
             tui.routerCreateFormState = FormBuilderState(fields: [])

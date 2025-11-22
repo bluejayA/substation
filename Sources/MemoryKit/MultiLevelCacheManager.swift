@@ -901,9 +901,39 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
 
 // MARK: - Supporting Types
 
-public enum MultiLevelCacheError: Error {
+/// Errors that can occur during multi-level cache operations
+public enum MultiLevelCacheError: Error, LocalizedError {
+    /// Compression operation failed during cache promotion or storage
     case compressionFailed
+    /// Decompression operation failed during cache retrieval
     case decompressionFailed
+
+    public var errorDescription: String? {
+        switch self {
+        case .compressionFailed:
+            return "Failed to compress data for cache storage"
+        case .decompressionFailed:
+            return "Failed to decompress cached data"
+        }
+    }
+
+    public var failureReason: String? {
+        switch self {
+        case .compressionFailed:
+            return "The compression algorithm returned an invalid result or empty output"
+        case .decompressionFailed:
+            return "The decompression algorithm could not decode the compressed data"
+        }
+    }
+
+    public var recoverySuggestion: String? {
+        switch self {
+        case .compressionFailed:
+            return "The entry will be stored without compression in a lower cache tier"
+        case .decompressionFailed:
+            return "The corrupted cache entry will be removed and data will be fetched fresh"
+        }
+    }
 }
 
 public struct CompressionStats: Sendable {

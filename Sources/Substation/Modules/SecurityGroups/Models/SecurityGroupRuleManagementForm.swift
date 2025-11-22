@@ -34,7 +34,14 @@ struct SecurityGroupRuleManagementForm {
     var mode: SecurityGroupRuleManagementMode = .list
 
     /// Index of selected rule in list mode
-    var selectedRuleIndex: Int = 0
+    ///
+    /// This is a computed property that mirrors `highlightedRuleIndex` to ensure
+    /// consistent state management. Both properties always remain synchronized,
+    /// eliminating index divergence issues in navigation.
+    var selectedRuleIndex: Int {
+        get { highlightedRuleIndex }
+        set { highlightedRuleIndex = newValue }
+    }
 
     /// Scroll offset for rule list
     var scrollOffset: Int = 0
@@ -80,16 +87,21 @@ struct SecurityGroupRuleManagementForm {
     // MARK: - Rule List Management
 
     /// Move selection up in the rule list
+    ///
+    /// Decrements the highlighted rule index while ensuring it does not go below zero.
+    /// The `selectedRuleIndex` computed property automatically stays synchronized.
     mutating func moveSelectionUp() {
         highlightedRuleIndex = max(0, highlightedRuleIndex - 1)
-        selectedRuleIndex = highlightedRuleIndex
     }
 
     /// Move selection down in the rule list
+    ///
+    /// Increments the highlighted rule index while ensuring it does not exceed
+    /// the maximum valid index. The `selectedRuleIndex` computed property
+    /// automatically stays synchronized.
     mutating func moveSelectionDown() {
         let maxIndex = max(0, (securityGroup.securityGroupRules?.count ?? 0) - 1)
         highlightedRuleIndex = min(maxIndex, highlightedRuleIndex + 1)
-        selectedRuleIndex = highlightedRuleIndex
     }
 
     /// Toggle selection state of the currently highlighted rule
@@ -297,10 +309,17 @@ struct SecurityGroupRuleManagementForm {
         }
     }
 
+    /// Get contextual help text for the current mode
+    ///
+    /// Returns keyboard shortcuts and actions available based on the current mode:
+    /// - List mode: Navigation, edit, create, delete, and back to security groups
+    /// - Create/Edit mode: Delegates to rule create form navigation help
+    ///
+    /// - Returns: Help text string with available keyboard shortcuts
     func getHelpText() -> String {
         switch mode {
         case .list:
-            return "UP/DOWN Navigate | SPACE Edit | C Create | DEL Delete | ESC Back"
+            return "UP/DOWN Navigate | SPACE Edit | C Create | DEL Delete | ESC Return to Security Groups"
         case .create, .edit:
             return ruleCreateForm.getNavigationHelp()
         }
@@ -329,12 +348,18 @@ struct SecurityGroupRuleManagementForm {
 
     // MARK: - Data Updates
 
+    /// Update the security group with new data
+    ///
+    /// Updates the managed security group and adjusts the selection index if rules
+    /// were removed. Automatically returns to list mode after create/edit operations.
+    ///
+    /// - Parameter updatedSecurityGroup: The updated security group data
     mutating func updateSecurityGroup(_ updatedSecurityGroup: SecurityGroup) {
         self.securityGroup = updatedSecurityGroup
 
         // Adjust selection if rules were removed
         let maxIndex = max(0, (securityGroup.securityGroupRules?.count ?? 0) - 1)
-        selectedRuleIndex = min(selectedRuleIndex, maxIndex)
+        highlightedRuleIndex = min(highlightedRuleIndex, maxIndex)
 
         // Return to list mode after operations
         if case .create = mode {

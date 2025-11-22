@@ -14,8 +14,8 @@ import MemoryKit
 @MainActor
 extension TUI {
 
-    internal func handleFloatingIPServerManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard viewCoordinator.currentView == .floatingIPServerManagement else { return }
+    internal func handleFloatingIPServerManagementInput(_ ch: Int32, screen: OpaquePointer?) async -> Bool {
+        // Guard removed - ViewRegistry ensures this handler is only called for the correct view
 
         // Apply search filter if needed
         let filteredServers: [Server]
@@ -50,7 +50,7 @@ extension TUI {
             }
         }
 
-        let _ = await formInputHandler.handleManagementInput(
+        return await formInputHandler.handleManagementInput(
             ch,
             screen: screen,
             itemCount: relevantServers.count,
@@ -64,6 +64,8 @@ extension TUI {
                     self.selectionManager.selectedServerId = server.id
                     self.statusMessage = "Selected server '\(server.name ?? "Unknown")'"
                 }
+                self.renderCoordinator.needsRedraw = true
+                await self.draw(screen: screen)
             },
             onEnter: {
                 self.renderCoordinator.needsRedraw = true
@@ -79,6 +81,8 @@ extension TUI {
                     self.viewCoordinator.selectedIndex = 0
                     self.viewCoordinator.scrollOffset = 0
                     self.statusMessage = "Switched to \(self.selectionManager.attachmentMode == .attach ? "ASSIGN" : "UNASSIGN") mode"
+                    self.renderCoordinator.needsRedraw = true
+                    await self.draw(screen: screen)
                     return true
                 }
                 return false

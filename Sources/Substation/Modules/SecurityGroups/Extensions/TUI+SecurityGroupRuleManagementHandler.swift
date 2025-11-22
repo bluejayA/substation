@@ -76,7 +76,7 @@ extension TUI {
                     mutableForm.ruleCreateForm = formAdapter.form
                     self.securityGroupRuleManagementForm = mutableForm
 
-                    if let module = ModuleRegistry.shared.module(for: "securityGroups") as? SecurityGroupsModule {
+                    if let module = ModuleRegistry.shared.module(for: "securitygroups") as? SecurityGroupsModule {
                         if mutableForm.shouldShowCreateForm() {
                             await module.createSecurityGroupRule(screen: screen)
                         } else {
@@ -146,7 +146,7 @@ extension TUI {
             return true
 
         case Int32(127), Int32(330): // DELETE - Delete selected rule
-            if let module = ModuleRegistry.shared.module(for: "securityGroups") as? SecurityGroupsModule {
+            if let module = ModuleRegistry.shared.module(for: "securitygroups") as? SecurityGroupsModule {
                 await module.deleteSecurityGroupRule(screen: screen)
             }
             return true

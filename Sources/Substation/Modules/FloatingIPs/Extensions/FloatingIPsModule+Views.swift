@@ -50,7 +50,24 @@ extension FloatingIPsModule {
                         selectedItems: tui.selectionManager.multiSelectedResourceIDs
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak self, weak tui] ch, screen in
+                    guard let self = self, let tui = tui else { return false }
+
+                    switch ch {
+                    case Int32(77):  // M - Manage server assignment
+                        Logger.shared.logUserAction("manage_floating_ip_server_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.manageFloatingIPServerAssignment(screen: screen)
+                        return true
+
+                    case Int32(80):  // P - Manage port assignment
+                        Logger.shared.logUserAction("manage_floating_ip_port_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.manageFloatingIPPortAssignment(screen: screen)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
             ViewMetadata(
                 identifier: Views.detail,
@@ -131,7 +148,10 @@ extension FloatingIPsModule {
                         )
                     }
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    return await tui.handleFloatingIPServerManagementInput(ch, screen: screen)
+                }
             ),
             ViewMetadata(
                 identifier: Views.portManagement,
@@ -161,7 +181,39 @@ extension FloatingIPsModule {
                         )
                     }
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    return await tui.handleFloatingIPPortManagementInput(ch, screen: screen)
+                }
+            ),
+            ViewMetadata(
+                identifier: Views.create,
+                title: "Create Floating IP",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .network,
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    _ = self  // Silence unused capture warning
+                    await FloatingIPViews.drawFloatingIPCreateForm(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        floatingIPCreateForm: tui.floatingIPCreateForm,
+                        floatingIPCreateFormState: tui.floatingIPCreateFormState,
+                        cachedNetworks: tui.cacheManager.cachedNetworks,
+                        cachedSubnets: tui.cacheManager.cachedSubnets
+                    )
+                },
+                inputHandler: { [weak self, weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    _ = self  // Silence unused capture warning
+                    await tui.handleFloatingIPCreateInput(ch, screen: screen)
+                    return true
+                }
             )
         ]
     }

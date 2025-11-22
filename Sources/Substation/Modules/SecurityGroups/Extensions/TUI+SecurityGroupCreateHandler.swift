@@ -31,7 +31,7 @@ extension TUI {
                 // Receive formState and formAdapter as parameters to avoid exclusivity violation
                 self.securityGroupCreateFormState = formState
                 self.securityGroupCreateForm = formAdapter.form
-                if let module = ModuleRegistry.shared.module(for: "securityGroups") as? SecurityGroupsModule {
+                if let module = ModuleRegistry.shared.module(for: "securitygroups") as? SecurityGroupsModule {
                     await module.submitSecurityGroupCreation(screen: screen)
                 }
             },

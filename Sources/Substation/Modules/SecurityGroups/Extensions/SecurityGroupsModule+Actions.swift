@@ -512,6 +512,9 @@ extension SecurityGroupsModule {
             tui.statusMessage = "Security group '\(securityGroupName)' deleted successfully"
             Logger.shared.logInfo("Deleted security group: \(securityGroupName)")
 
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
+
         } catch {
             tui.statusMessage = "Failed to delete security group: \(error.localizedDescription)"
             Logger.shared.logError("Failed to delete security group '\(securityGroupName)': \(error.localizedDescription)")
@@ -571,6 +574,9 @@ extension SecurityGroupsModule {
             if let index = tui.cacheManager.cachedSecurityGroups.firstIndex(where: { $0.id == form.securityGroup.id }) {
                 tui.cacheManager.cachedSecurityGroups[index] = updatedSecurityGroup
             }
+
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
 
         } catch let error as OpenStackError {
             let baseMsg = "Failed to create security group rule"
@@ -657,6 +663,9 @@ extension SecurityGroupsModule {
             }
 
             tui.statusMessage = "Security group rule deleted successfully"
+
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
 
         } catch let error as OpenStackError {
             let baseMsg = createNew ? "Failed to update security group rule" : "Failed to delete security group rule"

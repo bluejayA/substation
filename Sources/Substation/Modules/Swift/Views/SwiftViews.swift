@@ -69,7 +69,66 @@ struct SwiftViews {
         // Apply search filter if present
         let filteredItems = SwiftTreeItem.filterItems(treeItems, query: searchQuery.isEmpty ? nil : searchQuery)
 
+        // Validate selectedIndex bounds - critical for preventing crashes when cache updates
+        let validatedSelectedIndex = filteredItems.isEmpty ? 0 : min(max(0, selectedIndex), filteredItems.count - 1)
+
+        // Log if bounds validation was needed
+        if validatedSelectedIndex != selectedIndex {
+            Logger.shared.logDebug("SwiftViews - Bounds validation: selectedIndex \(selectedIndex) -> \(validatedSelectedIndex) (items: \(filteredItems.count))")
+        }
+
         Logger.shared.logDebug("Rendering Swift object list: \(filteredItems.count) items (from \(objects.count) objects)")
+
+        // Create VirtualScrollManager for large lists (over 100 items)
+        var virtualManager: VirtualScrollManager<SwiftTreeItem>? = nil
+        var effectiveScrollOffset = scrollOffset
+
+        if filteredItems.count > 100 {
+            // Calculate viewport height with better minimum bounds
+            // StatusListView uses height - 10 for header/footer/borders
+            // Ensure minimum viewport of 5 rows for usability
+            let calculatedHeight = Int(height) - 10
+            let viewportHeight = max(5, calculatedHeight)
+
+            // Log viewport calculation for debugging
+            if calculatedHeight < 5 {
+                Logger.shared.logDebug("SwiftViews - Viewport height adjusted: \(calculatedHeight) -> \(viewportHeight) (screen height: \(height))")
+            }
+
+            let config = VirtualScrollConfig(
+                viewportHeight: viewportHeight,
+                bufferSize: 10,
+                minimumItemHeight: 1,
+                maxRenderItems: 50,
+                scrollSensitivity: 1.0
+            )
+            virtualManager = VirtualScrollManager<SwiftTreeItem>(config: config)
+            virtualManager?.updateData(filteredItems)
+
+            // Calculate scroll position that keeps selectedIndex in view
+            // Use validated index to prevent negative calculations
+            if validatedSelectedIndex >= effectiveScrollOffset + viewportHeight {
+                // Selected item is below viewport - scroll to show it at bottom
+                effectiveScrollOffset = validatedSelectedIndex - viewportHeight + 1
+            } else if validatedSelectedIndex < effectiveScrollOffset {
+                // Selected item is above viewport - scroll up to show it at top
+                effectiveScrollOffset = validatedSelectedIndex
+            }
+
+            // Ensure scroll offset is within valid bounds
+            let maxScrollOffset = max(0, filteredItems.count - viewportHeight)
+            effectiveScrollOffset = max(0, min(effectiveScrollOffset, maxScrollOffset))
+
+            // Sync scroll position with VirtualScrollManager
+            if let manager = virtualManager {
+                await manager.scrollToItem(index: effectiveScrollOffset)
+            }
+        } else {
+            // For smaller lists, still validate scroll offset
+            let visibleItems = max(5, Int(height) - 10)
+            let maxScrollOffset = max(0, filteredItems.count - visibleItems)
+            effectiveScrollOffset = max(0, min(scrollOffset, maxScrollOffset))
+        }
 
         let statusListView = createTreeItemStatusListView(navState: navState)
         await statusListView.draw(
@@ -80,10 +139,10 @@ struct SwiftViews {
             height: height,
             items: filteredItems,
             searchQuery: searchQuery.isEmpty ? nil : searchQuery,
-            scrollOffset: scrollOffset,
-            selectedIndex: selectedIndex,
+            scrollOffset: effectiveScrollOffset,
+            selectedIndex: validatedSelectedIndex,
             dataManager: dataManager,
-            virtualScrollManager: nil, // Don't use virtual scroll manager for tree items
+            virtualScrollManager: virtualManager,
             multiSelectMode: multiSelectMode,
             selectedItems: selectedItems
         )

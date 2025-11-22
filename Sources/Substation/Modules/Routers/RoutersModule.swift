@@ -75,7 +75,7 @@ final class RoutersModule: OpenStackModule {
     /// The module will load even if Neutron is temporarily unavailable to allow
     /// for graceful degradation in multi-cloud or degraded environments.
     func configure() async throws {
-        guard tui != nil else {
+        guard let tuiInstance = tui else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -95,7 +95,7 @@ final class RoutersModule: OpenStackModule {
         )
 
         // Register as data provider
-        let dataProvider = RoutersDataProvider(module: self, tui: tui!)
+        let dataProvider = RoutersDataProvider(module: self, tui: tuiInstance)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
         // Register enhanced views with metadata

@@ -31,7 +31,7 @@ extension TUI {
                 // Sync to self before submission so submitFloatingIPCreation can access the values
                 self.floatingIPCreateFormState = formState
                 self.floatingIPCreateForm = form
-                if let module = ModuleRegistry.shared.module(for: "floatingIPs") as? FloatingIPsModule {
+                if let module = ModuleRegistry.shared.module(for: "floatingips") as? FloatingIPsModule {
                     await module.submitFloatingIPCreation(screen: screen)
                 }
             },

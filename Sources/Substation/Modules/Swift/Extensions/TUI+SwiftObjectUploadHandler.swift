@@ -272,10 +272,19 @@ extension TUI {
             operation.progress = 1.0
             operation.bytesTransferred = Int64(fileSize)
 
-            // Refresh object list for the current container
-            if let currentContainer = viewCoordinator.swiftNavState.currentContainer {
+            // Invalidate cache and refresh object list for the container
+            cacheManager.clearSwiftObjects(forContainer: containerName)
+
+            // If currently viewing this container, refresh the list
+            if viewCoordinator.swiftNavState.currentContainer == containerName {
                 if let swiftModule = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
-                    await swiftModule.fetchSwiftObjects(containerName: currentContainer, priority: "interactive", forceRefresh: true)
+                    await swiftModule.fetchSwiftObjectsPaginated(
+                        containerName: containerName,
+                        marker: nil,
+                        limit: 100,
+                        priority: "interactive",
+                        forceRefresh: false
+                    )
                 }
             }
 
@@ -435,10 +444,19 @@ extension TUI {
             operation.markCompleted()
             operation.progress = 1.0
 
-            // Refresh object list for the current container
-            if let currentContainer = viewCoordinator.swiftNavState.currentContainer {
+            // Invalidate cache and refresh object list for the container
+            cacheManager.clearSwiftObjects(forContainer: containerName)
+
+            // If currently viewing this container, refresh the list
+            if viewCoordinator.swiftNavState.currentContainer == containerName {
                 if let swiftModule = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
-                    await swiftModule.fetchSwiftObjects(containerName: currentContainer, priority: "interactive", forceRefresh: true)
+                    await swiftModule.fetchSwiftObjectsPaginated(
+                        containerName: containerName,
+                        marker: nil,
+                        limit: 100,
+                        priority: "interactive",
+                        forceRefresh: false
+                    )
                 }
             }
 

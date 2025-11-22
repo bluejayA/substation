@@ -11,9 +11,27 @@ import MemoryKit
 
 // MARK: - Security Group Management Input Handler
 
+/// Extension providing security group management input handling for TUI
+///
+/// This extension handles keyboard input for the security group management view,
+/// supporting navigation through security groups and toggling group membership.
+///
+/// Supported keys:
+/// - UP/DOWN: Navigate through security groups
+/// - SPACE: Toggle security group selection
+/// - ENTER: Apply changes
+/// - ESC: Return to previous view
 @MainActor
 extension TUI {
 
+    /// Handle keyboard input for security group management view
+    ///
+    /// Processes navigation and action keys for the security group management interface.
+    /// Delegates input handling to the form input handler for consistent behavior.
+    ///
+    /// - Parameters:
+    ///   - ch: The key code pressed
+    ///   - screen: NCurses screen pointer for rendering
     internal func handleSecurityGroupInput(_ ch: Int32, screen: OpaquePointer?) async {
         let managementGroups = securityGroupForm.getManagementGroups()
 

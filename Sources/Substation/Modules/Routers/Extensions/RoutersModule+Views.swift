@@ -67,9 +67,37 @@ extension RoutersModule {
                         scrollOffset: tui.viewCoordinator.detailScrollOffset
                     )
                 },
-                inputHandler: nil
+                    inputHandler: nil
+            ),
+
+            // Router Create View
+            ViewMetadata(
+                identifier: Views.create,
+                title: "Create Router",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .network,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await RouterViews.drawRouterCreateForm(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        routerCreateForm: tui.routerCreateForm,
+                        routerCreateFormState: tui.routerCreateFormState,
+                        availabilityZones: tui.cacheManager.cachedAvailabilityZones,
+                        externalNetworks: tui.cacheManager.cachedNetworks.filter { $0.external == true }
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleRouterCreateInput(ch, screen: screen)
+                    return true
+                }
             )
-            // Note: Create view is handled via legacy system
         ]
     }
 }

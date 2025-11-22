@@ -296,8 +296,8 @@ extension FloatingIPsModule {
 
             tui.statusMessage = "Floating IP created successfully"
 
-            // Refresh floating IP cache and return to list
-            await tui.dataManager.refreshAllData()
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
             tui.refreshManager.lastRefresh = Date()
             tui.changeView(to: .floatingIPs, resetSelection: false)
 

@@ -51,7 +51,7 @@ extension TUI {
                 // Receive formState and form as parameters to avoid exclusivity violation
                 self.keyPairCreateFormState = formState
                 self.keyPairCreateForm = form
-                if let module = ModuleRegistry.shared.module(for: "keyPairs") as? KeyPairsModule {
+                if let module = ModuleRegistry.shared.module(for: "keypairs") as? KeyPairsModule {
                     await module.submitKeyPairCreation(screen: screen)
                 }
             },

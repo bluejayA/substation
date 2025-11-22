@@ -419,10 +419,23 @@ extension SwiftModule {
             operation.markCompleted()
             operation.progress = 1.0
             tui.statusMessage = "Object '\(objectName)' deleted successfully"
-            tui.markNeedsRedraw()
 
-            // Refresh object cache from server
-            await self.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
+            // Optimistic cache update - remove deleted object from cache immediately
+            await tui.cacheManager.removeSwiftObject(withName: objectName, forContainer: containerName)
+
+            // Adjust selection if we deleted the last item
+            if let objects = tui.cacheManager.cachedSwiftObjects {
+                let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
+                let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+                let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery)
+                if tui.viewCoordinator.selectedIndex >= filteredItems.count && filteredItems.count > 0 {
+                    tui.viewCoordinator.selectedIndex = filteredItems.count - 1
+                } else if filteredItems.isEmpty {
+                    tui.viewCoordinator.selectedIndex = 0
+                }
+            }
+
+            tui.markNeedsRedraw()
 
             Logger.shared.logUserAction("object_deleted", details: [
                 "containerName": containerName,
@@ -524,10 +537,23 @@ extension SwiftModule {
             tui.statusMessage = "Directory deleted successfully (\(deletedCount) objects)"
         }
 
-        tui.markNeedsRedraw()
+        // Optimistic cache update - remove all deleted objects from cache
+        let deletedObjectNames = Set(objects.compactMap { $0.name })
+        await tui.cacheManager.removeSwiftObjects(withNames: deletedObjectNames, forContainer: containerName)
 
-        // Refresh object cache from server
-        await self.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: true)
+        // Adjust selection if we deleted items
+        if let cachedObjects = tui.cacheManager.cachedSwiftObjects {
+            let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
+            let treeItems = SwiftTreeItem.buildTree(from: cachedObjects, currentPath: currentPath)
+            let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery)
+            if tui.viewCoordinator.selectedIndex >= filteredItems.count && filteredItems.count > 0 {
+                tui.viewCoordinator.selectedIndex = filteredItems.count - 1
+            } else if filteredItems.isEmpty {
+                tui.viewCoordinator.selectedIndex = 0
+            }
+        }
+
+        tui.markNeedsRedraw()
 
         Logger.shared.logUserAction("directory_deleted", details: [
             "containerName": containerName,
@@ -541,6 +567,92 @@ extension SwiftModule {
 // MARK: - Swift View Input Handlers
 
 extension SwiftModule {
+    /// Show container metadata in a detail view
+    ///
+    /// - Parameters:
+    ///   - container: The container to show metadata for
+    ///   - screen: The ncurses screen pointer
+    internal func showContainerMetadata(container: SwiftContainer, screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+        guard let containerName = container.name else {
+            tui.statusMessage = "Invalid container"
+            return
+        }
+
+        // Fetch container metadata
+        var metadata: SwiftContainerMetadataResponse? = nil
+        do {
+            metadata = try await tui.client.swift.getContainerMetadata(containerName: containerName)
+        } catch {
+            Logger.shared.logDebug("Failed to fetch container metadata: \(error.localizedDescription)")
+        }
+
+        // Build sections for detail view
+        var sections: [DetailSection] = []
+
+        // Basic info section
+        var basicItems: [DetailItem] = [
+            .field(label: "Name", value: containerName)
+        ]
+        basicItems.append(.field(label: "Object Count", value: "\(container.count)"))
+        let formattedSize = ByteCountFormatter.string(fromByteCount: Int64(container.bytes), countStyle: .file)
+        basicItems.append(.field(label: "Total Size", value: formattedSize))
+        sections.append(DetailSection(title: "Container Information", items: basicItems))
+
+        // Metadata section if available
+        if let meta = metadata {
+            var metaItems: [DetailItem] = []
+            if let readACL = meta.readACL, !readACL.isEmpty {
+                metaItems.append(.field(label: "Read ACL", value: readACL))
+            }
+            if let writeACL = meta.writeACL, !writeACL.isEmpty {
+                metaItems.append(.field(label: "Write ACL", value: writeACL))
+            }
+            if !metaItems.isEmpty {
+                sections.append(DetailSection(title: "Access Control", items: metaItems))
+            }
+
+            // Custom metadata from metadata dictionary
+            if !meta.metadata.isEmpty {
+                var customItems: [DetailItem] = []
+                for (key, value) in meta.metadata.sorted(by: { $0.key < $1.key }) {
+                    customItems.append(.field(label: key, value: value))
+                }
+                sections.append(DetailSection(title: "Custom Metadata", items: customItems))
+            }
+        }
+
+        // Show detail view
+        let detailView = DetailView(
+            title: "Container: \(containerName)",
+            sections: sections,
+            helpText: "Press ESC or ENTER to close"
+        )
+
+        // Draw the detail view
+        await detailView.draw(
+            screen: screen,
+            startRow: 2,
+            startCol: 2,
+            width: tui.screenCols - 4,
+            height: tui.screenRows - 4
+        )
+        SwiftNCurses.refresh(WindowHandle(screen))
+
+        // Wait for user to dismiss
+        var done = false
+        while !done {
+            let ch = SwiftNCurses.getInput(WindowHandle(screen))
+            if ch == 27 || ch == 10 || ch == Int32(UInt8(ascii: "q")) {  // ESC, ENTER, or q
+                done = true
+            }
+        }
+
+        // Redraw the main view
+        tui.renderCoordinator.needsRedraw = true
+        await tui.draw(screen: screen)
+    }
+
     /// Handle web access management for the selected container
     ///
     /// - Parameter screen: The ncurses screen pointer
@@ -548,12 +660,22 @@ extension SwiftModule {
         guard let tui = tui else { return }
         guard tui.viewCoordinator.currentView == .swift else { return }
 
-        guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+        // Filter containers based on search query to match displayed list
+        let filteredContainers: [SwiftContainer]
+        if let query = tui.searchQuery, !query.isEmpty {
+            filteredContainers = tui.cacheManager.cachedSwiftContainers.filter {
+                $0.name?.localizedCaseInsensitiveContains(query) ?? false
+            }
+        } else {
+            filteredContainers = tui.cacheManager.cachedSwiftContainers
+        }
+
+        guard tui.viewCoordinator.selectedIndex < filteredContainers.count else {
             tui.statusMessage = "No container selected"
             return
         }
 
-        let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+        let container = filteredContainers[tui.viewCoordinator.selectedIndex]
         guard let containerName = container.name else {
             tui.statusMessage = "Invalid container"
             return
@@ -598,12 +720,22 @@ extension SwiftModule {
         guard let tui = tui else { return }
         guard tui.viewCoordinator.currentView == .swift else { return }
 
-        guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+        // Filter containers based on search query to match displayed list
+        let filteredContainers: [SwiftContainer]
+        if let query = tui.searchQuery, !query.isEmpty {
+            filteredContainers = tui.cacheManager.cachedSwiftContainers.filter {
+                $0.name?.localizedCaseInsensitiveContains(query) ?? false
+            }
+        } else {
+            filteredContainers = tui.cacheManager.cachedSwiftContainers
+        }
+
+        guard tui.viewCoordinator.selectedIndex < filteredContainers.count else {
             tui.statusMessage = "No container selected"
             return
         }
 
-        let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+        let container = filteredContainers[tui.viewCoordinator.selectedIndex]
         guard let containerName = container.name else {
             tui.statusMessage = "Invalid container"
             return
@@ -730,12 +862,22 @@ extension SwiftModule {
 
         if tui.viewCoordinator.currentView == .swift {
             // Called from container list - get selected container
-            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+            // Filter containers based on search query to match displayed list
+            let filteredContainers: [SwiftContainer]
+            if let query = tui.searchQuery, !query.isEmpty {
+                filteredContainers = tui.cacheManager.cachedSwiftContainers.filter {
+                    $0.name?.localizedCaseInsensitiveContains(query) ?? false
+                }
+            } else {
+                filteredContainers = tui.cacheManager.cachedSwiftContainers
+            }
+
+            guard tui.viewCoordinator.selectedIndex < filteredContainers.count else {
                 tui.statusMessage = "No container selected"
                 return
             }
 
-            let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+            let container = filteredContainers[tui.viewCoordinator.selectedIndex]
             guard let name = container.name else {
                 tui.statusMessage = "Invalid container"
                 return
@@ -779,12 +921,22 @@ extension SwiftModule {
         guard let tui = tui else { return }
         guard tui.viewCoordinator.currentView == .swift else { return }
 
-        guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+        // Filter containers based on search query to match displayed list
+        let filteredContainers: [SwiftContainer]
+        if let query = tui.searchQuery, !query.isEmpty {
+            filteredContainers = tui.cacheManager.cachedSwiftContainers.filter {
+                $0.name?.localizedCaseInsensitiveContains(query) ?? false
+            }
+        } else {
+            filteredContainers = tui.cacheManager.cachedSwiftContainers
+        }
+
+        guard tui.viewCoordinator.selectedIndex < filteredContainers.count else {
             tui.statusMessage = "No container selected"
             return
         }
 
-        let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+        let container = filteredContainers[tui.viewCoordinator.selectedIndex]
         guard let containerName = container.name else {
             tui.statusMessage = "Invalid container"
             return

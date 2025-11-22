@@ -52,7 +52,7 @@ final class BarbicanModule: OpenStackModule {
     /// This method performs any necessary setup for the Barbican module.
     /// Currently, Barbican requires no special configuration beyond registration.
     func configure() async throws {
-        guard tui != nil else {
+        guard let tuiInstance = tui else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -70,7 +70,7 @@ final class BarbicanModule: OpenStackModule {
         )
 
         // Register as data provider
-        let dataProvider = BarbicanDataProvider(module: self, tui: tui!)
+        let dataProvider = BarbicanDataProvider(module: self, tui: tuiInstance)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
         // Register enhanced views with metadata

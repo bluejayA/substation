@@ -1167,12 +1167,9 @@ final class TUI {
             filteredResources = archives
             targetDetailView = .volumeArchiveDetail
         case .swift:
-            // Filter Swift containers based on search query
-            let filteredContainers = searchQuery?.isEmpty ?? true ? cacheManager.cachedSwiftContainers : cacheManager.cachedSwiftContainers.filter { container in
-                container.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
-            }
-            filteredResources = filteredContainers
-            targetDetailView = .swiftContainerDetail
+            // Swift containers require special handling (navigateIntoContainer, fetchSwiftObjects)
+            // that is done in the SwiftModule's ViewRegistry inputHandler, not here
+            return
         case .swiftContainerDetail:
             // When in container detail view, navigating opens object detail
             if let objects = cacheManager.cachedSwiftObjects {

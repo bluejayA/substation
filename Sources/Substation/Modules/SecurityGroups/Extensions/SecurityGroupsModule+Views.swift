@@ -236,13 +236,19 @@ extension SecurityGroupsModule {
                 category: .network,
                 renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                     guard let tui = tui else { return }
+                    guard let form = tui.securityGroupRuleManagementForm else {
+                        let surface = SwiftNCurses.surface(from: screen)
+                        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+                        await SwiftNCurses.render(Text("No rule management form available").error(), on: surface, in: bounds)
+                        return
+                    }
                     await SecurityGroupViews.drawSecurityGroupRuleManagement(
                         screen: screen,
                         startRow: startRow,
                         startCol: startCol,
                         width: width,
                         height: height,
-                        form: tui.securityGroupRuleManagementForm!,
+                        form: form,
                         cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups
                     )
                 },

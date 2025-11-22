@@ -58,23 +58,62 @@ extension SwiftModule {
                 inputHandler: { [weak self, weak tui] ch, screen in
                     guard let self = self, let tui = tui else { return false }
 
+                    // Filter containers based on search query to match displayed list
+                    let filteredContainers: [SwiftContainer]
+                    if let query = tui.searchQuery, !query.isEmpty {
+                        filteredContainers = tui.cacheManager.cachedSwiftContainers.filter {
+                            $0.name?.localizedCaseInsensitiveContains(query) ?? false
+                        }
+                    } else {
+                        filteredContainers = tui.cacheManager.cachedSwiftContainers
+                    }
+
                     switch ch {
                     case Int32(32):  // SPACEBAR - Navigate into container
-                        Logger.shared.logUserAction("swift_navigate_into_container", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
-                        let containers = tui.cacheManager.cachedSwiftContainers
-                        guard tui.viewCoordinator.selectedIndex < containers.count else {
-                            tui.statusMessage = "No container selected"
+                        Logger.shared.logUserAction("swift_navigate_into_container", details: [
+                            "selectedIndex": tui.viewCoordinator.selectedIndex,
+                            "containerCount": filteredContainers.count,
+                            "cacheCount": tui.cacheManager.cachedSwiftContainers.count,
+                            "searchQuery": tui.searchQuery ?? "nil"
+                        ])
+                        guard tui.viewCoordinator.selectedIndex < filteredContainers.count else {
+                            tui.statusMessage = "No container selected (index: \(tui.viewCoordinator.selectedIndex), count: \(filteredContainers.count))"
                             return true
                         }
-                        let container = containers[tui.viewCoordinator.selectedIndex]
+                        let container = filteredContainers[tui.viewCoordinator.selectedIndex]
                         guard let containerName = container.name else {
                             tui.statusMessage = "Invalid container"
                             return true
                         }
+
+                        // Set loading state before fetching (only if cache is not fresh)
+                        let cacheFresh = tui.cacheManager.isSwiftObjectsCacheFresh(forContainer: containerName)
+                        if !cacheFresh {
+                            tui.viewCoordinator.isLoadingSwiftObjects = true
+                        }
+
                         tui.viewCoordinator.swiftNavState.navigateIntoContainer(containerName)
-                        tui.viewCoordinator.selectedResource = container
                         tui.changeView(to: .swiftContainerDetail, resetSelection: true)
-                        await self.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: false)
+                        // Set selectedResource AFTER changeView because resetSelection clears it
+                        tui.viewCoordinator.selectedResource = container
+
+                        // Clear screen and force redraw to prevent artifacts
+                        SwiftNCurses.clear(WindowHandle(screen))
+                        tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
+                        await tui.draw(screen: screen)
+
+                        // Fetch will use cache if fresh, otherwise fetch from server
+                        await self.fetchSwiftObjectsPaginated(containerName: containerName, marker: nil, limit: 100, priority: "interactive", forceRefresh: false)
+                        return true
+
+                    case Int32(10):  // ENTER - Show container metadata/details
+                        Logger.shared.logUserAction("show_container_metadata", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        guard tui.viewCoordinator.selectedIndex < filteredContainers.count else {
+                            tui.statusMessage = "No container selected"
+                            return true
+                        }
+                        let container = filteredContainers[tui.viewCoordinator.selectedIndex]
+                        await self.showContainerMetadata(container: container, screen: screen)
                         return true
 
                     case Int32(87):  // W - Manage web access
@@ -145,9 +184,14 @@ extension SwiftModule {
                             tui.viewCoordinator.selectedResource = object
                             tui.changeView(to: .swiftObjectDetail, resetSelection: false)
                         case .directory(let name, _, _):
+                            // Navigate into subdirectory - no loading state needed since all objects are cached
                             tui.viewCoordinator.swiftNavState.navigateIntoDirectory(name)
                             tui.viewCoordinator.selectedIndex = 0
                             tui.viewCoordinator.scrollOffset = 0
+
+                            // Clear screen and redraw with new directory contents
+                            SwiftNCurses.clear(WindowHandle(screen))
+                            tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
                             tui.markNeedsRedraw()
                         }
                         return true
@@ -182,7 +226,9 @@ extension SwiftModule {
                             tui.viewCoordinator.selectedIndex = 0
                             tui.viewCoordinator.scrollOffset = 0
 
-                            // Stay in the same view (swiftContainerDetail)
+                            // Clear screen and redraw to prevent artifacts
+                            SwiftNCurses.clear(WindowHandle(screen))
+                            tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
                             tui.markNeedsRedraw()
 
                             Logger.shared.logInfo("Navigated up to path: \(tui.viewCoordinator.swiftNavState.currentPathString)")
@@ -209,6 +255,10 @@ extension SwiftModule {
 
                             // Reset navigation state
                             tui.viewCoordinator.swiftNavState.reset()
+
+                            // Clear screen to prevent artifacts
+                            SwiftNCurses.clear(WindowHandle(screen))
+                            tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
 
                             // Return to container list view
                             tui.changeView(to: .swift, resetSelection: false)
@@ -239,7 +289,7 @@ extension SwiftModule {
                         height: height
                     )
                 },
-                inputHandler: { [weak tui] ch, _ in
+                inputHandler: { [weak tui] ch, screen in
                     guard let tui = tui else { return false }
 
                     switch ch {
@@ -260,6 +310,10 @@ extension SwiftModule {
                                 tui.viewCoordinator.scrollOffset = max(0, index - visibleItems + 1)
                             }
                         }
+
+                        // Clear screen to prevent artifacts
+                        SwiftNCurses.clear(WindowHandle(screen))
+                        tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
 
                         tui.changeView(to: .swiftContainerDetail, resetSelection: false)
                         tui.viewCoordinator.selectedResource = nil

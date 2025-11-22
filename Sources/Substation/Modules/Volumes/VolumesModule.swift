@@ -60,7 +60,7 @@ final class VolumesModule: OpenStackModule {
     /// Performs verification that the Cinder service is available in the service catalog.
     /// Does not throw if service is temporarily unavailable to allow graceful degradation.
     func configure() async throws {
-        guard tui != nil else {
+        guard let tuiInstance = tui else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -81,7 +81,7 @@ final class VolumesModule: OpenStackModule {
         )
 
         // Register as data provider
-        let dataProvider = VolumesDataProvider(module: self, tui: tui!)
+        let dataProvider = VolumesDataProvider(module: self, tui: tuiInstance)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
         // Register enhanced views with metadata

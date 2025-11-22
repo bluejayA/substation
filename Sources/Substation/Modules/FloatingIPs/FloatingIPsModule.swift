@@ -54,7 +54,7 @@ final class FloatingIPsModule: OpenStackModule {
     /// This method performs any necessary setup for the Floating IPs module.
     /// Verifies that the Networks dependency is available and functional.
     func configure() async throws {
-        guard tui != nil else {
+        guard let tuiInstance = tui else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -69,7 +69,7 @@ final class FloatingIPsModule: OpenStackModule {
         )
 
         // Register as data provider
-        let dataProvider = FloatingIPsDataProvider(module: self, tui: tui!)
+        let dataProvider = FloatingIPsDataProvider(module: self, tui: tuiInstance)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
         // Register enhanced views with metadata

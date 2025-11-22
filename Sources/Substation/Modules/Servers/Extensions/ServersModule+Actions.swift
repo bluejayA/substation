@@ -199,8 +199,8 @@ extension ServersModule {
 
             tui.statusMessage = "Server '\(serverName)' restart initiated successfully"
 
-            // Refresh data to get updated server status
-            await tui.dataManager.refreshAllData()
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
 
         } catch let error as OpenStackError {
             let baseMsg = "Failed to restart server '\(serverName)'"
@@ -296,8 +296,8 @@ extension ServersModule {
             try await tui.client.startServer(id: server.id)
             tui.statusMessage = "Server '\(serverName)' start initiated successfully"
 
-            // Refresh server data to update status
-            await tui.dataManager.refreshAllData()
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
         } catch let error as OpenStackError {
             let baseMsg = "Failed to start server '\(serverName)'"
             switch error {
@@ -394,8 +394,8 @@ extension ServersModule {
             try await tui.client.stopServer(id: server.id)
             tui.statusMessage = "Server '\(serverName)' stop initiated successfully"
 
-            // Refresh server data to update status
-            await tui.dataManager.refreshAllData()
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
         } catch let error as OpenStackError {
             let baseMsg = "Failed to stop server '\(serverName)'"
             switch error {
@@ -741,8 +741,8 @@ extension ServersModule {
                 tui.serverResizeForm.reset()
                 tui.viewCoordinator.currentView = .servers
 
-                // Refresh server data
-                await tui.dataManager.refreshAllData()
+                // Trigger accelerated refresh to show state transitions
+                tui.refreshAfterOperation()
             } catch let error as OpenStackError {
                 let baseMsg = "Failed to \(actionName) resize for server '\(serverName)'"
                 switch error {
@@ -835,8 +835,8 @@ extension ServersModule {
                 tui.serverResizeForm.reset()
                 tui.viewCoordinator.currentView = .servers
 
-                // Refresh server data
-                await tui.dataManager.refreshAllData()
+                // Trigger accelerated refresh to show state transitions
+                tui.refreshAfterOperation()
             } catch let error as OpenStackError {
                 let baseMsg = "Failed to resize server '\(serverName)'"
                 switch error {
@@ -956,8 +956,8 @@ extension ServersModule {
             await tui.draw(screen: screen)
             usleep(2_000_000) // Show success message for 2 seconds
 
-            // Refresh image cache to include the new snapshot
-            let _ = await DataProviderRegistry.shared.fetchData(for: "images", priority: .onDemand, forceRefresh: true)
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
 
             // Restore success status message after refresh (which may overwrite it)
             tui.statusMessage = "[SUCCESS] Snapshot '\(snapshotName)' created successfully for '\(serverName)' (ID: \(imageID))"
@@ -1119,8 +1119,8 @@ extension ServersModule {
             tui.networkInterfaceForm.pendingPortAttachments.removeAll()
             tui.networkInterfaceForm.pendingPortDetachments.removeAll()
 
-            // Refresh server data
-            let _ = await DataProviderRegistry.shared.fetchData(for: "servers", priority: .onDemand, forceRefresh: true)
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
         } else if !errors.isEmpty {
             tui.statusMessage = "All network interface operations failed"
         } else {

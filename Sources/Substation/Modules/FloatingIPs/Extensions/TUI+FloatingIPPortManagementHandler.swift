@@ -24,8 +24,8 @@ extension TUI {
     /// - Parameters:
     ///   - ch: The input character code from ncurses
     ///   - screen: The ncurses screen pointer for rendering
-    internal func handleFloatingIPPortManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard viewCoordinator.currentView == .floatingIPPortManagement else { return }
+    internal func handleFloatingIPPortManagementInput(_ ch: Int32, screen: OpaquePointer?) async -> Bool {
+        // Guard removed - ViewRegistry ensures this handler is only called for the correct view
 
         // Filter ports based on mode and attachment status
         // A floating IP can only be attached to one port at a time
@@ -62,7 +62,7 @@ extension TUI {
             relevantPorts = basePorts
         }
 
-        let _ = await formInputHandler.handleManagementInput(
+        return await formInputHandler.handleManagementInput(
             ch,
             screen: screen,
             itemCount: relevantPorts.count,
@@ -76,6 +76,7 @@ extension TUI {
                     self.selectionManager.selectedPortId = port.id
                     self.statusMessage = "Selected port '\(port.name ?? port.id)' - Press ENTER to \(self.selectionManager.attachmentMode == .attach ? "attach" : "detach")"
                 }
+                self.renderCoordinator.needsRedraw = true
                 await self.draw(screen: screen)
             },
             onEnter: {
@@ -106,6 +107,8 @@ extension TUI {
                     self.viewCoordinator.selectedIndex = 0
                     self.viewCoordinator.scrollOffset = 0
                     self.statusMessage = "Switched to \(self.selectionManager.attachmentMode == .attach ? "ATTACH" : "DETACH") mode"
+                    self.renderCoordinator.needsRedraw = true
+                    await self.draw(screen: screen)
                     return true
                 }
                 return false
@@ -129,6 +132,9 @@ extension TUI {
                 "floatingIPId": floatingIP.id,
                 "portId": port.id
             ])
+
+            // Trigger accelerated refresh to show state transitions
+            refreshAfterOperation()
 
             // Refresh data and return to floating IPs view
             await dataManager.refreshAllData()
@@ -168,6 +174,9 @@ extension TUI {
                 "floatingIPId": floatingIP.id,
                 "portId": port.id
             ])
+
+            // Trigger accelerated refresh to show state transitions
+            refreshAfterOperation()
 
             // Refresh data and return to floating IPs view
             await dataManager.refreshAllData()

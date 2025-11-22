@@ -39,6 +39,13 @@ class InputHandler {
             return
         }
 
+        // PRIORITY: Handle unified input (command/search mode) before view-specific handlers
+        // This ensures typing in command mode (:) or search mode (/) works correctly
+        if tui.unifiedInputState.isActive {
+            await handleMainInput(ch, screen: screen)
+            return
+        }
+
         // Check ViewRegistry metadata for dynamic input routing
         let viewId = tui.viewCoordinator.currentView.viewIdentifierId
         if let metadata = ViewRegistry.shared.metadata(forId: viewId),

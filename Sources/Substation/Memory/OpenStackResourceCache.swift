@@ -35,7 +35,9 @@ final class OpenStackResourceCache {
     private var syncSecrets: [Secret] = []
     private var syncLoadBalancers: [LoadBalancer] = []
     private var syncSwiftContainers: [SwiftContainer] = []
+    private var syncSwiftContainersCacheTime: Date = Date.distantPast
     private var syncSwiftObjectsByContainer: [String: [SwiftObject]] = [:]
+    private var syncSwiftObjectsCacheTime: [String: Date] = [:]
     private var syncVolumeSnapshots: [VolumeSnapshot] = []
     private var syncVolumeBackups: [VolumeBackup] = []
 
@@ -197,17 +199,106 @@ final class OpenStackResourceCache {
 
     func setSwiftContainers(_ containers: [SwiftContainer]) async {
         syncSwiftContainers = containers
+        syncSwiftContainersCacheTime = Date()
 
         Logger.shared.logDebug("OpenStackResourceCache cached \(containers.count) Swift containers")
     }
 
+    /// Get the cache timestamp for the container list.
+    ///
+    /// - Returns: The date when containers were last cached
+    func getSwiftContainersCacheTime() -> Date {
+        return syncSwiftContainersCacheTime
+    }
+
+    /// Check if the container list cache is fresh.
+    ///
+    /// - Parameter maxAge: Maximum age in seconds for cache to be considered fresh
+    /// - Returns: true if cache exists and is within maxAge
+    func isSwiftContainersCacheFresh(maxAge: TimeInterval) -> Bool {
+        return Date().timeIntervalSince(syncSwiftContainersCacheTime) < maxAge
+    }
+
     func setSwiftObjects(_ objects: [SwiftObject], forContainer containerName: String) async {
         syncSwiftObjectsByContainer[containerName] = objects
+        syncSwiftObjectsCacheTime[containerName] = Date()
         Logger.shared.logDebug("OpenStackResourceCache cached \(objects.count) Swift objects for container '\(containerName)'")
     }
 
     func getSwiftObjects(forContainer containerName: String) -> [SwiftObject]? {
         return syncSwiftObjectsByContainer[containerName]
+    }
+
+    /// Get the cache timestamp for a container's objects.
+    ///
+    /// - Parameter containerName: Name of the container
+    /// - Returns: The date when objects were last cached, or nil if not cached
+    func getSwiftObjectsCacheTime(forContainer containerName: String) -> Date? {
+        return syncSwiftObjectsCacheTime[containerName]
+    }
+
+    /// Check if the cache for a container is fresh.
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    ///   - maxAge: Maximum age in seconds for cache to be considered fresh
+    /// - Returns: true if cache exists and is within maxAge
+    func isSwiftObjectsCacheFresh(forContainer containerName: String, maxAge: TimeInterval) -> Bool {
+        guard let cacheTime = syncSwiftObjectsCacheTime[containerName] else {
+            return false
+        }
+        return Date().timeIntervalSince(cacheTime) < maxAge
+    }
+
+    /// Clear cached Swift objects for a specific container.
+    ///
+    /// This removes the cached objects for the specified container from the cache.
+    /// Used when navigating away from a container to ensure fresh data on re-entry.
+    ///
+    /// - Parameter containerName: Name of the container to clear objects for
+    func clearSwiftObjects(forContainer containerName: String) {
+        syncSwiftObjectsByContainer.removeValue(forKey: containerName)
+        syncSwiftObjectsCacheTime.removeValue(forKey: containerName)
+        Logger.shared.logDebug("OpenStackResourceCache cleared Swift objects for container '\(containerName)'")
+    }
+
+    /// Add objects to the cache for a container (optimistic update after upload).
+    ///
+    /// - Parameters:
+    ///   - objects: Objects to add
+    ///   - containerName: Name of the container
+    func addSwiftObjects(_ objects: [SwiftObject], forContainer containerName: String) async {
+        var existing = syncSwiftObjectsByContainer[containerName] ?? []
+        existing.append(contentsOf: objects)
+        syncSwiftObjectsByContainer[containerName] = existing
+        syncSwiftObjectsCacheTime[containerName] = Date()
+        Logger.shared.logDebug("OpenStackResourceCache added \(objects.count) Swift objects to container '\(containerName)' (total: \(existing.count))")
+    }
+
+    /// Remove objects from the cache for a container (optimistic update after delete).
+    ///
+    /// - Parameters:
+    ///   - objectNames: Names of objects to remove
+    ///   - containerName: Name of the container
+    func removeSwiftObjects(withNames objectNames: Set<String>, forContainer containerName: String) async {
+        guard var existing = syncSwiftObjectsByContainer[containerName] else { return }
+        let originalCount = existing.count
+        existing.removeAll { object in
+            guard let name = object.name else { return false }
+            return objectNames.contains(name)
+        }
+        syncSwiftObjectsByContainer[containerName] = existing
+        syncSwiftObjectsCacheTime[containerName] = Date()
+        Logger.shared.logDebug("OpenStackResourceCache removed \(originalCount - existing.count) Swift objects from container '\(containerName)' (remaining: \(existing.count))")
+    }
+
+    /// Remove a single object from the cache for a container (optimistic update after delete).
+    ///
+    /// - Parameters:
+    ///   - objectName: Name of the object to remove
+    ///   - containerName: Name of the container
+    func removeSwiftObject(withName objectName: String, forContainer containerName: String) async {
+        await removeSwiftObjects(withNames: [objectName], forContainer: containerName)
     }
 
     func setVolumeSnapshots(_ snapshots: [VolumeSnapshot]) async {
@@ -271,6 +362,7 @@ final class OpenStackResourceCache {
         syncLoadBalancers.removeAll()
         syncSwiftContainers.removeAll()
         syncSwiftObjectsByContainer.removeAll()
+        syncSwiftObjectsCacheTime.removeAll()
         syncVolumeSnapshots.removeAll()
         syncVolumeBackups.removeAll()
         syncComputeQuotas = nil

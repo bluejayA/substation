@@ -41,11 +41,9 @@ struct PortServerManagementView {
             title += " (Unattached)"
         }
 
-        // Mark the attached server in the selection
-        var selectedIds: Set<String> = selectedServerId.map { Set([$0]) } ?? []
-        if let attachedId = attachedServerId {
-            selectedIds.insert(attachedId)
-        }
+        // Only mark the user-selected server in the selection
+        // The attachedServerId is shown in the title, not as a selection checkbox
+        let selectedIds: Set<String> = selectedServerId.map { Set([$0]) } ?? []
 
         await ServerSelectionView.drawServerSelection(
             screen: screen,

@@ -69,8 +69,71 @@ extension SubnetsModule {
                     )
                 },
                 inputHandler: nil
+            ),
+            // MARK: - Create View
+            ViewMetadata(
+                identifier: Views.create,
+                title: "Create Subnet",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .network,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await SubnetViews.drawSubnetCreate(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        subnetCreateForm: tui.subnetCreateForm,
+                        cachedNetworks: tui.cacheManager.cachedNetworks,
+                        formState: tui.subnetCreateFormState
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleSubnetCreateInput(ch, screen: screen)
+                    return true
+                }
+            ),
+            // MARK: - Router Management View
+            ViewMetadata(
+                identifier: Views.routerManagement,
+                title: "Subnet Router Management",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .network,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    guard let subnet = tui.viewCoordinator.selectedResource as? Subnet else {
+                        let surface = SwiftNCurses.surface(from: screen)
+                        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+                        await SwiftNCurses.render(
+                            Text("No subnet selected for router management").error(),
+                            on: surface,
+                            in: bounds
+                        )
+                        return
+                    }
+                    // Render subnet detail view for router management context
+                    await SubnetViews.drawSubnetDetail(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        subnet: subnet,
+                        scrollOffset: tui.viewCoordinator.scrollOffset
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleSubnetRouterManagementInput(ch, screen: screen)
+                    return true
+                }
             )
-            // Note: Create and router management views are handled via legacy system
         ]
     }
 }

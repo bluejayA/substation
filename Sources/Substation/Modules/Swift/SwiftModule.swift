@@ -21,6 +21,12 @@ final class SwiftModule: OpenStackModule {
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
 
+    /// Background sync task for keeping active container cache up to date
+    private var backgroundSyncTask: Task<Void, Never>?
+
+    /// Interval between background sync operations (in seconds)
+    private let backgroundSyncInterval: TimeInterval = 60
+
     // MARK: - Initialization
 
     /// Initialize the Swift module with TUI context
@@ -38,7 +44,7 @@ final class SwiftModule: OpenStackModule {
     /// Configure the module after initialization
     /// Performs any necessary setup, validation, and initialization tasks
     func configure() async throws {
-        guard tui != nil else {
+        guard let tuiInstance = tui else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -59,12 +65,375 @@ final class SwiftModule: OpenStackModule {
         )
 
         // Register as data provider
-        let dataProvider = SwiftDataProvider(module: self, tui: tui!)
+        let dataProvider = SwiftDataProvider(module: self, tui: tuiInstance)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
         // Register enhanced views with metadata
         let viewMetadata = registerViewsEnhanced()
         ViewRegistry.shared.register(metadataList: viewMetadata)
+
+        // Start background sync task for active container
+        startBackgroundSyncTask()
+    }
+
+    // MARK: - Background Sync
+
+    /// Start the background sync task for keeping active container cache up to date
+    private func startBackgroundSyncTask() {
+        // Cancel any existing task
+        backgroundSyncTask?.cancel()
+
+        backgroundSyncTask = Task { @MainActor [weak self] in
+            guard let self = self else { return }
+
+            while !Task.isCancelled {
+                // Sleep for the sync interval
+                try? await Task.sleep(nanoseconds: UInt64(self.backgroundSyncInterval * 1_000_000_000))
+
+                // Check if cancelled during sleep
+                if Task.isCancelled { break }
+
+                // Perform background sync
+                await self.performBackgroundSync()
+            }
+
+            Logger.shared.logDebug("SwiftModule background sync task stopped")
+        }
+
+        Logger.shared.logInfo("SwiftModule background sync task started (interval: \(Int(backgroundSyncInterval))s) with ETag-based differential sync")
+    }
+
+    /// Stop the background sync task
+    func stopBackgroundSyncTask() {
+        backgroundSyncTask?.cancel()
+        backgroundSyncTask = nil
+        Logger.shared.logDebug("SwiftModule background sync task cancelled")
+    }
+
+    /// Perform a background sync of the active container's objects
+    ///
+    /// This refreshes the cache for the currently viewed container to detect
+    /// any changes made outside of Substation. Uses ETag-based differential
+    /// sync to avoid unnecessary full fetches.
+    private func performBackgroundSync() async {
+        // Use differential sync with ETag checking
+        await performDifferentialSync()
+    }
+
+    /// Revalidate container cache in background (stale-while-revalidate pattern)
+    ///
+    /// Uses ETag-based differential sync to detect changes and avoid unnecessary
+    /// full fetches. Shows status indicator while revalidating.
+    ///
+    /// - Parameter containerName: Name of the container to revalidate
+    private func revalidateContainerCache(containerName: String) async {
+        guard let tui = tui else { return }
+
+        // Show revalidating indicator
+        tui.statusMessage = "Refreshing \(containerName)..."
+
+        Logger.shared.logDebug("SwiftModule - Revalidating cache for container '\(containerName)' with ETag check")
+
+        // Use ETag-based differential sync
+        let refreshed = await fetchWithETagCheck(containerName: containerName)
+
+        // Check if we're still viewing this container
+        if tui.viewCoordinator.swiftNavState.currentContainer == containerName {
+            if refreshed {
+                // Validate selectedIndex after cache update to prevent out-of-bounds access
+                await validateSelectedIndexAfterCacheUpdate()
+
+                let objectCount = tui.cacheManager.cachedSwiftObjects?.count ?? 0
+                Logger.shared.logInfo("SwiftModule - Revalidation detected change: \(objectCount) objects")
+                tui.statusMessage = "Updated: \(objectCount) objects"
+            } else {
+                Logger.shared.logDebug("SwiftModule - Revalidation completed, no changes (ETag match)")
+                tui.statusMessage = nil
+            }
+            tui.markNeedsRedraw()
+        }
+
+        // Manage cache size - evict old containers if needed
+        await manageCacheSize()
+    }
+
+    // MARK: - Cache Management
+
+    /// Maximum number of containers to keep cached
+    private let maxCachedContainers = 10
+
+    /// Prefetched directory tree cache for instant navigation
+    private var prefetchedTrees: [String: [SwiftTreeItem]] = [:]
+
+    /// ETag cache for differential sync
+    private var containerETags: [String: String] = [:]
+
+    /// Manage cache size by evicting least recently used containers
+    ///
+    /// Keeps only the most recently accessed containers to manage memory.
+    private func manageCacheSize() async {
+        guard let tui = tui else { return }
+
+        // Get all cached container names with their timestamps
+        let cachedContainers = tui.cacheManager.resourceCache.swiftObjectsByContainer.keys
+        guard cachedContainers.count > maxCachedContainers else { return }
+
+        // Build list of containers with their cache times
+        var containerTimes: [(name: String, time: Date)] = []
+        for containerName in cachedContainers {
+            if let cacheTime = tui.cacheManager.getSwiftObjectsCacheTime(forContainer: containerName) {
+                containerTimes.append((name: containerName, time: cacheTime))
+            }
+        }
+
+        // Sort by time (oldest first)
+        containerTimes.sort { $0.time < $1.time }
+
+        // Evict oldest containers until we're under the limit
+        let containersToEvict = containerTimes.count - maxCachedContainers
+        if containersToEvict > 0 {
+            for i in 0..<containersToEvict {
+                let containerName = containerTimes[i].name
+                // Don't evict the currently viewed container
+                if containerName != tui.viewCoordinator.swiftNavState.currentContainer {
+                    tui.cacheManager.clearSwiftObjects(forContainer: containerName)
+                    clearPrefetchedTrees(forContainer: containerName)
+                    clearETagCache(forContainer: containerName)
+                    Logger.shared.logDebug("SwiftModule - Evicted cached objects for container '\(containerName)' (LRU)")
+                }
+            }
+        }
+    }
+
+    // MARK: - Prefetching
+
+    /// Prefetch subdirectory trees for instant navigation
+    ///
+    /// After loading a container's objects, this method pre-builds tree structures
+    /// for immediate subdirectories so navigation is instant.
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    ///   - objects: All objects in the container
+    private func prefetchSubdirectoryTrees(containerName: String, objects: [SwiftObject]) async {
+        // Build tree for root path to identify top-level directories
+        let rootTree = SwiftTreeItem.buildTree(from: objects, currentPath: "")
+
+        // Find top-level directories to prefetch
+        var directoriesToPrefetch: [String] = []
+        for item in rootTree {
+            if case .directory(let name, _, _) = item {
+                directoriesToPrefetch.append(name)
+            }
+        }
+
+        // Limit prefetching to first 10 directories to avoid excessive memory use
+        let prefetchLimit = min(directoriesToPrefetch.count, 10)
+
+        Logger.shared.logDebug("SwiftModule - Prefetching \(prefetchLimit) subdirectory trees for container '\(containerName)'")
+
+        // Prefetch tree structures in background
+        for i in 0..<prefetchLimit {
+            let dirName = directoriesToPrefetch[i]
+            let dirPath = dirName + "/"
+
+            // Build and cache tree for this subdirectory
+            let tree = SwiftTreeItem.buildTree(from: objects, currentPath: dirPath)
+            let cacheKey = "\(containerName):\(dirPath)"
+            prefetchedTrees[cacheKey] = tree
+
+            Logger.shared.logDebug("SwiftModule - Prefetched tree for '\(dirPath)' (\(tree.count) items)")
+        }
+
+        Logger.shared.logInfo("SwiftModule - Prefetched \(prefetchLimit) subdirectory trees for container '\(containerName)'")
+    }
+
+    /// Get prefetched tree for a container path, or build it if not cached
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    ///   - path: Current path within the container
+    ///   - objects: All objects in the container
+    /// - Returns: Tree items for the specified path
+    func getPrefetchedTree(containerName: String, path: String, objects: [SwiftObject]) -> [SwiftTreeItem] {
+        let cacheKey = "\(containerName):\(path)"
+
+        // Check if we have a prefetched tree
+        if let cached = prefetchedTrees[cacheKey] {
+            Logger.shared.logDebug("SwiftModule - Using prefetched tree for '\(path)'")
+            return cached
+        }
+
+        // Build tree on demand
+        let tree = SwiftTreeItem.buildTree(from: objects, currentPath: path)
+
+        // Cache it for future use
+        prefetchedTrees[cacheKey] = tree
+
+        return tree
+    }
+
+    /// Clear prefetched trees for a container
+    ///
+    /// - Parameter containerName: Name of the container
+    func clearPrefetchedTrees(forContainer containerName: String) {
+        let keysToRemove = prefetchedTrees.keys.filter { $0.hasPrefix("\(containerName):") }
+        for key in keysToRemove {
+            prefetchedTrees.removeValue(forKey: key)
+        }
+        Logger.shared.logDebug("SwiftModule - Cleared \(keysToRemove.count) prefetched trees for container '\(containerName)'")
+    }
+
+    // MARK: - Differential Sync (ETags)
+
+    /// Fetch container objects with ETag-based differential sync
+    ///
+    /// Uses ETags to detect if container contents have changed. Only fetches
+    /// full object list if ETag differs from cached value.
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    /// - Returns: True if objects were refreshed, false if cache is still valid
+    private func fetchWithETagCheck(containerName: String) async -> Bool {
+        guard let tui = tui else { return false }
+
+        // Get stored ETag for this container
+        let storedETag = containerETags[containerName]
+
+        do {
+            // First, do a HEAD request to get current ETag without fetching objects
+            // Note: Swift API returns ETag in container metadata
+            let containerInfo = try await tui.client.swift.getContainerMetadata(containerName: containerName)
+
+            // Extract ETag from response (use object count as pseudo-ETag)
+            let currentETag = String(containerInfo.objectCount)
+
+            // Compare ETags
+            if let stored = storedETag, stored == currentETag {
+                Logger.shared.logDebug("SwiftModule - ETag match for container '\(containerName)', skipping fetch")
+                return false
+            }
+
+            // ETags differ or no stored ETag - fetch full object list
+            Logger.shared.logDebug("SwiftModule - ETag mismatch for container '\(containerName)', fetching objects (stored: \(storedETag ?? "nil"), current: \(currentETag))")
+
+            let objects = try await tui.client.swift.listObjects(containerName: containerName)
+
+            // Update cache with fresh data
+            await self.setSwiftObjects(objects, forContainer: containerName)
+
+            // Store new ETag
+            containerETags[containerName] = currentETag
+
+            // Prefetch subdirectory trees with new data
+            await prefetchSubdirectoryTrees(containerName: containerName, objects: objects)
+
+            return true
+        } catch {
+            Logger.shared.logError("SwiftModule - ETag check failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// Perform differential sync for active container using ETags
+    ///
+    /// Only fetches objects if the container's ETag (object count) has changed.
+    private func performDifferentialSync() async {
+        guard let tui = tui else { return }
+
+        // Only sync if we're viewing a Swift container
+        guard tui.viewCoordinator.currentView == .swiftContainerDetail else {
+            return
+        }
+
+        // Get the current container name
+        guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
+            return
+        }
+
+        // Check if cache exists - only sync if we have existing data
+        guard tui.cacheManager.cachedSwiftObjects != nil else {
+            return
+        }
+
+        // Don't sync if an operation is in progress
+        if tui.viewCoordinator.isLoadingSwiftObjects {
+            return
+        }
+
+        Logger.shared.logDebug("SwiftModule - Performing differential sync for container '\(containerName)'")
+
+        // Use ETag-based check
+        let refreshed = await fetchWithETagCheck(containerName: containerName)
+
+        if refreshed {
+            // Validate selectedIndex after cache update to prevent out-of-bounds access
+            await validateSelectedIndexAfterCacheUpdate()
+
+            // Show status update
+            let objectCount = tui.cacheManager.cachedSwiftObjects?.count ?? 0
+            tui.statusMessage = "Updated: \(objectCount) objects"
+            tui.markNeedsRedraw()
+
+            // Clear status after delay
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if tui.statusMessage == "Updated: \(objectCount) objects" {
+                    tui.statusMessage = nil
+                }
+            }
+        }
+    }
+
+    /// Validate and correct selectedIndex after cache updates
+    ///
+    /// Ensures selectedIndex remains within bounds after background cache updates.
+    /// This prevents rendering issues when the cache size changes.
+    private func validateSelectedIndexAfterCacheUpdate() async {
+        guard let tui = tui else { return }
+
+        // Get current objects and build tree for the current path
+        guard let objects = tui.cacheManager.cachedSwiftObjects else { return }
+
+        let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
+        let treeItems = SwiftTreeItem.buildTree(from: objects, currentPath: currentPath)
+
+        // Apply search filter if present
+        let searchQuery = tui.searchQuery ?? ""
+        let filteredItems = SwiftTreeItem.filterItems(treeItems, query: searchQuery.isEmpty ? nil : searchQuery)
+
+        // Validate selectedIndex
+        let itemCount = filteredItems.count
+        if itemCount == 0 {
+            tui.viewCoordinator.selectedIndex = 0
+            tui.viewCoordinator.scrollOffset = 0
+        } else if tui.viewCoordinator.selectedIndex >= itemCount {
+            let oldIndex = tui.viewCoordinator.selectedIndex
+            tui.viewCoordinator.selectedIndex = itemCount - 1
+            Logger.shared.logDebug("SwiftModule - Validated selectedIndex: \(oldIndex) -> \(tui.viewCoordinator.selectedIndex) (items: \(itemCount))")
+        }
+
+        // Validate scrollOffset
+        let visibleItems = max(5, Int(tui.screenRows) - 10)
+        let maxScrollOffset = max(0, itemCount - visibleItems)
+        if tui.viewCoordinator.scrollOffset > maxScrollOffset {
+            tui.viewCoordinator.scrollOffset = maxScrollOffset
+        }
+
+        // Ensure selectedIndex is visible within viewport
+        if tui.viewCoordinator.selectedIndex < tui.viewCoordinator.scrollOffset {
+            tui.viewCoordinator.scrollOffset = tui.viewCoordinator.selectedIndex
+        } else if tui.viewCoordinator.selectedIndex >= tui.viewCoordinator.scrollOffset + visibleItems {
+            tui.viewCoordinator.scrollOffset = max(0, tui.viewCoordinator.selectedIndex - visibleItems + 1)
+        }
+    }
+
+    /// Clear ETag cache for a container
+    ///
+    /// - Parameter containerName: Name of the container
+    func clearETagCache(forContainer containerName: String) {
+        containerETags.removeValue(forKey: containerName)
+        Logger.shared.logDebug("SwiftModule - Cleared ETag cache for container '\(containerName)'")
     }
 
     // MARK: - View Registration
@@ -96,23 +465,54 @@ final class SwiftModule: OpenStackModule {
                 inputHandler: { [weak self, weak tui] ch, screen in
                     guard let self = self, let tui = tui else { return false }
 
+                    // Debug: Log that this handler is being called
+                    if ch == Int32(32) {
+                        Logger.shared.logDebug("SwiftModule.swift inputHandler received SPACEBAR")
+                    }
+
+                    // Filter containers based on search query to match displayed list
+                    let filteredContainers: [SwiftContainer]
+                    if let query = tui.searchQuery, !query.isEmpty {
+                        filteredContainers = tui.cacheManager.cachedSwiftContainers.filter {
+                            $0.name?.localizedCaseInsensitiveContains(query) ?? false
+                        }
+                    } else {
+                        filteredContainers = tui.cacheManager.cachedSwiftContainers
+                    }
+
                     switch ch {
                     case Int32(32):  // SPACEBAR - Navigate into container
-                        Logger.shared.logUserAction("swift_navigate_into_container", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
-                        let containers = tui.cacheManager.cachedSwiftContainers
-                        guard tui.viewCoordinator.selectedIndex < containers.count else {
-                            tui.statusMessage = "No container selected"
+                        Logger.shared.logUserAction("swift_navigate_into_container_MVR", details: [
+                            "selectedIndex": tui.viewCoordinator.selectedIndex,
+                            "containerCount": filteredContainers.count,
+                            "source": "ModuleViewRegistration"
+                        ])
+                        guard tui.viewCoordinator.selectedIndex < filteredContainers.count else {
+                            tui.statusMessage = "No container selected [MVR] (idx: \(tui.viewCoordinator.selectedIndex), cnt: \(filteredContainers.count))"
                             return true
                         }
-                        let container = containers[tui.viewCoordinator.selectedIndex]
+                        let container = filteredContainers[tui.viewCoordinator.selectedIndex]
                         guard let containerName = container.name else {
                             tui.statusMessage = "Invalid container"
                             return true
                         }
+
+                        // Clear cached objects immediately for visual feedback
+                        tui.cacheManager.clearSwiftObjects(forContainer: containerName)
+
+                        // Set loading state before fetching
+                        tui.viewCoordinator.isLoadingSwiftObjects = true
+
                         tui.viewCoordinator.swiftNavState.navigateIntoContainer(containerName)
-                        tui.viewCoordinator.selectedResource = container
                         tui.changeView(to: .swiftContainerDetail, resetSelection: true)
-                        await self.fetchSwiftObjects(containerName: containerName, priority: "interactive", forceRefresh: false)
+                        // Set selectedResource AFTER changeView because resetSelection clears it
+                        tui.viewCoordinator.selectedResource = container
+
+                        // Force screen redraw to show loading state
+                        tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
+                        await tui.draw(screen: screen)
+
+                        await self.fetchSwiftObjectsPaginated(containerName: containerName, marker: nil, limit: 100, priority: "interactive", forceRefresh: false)
                         return true
 
                     case Int32(87):  // W - Manage web access
@@ -182,9 +582,18 @@ final class SwiftModule: OpenStackModule {
                             tui.viewCoordinator.selectedResource = object
                             tui.changeView(to: .swiftObjectDetail, resetSelection: false)
                         case .directory(let name, _, _):
+                            // Set loading state for directory navigation
+                            tui.viewCoordinator.isLoadingSwiftObjects = true
+
                             tui.viewCoordinator.swiftNavState.navigateIntoDirectory(name)
                             tui.viewCoordinator.selectedIndex = 0
                             tui.viewCoordinator.scrollOffset = 0
+
+                            // Force full redraw to show loading state
+                            tui.renderCoordinator.renderOptimizer.markFullScreenDirty()
+
+                            // Clear loading state after navigation (tree is already cached)
+                            tui.viewCoordinator.isLoadingSwiftObjects = false
                             tui.markNeedsRedraw()
                         }
                         return true
@@ -230,6 +639,13 @@ final class SwiftModule: OpenStackModule {
                                 "action": "escape_container",
                                 "containerName": tui.viewCoordinator.swiftNavState.currentContainer ?? "unknown"
                             ])
+
+                            // Clear cached objects for this container before navigating away
+                            // This ensures fresh data will be fetched when re-entering the container
+                            if let containerName = tui.viewCoordinator.swiftNavState.currentContainer {
+                                tui.cacheManager.clearSwiftObjects(forContainer: containerName)
+                                Logger.shared.logDebug("Cleared Swift objects cache for container '\(containerName)' on navigation up")
+                            }
 
                             // Restore selection to the container that was opened
                             if let containerName = tui.viewCoordinator.swiftNavState.currentContainer,
@@ -909,6 +1325,13 @@ final class SwiftModule: OpenStackModule {
     func cleanup() async {
         Logger.shared.logInfo("SwiftModule cleanup started", context: [:])
 
+        // Stop background sync
+        stopBackgroundSyncTask()
+
+        // Clear prefetched trees and ETags
+        prefetchedTrees.removeAll()
+        containerETags.removeAll()
+
         // Clear any cached Swift data
         if let tui = tui {
             tui.cacheManager.cachedSwiftContainers = []
@@ -1029,7 +1452,7 @@ final class SwiftModule: OpenStackModule {
         )
     }
 
-    /// Render the Swift container detail view
+    /// Render the Swift container detail view (shows objects inside container)
     func renderSwiftContainerDetailView(
         tui: TUI,
         screen: OpaquePointer?,
@@ -1038,33 +1461,52 @@ final class SwiftModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let container = tui.viewCoordinator.selectedResource as? SwiftContainer else {
+        guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
             let surface = SwiftNCurses.surface(from: screen)
             let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
             await SwiftNCurses.render(Text("No container selected").error(), on: surface, in: bounds)
             return
         }
 
-        // Fetch container metadata from the Swift service
-        var metadata: SwiftContainerMetadataResponse? = nil
-        if let containerName = container.name {
-            do {
-                metadata = try await tui.client.swift.getContainerMetadata(containerName: containerName)
-            } catch {
-                Logger.shared.logDebug("Failed to fetch container metadata: \(error.localizedDescription)")
-                // Continue without metadata - the view will handle nil gracefully
-            }
+        // Check if we're in loading state - show loading message instead of stale data
+        if tui.viewCoordinator.isLoadingSwiftObjects {
+            let surface = SwiftNCurses.surface(from: screen)
+            let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+            surface.clear(rect: bounds)
+
+            // Build loading message with container context
+            let navTitle = tui.viewCoordinator.swiftNavState.getTitle()
+            let loadingComponent = VStack(spacing: 1, children: [
+                Text(navTitle).bold(),
+                Text(""),
+                Text("Loading objects...").info(),
+                Text("").secondary()
+            ])
+
+            await SwiftNCurses.render(loadingComponent, on: surface, in: bounds)
+            return
         }
 
-        await SwiftViews.drawSwiftContainerDetail(
+        // Get objects from cache
+        let objects = tui.cacheManager.cachedSwiftObjects ?? []
+
+        await SwiftViews.drawSwiftObjectList(
             screen: screen,
             startRow: startRow,
             startCol: startCol,
             width: width,
             height: height,
-            container: container,
-            metadata: metadata,
-            scrollOffset: tui.viewCoordinator.detailScrollOffset
+            objects: objects,
+            containerName: containerName,
+            currentPath: tui.viewCoordinator.swiftNavState.currentPathString,
+            searchQuery: tui.searchQuery ?? "",
+            scrollOffset: tui.viewCoordinator.scrollOffset,
+            selectedIndex: tui.viewCoordinator.selectedIndex,
+            navState: tui.viewCoordinator.swiftNavState,
+            dataManager: tui.dataManager,
+            virtualScrollManager: nil,
+            multiSelectMode: tui.selectionManager.multiSelectMode,
+            selectedItems: tui.selectionManager.multiSelectedResourceIDs
         )
     }
 
@@ -1379,6 +1821,304 @@ final class SwiftModule: OpenStackModule {
         } catch {
             Logger.shared.logError("Failed to fetch Swift objects: \(error)")
         }
+    }
+
+    /// Fetch Swift objects with pagination for improved performance
+    ///
+    /// Fetches objects in pages, providing immediate visual feedback while
+    /// loading remaining objects in the background with parallel workers.
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    ///   - marker: Marker for pagination (last object name from previous page)
+    ///   - limit: Number of objects per page (default 100)
+    ///   - priority: Fetch priority
+    ///   - forceRefresh: Whether to bypass cache
+    public func fetchSwiftObjectsPaginated(
+        containerName: String,
+        marker: String? = nil,
+        limit: Int = 100,
+        priority: String,
+        forceRefresh: Bool = false
+    ) async {
+        guard let tui = tui else { return }
+
+        // Cache freshness threshold
+        let cacheMaxAge: TimeInterval = 30
+
+        // Stale-while-revalidate: If we have cached data, show it immediately
+        // Then fetch fresh data in the background if cache is stale
+        if marker == nil && !forceRefresh {
+            if let cachedObjects = self.getSwiftObjects(forContainer: containerName) {
+                // We have cached data - check if it's fresh
+                let isFresh = tui.cacheManager.isSwiftObjectsCacheFresh(forContainer: containerName, maxAge: cacheMaxAge)
+
+                // Clear loading state before returning (in case it was set by caller)
+                tui.viewCoordinator.isLoadingSwiftObjects = false
+                tui.markNeedsRedraw()
+
+                if isFresh {
+                    // Cache is fresh - use it directly
+                    Logger.shared.logDebug("SwiftModule - Using fresh cached Swift objects for container '\(containerName)' (\(cachedObjects.count) objects)")
+                    return
+                } else {
+                    // Cache is stale - show it immediately but revalidate in background
+                    Logger.shared.logDebug("SwiftModule - Showing stale cache for container '\(containerName)' (\(cachedObjects.count) objects), revalidating in background")
+
+                    // Launch background revalidation
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        await self.revalidateContainerCache(containerName: containerName)
+                    }
+                    return
+                }
+            }
+        }
+
+        // No cached data or force refresh - show loading state and fetch
+        tui.viewCoordinator.isLoadingSwiftObjects = true
+        defer {
+            tui.viewCoordinator.isLoadingSwiftObjects = false
+            tui.markNeedsRedraw()
+        }
+
+        // Clear cache on force refresh
+        if marker == nil && forceRefresh {
+            tui.cacheManager.clearSwiftObjects(forContainer: containerName)
+        }
+
+        Logger.shared.logDebug("SwiftModule - Fetching Swift objects page for container '\(containerName)' (marker: \(marker ?? "nil"), limit: \(limit), \(priority) priority)...")
+
+        do {
+            let apiStart = Date().timeIntervalSinceReferenceDate
+            let objects = try await tui.client.swift.listObjects(
+                containerName: containerName,
+                limit: limit,
+                marker: marker
+            )
+            let apiDuration = Date().timeIntervalSinceReferenceDate - apiStart
+            Logger.shared.logDebug("SwiftModule - Fetched \(objects.count) Swift objects in \(String(format: "%.2f", apiDuration))s")
+
+            // Append results to existing objects if paginating
+            if marker != nil {
+                // Get existing objects and append new ones
+                var existingObjects = tui.cacheManager.cachedSwiftObjects ?? []
+                existingObjects.append(contentsOf: objects)
+                await self.setSwiftObjects(existingObjects, forContainer: containerName)
+            } else {
+                // Initial load - set objects directly
+                await self.setSwiftObjects(objects, forContainer: containerName)
+
+                // Store ETag for differential sync (use object count as pseudo-ETag)
+                containerETags[containerName] = String(objects.count)
+
+                // Trigger prefetching for subdirectories
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    await self.prefetchSubdirectoryTrees(containerName: containerName, objects: objects)
+                }
+            }
+
+            // Clear loading state after first page
+            tui.viewCoordinator.isLoadingSwiftObjects = false
+            tui.markNeedsRedraw()
+
+            // If results count equals limit, there may be more pages
+            // Launch parallel background fetchers for faster loading
+            if objects.count == limit {
+                if let lastObject = objects.last, let lastObjectName = lastObject.name {
+                    Logger.shared.logDebug("SwiftModule - Launching parallel background fetchers (marker: \(lastObjectName))")
+
+                    // Launch parallel background workers
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        await self.fetchSwiftObjectsParallel(
+                            containerName: containerName,
+                            initialMarker: lastObjectName
+                        )
+                    }
+                }
+            }
+        } catch let error as OpenStackError {
+            switch error {
+            case .httpError(403, _):
+                Logger.shared.logDebug("Swift object access requires permissions (HTTP 403)")
+            case .httpError(404, _):
+                Logger.shared.logDebug("Swift container not found (HTTP 404)")
+            default:
+                Logger.shared.logError("Failed to fetch Swift objects: \(error)")
+            }
+        } catch {
+            Logger.shared.logError("Failed to fetch Swift objects: \(error)")
+        }
+    }
+
+    /// Fetch remaining Swift objects using parallel workers
+    ///
+    /// Uses TaskGroup to run multiple concurrent fetchers, each processing
+    /// sequential pages but all running in parallel for maximum throughput.
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    ///   - initialMarker: Starting marker for the first worker
+    private func fetchSwiftObjectsParallel(
+        containerName: String,
+        initialMarker: String
+    ) async {
+        guard let tui = tui else { return }
+
+        // Configuration for parallel fetching
+        let maxConcurrentWorkers = 5
+        let pageSize = 1000  // Large pages for background fetching
+
+        // Progress tracker for parallel operations
+        actor ParallelFetchState {
+            var allObjects: [SwiftObject] = []
+            var completedWorkers = 0
+            var activeWorkers = 0
+            var nextMarker: String?
+            var hasMorePages = true
+
+            func addObjects(_ objects: [SwiftObject]) {
+                allObjects.append(contentsOf: objects)
+            }
+
+            func workerCompleted() {
+                completedWorkers += 1
+                activeWorkers -= 1
+            }
+
+            func workerStarted() {
+                activeWorkers += 1
+            }
+
+            func setNextMarker(_ marker: String?) {
+                nextMarker = marker
+            }
+
+            func setHasMorePages(_ hasMore: Bool) {
+                hasMorePages = hasMore
+            }
+
+            func getState() -> (objects: [SwiftObject], active: Int, completed: Int, nextMarker: String?, hasMore: Bool) {
+                return (allObjects, activeWorkers, completedWorkers, nextMarker, hasMorePages)
+            }
+
+            func reset() {
+                allObjects = []
+                completedWorkers = 0
+                activeWorkers = 0
+                nextMarker = nil
+                hasMorePages = true
+            }
+        }
+
+        let fetchState = ParallelFetchState()
+        await fetchState.setNextMarker(initialMarker)
+
+        Logger.shared.logInfo("SwiftModule - Starting parallel fetch with \(maxConcurrentWorkers) workers")
+        let startTime = Date().timeIntervalSinceReferenceDate
+
+        // Use TaskGroup for concurrent fetching
+        await withTaskGroup(of: [SwiftObject].self) { group in
+            var markersToProcess: [String] = [initialMarker]
+
+            // Process until all pages are fetched
+            while true {
+                // Verify we're still viewing the same container
+                guard tui.viewCoordinator.swiftNavState.currentContainer == containerName else {
+                    Logger.shared.logDebug("SwiftModule - Cancelling parallel fetch, container changed")
+                    group.cancelAll()
+                    return
+                }
+
+                // Start new workers for available markers
+                while let marker = markersToProcess.first {
+                    markersToProcess.removeFirst()
+
+                    let state = await fetchState.getState()
+                    if state.active >= maxConcurrentWorkers {
+                        // Re-add marker for later processing
+                        markersToProcess.insert(marker, at: 0)
+                        break
+                    }
+
+                    await fetchState.workerStarted()
+
+                    // Capture client reference outside of task for Sendable compliance
+                    let client = tui.client
+
+                    group.addTask {
+                        do {
+                            let objects = try await client.swift.listObjects(
+                                containerName: containerName,
+                                limit: pageSize,
+                                marker: marker
+                            )
+                            return objects
+                        } catch {
+                            Logger.shared.logError("Parallel fetch worker failed: \(error)")
+                            return []
+                        }
+                    }
+                }
+
+                // Wait for a worker to complete
+                if let objects = await group.next() {
+                    await fetchState.workerCompleted()
+
+                    if !objects.isEmpty {
+                        await fetchState.addObjects(objects)
+
+                        // Get next marker if there are more pages
+                        if objects.count == pageSize {
+                            if let lastObject = objects.last, let lastObjectName = lastObject.name {
+                                markersToProcess.append(lastObjectName)
+                            }
+                        }
+
+                        // Update cache with all fetched objects so far
+                        let state = await fetchState.getState()
+                        let existingObjects = tui.cacheManager.cachedSwiftObjects ?? []
+
+                        // Only append new objects (state.objects already includes all fetched)
+                        let newObjectCount = state.objects.count
+                        let currentCount = existingObjects.count
+                        if newObjectCount > currentCount - 100 {  // Account for initial page
+                            // Replace with full set including initial page
+                            let initialObjects = Array(existingObjects.prefix(100))
+                            let allFetched = initialObjects + state.objects
+                            await self.setSwiftObjects(allFetched, forContainer: containerName)
+
+                            // Trigger redraw to show progress
+                            tui.markNeedsRedraw()
+                        }
+                    }
+                } else {
+                    // No more results and no pending markers
+                    if markersToProcess.isEmpty {
+                        break
+                    }
+                }
+
+                let state = await fetchState.getState()
+                if state.active == 0 && markersToProcess.isEmpty {
+                    break
+                }
+            }
+        }
+
+        let totalDuration = Date().timeIntervalSinceReferenceDate - startTime
+        let allObjects = tui.cacheManager.cachedSwiftObjects ?? []
+        let totalObjects = allObjects.count
+
+        // Update ETag after parallel fetch completes
+        containerETags[containerName] = String(totalObjects)
+
+        // Prefetch subdirectory trees with all objects
+        await prefetchSubdirectoryTrees(containerName: containerName, objects: allObjects)
+
+        Logger.shared.logInfo("SwiftModule - Completed parallel fetch: \(totalObjects) total objects in \(String(format: "%.2f", totalDuration))s")
     }
 }
 

@@ -565,6 +565,12 @@ final class NavigationInputHandler {
         // Not in detail view - open detail view
         // NOTE: Module views handle SPACEBAR in their inputHandlers for view-specific navigation
         if !tui.viewCoordinator.currentView.isDetailView {
+            // Swift containers require special handling (navigateIntoContainer, fetchSwiftObjects)
+            // that should be done by the SwiftModule's ViewRegistry inputHandler
+            if tui.viewCoordinator.currentView == .swift || tui.viewCoordinator.currentView == .swiftContainerDetail {
+                return false
+            }
+
             Logger.shared.logUserAction("open_detail_view", details: [
                 "view": "\(tui.viewCoordinator.currentView)",
                 "selectedIndex": tui.viewCoordinator.selectedIndex

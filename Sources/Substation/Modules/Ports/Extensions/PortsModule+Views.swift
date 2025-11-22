@@ -49,7 +49,24 @@ extension PortsModule {
                         selectedItems: tui.selectionManager.multiSelectedResourceIDs
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak self, weak tui] ch, screen in
+                    guard let self = self, let tui = tui else { return false }
+
+                    switch ch {
+                    case Int32(77):  // M - Manage server assignment
+                        Logger.shared.logUserAction("manage_port_server_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.managePortServerAssignment(screen: screen)
+                        return true
+
+                    case Int32(69):  // E - Manage allowed address pairs
+                        Logger.shared.logUserAction("manage_port_allowed_address_pairs", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.managePortAllowedAddressPairs(screen: screen)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
             ViewMetadata(
                 identifier: Views.detail,
@@ -74,6 +91,36 @@ extension PortsModule {
                     )
                 },
                 inputHandler: nil
+            ),
+
+            // Port Create Form View
+            ViewMetadata(
+                identifier: Views.create,
+                title: "Create Port",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .network,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await PortViews.drawPortCreateForm(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        portCreateForm: tui.portCreateForm,
+                        portCreateFormState: tui.portCreateFormState,
+                        cachedNetworks: tui.cacheManager.cachedNetworks,
+                        cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups,
+                        cachedQoSPolicies: tui.cacheManager.cachedQoSPolicies
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handlePortCreateInput(ch, screen: screen)
+                    return true
+                }
             ),
 
             // Port Server Management View
@@ -105,7 +152,10 @@ extension PortsModule {
                         )
                     }
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    return await tui.handlePortServerManagementInput(ch, screen: screen)
+                }
             ),
 
             // Port Allowed Address Pair Management View
@@ -130,7 +180,10 @@ extension PortsModule {
                         )
                     }
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    return await tui.handleAllowedAddressPairManagementInput(ch, screen: screen)
+                }
             )
         ]
     }

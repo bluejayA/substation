@@ -162,8 +162,8 @@ extension BarbicanModule {
 
             tui.statusMessage = "Secret '\(secretName)' created successfully"
 
-            // Refresh secrets cache and return to list
-            let _ = await DataProviderRegistry.shared.fetchData(for: "secrets", priority: .onDemand, forceRefresh: true)
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
             tui.changeView(to: .barbicanSecrets, resetSelection: false)
             tui.barbicanSecretCreateForm = BarbicanSecretCreateForm() // Reset form
 

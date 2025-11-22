@@ -11,9 +11,24 @@ import MemoryKit
 
 // MARK: - Subnet Router Management Input Handler
 
+/// Extension providing subnet router management input handling for TUI
+///
+/// This extension handles keyboard input for the subnet router management view,
+/// supporting navigation, selection, and attachment/detachment operations.
+///
+/// Supported keys:
+/// - UP/DOWN: Navigate through routers
+/// - TAB: Toggle between attach/detach mode
+/// - SPACE: Toggle router selection
+/// - ENTER: Apply changes
+/// - ESC: Return to subnet list
 @MainActor
 extension TUI {
 
+    /// Navigation context for subnet router management
+    ///
+    /// Provides bounds for keyboard navigation within the filtered router list
+    /// based on the current attachment mode.
     var subnetRouterManagementNavigationContext: NavigationContext {
         let filteredRouters: [Router]
         if let query = searchQuery, !query.isEmpty {
@@ -37,6 +52,14 @@ extension TUI {
         return .list(maxIndex: max(0, relevantRouters.count - 1))
     }
 
+    /// Handle keyboard input for subnet router management view
+    ///
+    /// Processes navigation and action keys for the subnet router management interface.
+    /// Supports filtering, mode toggling, router selection, and applying changes.
+    ///
+    /// - Parameters:
+    ///   - ch: The key code pressed
+    ///   - screen: NCurses screen pointer for rendering
     internal func handleSubnetRouterManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
         guard viewCoordinator.currentView == .subnetRouterManagement else { return }
 
@@ -72,6 +95,12 @@ extension TUI {
         await handleSubnetRouterManagementSpecificInput(ch, screen: screen, relevantRouters: relevantRouters)
     }
 
+    /// Handle view-specific input for subnet router management
+    ///
+    /// - Parameters:
+    ///   - ch: The key code pressed
+    ///   - screen: NCurses screen pointer for rendering
+    ///   - relevantRouters: Filtered list of routers based on current mode
     private func handleSubnetRouterManagementSpecificInput(_ ch: Int32, screen: OpaquePointer?, relevantRouters: [Router]) async {
         switch ch {
         case Int32(9): // TAB - toggle attachment mode
@@ -102,6 +131,11 @@ extension TUI {
         }
     }
 
+    /// Handle ESC key press for subnet router management
+    ///
+    /// Uses centralized navigation handling to return to the previous view.
+    ///
+    /// - Returns: Boolean indicating if navigation was handled
     private func handleSubnetRouterManagementEscape() async -> Bool {
         // Use centralized ESC handling
         return await NavigationInputHandler.handleEscapeKey(tui: self)

@@ -177,6 +177,21 @@ final class CacheManager {
         set { Task { await resourceCache.setSwiftContainers(newValue) } }
     }
 
+    /// Check if the container list cache is fresh.
+    ///
+    /// - Parameter maxAge: Maximum age in seconds for cache to be considered fresh (default 30s)
+    /// - Returns: true if cache exists and is within maxAge
+    func isSwiftContainersCacheFresh(maxAge: TimeInterval = 30) -> Bool {
+        return resourceCache.isSwiftContainersCacheFresh(maxAge: maxAge)
+    }
+
+    /// Get the cache timestamp for the container list.
+    ///
+    /// - Returns: The date when containers were last cached
+    func getSwiftContainersCacheTime() -> Date {
+        return resourceCache.getSwiftContainersCacheTime()
+    }
+
     /// Cached Swift objects for the current container.
     /// Uses navigation state to determine which container's objects to return.
     internal var cachedSwiftObjects: [SwiftObject]? {
@@ -195,6 +210,61 @@ final class CacheManager {
             }
             Task { await resourceCache.setSwiftObjects(objects, forContainer: containerName) }
         }
+    }
+
+    /// Clear cached Swift objects for a specific container.
+    ///
+    /// This removes the cached objects for the specified container, ensuring fresh data
+    /// will be fetched when the container is accessed again.
+    ///
+    /// - Parameter containerName: Name of the container to clear objects for
+    func clearSwiftObjects(forContainer containerName: String) {
+        resourceCache.clearSwiftObjects(forContainer: containerName)
+    }
+
+    /// Check if the cache for a container's objects is fresh.
+    ///
+    /// - Parameters:
+    ///   - containerName: Name of the container
+    ///   - maxAge: Maximum age in seconds for cache to be considered fresh (default 30s)
+    /// - Returns: true if cache exists and is within maxAge
+    func isSwiftObjectsCacheFresh(forContainer containerName: String, maxAge: TimeInterval = 30) -> Bool {
+        return resourceCache.isSwiftObjectsCacheFresh(forContainer: containerName, maxAge: maxAge)
+    }
+
+    /// Get the cache timestamp for a container's objects.
+    ///
+    /// - Parameter containerName: Name of the container
+    /// - Returns: The date when objects were last cached, or nil if not cached
+    func getSwiftObjectsCacheTime(forContainer containerName: String) -> Date? {
+        return resourceCache.getSwiftObjectsCacheTime(forContainer: containerName)
+    }
+
+    /// Add objects to the cache for a container (optimistic update after upload).
+    ///
+    /// - Parameters:
+    ///   - objects: Objects to add
+    ///   - containerName: Name of the container
+    func addSwiftObjects(_ objects: [SwiftObject], forContainer containerName: String) async {
+        await resourceCache.addSwiftObjects(objects, forContainer: containerName)
+    }
+
+    /// Remove objects from the cache for a container (optimistic update after delete).
+    ///
+    /// - Parameters:
+    ///   - objectNames: Names of objects to remove
+    ///   - containerName: Name of the container
+    func removeSwiftObjects(withNames objectNames: Set<String>, forContainer containerName: String) async {
+        await resourceCache.removeSwiftObjects(withNames: objectNames, forContainer: containerName)
+    }
+
+    /// Remove a single object from the cache for a container (optimistic update after delete).
+    ///
+    /// - Parameters:
+    ///   - objectName: Name of the object to remove
+    ///   - containerName: Name of the container
+    func removeSwiftObject(withName objectName: String, forContainer containerName: String) async {
+        await resourceCache.removeSwiftObject(withName: objectName, forContainer: containerName)
     }
 
     // MARK: - Cached Flavor Recommendations

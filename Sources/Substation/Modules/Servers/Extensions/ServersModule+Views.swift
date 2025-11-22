@@ -234,9 +234,114 @@ extension ServersModule {
                     await tui.handleServerResizeInput(ch, screen: screen)
                     return true
                 }
+            ),
+
+            // Server Snapshot Management View
+            ViewMetadata(
+                identifier: Views.snapshotManagement,
+                title: "Create Server Snapshot",
+                parentViewId: Views.detail.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .compute,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await SnapshotManagementView.drawServerSnapshotManagement(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        form: tui.snapshotManagementForm,
+                        formBuilderState: tui.snapshotManagementFormState
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleSnapshotManagementInput(ch, screen: screen)
+                    return true
+                }
+            ),
+
+            // Server Security Groups Management View
+            ViewMetadata(
+                identifier: Views.securityGroups,
+                title: "Manage Security Groups",
+                parentViewId: Views.detail.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .compute,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await SecurityGroupViews.drawServerSecurityGroupManagement(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        form: tui.securityGroupForm
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleSecurityGroupInput(ch, screen: screen)
+                    return true
+                }
+            ),
+
+            // Server Network Interfaces Management View
+            ViewMetadata(
+                identifier: Views.networkInterfaces,
+                title: "Manage Network Interfaces",
+                parentViewId: Views.detail.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .compute,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await NetworkInterfaceManagementView.drawServerNetworkInterfaceManagement(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        form: tui.networkInterfaceForm,
+                        resourceNameCache: tui.resourceNameCache,
+                        resourceResolver: tui.resourceResolver
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleNetworkInterfaceInput(ch, screen: screen)
+                    return true
+                }
+            ),
+
+            // Server Group Management View
+            ViewMetadata(
+                identifier: Views.groupManagement,
+                title: "Manage Server Group",
+                parentViewId: Views.detail.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .compute,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await ServerGroupViews.drawServerGroupManagement(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        form: tui.serverGroupManagementForm
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleServerGroupManagementInput(ch, screen: screen)
+                    return true
+                }
             )
-            // Note: Additional management views (snapshotManagement, securityGroups, networkInterfaces, groupManagement)
-            // are handled via legacy system due to complex context-dependent parameters
         ]
     }
 }

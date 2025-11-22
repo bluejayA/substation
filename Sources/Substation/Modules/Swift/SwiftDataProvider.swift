@@ -77,6 +77,37 @@ final class SwiftDataProvider: DataProvider {
             )
         }
 
+        // Stale-while-revalidate for container list
+        let cacheMaxAge: TimeInterval = 30
+        if !forceRefresh && !tui.cacheManager.cachedSwiftContainers.isEmpty {
+            let isFresh = tui.cacheManager.isSwiftContainersCacheFresh(maxAge: cacheMaxAge)
+
+            if isFresh {
+                // Cache is fresh - use it directly
+                Logger.shared.logDebug("SwiftDataProvider - Using fresh cached containers (\(currentItemCount) items)")
+                return DataFetchResult(
+                    itemCount: currentItemCount,
+                    duration: 0,
+                    fromCache: true
+                )
+            } else {
+                // Cache is stale - show it but revalidate in background
+                Logger.shared.logDebug("SwiftDataProvider - Showing stale cache (\(currentItemCount) items), revalidating in background")
+
+                // Launch background revalidation
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    await self.revalidateContainerListCache()
+                }
+
+                return DataFetchResult(
+                    itemCount: currentItemCount,
+                    duration: 0,
+                    fromCache: true
+                )
+            }
+        }
+
         let startTime = Date()
 
         do {
@@ -160,6 +191,47 @@ final class SwiftDataProvider: DataProvider {
         paginationManager = nil
         serviceUnavailable = false
         Logger.shared.logDebug("SwiftDataProvider - Cache cleared")
+    }
+
+    /// Revalidate container list cache in background
+    ///
+    /// Fetches fresh data from server and updates cache without blocking UI.
+    private func revalidateContainerListCache() async {
+        guard let tui = tui else { return }
+
+        Logger.shared.logDebug("SwiftDataProvider - Revalidating container list cache")
+
+        do {
+            let startTime = Date()
+            let containers = try await tui.client.swift.listContainers()
+
+            // Update cache
+            tui.cacheManager.cachedSwiftContainers = containers
+            lastRefreshTime = Date()
+            serviceUnavailable = false
+
+            // Update pagination if enabled
+            if let paginationManager = paginationManager {
+                await paginationManager.updateFromFilterCache(containers)
+            }
+
+            let duration = Date().timeIntervalSince(startTime)
+            let oldCount = currentItemCount
+
+            if oldCount != containers.count {
+                Logger.shared.logInfo("SwiftDataProvider - Revalidation detected change: \(oldCount) -> \(containers.count) containers in \(String(format: "%.2f", duration))s")
+                // Only show status if user is viewing containers
+                if tui.viewCoordinator.currentView == .swift {
+                    tui.statusMessage = "Updated: \(containers.count) containers"
+                    tui.markNeedsRedraw()
+                }
+            } else {
+                Logger.shared.logDebug("SwiftDataProvider - Revalidation completed, no changes (\(containers.count) containers) in \(String(format: "%.2f", duration))s")
+            }
+
+        } catch {
+            Logger.shared.logDebug("SwiftDataProvider - Revalidation failed: \(error.localizedDescription)")
+        }
     }
 
     /// Get paginated items if pagination is supported

@@ -17,16 +17,27 @@ import SwiftNCurses
 @MainActor
 extension TUI {
 
-    internal func handleAllowedAddressPairManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard viewCoordinator.currentView == .portAllowedAddressPairManagement else { return }
-        guard let form = allowedAddressPairForm else { return }
+    /// Handle input for allowed address pair management view
+    ///
+    /// Supports:
+    /// - UP/DOWN: Navigate port list
+    /// - SPACE: Toggle port selection for allowed address pairs
+    /// - ENTER: Apply pending changes
+    /// - ESC: Cancel and return to ports
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code
+    ///   - screen: Screen pointer for rendering
+    internal func handleAllowedAddressPairManagementInput(_ ch: Int32, screen: OpaquePointer?) async -> Bool {
+        // Guard removed - ViewRegistry ensures this handler is only called for the correct view
+        guard let form = allowedAddressPairForm else { return false }
 
         let portCount = cacheManager.cachedPorts.count
 
         // Synchronize viewCoordinator.selectedIndex with form's highlightedPortIndex
         viewCoordinator.selectedIndex = form.highlightedPortIndex
 
-        let _ = await formInputHandler.handleManagementInput(
+        let handled = await formInputHandler.handleManagementInput(
             ch,
             screen: screen,
             itemCount: portCount,
@@ -79,5 +90,7 @@ extension TUI {
             updatedForm.highlightedPortIndex = viewCoordinator.selectedIndex
             allowedAddressPairForm = updatedForm
         }
+
+        return handled
     }
 }

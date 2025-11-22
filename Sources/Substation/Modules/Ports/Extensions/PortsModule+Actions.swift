@@ -310,6 +310,9 @@ extension PortsModule {
             "failureCount": failureCount
         ])
 
+        // Trigger accelerated refresh to show state transitions
+        tui.refreshAfterOperation()
+
         // Return to ports list
         tui.changeView(to: .ports, resetSelection: false)
     }
@@ -463,6 +466,9 @@ extension PortsModule {
             )
 
             tui.statusMessage = "Port '\(portName)' created successfully"
+
+            // Trigger accelerated refresh to show state transitions
+            tui.refreshAfterOperation()
 
             // Refresh port cache and return to list
             let _ = await DataProviderRegistry.shared.fetchData(for: "ports", priority: .onDemand, forceRefresh: true)

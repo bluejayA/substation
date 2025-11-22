@@ -59,7 +59,7 @@ final class SecurityGroupsModule: OpenStackModule {
     /// This method performs any necessary setup for the Security Groups module.
     /// Verifies that the Neutron network service is available for security group operations.
     func configure() async throws {
-        guard tui != nil else {
+        guard let tuiInstance = tui else {
             throw ModuleError.invalidState("TUI reference is nil during configuration")
         }
 
@@ -79,7 +79,7 @@ final class SecurityGroupsModule: OpenStackModule {
         )
 
         // Register as data provider
-        let dataProvider = SecurityGroupsDataProvider(module: self, tui: tui!)
+        let dataProvider = SecurityGroupsDataProvider(module: self, tui: tuiInstance)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
         // Register enhanced views with metadata
@@ -167,7 +167,6 @@ final class SecurityGroupsModule: OpenStackModule {
                     width: width,
                     height: height,
                     securityGroup: securityGroup,
-                    selectedRuleIndex: nil,
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
@@ -206,6 +205,12 @@ final class SecurityGroupsModule: OpenStackModule {
             title: "Manage Security Group Rules",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
+                guard let form = tui.securityGroupRuleManagementForm else {
+                    let surface = SwiftNCurses.surface(from: screen)
+                    let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+                    await SwiftNCurses.render(Text("No rule management form available").error(), on: surface, in: bounds)
+                    return
+                }
 
                 await SecurityGroupViews.drawSecurityGroupRuleManagement(
                     screen: screen,
@@ -213,7 +218,7 @@ final class SecurityGroupsModule: OpenStackModule {
                     startCol: startCol,
                     width: width,
                     height: height,
-                    form: tui.securityGroupRuleManagementForm!,
+                    form: form,
                     cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups
                 )
             },
@@ -269,10 +274,10 @@ final class SecurityGroupsModule: OpenStackModule {
             },
             formValidation: { [weak tui] in
                 guard let tui = tui else { return false }
+                guard let form = tui.securityGroupRuleManagementForm else { return false }
                 // Rule management form validation depends on current mode
-                if tui.securityGroupRuleManagementForm!.shouldShowCreateForm() ||
-                   tui.securityGroupRuleManagementForm!.shouldShowEditForm() {
-                    let validation = tui.securityGroupRuleManagementForm!.ruleCreateForm.validateForm()
+                if form.shouldShowCreateForm() || form.shouldShowEditForm() {
+                    let validation = form.ruleCreateForm.validateForm()
                     return validation.isValid
                 }
                 return true

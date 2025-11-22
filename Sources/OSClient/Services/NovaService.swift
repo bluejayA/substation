@@ -130,8 +130,33 @@ public actor NovaService: OpenStackService {
     }
 
     /// Create a new server with intelligent cache invalidation
+    ///
+    /// Creates a server using the Nova API. If a server group is specified,
+    /// it is passed via os:scheduler_hints as required by the OpenStack API.
+    ///
+    /// - Parameter request: The server creation request parameters
+    /// - Returns: The created server
+    /// - Throws: API errors if creation fails
     public func createServer(request: CreateServerRequest) async throws -> Server {
-        let requestData = try SharedResources.jsonEncoder.encode(["server": request])
+        // Build the request body - serverGroup must go in os:scheduler_hints, not in server
+        var requestBody: [String: Any] = [:]
+
+        // Encode the server request (without serverGroup)
+        let serverData = try SharedResources.jsonEncoder.encode(request)
+        guard var serverDict = try JSONSerialization.jsonObject(with: serverData) as? [String: Any] else {
+            throw OpenStackError.configurationError("Failed to encode server request as dictionary")
+        }
+
+        // Remove server_group from server object if present (it goes in scheduler_hints)
+        serverDict.removeValue(forKey: "server_group")
+        requestBody["server"] = serverDict
+
+        // Add scheduler hints if server group is specified
+        if let serverGroup = request.serverGroup {
+            requestBody["os:scheduler_hints"] = ["group": serverGroup]
+        }
+
+        let requestData = try JSONSerialization.data(withJSONObject: requestBody)
         let response: ServerDetailResponse = try await core.request(
             service: serviceName,
             method: "POST",

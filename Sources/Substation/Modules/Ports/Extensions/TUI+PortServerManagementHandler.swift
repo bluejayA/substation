@@ -8,8 +8,20 @@ import SwiftNCurses
 @MainActor
 extension TUI {
 
-    internal func handlePortServerManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard viewCoordinator.currentView == .portServerManagement else { return }
+    /// Handle input for port server management view
+    ///
+    /// Supports:
+    /// - UP/DOWN: Navigate server list
+    /// - SPACE: Toggle server selection
+    /// - ENTER: Apply attach/detach operation
+    /// - TAB: Switch between attach/detach modes
+    /// - ESC: Cancel and return to ports
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code
+    ///   - screen: Screen pointer for rendering
+    internal func handlePortServerManagementInput(_ ch: Int32, screen: OpaquePointer?) async -> Bool {
+        // Guard removed - ViewRegistry ensures this handler is only called for the correct view
 
         // Filter servers based on mode and attachment status
         // A port can only be attached to one server at a time
@@ -45,7 +57,7 @@ extension TUI {
             relevantServers = baseServers
         }
 
-        let _ = await formInputHandler.handleManagementInput(
+        return await formInputHandler.handleManagementInput(
             ch,
             screen: screen,
             itemCount: relevantServers.count,
@@ -59,6 +71,7 @@ extension TUI {
                     self.selectionManager.selectedServerId = server.id
                     self.statusMessage = "Selected server '\(server.name ?? "Unknown")' - Press ENTER to \(self.selectionManager.attachmentMode == .attach ? "attach" : "detach")"
                 }
+                self.renderCoordinator.needsRedraw = true
                 await self.draw(screen: screen)
             },
             onEnter: {
@@ -89,6 +102,8 @@ extension TUI {
                     self.viewCoordinator.selectedIndex = 0
                     self.viewCoordinator.scrollOffset = 0
                     self.statusMessage = "Switched to \(self.selectionManager.attachmentMode == .attach ? "ATTACH" : "DETACH") mode"
+                    self.renderCoordinator.needsRedraw = true
+                    await self.draw(screen: screen)
                     return true
                 }
                 return false
@@ -112,6 +127,9 @@ extension TUI {
                 "portId": port.id,
                 "serverId": server.id
             ])
+
+            // Trigger accelerated refresh to show state transitions
+            refreshAfterOperation()
 
             // Refresh data and return to ports view
             await dataManager.refreshAllData()
@@ -151,6 +169,9 @@ extension TUI {
                 "portId": port.id,
                 "serverId": server.id
             ])
+
+            // Trigger accelerated refresh to show state transitions
+            refreshAfterOperation()
 
             // Refresh data and return to ports view
             await dataManager.refreshAllData()

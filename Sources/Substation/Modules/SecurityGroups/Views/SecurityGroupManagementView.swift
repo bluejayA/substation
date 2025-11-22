@@ -244,10 +244,24 @@ struct SecurityGroupViews {
     private static let securityGroupDetailSectionTrailingPadding: Int32 = 0
     private static let securityGroupDetailHelpText = "Press ESC to return to security group list"
 
+    /// Draw security group detail view with comprehensive rule analysis
+    ///
+    /// Renders a detailed view of a security group including basic information,
+    /// rule summaries, network configuration, remote sources, and individual
+    /// ingress/egress rules with enhanced metadata.
+    ///
+    /// - Parameters:
+    ///   - screen: NCurses screen pointer for rendering
+    ///   - startRow: Starting row position
+    ///   - startCol: Starting column position
+    ///   - width: Available width for rendering
+    ///   - height: Available height for rendering
+    ///   - securityGroup: The security group to display
+    ///   - scrollOffset: Current scroll offset for rule navigation
     @MainActor
     static func drawSecurityGroupDetail(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                        width: Int32, height: Int32, securityGroup: SecurityGroup,
-                                       selectedRuleIndex: Int? = nil, scrollOffset: Int = 0) async {
+                                       scrollOffset: Int = 0) async {
 
         var sections: [DetailSection] = []
 
