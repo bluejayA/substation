@@ -1,34 +1,76 @@
 import Foundation
 import OSClient
 
+/// Mode enumeration for security group rule management
+///
+/// Tracks the current state of the rule management interface:
+/// - list: Viewing and selecting rules
+/// - create: Creating a new rule
+/// - edit: Editing an existing rule
 enum SecurityGroupRuleManagementMode {
     case list
     case create
     case edit(SecurityGroupRule)
 }
 
+/// Form model for managing security group rules
+///
+/// This form handles the dual-mode interface for security group rule management,
+/// supporting both list navigation and rule creation/editing. It maintains proper
+/// state separation between modes to prevent corruption during transitions.
+///
+/// **Usage Pattern:**
+/// 1. Initialize with security group and available groups
+/// 2. Use list navigation methods in list mode
+/// 3. Enter create/edit mode with enterCreateMode()/enterEditMode()
+/// 4. Return to list with returnToListMode()
 struct SecurityGroupRuleManagementForm {
-    // Management state
+    // MARK: - Management State
+
+    /// The security group being managed
     var securityGroup: SecurityGroup
+
+    /// Current management mode (list, create, or edit)
     var mode: SecurityGroupRuleManagementMode = .list
+
+    /// Index of selected rule in list mode
     var selectedRuleIndex: Int = 0
+
+    /// Scroll offset for rule list
     var scrollOffset: Int = 0
 
-    // FormSelector state for rule list
+    // MARK: - FormSelector State for Rule List
+
+    /// Set of selected rule IDs for batch operations
     var selectedRuleIds: Set<String> = []
+
+    /// Index of currently highlighted rule in list
     var highlightedRuleIndex: Int = 0
+
+    /// Search query for filtering rules
     var ruleSearchQuery: String? = nil
+
+    /// Scroll offset for rule list display
     var ruleScrollOffset: Int = 0
 
-    // Rule creation/editing form
+    // MARK: - Rule Creation/Editing State
+
+    /// Form for creating or editing rules
     var ruleCreateForm: SecurityGroupRuleCreateForm = SecurityGroupRuleCreateForm()
 
-    // FormBuilder state for rule creation/editing
+    /// FormBuilder state for rule creation/editing
     var ruleCreateFormState: FormBuilderState = FormBuilderState(fields: [])
 
-    // Available security groups for remote type selection
+    /// Available security groups for remote type selection
     var availableSecurityGroups: [SecurityGroup] = []
 
+    // MARK: - Initialization
+
+    /// Initialize the rule management form
+    ///
+    /// - Parameters:
+    ///   - securityGroup: The security group to manage rules for
+    ///   - availableSecurityGroups: Available security groups for remote type selection
     init(securityGroup: SecurityGroup, availableSecurityGroups: [SecurityGroup] = []) {
         self.securityGroup = securityGroup
         self.availableSecurityGroups = availableSecurityGroups
@@ -37,17 +79,20 @@ struct SecurityGroupRuleManagementForm {
 
     // MARK: - Rule List Management
 
+    /// Move selection up in the rule list
     mutating func moveSelectionUp() {
         highlightedRuleIndex = max(0, highlightedRuleIndex - 1)
         selectedRuleIndex = highlightedRuleIndex
     }
 
+    /// Move selection down in the rule list
     mutating func moveSelectionDown() {
         let maxIndex = max(0, (securityGroup.securityGroupRules?.count ?? 0) - 1)
         highlightedRuleIndex = min(maxIndex, highlightedRuleIndex + 1)
         selectedRuleIndex = highlightedRuleIndex
     }
 
+    /// Toggle selection state of the currently highlighted rule
     mutating func toggleRuleSelection() {
         guard let rule = getHighlightedRule() else { return }
         if selectedRuleIds.contains(rule.id) {
@@ -57,10 +102,13 @@ struct SecurityGroupRuleManagementForm {
         }
     }
 
+    /// Clear all rule selections
     mutating func clearRuleSelection() {
         selectedRuleIds.removeAll()
     }
 
+    /// Get the currently highlighted rule
+    /// - Returns: The highlighted security group rule or nil
     func getHighlightedRule() -> SecurityGroupRule? {
         guard highlightedRuleIndex < (securityGroup.securityGroupRules?.count ?? 0) else {
             return nil
@@ -68,16 +116,24 @@ struct SecurityGroupRuleManagementForm {
         return securityGroup.securityGroupRules?[highlightedRuleIndex]
     }
 
+    /// Get the currently selected rule (alias for getHighlightedRule)
+    /// - Returns: The selected security group rule or nil
     func getSelectedRule() -> SecurityGroupRule? {
         return getHighlightedRule()
     }
 
+    /// Get all selected rules for batch operations
+    /// - Returns: Array of selected security group rules
     func getSelectedRules() -> [SecurityGroupRule] {
         return securityGroup.securityGroupRules?.filter { selectedRuleIds.contains($0.id) } ?? []
     }
 
     // MARK: - Mode Management
 
+    /// Enter create mode for adding a new rule
+    ///
+    /// Resets the rule form and initializes FormBuilderState for a new rule.
+    /// This properly separates state from list mode to prevent corruption.
     mutating func enterCreateMode() {
         mode = .create
         ruleCreateForm.reset()
@@ -91,6 +147,10 @@ struct SecurityGroupRuleManagementForm {
         ))
     }
 
+    /// Enter edit mode for modifying the selected rule
+    ///
+    /// Populates the form with the selected rule's data and initializes
+    /// FormBuilderState for editing. Returns early if no rule is selected.
     mutating func enterEditMode() {
         guard let rule = getSelectedRule() else { return }
         mode = .edit(rule)
@@ -104,9 +164,15 @@ struct SecurityGroupRuleManagementForm {
         ))
     }
 
+    /// Return to list mode from create or edit mode
+    ///
+    /// Resets the form state and switches back to list mode.
+    /// This is typically called when canceling a create/edit operation.
     mutating func returnToListMode() {
         mode = .list
         ruleCreateForm.reset()
+        // Clear FormBuilderState to prevent stale state
+        ruleCreateFormState = FormBuilderState(fields: [])
     }
 
     // MARK: - Form Population from Existing Rule

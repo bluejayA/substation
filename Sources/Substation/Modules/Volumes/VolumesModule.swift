@@ -118,8 +118,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumes,
             title: "Volumes",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeListView(
                     tui: tui,
                     screen: screen,
@@ -159,8 +159,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumeDetail,
             title: "Volume Details",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeDetailView(
                     tui: tui,
                     screen: screen,
@@ -178,8 +178,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumeCreate,
             title: "Create Volume",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeCreateView(
                     tui: tui,
                     screen: screen,
@@ -197,8 +197,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumeManagement,
             title: "Manage Volume Attachments",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeManagementView(
                     tui: tui,
                     screen: screen,
@@ -216,8 +216,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumeSnapshotManagement,
             title: "Create Volume Snapshot",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeSnapshotManagementView(
                     tui: tui,
                     screen: screen,
@@ -235,8 +235,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumeBackupManagement,
             title: "Create Volume Backup",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeBackupManagementView(
                     tui: tui,
                     screen: screen,
@@ -254,8 +254,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumeArchives,
             title: "Volume Archives",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeArchivesView(
                     tui: tui,
                     screen: screen,
@@ -284,8 +284,8 @@ final class VolumesModule: OpenStackModule {
         registrations.append(ModuleViewRegistration(
             viewMode: .volumeArchiveDetail,
             title: "Archive Details",
-            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                guard let tui = tui else { return }
+            renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                guard let self = self, let tui = tui else { return }
                 await self.renderVolumeArchiveDetailView(
                     tui: tui,
                     screen: screen,
@@ -583,6 +583,7 @@ final class VolumesModule: OpenStackModule {
             width: width,
             height: height,
             form: tui.volumeManagementForm,
+            selectedIndex: tui.viewCoordinator.selectedIndex,
             resourceNameCache: tui.resourceNameCache
         )
     }

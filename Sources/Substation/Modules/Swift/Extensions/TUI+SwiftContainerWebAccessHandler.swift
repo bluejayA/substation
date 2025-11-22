@@ -5,12 +5,23 @@ import Darwin
 import Glibc
 #endif
 import OSClient
+import SwiftNCurses
+import MemoryKit
 
-// MARK: - Swift Container Web Access Form Handler
+// MARK: - Swift Container Web Access Input Handler (Universal Pattern)
 
+@MainActor
 extension TUI {
 
-    /// Handle input for Swift container web access form using the universal handler
+    /// Handles input for the Swift container web access form using the universal handler
+    ///
+    /// This handler manages the container web access form which allows users to enable
+    /// or disable public web access for a Swift storage container. When enabled, the
+    /// container's contents become accessible via HTTP.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftContainerWebAccessInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Get local references to avoid actor-isolated inout issues
         var localFormState = swiftContainerWebAccessFormState
@@ -83,5 +94,6 @@ extension TUI {
 
 // MARK: - SwiftContainerWebAccessForm Protocol Conformance
 
-// SwiftContainerWebAccessForm already has all required methods
+// SwiftContainerWebAccessForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftContainerWebAccessForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

@@ -14,6 +14,25 @@ import MemoryKit
 @MainActor
 extension TUI {
 
+    /// Handle input for security group server management view
+    ///
+    /// Processes keyboard input for managing security group attachments to servers.
+    /// Supports dual-mode operation (attach/detach), server selection, and batch operations.
+    ///
+    /// **Mode Switching:**
+    /// - TAB toggles between attach and detach modes
+    /// - Mode change clears selections and resets position
+    ///
+    /// **Supported Keys:**
+    /// - UP/DOWN: Navigate server list
+    /// - SPACE: Toggle server selection
+    /// - TAB: Switch between attach/detach modes
+    /// - ENTER: Execute batch operation
+    /// - ESC: Cancel and return to security groups
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSecurityGroupServerManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
         guard viewCoordinator.currentView == .securityGroupServerManagement else { return }
 
@@ -69,6 +88,16 @@ extension TUI {
                     self.statusMessage = "Switched to \(self.selectionManager.attachmentMode == .attach ? "ATTACH" : "DETACH") mode"
                     return true
                 }
+
+                // Handle ESC to cancel
+                if ch == Int32(27) {
+                    self.selectionManager.selectedServers.removeAll()
+                    self.selectionManager.attachedServerIds.removeAll()
+                    self.changeView(to: .securityGroups, resetSelection: false)
+                    self.statusMessage = "Server management cancelled"
+                    return true
+                }
+
                 return false
             }
         )

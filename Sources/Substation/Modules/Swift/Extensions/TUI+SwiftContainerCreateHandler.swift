@@ -6,13 +6,22 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
 
 // MARK: - Swift Container Create Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for SwiftContainer create form using the universal handler
+    /// Handles input for the Swift container create form using the universal handler
+    ///
+    /// This handler manages the container creation form which allows users to specify
+    /// a name for the new Swift storage container. It uses the UniversalFormInputHandler
+    /// for consistent form navigation and input handling.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftContainerCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Get local references to avoid actor-isolated inout issues
         var localFormState = swiftContainerCreateFormState
@@ -71,5 +80,6 @@ extension TUI {
 
 // MARK: - SwiftContainerCreateForm Protocol Conformance
 
-// SwiftContainerCreateForm already has all required methods
+// SwiftContainerCreateForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftContainerCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

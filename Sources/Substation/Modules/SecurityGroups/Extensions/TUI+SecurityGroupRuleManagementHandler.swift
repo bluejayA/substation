@@ -15,7 +15,17 @@ import MemoryKit
 extension TUI {
 
     /// Handle input for Security Group Rule Management using universal handler pattern
-    /// This is a dual-mode handler: list navigation + form input
+    ///
+    /// This is a dual-mode handler that manages both list navigation and form input modes.
+    /// It properly tracks state transitions between modes to prevent state corruption.
+    ///
+    /// **Mode Behaviors:**
+    /// - List mode: Navigate rules with UP/DOWN, edit with SPACE, add with A/C, delete with DEL
+    /// - Form mode: Full form input handling via UniversalFormInputHandler
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code
+    ///   - screen: The ncurses screen pointer for rendering
     /// - Returns: Bool indicating if the input was handled (true) or should be passed to global handlers (false)
     internal func handleSecurityGroupRuleManagementInput(_ ch: Int32, screen: OpaquePointer?) async -> Bool {
         guard var form = securityGroupRuleManagementForm else { return false }
@@ -51,18 +61,23 @@ extension TUI {
             var localFormState = form.ruleCreateFormState
             var localFormAdapter = SecurityGroupRuleCreateFormAdapter(form: form.ruleCreateForm)
 
+            // Track if cancel was triggered to properly update state
+            var wasCancelled = false
+
             await universalFormInputHandler.handleInput(
                 ch,
                 screen: screen,
                 formState: &localFormState,
                 form: &localFormAdapter,
-                onSubmit: { formState, formAdapter in
-                    // Sync state before submission
-                    form.ruleCreateFormState = formState
-                    form.ruleCreateForm = formAdapter.form
+                onSubmit: { [self] formState, formAdapter in
+                    // Create a mutable copy for submission
+                    var mutableForm = form
+                    mutableForm.ruleCreateFormState = formState
+                    mutableForm.ruleCreateForm = formAdapter.form
+                    self.securityGroupRuleManagementForm = mutableForm
 
                     if let module = ModuleRegistry.shared.module(for: "securityGroups") as? SecurityGroupsModule {
-                        if form.shouldShowCreateForm() {
+                        if mutableForm.shouldShowCreateForm() {
                             await module.createSecurityGroupRule(screen: screen)
                         } else {
                             await module.updateSecurityGroupRule(screen: screen)
@@ -70,20 +85,29 @@ extension TUI {
                     }
                 },
                 onCancel: {
-                    form.returnToListMode()
+                    wasCancelled = true
                 }
             )
 
-            // Update form with changes
+            // Handle cancel by returning to list mode
+            if wasCancelled {
+                form.returnToListMode()
+                securityGroupRuleManagementForm = form
+                await self.draw(screen: screen)
+                return true
+            }
+
+            // Update form with changes from input handler
             form.ruleCreateFormState = localFormState
             form.ruleCreateForm = localFormAdapter.form
 
-            // Rebuild formState after changes
+            // Rebuild formState after changes, preserving active field state
+            let currentActiveFieldId = localFormState.getActiveFieldId()
             form.ruleCreateFormState = FormBuilderState(fields: form.ruleCreateForm.buildFields(
                 selectedFieldId: form.ruleCreateFormState.getCurrentFieldId(),
-                activeFieldId: nil,
+                activeFieldId: currentActiveFieldId,
                 formState: form.ruleCreateFormState
-            ))
+            ), preservingStateFrom: form.ruleCreateFormState)
 
             securityGroupRuleManagementForm = form
             return true  // Form mode handles all input
@@ -93,16 +117,32 @@ extension TUI {
         return false  // Input not handled
     }
 
-    /// Handle list-specific input keys
+    /// Handle list-specific input keys for security group rule management
+    ///
+    /// Processes keyboard input when in list mode for rule navigation and actions.
+    /// This method handles mode transitions and delegates to module actions.
+    ///
+    /// **Supported Keys:**
+    /// - A/C: Enter create mode for new rule
+    /// - SPACE: Enter edit mode for selected rule
+    /// - DELETE/BACKSPACE: Delete selected rule
+    /// - ESC: Return to security groups list
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code
+    ///   - screen: The ncurses screen pointer for rendering
+    ///   - form: The management form (inout for state updates)
     /// - Returns: Bool indicating if the input was handled
     private func handleSecurityGroupRuleListInput(_ ch: Int32, screen: OpaquePointer?, form: inout SecurityGroupRuleManagementForm) async -> Bool {
         switch ch {
         case Int32(65), Int32(67): // A or C - Add/Create new rule
             form.enterCreateMode()
+            await self.draw(screen: screen)
             return true
 
         case Int32(32): // SPACE - Edit selected rule
             form.enterEditMode()
+            await self.draw(screen: screen)
             return true
 
         case Int32(127), Int32(330): // DELETE - Delete selected rule

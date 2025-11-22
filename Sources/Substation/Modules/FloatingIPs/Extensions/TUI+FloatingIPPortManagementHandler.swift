@@ -1,14 +1,29 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 import struct OSClient.FloatingIP
 import struct OSClient.Port
 import OSClient
 import SwiftNCurses
+import MemoryKit
 
-// MARK: - Floating IP Port Management Input Handling
+// MARK: - Floating IP Port Management Input Handler
 
 @MainActor
 extension TUI {
 
+    /// Handles input for the Floating IP port management view
+    ///
+    /// This handler manages the port attachment/detachment interface for floating IPs.
+    /// It uses the FormInputHandler pattern for list-based management views with
+    /// toggle selection and mode switching between attach and detach operations.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleFloatingIPPortManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
         guard viewCoordinator.currentView == .floatingIPPortManagement else { return }
 

@@ -6,11 +6,21 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
+
+// MARK: - Swift Object Metadata Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Swift object metadata form using the universal handler
+    /// Handles input for the Swift object metadata form using the universal handler
+    ///
+    /// This handler manages the object metadata form which allows users to update
+    /// metadata (such as content type) for a single Swift storage object.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftObjectMetadataInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Get local references to avoid actor-isolated inout issues
         var localFormState = swiftObjectMetadataFormState
@@ -77,5 +87,6 @@ extension TUI {
 
 // MARK: - SwiftObjectMetadataForm Protocol Conformance
 
-// SwiftObjectMetadataForm already has all required methods
+// SwiftObjectMetadataForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftObjectMetadataForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

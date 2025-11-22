@@ -6,11 +6,22 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
+
+// MARK: - Swift Object Download Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Swift object download form using the universal handler
+    /// Handles input for the Swift object download form using the universal handler
+    ///
+    /// This handler manages the object download form which allows users to specify
+    /// a destination path for downloading Swift storage objects. It uses the
+    /// UniversalFormInputHandler for consistent form navigation and input handling.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftObjectDownloadInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Get local references to avoid actor-isolated inout issues
         var localFormState = swiftObjectDownloadFormState
@@ -126,5 +137,6 @@ extension TUI {
 
 // MARK: - SwiftObjectDownloadForm Protocol Conformance
 
-// SwiftObjectDownloadForm already has all required methods
+// SwiftObjectDownloadForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftObjectDownloadForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

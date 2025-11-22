@@ -17,11 +17,24 @@ final class SwiftBackgroundOperation: Identifiable {
     var filesCompleted: Int
     var filesTotal: Int
     var error: String?
+    /// Task for the main operation
     var task: Task<Void, Never>?
+    /// Task for upload operations
     var uploadTask: Task<Void, Never>?
 
     // Resource bulk operation fields
     let resourceType: String?
+
+    // MARK: - Deinitialization
+
+    /// Clean up Task references when the operation is deallocated
+    ///
+    /// Cancels any running tasks to prevent memory leaks and ensure
+    /// proper resource cleanup when the operation is no longer needed.
+    deinit {
+        task?.cancel()
+        uploadTask?.cancel()
+    }
     var itemsTotal: Int
     var itemsCompleted: Int
     var itemsFailed: Int

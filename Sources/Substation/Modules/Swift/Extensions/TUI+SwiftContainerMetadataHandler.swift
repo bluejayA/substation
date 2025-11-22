@@ -6,11 +6,21 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
+
+// MARK: - Swift Container Metadata Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Swift container metadata form using the universal handler
+    /// Handles input for the Swift container metadata form using the universal handler
+    ///
+    /// This handler manages the container metadata form which allows users to update
+    /// ACLs (read/write access controls) for a Swift storage container.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftContainerMetadataInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Get local references to avoid actor-isolated inout issues
         var localFormState = swiftContainerMetadataFormState
@@ -85,5 +95,6 @@ extension TUI {
 
 // MARK: - SwiftContainerMetadataForm Protocol Conformance
 
-// SwiftContainerMetadataForm already has all required methods
+// SwiftContainerMetadataForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftContainerMetadataForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

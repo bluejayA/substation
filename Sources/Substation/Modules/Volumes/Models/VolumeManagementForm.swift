@@ -1,17 +1,44 @@
 import OSClient
 
+// MARK: - Volume Management Form
+//
+// This form manages the state for volume attachment operations.
+// It tracks available servers, pending attachments, and the current operation mode.
+// Navigation state (selectedIndex, scrollOffset) is managed by TUI.viewCoordinator.
+
+/// Form state for managing volume server attachments
+///
+/// This struct holds the data and state for the volume management view,
+/// which allows users to view current attachments and attach volumes to servers.
+/// Navigation index is managed externally by `TUI.viewCoordinator.selectedIndex`
+/// to integrate with the core navigation system.
 struct VolumeManagementForm {
+    /// The volume being managed
     var selectedVolume: Volume?
+
+    /// All available servers that can be attached to
     var availableServers: [Server] = []
-    var selectedResourceIndex: Int = 0
+
+    /// Current operation mode (view or attach)
     var selectedOperation: VolumeOperation = .view
-    var pendingAttachments: Set<String> = [] // Server IDs to attach volume to
+
+    /// Server IDs selected for pending attachment
+    var pendingAttachments: Set<String> = []
+
+    /// Loading state indicator
     var isLoading: Bool = false
+
+    /// Error message to display
     var errorMessage: String?
 
+    /// Available operations for volume management
     enum VolumeOperation: CaseIterable {
-        case view, attach
+        /// View current server attachments
+        case view
+        /// Attach volume to a server
+        case attach
 
+        /// Display title for the operation
         var title: String {
             switch self {
             case .view: return "View Current"
@@ -20,14 +47,24 @@ struct VolumeManagementForm {
         }
     }
 
+    /// Reset the form to its initial state
+    ///
+    /// Clears all pending attachments and resets to view mode.
+    /// Note: This does not reset viewCoordinator.selectedIndex which is managed externally.
     mutating func reset() {
-        selectedResourceIndex = 0
         selectedOperation = .view
         pendingAttachments.removeAll()
         isLoading = false
         errorMessage = nil
     }
 
+    /// Toggle server selection for attachment
+    ///
+    /// In attach mode, this toggles the server in the pending attachments set.
+    /// Only one server can be selected at a time due to OpenStack volume limitations.
+    /// In view mode, this operation is ignored.
+    ///
+    /// - Parameter serverID: The ID of the server to toggle
     mutating func toggleServer(_ serverID: String) {
         switch selectedOperation {
         case .attach:
@@ -43,6 +80,13 @@ struct VolumeManagementForm {
         }
     }
 
+    /// Check if a server is currently selected
+    ///
+    /// In attach mode, checks if server is in pending attachments.
+    /// In view mode, checks if server is currently attached to the volume.
+    ///
+    /// - Parameter serverID: The ID of the server to check
+    /// - Returns: True if the server is selected
     func isServerSelected(_ serverID: String) -> Bool {
         switch selectedOperation {
         case .attach:
@@ -53,10 +97,20 @@ struct VolumeManagementForm {
         }
     }
 
+    /// Check if a server currently has this volume attached
+    ///
+    /// - Parameter serverID: The ID of the server to check
+    /// - Returns: True if the volume is attached to the server
     func isServerCurrentlyAttached(_ serverID: String) -> Bool {
         return selectedVolume?.attachments?.contains { $0.serverId == serverID } ?? false
     }
 
+    /// Get servers available for attachment
+    ///
+    /// Returns all available servers if the volume is not attached.
+    /// Returns empty array if volume is already attached (OpenStack limitation).
+    ///
+    /// - Returns: Array of servers available for attachment
     func getAvailableServersForAttach() -> [Server] {
         guard let volume = selectedVolume else { return [] }
 
@@ -69,11 +123,19 @@ struct VolumeManagementForm {
         return []
     }
 
-
+    /// Check if there are pending changes to apply
+    ///
+    /// - Returns: True if there are servers selected for attachment
     func hasPendingChanges() -> Bool {
         return !pendingAttachments.isEmpty
     }
 
+    /// Get the current list of servers to display based on operation mode
+    ///
+    /// In view mode, returns servers that have the volume attached.
+    /// In attach mode, returns servers available for attachment.
+    ///
+    /// - Returns: Array of servers to display
     func getCurrentDisplayItems() -> [Server] {
         switch selectedOperation {
         case .view:
@@ -86,6 +148,9 @@ struct VolumeManagementForm {
         }
     }
 
+    /// Get a human-readable status string for the volume
+    ///
+    /// - Returns: Status string describing the volume's attachment state
     func getVolumeStatus() -> String {
         guard let volume = selectedVolume else { return "No volume selected" }
 
@@ -96,6 +161,9 @@ struct VolumeManagementForm {
         }
     }
 
+    /// Get attachment information for display
+    ///
+    /// - Returns: String describing current attachments, or nil if not attached
     func getAttachmentInfo() -> String? {
         guard let volume = selectedVolume, !(volume.attachments?.isEmpty ?? true) else { return nil }
 

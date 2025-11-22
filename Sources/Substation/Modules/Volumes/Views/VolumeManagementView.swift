@@ -1,6 +1,17 @@
 import OSClient
 import SwiftNCurses
 
+// MARK: - Volume Management View
+//
+// This view renders the volume attachment management interface.
+// It displays servers that can be attached to or detached from a volume,
+// with tabbed navigation between view and attach modes.
+
+/// View component for managing volume server attachments
+///
+/// Provides a tabbed interface for viewing current attachments and
+/// selecting servers to attach a volume to. Uses the core navigation
+/// system via viewCoordinator.selectedIndex for consistent behavior.
 struct VolumeManagementView {
     // Layout Constants
     private static let titleStartOffset: Int32 = 2
@@ -80,9 +91,25 @@ struct VolumeManagementView {
 
     // Enhanced Title Constants
     private static let manageTitlePrefix = "Manage Volume Attachments - "
+
+    /// Draw the volume management view
+    ///
+    /// Renders the volume attachment management interface with operation tabs,
+    /// server list, and action controls.
+    ///
+    /// - Parameters:
+    ///   - screen: The ncurses screen pointer
+    ///   - startRow: Starting row for rendering
+    ///   - startCol: Starting column for rendering
+    ///   - width: Available width for rendering
+    ///   - height: Available height for rendering
+    ///   - form: The volume management form state
+    ///   - selectedIndex: The currently selected index from viewCoordinator
+    ///   - resourceNameCache: Cache for resolving resource names
     @MainActor
     static func draw(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                     width: Int32, height: Int32, form: VolumeManagementForm,
+                    selectedIndex: Int,
                     resourceNameCache: ResourceNameCache) async {
 
         // Defensive bounds checking - prevent crashes on small screens
@@ -139,7 +166,7 @@ struct VolumeManagementView {
             components.append(Text(Self.loadingMessage).info())
         } else {
             // Server list components
-            let serverListComponents = createServerListComponents(form: form, volume: volume, height: height)
+            let serverListComponents = createServerListComponents(form: form, volume: volume, selectedIndex: selectedIndex, height: height)
             components.append(contentsOf: serverListComponents)
         }
 
@@ -156,7 +183,15 @@ struct VolumeManagementView {
 
     // MARK: - Component Creation Functions
 
-    private static func createServerListComponents(form: VolumeManagementForm, volume: Volume, height: Int32) -> [any Component] {
+    /// Create server list components for the management view
+    ///
+    /// - Parameters:
+    ///   - form: The volume management form state
+    ///   - volume: The volume being managed
+    ///   - selectedIndex: The currently selected index from viewCoordinator
+    ///   - height: Available height for the list
+    /// - Returns: Array of components for the server list
+    private static func createServerListComponents(form: VolumeManagementForm, volume: Volume, selectedIndex: Int, height: Int32) -> [any Component] {
         var components: [any Component] = []
 
         let displayServers = form.getCurrentDisplayItems()
@@ -210,7 +245,7 @@ struct VolumeManagementView {
         )
 
         // Clamp highlighted index to valid range
-        let safeHighlightedIndex = min(max(0, form.selectedResourceIndex), max(0, displayServers.count - 1))
+        let safeHighlightedIndex = min(max(0, selectedIndex), max(0, displayServers.count - 1))
 
         // Determine checkbox mode based on operation
         let checkboxMode: FormSelectorCheckboxMode = (form.selectedOperation == .attach && (volume.attachments?.isEmpty ?? true)) ? .multiSelect : .basic

@@ -82,8 +82,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swift,
                 title: "Swift Containers",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftContainerListView(
                         tui: tui,
                         screen: screen,
@@ -146,8 +146,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftContainerDetail,
                 title: "Container Details",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftContainerDetailView(
                         tui: tui,
                         screen: screen,
@@ -264,8 +264,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftObjectDetail,
                 title: "Object Details",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftObjectDetailView(
                         tui: tui,
                         screen: screen,
@@ -312,8 +312,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftContainerCreate,
                 title: "Create Container",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftContainerCreateView(
                         tui: tui,
                         screen: screen,
@@ -335,8 +335,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftObjectUpload,
                 title: "Upload Object",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftObjectUploadView(
                         tui: tui,
                         screen: screen,
@@ -358,8 +358,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftContainerDownload,
                 title: "Download Container",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftContainerDownloadView(
                         tui: tui,
                         screen: screen,
@@ -381,8 +381,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftObjectDownload,
                 title: "Download Object",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftObjectDownloadView(
                         tui: tui,
                         screen: screen,
@@ -404,8 +404,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftDirectoryDownload,
                 title: "Download Directory",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftDirectoryDownloadView(
                         tui: tui,
                         screen: screen,
@@ -427,8 +427,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftContainerMetadata,
                 title: "Set Container Metadata",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftContainerMetadataView(
                         tui: tui,
                         screen: screen,
@@ -450,8 +450,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftObjectMetadata,
                 title: "Set Object Metadata",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftObjectMetadataView(
                         tui: tui,
                         screen: screen,
@@ -473,8 +473,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftDirectoryMetadata,
                 title: "Set Directory Metadata",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftDirectoryMetadataView(
                         tui: tui,
                         screen: screen,
@@ -496,8 +496,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftContainerWebAccess,
                 title: "Manage Web Access",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftContainerWebAccessView(
                         tui: tui,
                         screen: screen,
@@ -519,8 +519,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftBackgroundOperations,
                 title: "Background Operations",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftBackgroundOperationsView(
                         tui: tui,
                         screen: screen,
@@ -649,8 +649,8 @@ final class SwiftModule: OpenStackModule {
             ModuleViewRegistration(
                 viewMode: .swiftBackgroundOperationDetail,
                 title: "Operation Details",
-                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
-                    guard let tui = tui else { return }
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
                     await self.renderSwiftBackgroundOperationDetailView(
                         tui: tui,
                         screen: screen,

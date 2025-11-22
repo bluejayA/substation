@@ -6,12 +6,23 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
+
+// MARK: - Swift Container Download Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Swift Container Download form using universal handler
-    /// This form requires confirmation modal before starting background download
+    /// Handles input for the Swift container download form using the universal handler
+    ///
+    /// This handler manages the container download form which allows users to specify
+    /// a destination path for downloading all objects in a Swift storage container.
+    /// It supports concurrent downloads with progress tracking and includes a confirmation
+    /// modal when the destination directory already exists.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftContainerDownloadInput(_ ch: Int32, screen: OpaquePointer?) async {
         var localFormState = swiftContainerDownloadFormState
         var localForm = swiftContainerDownloadForm
@@ -351,5 +362,6 @@ extension TUI {
 
 // MARK: - SwiftContainerDownloadForm Protocol Conformance
 
-// SwiftContainerDownloadForm already conforms to all required protocols
+// SwiftContainerDownloadForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftContainerDownloadForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

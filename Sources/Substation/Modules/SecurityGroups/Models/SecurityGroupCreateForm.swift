@@ -1,9 +1,14 @@
 import Foundation
 import OSClient
 
+/// Field enumeration for security group create form
+///
+/// Defines the available fields in the security group creation form
+/// with their display titles.
 enum SecurityGroupCreateField: CaseIterable {
     case name, description
 
+    /// Display title for the field
     var title: String {
         switch self {
         case .name: return "Security Group Name"
@@ -12,11 +17,28 @@ enum SecurityGroupCreateField: CaseIterable {
     }
 }
 
+/// Form model for creating new security groups
+///
+/// This form handles the creation of new OpenStack security groups
+/// with name and optional description fields. It integrates with
+/// the UniversalFormInputHandler through the FormViewModel protocol.
+///
+/// **Usage:**
+/// 1. Initialize form with default values
+/// 2. Use with FormBuilder for rendering
+/// 3. Validate with validateForm() before submission
 struct SecurityGroupCreateForm: FormViewModel {
+    /// Name of the security group (required)
     var securityGroupName: String = ""
+
+    /// Description of the security group (optional)
     var securityGroupDescription: String = ""
+
+    /// Currently selected field for navigation
     var currentField: SecurityGroupCreateField = .name
-    var fieldEditMode: Bool = false // true when editing a text field
+
+    /// True when editing a text field, false when navigating
+    var fieldEditMode: Bool = false
 
     mutating func nextField() {
         let fields = SecurityGroupCreateField.allCases
@@ -243,7 +265,43 @@ struct SecurityGroupCreateForm: FormViewModel {
 
 // MARK: - Field Identifiers
 
+/// Field identifiers for security group create form
 enum SecurityGroupCreateFieldId: String {
     case name = "security-group-name"
     case description = "security-group-description"
+}
+
+// MARK: - FormStateUpdatable Extension
+
+extension SecurityGroupCreateForm {
+    /// Update form values from FormBuilderState
+    ///
+    /// Synchronizes the form's values with the current state of the FormBuilder,
+    /// including text field values and navigation state.
+    ///
+    /// - Parameter formState: The FormBuilderState to update from
+    mutating func updateFromFormState(_ formState: FormBuilderState) {
+        // Extract values from form state and update form
+        if let name = formState.getTextValue(SecurityGroupCreateFieldId.name.rawValue) {
+            self.securityGroupName = name
+        }
+        if let description = formState.getTextValue(SecurityGroupCreateFieldId.description.rawValue) {
+            self.securityGroupDescription = description
+        }
+
+        // Update navigation state based on current field
+        if let currentFieldId = formState.getCurrentFieldId() {
+            switch currentFieldId {
+            case SecurityGroupCreateFieldId.name.rawValue:
+                self.currentField = .name
+            case SecurityGroupCreateFieldId.description.rawValue:
+                self.currentField = .description
+            default:
+                break
+            }
+        }
+
+        // Update edit mode based on active field
+        self.fieldEditMode = formState.isCurrentFieldActive()
+    }
 }

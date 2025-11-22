@@ -50,12 +50,23 @@ extension TUI {
 // MARK: - NetworkCreateForm Protocol Conformance Adapters
 
 extension NetworkCreateForm {
-    /// Adapter for FormStateRebuildable - makes formState required instead of optional
+    /// Adapter for FormStateRebuildable protocol
+    ///
+    /// This adapter wraps the form's buildFields method to make the formState parameter
+    /// required instead of optional, conforming to the FormStateRebuildable protocol.
+    ///
+    /// - Parameters:
+    ///   - selectedFieldId: The ID of the currently selected field
+    ///   - activeFieldId: The ID of the currently active (editing) field
+    ///   - formState: The current form builder state
+    /// - Returns: Array of form fields for rendering
     func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
         // Call the original method with named parameter to avoid recursion
         return buildFields(selectedFieldId: selectedFieldId, activeFieldId: activeFieldId, formState: Optional(formState))
     }
 }
 
-// Declare protocol conformance after adapters
+// MARK: - Protocol Conformance Declaration
+// NetworkCreateForm naturally conforms to FormStateUpdatable and FormValidatable
+// through its existing methods. FormStateRebuildable is satisfied via the adapter above.
 extension NetworkCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

@@ -6,11 +6,22 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
+
+// MARK: - Swift Directory Download Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Swift Directory Download form using universal handler
+    /// Handles input for the Swift directory download form using the universal handler
+    ///
+    /// This handler manages the directory download form which allows users to specify
+    /// a destination path for downloading all objects within a Swift storage directory.
+    /// It supports concurrent downloads with progress tracking.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftDirectoryDownloadInput(_ ch: Int32, screen: OpaquePointer?) async {
         var localFormState = swiftDirectoryDownloadFormState
         var localForm = swiftDirectoryDownloadForm
@@ -366,6 +377,7 @@ extension TUI {
 
 // MARK: - SwiftDirectoryDownloadForm Protocol Conformance
 
-// SwiftDirectoryDownloadForm already conforms to all required protocols
+// SwiftDirectoryDownloadForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftDirectoryDownloadForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}
 

@@ -6,11 +6,22 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
+
+// MARK: - Swift Object Upload Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Swift Object Upload form using universal handler
+    /// Handles input for the Swift object upload form using the universal handler
+    ///
+    /// This handler manages the object upload form which allows users to specify
+    /// a file path, prefix, and options for uploading files to Swift storage.
+    /// It supports both single file and directory uploads with concurrent processing.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftObjectUploadInput(_ ch: Int32, screen: OpaquePointer?) async {
         var localFormState = swiftObjectUploadFormState
         var localForm = swiftObjectUploadForm
@@ -589,6 +600,7 @@ extension TUI {
 
 // MARK: - SwiftObjectUploadForm Protocol Conformance
 
-// SwiftObjectUploadForm already conforms to all required protocols
+// SwiftObjectUploadForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftObjectUploadForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}
 

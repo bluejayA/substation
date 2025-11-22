@@ -6,11 +6,22 @@ import Glibc
 #endif
 import OSClient
 import SwiftNCurses
+import MemoryKit
+
+// MARK: - Swift Directory Metadata Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Swift directory metadata form using the universal handler
+    /// Handles input for the Swift directory metadata form using the universal handler
+    ///
+    /// This handler manages the directory metadata form which allows users to update
+    /// metadata (such as content type) for all objects within a Swift storage directory.
+    /// It supports both recursive and non-recursive updates.
+    ///
+    /// - Parameters:
+    ///   - ch: The input character code from ncurses
+    ///   - screen: The ncurses screen pointer for rendering
     internal func handleSwiftDirectoryMetadataInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Get local references to avoid actor-isolated inout issues
         var localFormState = swiftDirectoryMetadataFormState
@@ -118,5 +129,6 @@ extension TUI {
 
 // MARK: - SwiftDirectoryMetadataForm Protocol Conformance
 
-// SwiftDirectoryMetadataForm already has all required methods
+// SwiftDirectoryMetadataForm naturally conforms to all three protocols through its
+// existing methods: updateFromFormState, buildFields, and validateForm
 extension SwiftDirectoryMetadataForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}
