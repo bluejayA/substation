@@ -219,8 +219,7 @@ final class SecurityGroupsModule: OpenStackModule {
             },
             inputHandler: { [weak tui] ch, screen in
                 guard let tui = tui else { return false }
-                await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
-                return true
+                return await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
             },
             category: .network
         ))
@@ -266,7 +265,7 @@ final class SecurityGroupsModule: OpenStackModule {
             viewMode: .securityGroupRuleManagement,
             handler: { [weak tui] ch, screen in
                 guard let tui = tui else { return }
-                await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
+                _ = await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
             },
             formValidation: { [weak tui] in
                 guard let tui = tui else { return false }

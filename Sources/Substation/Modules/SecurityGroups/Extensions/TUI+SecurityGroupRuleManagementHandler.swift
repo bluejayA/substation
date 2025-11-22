@@ -16,8 +16,9 @@ extension TUI {
 
     /// Handle input for Security Group Rule Management using universal handler pattern
     /// This is a dual-mode handler: list navigation + form input
-    internal func handleSecurityGroupRuleManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
-        guard var form = securityGroupRuleManagementForm else { return }
+    /// - Returns: Bool indicating if the input was handled (true) or should be passed to global handlers (false)
+    internal func handleSecurityGroupRuleManagementInput(_ ch: Int32, screen: OpaquePointer?) async -> Bool {
+        guard var form = securityGroupRuleManagementForm else { return false }
 
         // Mode detection: list vs form
         if form.shouldShowRulesList() {
@@ -27,22 +28,22 @@ extension TUI {
                 form.moveSelectionUp()
                 securityGroupRuleManagementForm = form
                 await self.draw(screen: screen)
-                return
+                return true
 
             case Int32(258), Int32(106):  // DOWN arrow or j
                 form.moveSelectionDown()
                 securityGroupRuleManagementForm = form
                 await self.draw(screen: screen)
-                return
+                return true
 
             default:
                 break
             }
 
             // Handle list-specific keys (A/C for add, SPACE for edit, DELETE, ESC)
-            await handleSecurityGroupRuleListInput(ch, screen: screen, form: &form)
+            let handled = await handleSecurityGroupRuleListInput(ch, screen: screen, form: &form)
             securityGroupRuleManagementForm = form
-            return
+            return handled
         }
 
         // FORM MODE: Use universal handler
@@ -83,30 +84,39 @@ extension TUI {
                 activeFieldId: nil,
                 formState: form.ruleCreateFormState
             ))
+
+            securityGroupRuleManagementForm = form
+            return true  // Form mode handles all input
         }
 
         securityGroupRuleManagementForm = form
+        return false  // Input not handled
     }
 
     /// Handle list-specific input keys
-    private func handleSecurityGroupRuleListInput(_ ch: Int32, screen: OpaquePointer?, form: inout SecurityGroupRuleManagementForm) async {
+    /// - Returns: Bool indicating if the input was handled
+    private func handleSecurityGroupRuleListInput(_ ch: Int32, screen: OpaquePointer?, form: inout SecurityGroupRuleManagementForm) async -> Bool {
         switch ch {
         case Int32(65), Int32(67): // A or C - Add/Create new rule
             form.enterCreateMode()
+            return true
 
         case Int32(32): // SPACE - Edit selected rule
             form.enterEditMode()
+            return true
 
         case Int32(127), Int32(330): // DELETE - Delete selected rule
             if let module = ModuleRegistry.shared.module(for: "securityGroups") as? SecurityGroupsModule {
                 await module.deleteSecurityGroupRule(screen: screen)
             }
+            return true
 
         case Int32(27): // ESC - Back to security groups
             self.changeView(to: .securityGroups, resetSelection: false)
+            return true
 
         default:
-            break
+            return false  // Allow global handlers (? for help, : for commands)
         }
     }
 }

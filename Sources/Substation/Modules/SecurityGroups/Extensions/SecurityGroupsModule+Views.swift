@@ -248,8 +248,7 @@ extension SecurityGroupsModule {
                 },
                 inputHandler: { [weak tui] ch, screen in
                     guard let tui = tui else { return false }
-                    await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
-                    return true
+                    return await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
                 }
             )
         ]

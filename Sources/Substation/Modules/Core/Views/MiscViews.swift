@@ -488,13 +488,19 @@ struct MiscViews {
         case .securityGroupRuleManagement:
             return [
                 generalNavigation,
-                ("Security Group Rules", [
-                    "SHIFT-C: Create new rule",
-                    "SHIFT-E: Edit existing rule",
-                    "TAB: Switch between rule management modes",
-                    "SPACE: Toggle rule selection",
-                    "DELETE: Delete selected rules",
-                    "ENTER: Apply rule changes",
+                ("Security Group Rule Management", [
+                    "A or C: Create new rule",
+                    "SPACE: Edit selected rule",
+                    "DELETE: Delete selected rule",
+                    "ESC: Return to security groups list",
+                    "Rules control inbound/outbound traffic",
+                ]),
+                ("Rule Properties", [
+                    "Direction: Ingress (inbound) or Egress (outbound)",
+                    "Protocol: TCP, UDP, ICMP, or Any",
+                    "Port Range: Single port or range (e.g., 80, 443, 8000-9000)",
+                    "Remote: IP prefix (CIDR) or security group reference",
+                    "Ethertype: IPv4 or IPv6",
                 ]),
                 generalActions
             ]
