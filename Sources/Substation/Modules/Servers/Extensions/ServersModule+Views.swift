@@ -170,23 +170,14 @@ extension ServersModule {
                 category: .compute,
                 renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                     guard let tui = tui else { return }
-                    guard let server = tui.viewCoordinator.selectedResource as? Server else {
-                        let surface = SwiftNCurses.surface(from: screen)
-                        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-                        await SwiftNCurses.render(Text("No server selected").error(), on: surface, in: bounds)
-                        return
-                    }
-                    await ServerViews.drawServerDetail(
+                    await ServerCreateView.drawServerCreateForm(
                         screen: screen,
                         startRow: startRow,
                         startCol: startCol,
                         width: width,
                         height: height,
-                        server: server,
-                        cachedVolumes: tui.cacheManager.cachedVolumes,
-                        cachedFlavors: tui.cacheManager.cachedFlavors,
-                        cachedImages: tui.cacheManager.cachedImages,
-                        scrollOffset: tui.viewCoordinator.detailScrollOffset
+                        form: tui.serverCreateForm,
+                        formState: tui.serverCreateFormState
                     )
                 },
                 inputHandler: { [weak tui] ch, screen in

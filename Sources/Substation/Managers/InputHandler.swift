@@ -39,18 +39,6 @@ class InputHandler {
             return
         }
 
-        // Check ViewRegistry for module-handled views first
-        // This allows modules to handle their own input through registered handlers
-        if let registration = ViewRegistry.shared.handler(for: tui.viewCoordinator.currentView),
-           let inputHandler = registration.inputHandler {
-            // Module has registered an input handler - delegate to it
-            // The module's handler will call back to specific TUI handlers as needed
-            let handled = await inputHandler(ch, screen)
-            if handled {
-                return
-            }
-        }
-
         // Check ViewRegistry metadata for dynamic input routing
         let viewId = tui.viewCoordinator.currentView.viewIdentifierId
         if let metadata = ViewRegistry.shared.metadata(forId: viewId),

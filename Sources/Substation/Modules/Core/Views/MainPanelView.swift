@@ -270,14 +270,7 @@ struct MainPanelView {
         screen: OpaquePointer?, tui: TUI, mainStartRow: Int32, mainStartCol: Int32,
         mainWidth: Int32, mainHeight: Int32
     ) async {
-        // PRIORITY 1: Check if a module handles this view via ViewRegistry
-        if FeatureFlags.useModuleSystem, let registration = ViewRegistry.shared.handler(for: tui.viewCoordinator.currentView) {
-            Logger.shared.logDebug("Rendering \(tui.viewCoordinator.currentView) via module: \(registration.title)")
-            await registration.renderHandler(screen, mainStartRow, mainStartCol, mainWidth, mainHeight)
-            return
-        }
-
-        // PRIORITY 2: Check ViewRegistry metadata for dynamic view routing
+        // Check ViewRegistry metadata for dynamic view routing
         let viewId = tui.viewCoordinator.currentView.viewIdentifierId
         if let metadata = ViewRegistry.shared.metadata(forId: viewId) {
             Logger.shared.logDebug("Rendering \(viewId) via metadata: \(metadata.title)")
