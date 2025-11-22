@@ -63,7 +63,23 @@ extension CoreViews {
                         tui: tui
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, _ in
+                    guard let tui = tui else { return false }
+
+                    switch ch {
+                    case Int32(259), Int32(107):  // UP arrow or k - Scroll quotas up
+                        tui.viewCoordinator.quotaScrollOffset = max(tui.viewCoordinator.quotaScrollOffset - 1, 0)
+                        return true
+
+                    case Int32(258), Int32(106):  // DOWN arrow or j - Scroll quotas down
+                        let maxQuotaScroll = tui.calculateMaxQuotaScrollOffset()
+                        tui.viewCoordinator.quotaScrollOffset = min(tui.viewCoordinator.quotaScrollOffset + 1, maxQuotaScroll)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
 
             // MARK: - Health Dashboard View
@@ -89,7 +105,20 @@ extension CoreViews {
                         performanceMonitor: tui.renderCoordinator.performanceMonitor
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, _ in
+                    guard let tui = tui else { return false }
+                    let telemetryActor = await tui.getTelemetryActor()
+                    let handled = await HealthDashboardView.handleInput(
+                        ch,
+                        navigationState: tui.viewCoordinator.healthDashboardNavState,
+                        telemetryActor: telemetryActor,
+                        dataManager: tui.dataManager
+                    )
+                    if handled {
+                        tui.forceRedraw()
+                    }
+                    return handled
+                }
             ),
 
             // MARK: - Health Dashboard Service Detail View
@@ -296,7 +325,9 @@ extension CoreViews {
                         tui: tui
                     )
                 },
-                inputHandler: nil
+                inputHandler: { ch, _ in
+                    return AdvancedSearchView.handleInput(ch)
+                }
             ),
 
             // MARK: - Performance Metrics View

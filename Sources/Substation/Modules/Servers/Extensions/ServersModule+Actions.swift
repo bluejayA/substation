@@ -583,6 +583,40 @@ extension ServersModule {
             tui.statusMessage = "Failed to get console URL for '\(serverName)': \(error.localizedDescription)"
         }
     }
+
+    /// Open the server console URL in the default browser
+    ///
+    /// Opens the noVNC console URL in the system's default web browser.
+    /// Only supports noVNC console types.
+    internal func openConsoleInBrowser() async {
+        guard let tui = tui else { return }
+
+        if let console = tui.viewCoordinator.selectedResource as? RemoteConsole {
+            if console.type.lowercased() == "novnc" {
+                await openURLInBrowser(console.url)
+                tui.statusMessage = "Opening console in default browser..."
+            } else {
+                tui.statusMessage = "Browser opening only supported for noVNC consoles"
+            }
+        }
+    }
+
+    /// Open a URL in the system's default browser
+    ///
+    /// - Parameter url: The URL to open
+    private func openURLInBrowser(_ url: String) async {
+        #if os(macOS)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [url]
+        try? process.run()
+        #elseif os(Linux)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xdg-open")
+        process.arguments = [url]
+        try? process.run()
+        #endif
+    }
 }
 
 // MARK: - Server Resize Action Implementations

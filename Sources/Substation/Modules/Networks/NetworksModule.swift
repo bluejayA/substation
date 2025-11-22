@@ -153,7 +153,19 @@ final class NetworksModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: nil, // Default system handles input
+            inputHandler: { [weak self, weak tui] ch, screen in
+                guard let self = self, let tui = tui else { return false }
+
+                switch ch {
+                case Int32(77):  // M - Manage network interface attachment to servers
+                    Logger.shared.logUserAction("manage_network_to_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.manageNetworkToServers(screen: screen)
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .network
         ))
 
@@ -568,12 +580,21 @@ extension NetworksModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".networkCreate")
+            tui.changeView(to: createMode)
+            tui.networkCreateForm = NetworkCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.networkCreateFormState = FormBuilderState(fields: tui.networkCreateForm.buildFields(
+                selectedFieldId: nil,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            ))
+
+            tui.statusMessage = "Create new network"
+            return true
         case .delete:
             await deleteNetwork(screen: screen)
             return true
@@ -583,5 +604,30 @@ extension NetworksModule: ActionProvider {
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected networks
+    ///
+    /// Creates a batch operation for deleting multiple networks at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of network IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for network bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .networkBulkDelete(networkIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected network
+    ///
+    /// Returns the network ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Network ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterNetworks(tui.cacheManager.cachedNetworks, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

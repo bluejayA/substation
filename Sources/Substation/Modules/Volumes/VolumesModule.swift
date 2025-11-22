@@ -129,7 +129,29 @@ final class VolumesModule: OpenStackModule {
                     height: height
                 )
             },
-            inputHandler: nil,
+            inputHandler: { [weak self, weak tui] ch, screen in
+                guard let self = self, let tui = tui else { return false }
+
+                switch ch {
+                case Int32(66):  // B - Create backup
+                    Logger.shared.logUserAction("create_volume_backup", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.createVolumeBackup(screen: screen)
+                    return true
+
+                case Int32(80):  // P - Create snapshot
+                    Logger.shared.logUserAction("create_volume_snapshot", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.createVolumeSnapshot(screen: screen)
+                    return true
+
+                case Int32(77):  // M - Manage volume attachment
+                    Logger.shared.logUserAction("manage_volume", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.attachVolumeToServers(screen: screen)
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .storage
         ))
 
@@ -243,7 +265,18 @@ final class VolumesModule: OpenStackModule {
                     height: height
                 )
             },
-            inputHandler: nil,
+            inputHandler: { [weak self] ch, screen in
+                guard let self = self else { return false }
+
+                switch ch {
+                case Int32(127), Int32(330):  // DELETE/BACKSPACE - Delete archive
+                    await self.deleteVolumeArchive(screen: screen)
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .storage
         ))
 
@@ -815,12 +848,29 @@ extension VolumesModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".volumeCreate")
+            tui.changeView(to: createMode)
+
+            // Load all snapshots for volume creation
+            _ = await loadAllVolumeSnapshots()
+
+            // Initialize form with cached data
+            tui.volumeCreateForm = VolumeCreateForm()
+            tui.volumeCreateForm.images = tui.cacheManager.cachedImages
+            tui.volumeCreateForm.snapshots = tui.cacheManager.cachedVolumeSnapshots
+            tui.volumeCreateForm.volumeTypes = tui.cacheManager.cachedVolumeTypes
+
+            // Initialize form state
+            tui.volumeCreateFormState = FormBuilderState(fields: tui.volumeCreateForm.buildFields(
+                selectedFieldId: nil,
+                activeFieldId: nil,
+                formState: nil
+            ))
+
+            tui.statusMessage = "Create new volume"
+            return true
         case .delete:
             await deleteVolume(screen: screen)
             return true
@@ -830,5 +880,30 @@ extension VolumesModule: ActionProvider {
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected volumes
+    ///
+    /// Creates a batch operation for deleting multiple volumes at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of volume IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for volume bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .volumeBulkDelete(volumeIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected volume
+    ///
+    /// Returns the volume ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Volume ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterVolumes(tui.cacheManager.cachedVolumes, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

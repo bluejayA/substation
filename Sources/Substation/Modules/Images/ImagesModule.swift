@@ -294,4 +294,29 @@ extension ImagesModule: ActionProvider {
             return false
         }
     }
+
+    /// Get the bulk delete operation for selected images
+    ///
+    /// Creates a batch operation for deleting multiple images at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of image IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for image bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .imageBulkDelete(imageIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected image
+    ///
+    /// Returns the image ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Image ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterImages(tui.cacheManager.cachedImages, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
+    }
 }

@@ -537,3 +537,364 @@ extension SwiftModule {
         ])
     }
 }
+
+// MARK: - Swift View Input Handlers
+
+extension SwiftModule {
+    /// Handle web access management for the selected container
+    ///
+    /// - Parameter screen: The ncurses screen pointer
+    internal func handleManageContainerWebAccess(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+        guard tui.viewCoordinator.currentView == .swift else { return }
+
+        guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+            tui.statusMessage = "No container selected"
+            return
+        }
+
+        let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+        guard let containerName = container.name else {
+            tui.statusMessage = "Invalid container"
+            return
+        }
+
+        // Fetch current metadata to check web access status
+        do {
+            let metadata = try await tui.client.swift.getContainerMetadata(containerName: containerName)
+
+            // Get Swift storage URL
+            let swiftEndpoint: String
+            do {
+                swiftEndpoint = try await tui.client.coreClient.getEndpoint(for: "object-store")
+            } catch {
+                tui.statusMessage = "Could not determine Swift endpoint"
+                return
+            }
+
+            // Load form with metadata and endpoint
+            tui.swiftContainerWebAccessForm.loadFromMetadata(metadata, swiftEndpoint: swiftEndpoint)
+
+            // Initialize form state
+            tui.swiftContainerWebAccessFormState = FormBuilderState(
+                fields: tui.swiftContainerWebAccessForm.buildFields(
+                    selectedFieldId: "webAccessEnabled",
+                    activeFieldId: nil,
+                    formState: FormBuilderState(fields: [])
+                )
+            )
+
+            // Navigate to web access form
+            tui.changeView(to: .swiftContainerWebAccess, resetSelection: false)
+        } catch {
+            tui.statusMessage = "Failed to load web access form: \(error.localizedDescription)"
+        }
+    }
+
+    /// Handle metadata management for the selected container
+    ///
+    /// - Parameter screen: The ncurses screen pointer
+    internal func handleManageContainerMetadata(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+        guard tui.viewCoordinator.currentView == .swift else { return }
+
+        guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+            tui.statusMessage = "No container selected"
+            return
+        }
+
+        let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+        guard let containerName = container.name else {
+            tui.statusMessage = "Invalid container"
+            return
+        }
+
+        // Fetch current metadata
+        do {
+            let metadata = try await tui.client.swift.getContainerMetadata(containerName: containerName)
+
+            // Initialize form with current metadata
+            tui.swiftContainerMetadataForm = SwiftContainerMetadataForm()
+            tui.swiftContainerMetadataForm.loadFromMetadata(metadata)
+
+            // Initialize form state
+            tui.swiftContainerMetadataFormState = FormBuilderState(
+                fields: tui.swiftContainerMetadataForm.buildFields(
+                    selectedFieldId: "readACL",
+                    activeFieldId: nil,
+                    formState: FormBuilderState(fields: [])
+                )
+            )
+
+            // Navigate to metadata form
+            tui.changeView(to: .swiftContainerMetadata, resetSelection: false)
+        } catch {
+            tui.statusMessage = "Failed to load metadata: \(error.localizedDescription)"
+        }
+    }
+
+    /// Handle metadata management for tree items (objects and directories)
+    ///
+    /// - Parameter screen: The ncurses screen pointer
+    internal func handleSwiftTreeItemMetadata(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+        guard tui.viewCoordinator.currentView == .swiftContainerDetail else { return }
+
+        guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
+            tui.statusMessage = "No container selected"
+            return
+        }
+
+        guard let allObjects = tui.cacheManager.cachedSwiftObjects else {
+            tui.statusMessage = "No objects loaded"
+            return
+        }
+
+        // Build tree from objects
+        let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
+        let treeItems = SwiftTreeItem.buildTree(from: allObjects, currentPath: currentPath)
+
+        guard tui.viewCoordinator.selectedIndex < treeItems.count else {
+            tui.statusMessage = "No item selected"
+            return
+        }
+
+        let selectedItem = treeItems[tui.viewCoordinator.selectedIndex]
+
+        switch selectedItem {
+        case .object(let object):
+            // Handle individual object metadata
+            guard let objectName = object.name else {
+                tui.statusMessage = "Invalid object"
+                return
+            }
+
+            // Fetch current metadata
+            do {
+                let metadata = try await tui.client.swift.getObjectMetadata(
+                    containerName: containerName,
+                    objectName: objectName
+                )
+
+                // Initialize form with current metadata
+                tui.swiftObjectMetadataForm = SwiftObjectMetadataForm()
+                tui.swiftObjectMetadataForm.loadFromMetadata(containerName: containerName, metadata: metadata)
+
+                // Initialize form state
+                tui.swiftObjectMetadataFormState = FormBuilderState(
+                    fields: tui.swiftObjectMetadataForm.buildFields(
+                        selectedFieldId: "contentType",
+                        activeFieldId: nil,
+                        formState: FormBuilderState(fields: [])
+                    )
+                )
+
+                // Navigate to metadata form
+                tui.changeView(to: .swiftObjectMetadata, resetSelection: false)
+            } catch {
+                tui.statusMessage = "Failed to load metadata: \(error.localizedDescription)"
+            }
+
+        case .directory(let name, _, _):
+            // Handle directory metadata (bulk update)
+            let fullDirectoryPath = currentPath + name + "/"
+
+            // Initialize directory metadata form
+            tui.swiftDirectoryMetadataForm = SwiftDirectoryMetadataForm()
+            tui.swiftDirectoryMetadataForm.initializeForDirectory(
+                containerName: containerName,
+                directoryPath: fullDirectoryPath
+            )
+
+            // Initialize form state
+            tui.swiftDirectoryMetadataFormState = FormBuilderState(
+                fields: tui.swiftDirectoryMetadataForm.buildFields(
+                    selectedFieldId: "contentType",
+                    activeFieldId: nil,
+                    formState: FormBuilderState(fields: [])
+                )
+            )
+
+            // Navigate to directory metadata form
+            tui.changeView(to: .swiftDirectoryMetadata, resetSelection: false)
+        }
+    }
+
+    /// Handle upload object to container
+    ///
+    /// - Parameter screen: The ncurses screen pointer
+    internal func handleUploadObjectToContainer(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        let containerName: String
+
+        if tui.viewCoordinator.currentView == .swift {
+            // Called from container list - get selected container
+            guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+                tui.statusMessage = "No container selected"
+                return
+            }
+
+            let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+            guard let name = container.name else {
+                tui.statusMessage = "Invalid container"
+                return
+            }
+            containerName = name
+
+        } else if tui.viewCoordinator.currentView == .swiftContainerDetail {
+            // Called from inside a container - use current container from navigation state
+            guard let currentContainer = tui.viewCoordinator.swiftNavState.currentContainer else {
+                tui.statusMessage = "No container context"
+                return
+            }
+            containerName = currentContainer
+
+        } else {
+            tui.statusMessage = "Upload not available from this view"
+            return
+        }
+
+        // Initialize upload form
+        tui.swiftObjectUploadForm = SwiftObjectUploadForm()
+        tui.swiftObjectUploadForm.containerName = containerName
+
+        // Initialize form state
+        tui.swiftObjectUploadFormState = FormBuilderState(
+            fields: tui.swiftObjectUploadForm.buildFields(
+                selectedFieldId: "filePath",
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            )
+        )
+
+        // Navigate to upload form
+        tui.changeView(to: .swiftObjectUpload, resetSelection: false)
+    }
+
+    /// Handle download container
+    ///
+    /// - Parameter screen: The ncurses screen pointer
+    internal func handleDownloadContainer(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+        guard tui.viewCoordinator.currentView == .swift else { return }
+
+        guard tui.viewCoordinator.selectedIndex < tui.cacheManager.cachedSwiftContainers.count else {
+            tui.statusMessage = "No container selected"
+            return
+        }
+
+        let container = tui.cacheManager.cachedSwiftContainers[tui.viewCoordinator.selectedIndex]
+        guard let containerName = container.name else {
+            tui.statusMessage = "Invalid container"
+            return
+        }
+
+        // Initialize download form
+        tui.swiftContainerDownloadForm = SwiftContainerDownloadForm()
+        tui.swiftContainerDownloadForm.containerName = containerName
+        tui.swiftContainerDownloadForm.destinationPath = "./\(containerName)/"
+
+        // Initialize form state
+        tui.swiftContainerDownloadFormState = FormBuilderState(
+            fields: tui.swiftContainerDownloadForm.buildFields(
+                selectedFieldId: "destinationPath",
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            )
+        )
+
+        // Navigate to download form
+        tui.changeView(to: .swiftContainerDownload, resetSelection: false)
+    }
+
+    /// Handle download object or directory
+    ///
+    /// - Parameter screen: The ncurses screen pointer
+    internal func handleDownloadObject(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+        guard tui.viewCoordinator.currentView == .swiftContainerDetail else { return }
+
+        guard let containerName = tui.viewCoordinator.swiftNavState.currentContainer else {
+            tui.statusMessage = "No container selected"
+            return
+        }
+
+        guard let allObjects = tui.cacheManager.cachedSwiftObjects else {
+            tui.statusMessage = "No objects loaded"
+            return
+        }
+
+        // Build tree from objects
+        let currentPath = tui.viewCoordinator.swiftNavState.currentPathString
+        let treeItems = SwiftTreeItem.buildTree(from: allObjects, currentPath: currentPath)
+
+        // Apply search filter if present
+        let filteredItems = SwiftTreeItem.filterItems(treeItems, query: tui.searchQuery?.isEmpty ?? true ? nil : tui.searchQuery)
+
+        guard tui.viewCoordinator.selectedIndex < filteredItems.count else {
+            tui.statusMessage = "No item selected"
+            return
+        }
+
+        let selectedItem = filteredItems[tui.viewCoordinator.selectedIndex]
+
+        switch selectedItem {
+        case .object(let object):
+            // Download single object
+            guard let objectName = object.name else {
+                tui.statusMessage = "Invalid object"
+                return
+            }
+
+            // Extract just the filename from the full path
+            let fileName: String
+            if let lastSlash = objectName.lastIndex(of: "/") {
+                fileName = String(objectName[objectName.index(after: lastSlash)...])
+            } else {
+                fileName = objectName
+            }
+
+            // Initialize download form
+            tui.swiftObjectDownloadForm = SwiftObjectDownloadForm()
+            tui.swiftObjectDownloadForm.containerName = containerName
+            tui.swiftObjectDownloadForm.objectName = objectName
+            tui.swiftObjectDownloadForm.destinationPath = "./\(fileName)"
+
+            // Initialize form state
+            tui.swiftObjectDownloadFormState = FormBuilderState(
+                fields: tui.swiftObjectDownloadForm.buildFields(
+                    selectedFieldId: "destinationPath",
+                    activeFieldId: nil,
+                    formState: FormBuilderState(fields: [])
+                )
+            )
+
+            // Navigate to object download form
+            tui.changeView(to: .swiftObjectDownload, resetSelection: false)
+
+        case .directory(let directoryName, _, _):
+            // Download entire directory
+            let fullDirectoryPath = currentPath + directoryName + "/"
+
+            // Initialize directory download form
+            tui.swiftDirectoryDownloadForm = SwiftDirectoryDownloadForm()
+            tui.swiftDirectoryDownloadForm.containerName = containerName
+            tui.swiftDirectoryDownloadForm.directoryPath = fullDirectoryPath
+            tui.swiftDirectoryDownloadForm.destinationPath = "./\(directoryName)/"
+            tui.swiftDirectoryDownloadForm.preserveStructure = true
+
+            // Initialize form state
+            tui.swiftDirectoryDownloadFormState = FormBuilderState(
+                fields: tui.swiftDirectoryDownloadForm.buildFields(
+                    selectedFieldId: "destinationPath",
+                    activeFieldId: nil,
+                    formState: FormBuilderState(fields: [])
+                )
+            )
+
+            // Navigate to directory download form
+            tui.changeView(to: .swiftDirectoryDownload, resetSelection: false)
+        }
+    }
+}

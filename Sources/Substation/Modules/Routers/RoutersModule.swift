@@ -585,17 +585,55 @@ extension RoutersModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".routerCreate")
+            tui.changeView(to: createMode)
+            tui.routerCreateForm = RouterCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.routerCreateFormState = FormBuilderState(
+                fields: tui.routerCreateForm.buildFields(
+                    selectedFieldId: nil,
+                    activeFieldId: nil,
+                    formState: nil,
+                    availabilityZones: tui.cacheManager.cachedAvailabilityZones,
+                    externalNetworks: tui.cacheManager.cachedNetworks
+                )
+            )
+
+            tui.statusMessage = "Create new router"
+            return true
         case .delete:
             await deleteRouter(screen: screen)
             return true
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected routers
+    ///
+    /// Creates a batch operation for deleting multiple routers at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of router IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for router bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .routerBulkDelete(routerIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected router
+    ///
+    /// Returns the router ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Router ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterRouters(tui.cacheManager.cachedRouters, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

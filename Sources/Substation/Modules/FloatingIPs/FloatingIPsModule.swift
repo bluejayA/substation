@@ -123,7 +123,24 @@ final class FloatingIPsModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: nil, // Default system handles input
+            inputHandler: { [weak self, weak tui] ch, screen in
+                guard let self = self, let tui = tui else { return false }
+
+                switch ch {
+                case Int32(77):  // M - Manage server assignment
+                    Logger.shared.logUserAction("manage_floating_ip_server_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.manageFloatingIPServerAssignment(screen: screen)
+                    return true
+
+                case Int32(80):  // P - Manage port assignment
+                    Logger.shared.logUserAction("manage_floating_ip_port_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.manageFloatingIPPortAssignment(screen: screen)
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .network
         ))
 
@@ -345,12 +362,24 @@ extension FloatingIPsModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".floatingIPCreate")
+            tui.changeView(to: createMode)
+            tui.floatingIPCreateForm = FloatingIPCreateForm()
+            let externalNetworks = tui.cacheManager.cachedNetworks.filter { $0.external == true }
+
+            // Initialize FormBuilderState with form fields
+            tui.floatingIPCreateFormState = FormBuilderState(
+                fields: tui.floatingIPCreateForm.buildFields(
+                    externalNetworks: externalNetworks,
+                    subnets: tui.cacheManager.cachedSubnets,
+                    selectedFieldId: nil
+                )
+            )
+
+            tui.statusMessage = "Create new floating IP"
+            return true
         case .delete:
             await deleteFloatingIP(screen: screen)
             return true
@@ -360,5 +389,30 @@ extension FloatingIPsModule: ActionProvider {
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected floating IPs
+    ///
+    /// Creates a batch operation for deleting multiple floating IPs at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of floating IP IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for floating IP bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .floatingIPBulkDelete(floatingIPIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected floating IP
+    ///
+    /// Returns the floating IP ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Floating IP ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterFloatingIPs(tui.cacheManager.cachedFloatingIPs, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

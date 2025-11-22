@@ -325,17 +325,68 @@ extension BarbicanModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".barbicanSecretCreate")
+            tui.changeView(to: createMode)
+            tui.barbicanSecretCreateForm = BarbicanSecretCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.barbicanSecretCreateFormState = FormBuilderState(fields: tui.barbicanSecretCreateForm.buildFields(
+                selectedFieldId: BarbicanSecretCreateFieldId.name.rawValue,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            ))
+
+            tui.statusMessage = "Create new secret"
+            return true
         case .delete:
             await deleteSecret(screen: screen)
             return true
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected Barbican resources
+    ///
+    /// Creates a batch operation for deleting multiple secrets or volume backups at once.
+    /// The operation type depends on the current view context.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of resource IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        // Handle both barbican secrets and volume archives
+        if tui.viewCoordinator.currentView == .volumeArchives {
+            return .volumeBackupBulkDelete(backupIDs: Array(selectedIDs))
+        }
+        return .barbicanSecretBulkDelete(secretIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected Barbican resource
+    ///
+    /// Returns the resource ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list. Handles both secrets and volume
+    /// backups depending on the current view.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Resource ID string (secretRef for secrets, ID for backups), or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        if tui.viewCoordinator.currentView == .volumeArchives {
+            // Filter volume backups by name
+            let filtered = tui.searchQuery?.isEmpty ?? true ? tui.cacheManager.cachedVolumeBackups : tui.cacheManager.cachedVolumeBackups.filter { backup in
+                backup.name?.lowercased().contains(tui.searchQuery?.lowercased() ?? "") ?? false
+            }
+            guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+            return filtered[tui.viewCoordinator.selectedIndex].id
+        }
+        // Filter secrets by name
+        let filtered = tui.searchQuery?.isEmpty ?? true ? tui.cacheManager.cachedSecrets : tui.cacheManager.cachedSecrets.filter { secret in
+            secret.name?.lowercased().contains(tui.searchQuery?.lowercased() ?? "") ?? false
+        }
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].secretRef ?? ""
     }
 }

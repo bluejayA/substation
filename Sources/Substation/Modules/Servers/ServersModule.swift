@@ -163,7 +163,34 @@ final class ServersModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: nil, // Default system handles input
+            inputHandler: { [weak self, weak tui] ch, screen in
+                guard let self = self, let tui = tui else { return false }
+
+                switch ch {
+                case Int32(76):  // L - View server logs
+                    Logger.shared.logUserAction("view_server_logs", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.viewServerLogs(screen: screen)
+                    return true
+
+                case Int32(79):  // O - View server console
+                    Logger.shared.logUserAction("view_server_console", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.viewServerConsole(screen: screen)
+                    return true
+
+                case Int32(80):  // P - Create snapshot
+                    Logger.shared.logUserAction("create_snapshot", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.createServerSnapshot(screen: screen)
+                    return true
+
+                case Int32(90):  // Z - Resize server
+                    Logger.shared.logUserAction("resize_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.resizeServer(screen: screen)
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .compute
         ))
 
@@ -248,7 +275,19 @@ final class ServersModule: OpenStackModule {
                 let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                 await SwiftNCurses.render(Text("Console data not available").error(), on: surface, in: bounds)
             },
-            inputHandler: nil, // Default system handles input
+            inputHandler: { [weak self] ch, _ in
+                guard let self = self else { return false }
+
+                switch ch {
+                case Int32(79):  // O - Open console in browser
+                    Logger.shared.logUserAction("open_console_in_browser")
+                    await self.openConsoleInBrowser()
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .compute
         ))
 
@@ -669,12 +708,27 @@ extension ServersModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".serverCreate")
+            tui.changeView(to: createMode)
+
+            // Initialize form with cached data
+            var form = ServerCreateForm()
+            form.images = tui.cacheManager.cachedImages
+            form.volumes = tui.cacheManager.cachedVolumes
+            form.flavors = tui.cacheManager.cachedFlavors
+            form.networks = tui.cacheManager.cachedNetworks
+            form.securityGroups = tui.cacheManager.cachedSecurityGroups
+            form.keyPairs = tui.cacheManager.cachedKeyPairs
+            form.serverGroups = tui.cacheManager.cachedServerGroups
+            tui.serverCreateForm = form
+
+            // Initialize FormBuilderState with form fields
+            tui.serverCreateFormState = FormBuilderState(fields: form.buildFields(selectedFieldId: nil))
+
+            tui.statusMessage = "Create new server"
+            return true
         case .delete:
             await deleteServer(screen: screen)
             return true
@@ -690,5 +744,34 @@ extension ServersModule: ActionProvider {
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected servers
+    ///
+    /// Creates a batch operation for deleting multiple servers at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of server IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for server bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .serverBulkDelete(serverIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected server
+    ///
+    /// Returns the server ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Server ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterServers(
+            tui.cacheManager.cachedServers,
+            query: tui.searchQuery,
+            getServerIP: tui.resourceResolver.getServerIP
+        )
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

@@ -131,7 +131,19 @@ final class SecurityGroupsModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: nil, // Default system handles input
+            inputHandler: { [weak self, weak tui] ch, screen in
+                guard let self = self, let tui = tui else { return false }
+
+                switch ch {
+                case Int32(77):  // M - Manage security group rules
+                    Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.manageSecurityGroupRules(screen: screen)
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .network
         ))
 
@@ -404,12 +416,21 @@ extension SecurityGroupsModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".securityGroupCreate")
+            tui.changeView(to: createMode)
+            tui.securityGroupCreateForm = SecurityGroupCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.securityGroupCreateFormState = FormBuilderState(fields: tui.securityGroupCreateForm.buildFields(
+                selectedFieldId: nil,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            ))
+
+            tui.statusMessage = "Create new security group"
+            return true
         case .delete:
             await deleteSecurityGroup(screen: screen)
             return true
@@ -419,5 +440,30 @@ extension SecurityGroupsModule: ActionProvider {
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected security groups
+    ///
+    /// Creates a batch operation for deleting multiple security groups at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of security group IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for security group bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .securityGroupBulkDelete(securityGroupIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected security group
+    ///
+    /// Returns the security group ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Security group ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterSecurityGroups(tui.cacheManager.cachedSecurityGroups, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

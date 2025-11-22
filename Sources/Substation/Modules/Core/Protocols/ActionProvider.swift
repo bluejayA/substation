@@ -79,6 +79,26 @@ protocol ActionProvider: OpenStackModule {
     ///   - tui: The TUI instance for view changes and status updates
     /// - Returns: True if the action was handled
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool
+
+    /// Get the bulk delete operation for selected items
+    ///
+    /// Returns the appropriate BatchOperationType for bulk deleting the selected
+    /// resource IDs. Returns nil if bulk delete is not supported.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of resource IDs to delete
+    ///   - tui: The TUI instance for accessing additional context
+    /// - Returns: The batch operation type, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType?
+
+    /// Get the resource ID at the current selection index
+    ///
+    /// Returns the ID of the resource at the current selectedIndex,
+    /// accounting for any search filtering. Used for multi-select operations.
+    ///
+    /// - Parameter tui: The TUI instance for accessing selection state
+    /// - Returns: The resource ID, or empty string if no selection
+    func getSelectedResourceId(tui: TUI) -> String
 }
 
 /// Default implementations for ActionProvider
@@ -90,6 +110,12 @@ extension ActionProvider {
 
     /// Default nil create view mode (no create support)
     var createViewMode: ViewMode? { nil }
+
+    /// Default nil bulk delete operation (no bulk delete support)
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? { nil }
+
+    /// Default empty string for resource ID (no selection support)
+    func getSelectedResourceId(tui: TUI) -> String { "" }
 }
 
 // MARK: - Action Provider Registry

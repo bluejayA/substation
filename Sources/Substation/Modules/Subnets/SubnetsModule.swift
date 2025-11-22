@@ -157,7 +157,22 @@ final class SubnetsModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: nil,
+            inputHandler: { [weak tui] ch, screen in
+                guard let tui = tui else { return false }
+
+                switch ch {
+                case Int32(77):  // M - Manage subnet router attachment
+                    Logger.shared.logUserAction("manage_subnet_router", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    // Get the routers module to handle this
+                    if let module = ModuleRegistry.shared.module(for: "routers") as? RoutersModule {
+                        await module.manageSubnetRouterAttachment(screen: screen)
+                    }
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .network
         ))
 
@@ -647,12 +662,22 @@ extension SubnetsModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".subnetCreate")
+            tui.changeView(to: createMode)
+            tui.subnetCreateForm = SubnetCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.subnetCreateFormState = FormBuilderState(fields: tui.subnetCreateForm.buildFields(
+                selectedFieldId: nil,
+                activeFieldId: nil,
+                cachedNetworks: tui.cacheManager.cachedNetworks,
+                formState: FormBuilderState(fields: [])
+            ))
+
+            tui.statusMessage = "Create new subnet"
+            return true
         case .delete:
             await deleteSubnet(screen: screen)
             return true
@@ -662,5 +687,30 @@ extension SubnetsModule: ActionProvider {
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected subnets
+    ///
+    /// Creates a batch operation for deleting multiple subnets at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of subnet IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for subnet bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .subnetBulkDelete(subnetIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected subnet
+    ///
+    /// Returns the subnet ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Subnet ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterSubnets(tui.cacheManager.cachedSubnets, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

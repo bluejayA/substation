@@ -328,17 +328,53 @@ extension KeyPairsModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".keyPairCreate")
+            tui.changeView(to: createMode)
+            tui.keyPairCreateForm = KeyPairCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.keyPairCreateFormState = FormBuilderState(fields: tui.keyPairCreateForm.buildFields(
+                selectedFieldId: nil,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            ))
+
+            tui.statusMessage = "Create new key pair"
+            return true
         case .delete:
             await deleteKeyPair(screen: screen)
             return true
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected key pairs
+    ///
+    /// Creates a batch operation for deleting multiple key pairs at once.
+    /// Note: Key pairs are identified by name, not ID.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of key pair names to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for key pair bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .keyPairBulkDelete(keyPairNames: Array(selectedIDs))
+    }
+
+    /// Get the name of the currently selected key pair
+    ///
+    /// Returns the key pair name based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list. Note: Key pairs are identified
+    /// by name rather than ID.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Key pair name string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterKeyPairs(tui.cacheManager.cachedKeyPairs, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].name ?? ""
     }
 }

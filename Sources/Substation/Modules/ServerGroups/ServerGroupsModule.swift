@@ -300,18 +300,52 @@ extension ServerGroupsModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".serverGroupCreate")
+            tui.changeView(to: createMode)
+            tui.serverGroupCreateForm = ServerGroupCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.serverGroupCreateFormState = FormBuilderState(fields: tui.serverGroupCreateForm.buildFields(
+                selectedFieldId: nil,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            ))
+
+            tui.statusMessage = "Create new server group"
+            return true
         case .delete:
             await deleteServerGroup(screen: screen)
             return true
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected server groups
+    ///
+    /// Creates a batch operation for deleting multiple server groups at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of server group IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for server group bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .serverGroupBulkDelete(serverGroupIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected server group
+    ///
+    /// Returns the server group ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Server group ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterServerGroups(tui.cacheManager.cachedServerGroups, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }
 

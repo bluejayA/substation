@@ -70,12 +70,6 @@ final class NavigationInputHandler {
             return true
         }
 
-        // Dashboard quota scrolling
-        if tui.viewCoordinator.currentView == .dashboard {
-            tui.viewCoordinator.quotaScrollOffset = max(tui.viewCoordinator.quotaScrollOffset - 1, 0)
-            return true
-        }
-
         // Detail views
         if tui.viewCoordinator.currentView.isDetailView {
             tui.viewCoordinator.detailScrollOffset = max(tui.viewCoordinator.detailScrollOffset - 1, 0)
@@ -109,13 +103,6 @@ final class NavigationInputHandler {
         // Help/About views
         if tui.viewCoordinator.currentView == .help || tui.viewCoordinator.currentView == .about {
             tui.viewCoordinator.helpScrollOffset = min(tui.viewCoordinator.helpScrollOffset + 1, 50)
-            return true
-        }
-
-        // Dashboard quota scrolling
-        if tui.viewCoordinator.currentView == .dashboard {
-            let maxQuotaScroll = tui.calculateMaxQuotaScrollOffset()
-            tui.viewCoordinator.quotaScrollOffset = min(tui.viewCoordinator.quotaScrollOffset + 1, maxQuotaScroll)
             return true
         }
 
@@ -280,26 +267,9 @@ final class NavigationInputHandler {
         }
 
         // Priority 3: Return from detail views
+        // Note: Swift views handle ESC in their inputHandlers for hierarchical navigation and selection restoration
         if tui.viewCoordinator.currentView.isDetailView {
             Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: "\(tui.viewCoordinator.currentView.parentView)", details: ["action": "escape_detail"])
-
-            // Special handling for Swift object detail view
-            if tui.viewCoordinator.currentView == .swiftObjectDetail {
-                // Restore selection to the object that was opened
-                if let object = tui.viewCoordinator.selectedResource as? SwiftObject,
-                   let objectName = object.name,
-                   let objects = tui.cacheManager.cachedSwiftObjects,
-                   let index = objects.firstIndex(where: { $0.name == objectName }) {
-                    tui.viewCoordinator.selectedIndex = index
-                    // Ensure the selected item is visible in the viewport
-                    let visibleItems = Int(tui.screenRows) - 10
-                    if index < tui.viewCoordinator.scrollOffset {
-                        tui.viewCoordinator.scrollOffset = index
-                    } else if index >= tui.viewCoordinator.scrollOffset + visibleItems {
-                        tui.viewCoordinator.scrollOffset = max(0, index - visibleItems + 1)
-                    }
-                }
-            }
 
             // Special handling for health dashboard service detail
             if tui.viewCoordinator.currentView == .healthDashboardServiceDetail {
@@ -310,57 +280,6 @@ final class NavigationInputHandler {
             tui.changeView(to: tui.viewCoordinator.currentView.parentView, resetSelection: false)
             tui.viewCoordinator.selectedResource = nil
             return true
-        }
-
-        // Priority 3.5: Return from sub-list views (like Swift container objects with hierarchical navigation)
-        if tui.viewCoordinator.currentView == .swiftContainerDetail {
-            // Check if we can navigate up within the hierarchy
-            if tui.viewCoordinator.swiftNavState.canNavigateUp() && !tui.viewCoordinator.swiftNavState.isAtContainerRoot {
-                // Navigate up one directory level
-                Logger.shared.logUserAction("swift_navigate_up", details: [
-                    "fromPath": tui.viewCoordinator.swiftNavState.currentPathString,
-                    "depth": tui.viewCoordinator.swiftNavState.depth
-                ])
-
-                tui.viewCoordinator.swiftNavState.navigateUp()
-
-                // Reset selection to top
-                tui.viewCoordinator.selectedIndex = 0
-                tui.viewCoordinator.scrollOffset = 0
-
-                // Stay in the same view (swiftContainerDetail)
-                tui.markNeedsRedraw()
-
-                Logger.shared.logInfo("Navigated up to path: \(tui.viewCoordinator.swiftNavState.currentPathString)")
-                return true
-            } else {
-                // Navigate back to container list
-                Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".swift", details: [
-                    "action": "escape_container",
-                    "containerName": tui.viewCoordinator.swiftNavState.currentContainer ?? "unknown"
-                ])
-
-                // Restore selection to the container that was opened
-                if let containerName = tui.viewCoordinator.swiftNavState.currentContainer,
-                   let index = tui.cacheManager.cachedSwiftContainers.firstIndex(where: { $0.name == containerName }) {
-                    tui.viewCoordinator.selectedIndex = index
-                    // Ensure the selected item is visible in the viewport
-                    let visibleItems = Int(tui.screenRows) - 10
-                    if index < tui.viewCoordinator.scrollOffset {
-                        tui.viewCoordinator.scrollOffset = index
-                    } else if index >= tui.viewCoordinator.scrollOffset + visibleItems {
-                        tui.viewCoordinator.scrollOffset = max(0, index - visibleItems + 1)
-                    }
-                }
-
-                // Reset navigation state
-                tui.viewCoordinator.swiftNavState.reset()
-
-                // Return to container list view
-                tui.changeView(to: .swift, resetSelection: false)
-                tui.viewCoordinator.selectedResource = nil
-                return true
-            }
         }
 
         // Priority 4: Clear search query
@@ -530,26 +449,9 @@ final class NavigationInputHandler {
         }
 
         // Priority 3: Return from detail views
+        // Note: Swift views handle ESC in their inputHandlers for hierarchical navigation and selection restoration
         if tui.viewCoordinator.currentView.isDetailView {
             Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: "\(tui.viewCoordinator.currentView.parentView)", details: ["action": "escape_detail"])
-
-            // Special handling for Swift object detail view
-            if tui.viewCoordinator.currentView == .swiftObjectDetail {
-                // Restore selection to the object that was opened
-                if let object = tui.viewCoordinator.selectedResource as? SwiftObject,
-                   let objectName = object.name,
-                   let objects = tui.cacheManager.cachedSwiftObjects,
-                   let index = objects.firstIndex(where: { $0.name == objectName }) {
-                    tui.viewCoordinator.selectedIndex = index
-                    // Ensure the selected item is visible in the viewport
-                    let visibleItems = Int(tui.screenRows) - 10
-                    if index < tui.viewCoordinator.scrollOffset {
-                        tui.viewCoordinator.scrollOffset = index
-                    } else if index >= tui.viewCoordinator.scrollOffset + visibleItems {
-                        tui.viewCoordinator.scrollOffset = max(0, index - visibleItems + 1)
-                    }
-                }
-            }
 
             // Special handling for health dashboard service detail
             if tui.viewCoordinator.currentView == .healthDashboardServiceDetail {
@@ -562,57 +464,6 @@ final class NavigationInputHandler {
             return true
         }
 
-        // Priority 3.5: Return from sub-list views (like Swift container objects with hierarchical navigation)
-        if tui.viewCoordinator.currentView == .swiftContainerDetail {
-            // Check if we can navigate up within the hierarchy
-            if tui.viewCoordinator.swiftNavState.canNavigateUp() && !tui.viewCoordinator.swiftNavState.isAtContainerRoot {
-                // Navigate up one directory level
-                Logger.shared.logUserAction("swift_navigate_up", details: [
-                    "fromPath": tui.viewCoordinator.swiftNavState.currentPathString,
-                    "depth": tui.viewCoordinator.swiftNavState.depth
-                ])
-
-                tui.viewCoordinator.swiftNavState.navigateUp()
-
-                // Reset selection to top
-                tui.viewCoordinator.selectedIndex = 0
-                tui.viewCoordinator.scrollOffset = 0
-
-                // Stay in the same view (swiftContainerDetail)
-                tui.markNeedsRedraw()
-
-                Logger.shared.logInfo("Navigated up to path: \(tui.viewCoordinator.swiftNavState.currentPathString)")
-                return true
-            } else {
-                // Navigate back to container list
-                Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".swift", details: [
-                    "action": "escape_container",
-                    "containerName": tui.viewCoordinator.swiftNavState.currentContainer ?? "unknown"
-                ])
-
-                // Restore selection to the container that was opened
-                if let containerName = tui.viewCoordinator.swiftNavState.currentContainer,
-                   let index = tui.cacheManager.cachedSwiftContainers.firstIndex(where: { $0.name == containerName }) {
-                    tui.viewCoordinator.selectedIndex = index
-                    // Ensure the selected item is visible in the viewport
-                    let visibleItems = Int(tui.screenRows) - 10
-                    if index < tui.viewCoordinator.scrollOffset {
-                        tui.viewCoordinator.scrollOffset = index
-                    } else if index >= tui.viewCoordinator.scrollOffset + visibleItems {
-                        tui.viewCoordinator.scrollOffset = max(0, index - visibleItems + 1)
-                    }
-                }
-
-                // Reset navigation state
-                tui.viewCoordinator.swiftNavState.reset()
-
-                // Return to container list view
-                tui.changeView(to: .swift, resetSelection: false)
-                tui.viewCoordinator.selectedResource = nil
-                return true
-            }
-        }
-
         // Priority 4: Clear search query
         if tui.searchQuery != nil {
             Logger.shared.logUserAction("search_cleared_via_escape", details: ["previousQuery": tui.searchQuery ?? ""])
@@ -622,5 +473,144 @@ final class NavigationInputHandler {
 
         // Not handled - let caller handle it
         return false
+    }
+
+    // MARK: - Global Input Handling
+
+    /// Handle global keys that work the same everywhere (CTRL-C, ?, @, A, CTRL-X, SPACEBAR)
+    /// Returns true if the input was handled, false if it should be passed to other handlers
+    func handleGlobalInput(_ ch: Int32, screen: OpaquePointer?) async -> Bool {
+        guard let tui = tui else { return false }
+
+        switch ch {
+        case Int32(3):  // CTRL-C - Universal quit
+            Logger.shared.logUserAction("quit_application")
+            tui.running = false
+            return true
+
+        case Int32(24):  // CTRL-X - Toggle multi-select mode
+            if !tui.viewCoordinator.currentView.isDetailView && tui.viewCoordinator.currentView.supportsMultiSelect {
+                Logger.shared.logUserAction("toggle_multi_select_mode", details: [
+                    "view": "\(tui.viewCoordinator.currentView)",
+                    "wasEnabled": tui.selectionManager.multiSelectMode
+                ])
+                return handleToggleMultiSelectMode()
+            }
+            return false
+
+        case Int32(63):  // ? - Show help
+            if tui.viewCoordinator.currentView != .help {
+                Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".help")
+                tui.viewCoordinator.helpScrollOffset = 0
+                tui.changeView(to: .help, resetSelection: false)
+                return true
+            }
+            return false
+
+        case Int32(64):  // @ - Show about page
+            if tui.viewCoordinator.currentView != .about {
+                Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".about")
+                tui.viewCoordinator.helpScrollOffset = 0
+                tui.changeView(to: .about, resetSelection: false)
+                return true
+            }
+            return false
+
+        case Int32(65):  // A - Cycle refresh interval
+            Logger.shared.logUserAction("cycle_refresh_interval", details: ["currentInterval": tui.refreshManager.baseRefreshInterval])
+            tui.cycleRefreshInterval()
+            return true
+
+        case Int32(32):  // SPACEBAR - Toggle selection or show details
+            return await handleSpacebar(screen: screen)
+
+        default:
+            return false
+        }
+    }
+
+    // MARK: - Multi-Select Mode
+
+    private func handleToggleMultiSelectMode() -> Bool {
+        guard let tui = tui else { return false }
+
+        tui.selectionManager.multiSelectMode.toggle()
+
+        if tui.selectionManager.multiSelectMode {
+            tui.statusMessage = "Multi-select mode enabled (CTRL-X to exit)"
+            Logger.shared.logUserAction("multi_select_mode_enabled", details: ["view": "\(tui.viewCoordinator.currentView)"])
+        } else {
+            tui.selectionManager.multiSelectedResourceIDs.removeAll()
+            tui.statusMessage = "Multi-select mode disabled"
+            Logger.shared.logUserAction("multi_select_mode_disabled", details: ["view": "\(tui.viewCoordinator.currentView)"])
+        }
+
+        return true
+    }
+
+    // MARK: - Spacebar Handling
+
+    private func handleSpacebar(screen: OpaquePointer?) async -> Bool {
+        guard let tui = tui else { return false }
+
+        // In multi-select mode, toggle item selection
+        if tui.selectionManager.multiSelectMode && !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logUserAction("toggle_multi_select_item", details: [
+                "view": "\(tui.viewCoordinator.currentView)",
+                "selectedIndex": tui.viewCoordinator.selectedIndex
+            ])
+            return await handleMultiSelectToggle()
+        }
+
+        // Not in detail view - open detail view
+        // NOTE: Module views handle SPACEBAR in their inputHandlers for view-specific navigation
+        if !tui.viewCoordinator.currentView.isDetailView {
+            Logger.shared.logUserAction("open_detail_view", details: [
+                "view": "\(tui.viewCoordinator.currentView)",
+                "selectedIndex": tui.viewCoordinator.selectedIndex
+            ])
+            tui.openDetailView()
+            return true
+        }
+
+        return false
+    }
+
+    private func handleMultiSelectToggle() async -> Bool {
+        guard let tui = tui else { return false }
+
+        let resourceId = getSelectedResourceId()
+        guard !resourceId.isEmpty else {
+            tui.statusMessage = "No item selected"
+            return true
+        }
+
+        if tui.selectionManager.multiSelectedResourceIDs.contains(resourceId) {
+            tui.selectionManager.multiSelectedResourceIDs.remove(resourceId)
+            Logger.shared.logUserAction("multi_select_item_deselected", details: [
+                "resourceId": resourceId,
+                "selectedCount": tui.selectionManager.multiSelectedResourceIDs.count
+            ])
+        } else {
+            tui.selectionManager.multiSelectedResourceIDs.insert(resourceId)
+            Logger.shared.logUserAction("multi_select_item_selected", details: [
+                "resourceId": resourceId,
+                "selectedCount": tui.selectionManager.multiSelectedResourceIDs.count
+            ])
+        }
+
+        tui.statusMessage = "\(tui.selectionManager.multiSelectedResourceIDs.count) item(s) selected"
+        return true
+    }
+
+    private func getSelectedResourceId() -> String {
+        guard let tui = tui else { return "" }
+
+        // Get resource ID from module provider
+        if let provider = ActionProviderRegistry.shared.provider(for: tui.viewCoordinator.currentView) {
+            return provider.getSelectedResourceId(tui: tui)
+        }
+
+        return ""
     }
 }

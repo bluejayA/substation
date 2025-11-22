@@ -154,7 +154,24 @@ final class PortsModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: nil, // Default system handles input
+            inputHandler: { [weak self, weak tui] ch, screen in
+                guard let self = self, let tui = tui else { return false }
+
+                switch ch {
+                case Int32(77):  // M - Manage server assignment
+                    Logger.shared.logUserAction("manage_port_server_assignment", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.managePortServerAssignment(screen: screen)
+                    return true
+
+                case Int32(69):  // E - Manage allowed address pairs
+                    Logger.shared.logUserAction("manage_port_allowed_address_pairs", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                    await self.managePortAllowedAddressPairs(screen: screen)
+                    return true
+
+                default:
+                    return false
+                }
+            },
             category: .network
         ))
 
@@ -584,12 +601,24 @@ extension PortsModule: ActionProvider {
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
         case .create:
-            if let createMode = createViewMode {
-                tui.changeView(to: createMode)
-                tui.statusMessage = "Opening create form..."
-                return true
-            }
-            return false
+            guard let createMode = createViewMode else { return false }
+
+            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".portCreate")
+            tui.changeView(to: createMode)
+            tui.portCreateForm = PortCreateForm()
+
+            // Initialize FormBuilderState with form fields
+            tui.portCreateFormState = FormBuilderState(fields: tui.portCreateForm.buildFields(
+                selectedFieldId: nil,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: []),
+                networks: tui.cacheManager.cachedNetworks,
+                securityGroups: tui.cacheManager.cachedSecurityGroups,
+                qosPolicies: tui.cacheManager.cachedQoSPolicies
+            ))
+
+            tui.statusMessage = "Create new port"
+            return true
         case .delete:
             await deletePort(screen: screen)
             return true
@@ -599,5 +628,30 @@ extension PortsModule: ActionProvider {
         default:
             return false
         }
+    }
+
+    /// Get the bulk delete operation for selected ports
+    ///
+    /// Creates a batch operation for deleting multiple ports at once.
+    ///
+    /// - Parameters:
+    ///   - selectedIDs: Set of port IDs to delete
+    ///   - tui: The TUI instance for state management
+    /// - Returns: BatchOperationType for port bulk delete, or nil if not supported
+    func getBulkDeleteOperation(selectedIDs: Set<String>, tui: TUI) -> BatchOperationType? {
+        return .portBulkDelete(portIDs: Array(selectedIDs))
+    }
+
+    /// Get the ID of the currently selected port
+    ///
+    /// Returns the port ID based on the current selection index, accounting for any
+    /// search filtering that may be applied to the list.
+    ///
+    /// - Parameter tui: The TUI instance for state management
+    /// - Returns: Port ID string, or empty string if no valid selection
+    func getSelectedResourceId(tui: TUI) -> String {
+        let filtered = FilterUtils.filterPorts(tui.cacheManager.cachedPorts, query: tui.searchQuery)
+        guard tui.viewCoordinator.selectedIndex < filtered.count else { return "" }
+        return filtered[tui.viewCoordinator.selectedIndex].id
     }
 }

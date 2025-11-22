@@ -22,6 +22,58 @@ enum ActionType: String {
     var commandName: String {
         return ":\(rawValue)"
     }
+
+    /// Map a keyboard key code to an ActionType
+    ///
+    /// This provides the centralized key-to-action mapping for the input system.
+    /// Returns nil if the key doesn't map to a standard action.
+    ///
+    /// - Parameter keyCode: The ncurses key code
+    /// - Returns: The corresponding ActionType, or nil
+    static func fromKeyCode(_ keyCode: Int32) -> ActionType? {
+        switch keyCode {
+        case Int32(67):  // C - Create
+            return .create
+        case Int32(127), Int32(330):  // DELETE/BACKSPACE - Delete
+            return .delete
+        case Int32(82):  // R - Restart
+            return .restart
+        case Int32(83):  // S - Start
+            return .start
+        case Int32(84):  // T - Stop
+            return .stop
+        default:
+            return nil
+        }
+    }
+
+    /// Get the keyboard shortcut hint for this action
+    ///
+    /// Returns a human-readable description of the keyboard shortcut.
+    var keyboardHint: String {
+        switch self {
+        case .create:
+            return "SHIFT+C"
+        case .delete:
+            return "DELETE"
+        case .start:
+            return "SHIFT+S"
+        case .stop:
+            return "SHIFT+T"
+        case .restart:
+            return "SHIFT+R"
+        case .refresh:
+            return ":refresh"
+        case .manage:
+            return "SHIFT+M"
+        case .clearCache:
+            return ":clear-cache"
+        case .reload:
+            return ":reload"
+        case .reloadAll:
+            return ":reload-all"
+        }
+    }
 }
 
 @MainActor
