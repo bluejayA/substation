@@ -39,7 +39,7 @@ extension TUI {
                 }
             },
             onCancel: {
-                self.changeView(to: .volumeBackupManagement, resetSelection: false)
+                self.changeView(to: .volumes, resetSelection: false)
             }
         )
 

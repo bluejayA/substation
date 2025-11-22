@@ -568,7 +568,7 @@ final class VolumesModule: OpenStackModule {
     }
 
     /// Render the volume management (attachment) view
-    private func renderVolumeManagementView(
+    func renderVolumeManagementView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -576,32 +576,19 @@ final class VolumesModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let volume = tui.viewCoordinator.selectedResource as? Volume else {
-            let surface = SwiftNCurses.surface(from: screen)
-            let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-            await SwiftNCurses.render(Text("No volume selected").error(), on: surface, in: bounds)
-            return
-        }
-
-        await VolumeViews.drawDetailedVolumeList(
+        await VolumeManagementView.draw(
             screen: screen,
             startRow: startRow,
             startCol: startCol,
             width: width,
             height: height,
-            cachedVolumes: [volume],
-            searchQuery: nil,
-            scrollOffset: 0,
-            selectedIndex: 0,
-            dataManager: nil,
-            virtualScrollManager: nil,
-            multiSelectMode: false,
-            selectedItems: []
+            form: tui.volumeManagementForm,
+            resourceNameCache: tui.resourceNameCache
         )
     }
 
     /// Render the volume snapshot management view
-    private func renderVolumeSnapshotManagementView(
+    func renderVolumeSnapshotManagementView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -621,7 +608,7 @@ final class VolumesModule: OpenStackModule {
     }
 
     /// Render the volume backup management view
-    private func renderVolumeBackupManagementView(
+    func renderVolumeBackupManagementView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -853,14 +840,15 @@ extension VolumesModule: ActionProvider {
             Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".volumeCreate")
             tui.changeView(to: createMode)
 
-            // Load all snapshots for volume creation
-            _ = await loadAllVolumeSnapshots()
+            // Load data for volume creation (use returned values directly due to async cache setter)
+            let snapshots = await loadAllVolumeSnapshots()
+            let volumeTypes = await loadVolumeTypes()
 
-            // Initialize form with cached data
+            // Initialize form with loaded data
             tui.volumeCreateForm = VolumeCreateForm()
             tui.volumeCreateForm.images = tui.cacheManager.cachedImages
-            tui.volumeCreateForm.snapshots = tui.cacheManager.cachedVolumeSnapshots
-            tui.volumeCreateForm.volumeTypes = tui.cacheManager.cachedVolumeTypes
+            tui.volumeCreateForm.snapshots = snapshots
+            tui.volumeCreateForm.volumeTypes = volumeTypes
 
             // Initialize form state
             tui.volumeCreateFormState = FormBuilderState(fields: tui.volumeCreateForm.buildFields(

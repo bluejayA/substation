@@ -199,6 +199,73 @@ extension VolumesModule {
         }
     }
 
+    /// Apply server volume operation (attach or detach)
+    ///
+    /// Executes the volume attach/detach operation using selectionManager state.
+    ///
+    /// - Parameter screen: The ncurses screen pointer
+    internal func applyServerVolumeOperation(screen: OpaquePointer?) async {
+        guard let tui = tui else { return }
+
+        guard let volume = tui.viewCoordinator.selectedResource as? Volume else {
+            tui.statusMessage = "No volume selected"
+            return
+        }
+
+        let selectedServerIds = tui.selectionManager.selectedServers
+        guard !selectedServerIds.isEmpty else {
+            tui.statusMessage = "No servers selected"
+            return
+        }
+
+        let volumeName = volume.name ?? "Unnamed Volume"
+        let mode = tui.selectionManager.attachmentMode
+        let operationName = mode == .attach ? "Attaching" : "Detaching"
+
+        tui.statusMessage = "\(operationName) volume '\(volumeName)' \(mode == .attach ? "to" : "from") \(selectedServerIds.count) server(s)..."
+        await tui.draw(screen: screen)
+
+        var successCount = 0
+        var failureCount = 0
+
+        for serverId in selectedServerIds {
+            do {
+                if mode == .attach {
+                    try await tui.client.attachVolume(volumeId: volume.id, serverId: serverId)
+                } else {
+                    try await tui.client.detachVolume(serverId: serverId, volumeId: volume.id)
+                }
+                successCount += 1
+            } catch {
+                failureCount += 1
+                Logger.shared.logError(
+                    "Failed to \(mode == .attach ? "attach" : "detach") volume",
+                    error: error,
+                    context: ["volumeId": volume.id, "serverId": serverId]
+                )
+            }
+        }
+
+        // Clear selections
+        tui.selectionManager.selectedServers.removeAll()
+
+        // Build status message
+        if failureCount == 0 {
+            let action = mode == .attach ? "attached to" : "detached from"
+            tui.statusMessage = "Volume '\(volumeName)' \(action) \(successCount) server(s) successfully"
+        } else if successCount == 0 {
+            let action = mode == .attach ? "attach" : "detach"
+            tui.statusMessage = "Failed to \(action) volume '\(volumeName)' to any servers"
+        } else {
+            let action = mode == .attach ? "attached to" : "detached from"
+            tui.statusMessage = "Volume '\(volumeName)' \(action) \(successCount) server(s), \(failureCount) failed"
+        }
+
+        // Refresh data and return to volumes view
+        tui.refreshAfterOperation()
+        tui.changeView(to: .volumes, resetSelection: false)
+    }
+
     /// Open volume management form for a specific operation
     ///
     /// Opens the volume management view for attach or view operations.
@@ -369,6 +436,13 @@ extension VolumesModule {
             )
             tui.volumeBackupManagementForm.availableBackups = []
         }
+
+        // Initialize form state with fields
+        tui.volumeBackupManagementFormState = FormBuilderState(fields: tui.volumeBackupManagementForm.buildFields(
+            selectedFieldId: nil,
+            activeFieldId: nil,
+            formState: nil
+        ))
 
         // Switch to the volume backup management view
         tui.statusMessage = "Creating backup for volume '\(volumeName)'"
@@ -714,6 +788,22 @@ extension VolumesModule {
         }
     }
 
+    /// Load all volume types and update cache
+    ///
+    /// - Returns: Array of volume types
+    internal func loadVolumeTypes() async -> [VolumeType] {
+        guard let tui = tui else { return [] }
+
+        do {
+            let volumeTypes = try await tui.client.listVolumeTypes()
+            tui.cacheManager.cachedVolumeTypes = volumeTypes
+            return volumeTypes
+        } catch {
+            Logger.shared.logError("Failed to load volume types", error: error)
+            return []
+        }
+    }
+
     // MARK: - Volume CRUD Operations
 
     /// Delete the currently selected volume
@@ -830,6 +920,13 @@ extension VolumesModule {
         tui.volumeSnapshotManagementForm.reset()
         tui.volumeSnapshotManagementForm.selectedVolume = selectedVolume
         tui.volumeSnapshotManagementForm.generateDefaultSnapshotName()
+
+        // Initialize form state with fields
+        tui.volumeSnapshotManagementFormState = FormBuilderState(fields: tui.volumeSnapshotManagementForm.buildFields(
+            selectedFieldId: nil,
+            activeFieldId: nil,
+            formState: nil
+        ))
 
         // Switch to the volume snapshot management view
         tui.changeView(to: .volumeSnapshotManagement, resetSelection: false)

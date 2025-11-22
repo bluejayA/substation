@@ -83,12 +83,14 @@ extension TUI {
                 volumeManagementForm.selectedOperation = operations[nextIndex]
                 volumeManagementForm.selectedResourceIndex = 0
             }
+            renderCoordinator.needsRedraw = true
 
         case Int32(32): // SPACE - Toggle server selection (only in attach mode)
             if volumeManagementForm.selectedOperation == .attach {
                 if volumeManagementForm.selectedResourceIndex < displayServers.count {
                     let selectedServer = displayServers[volumeManagementForm.selectedResourceIndex]
                     volumeManagementForm.toggleServer(selectedServer.id)
+                    renderCoordinator.needsRedraw = true
                 }
             }
 
@@ -113,7 +115,8 @@ extension TUI {
     // MARK: - ESC Handling
 
     private func handleVolumeManagementEscape() async -> Bool {
-        // Use centralized ESC handling
-        return await NavigationInputHandler.handleEscapeKey(tui: self)
+        // Return to volumes list
+        changeView(to: .volumes, resetSelection: false)
+        return true
     }
 }

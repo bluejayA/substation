@@ -116,7 +116,29 @@ extension VolumesModule {
                         height: height
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak self, weak tui] ch, screen in
+                    guard let self = self, let tui = tui else { return false }
+
+                    switch ch {
+                    case Int32(66):  // B - Create backup
+                        Logger.shared.logUserAction("create_volume_backup", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.createVolumeBackup(screen: screen)
+                        return true
+
+                    case Int32(80):  // P - Create snapshot
+                        Logger.shared.logUserAction("create_volume_snapshot", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.createVolumeSnapshot(screen: screen)
+                        return true
+
+                    case Int32(77):  // M - Manage volume attachment
+                        Logger.shared.logUserAction("manage_volume", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.attachVolumeToServers(screen: screen)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
 
             // Volume Detail View
@@ -240,7 +262,168 @@ extension VolumesModule {
                         )
                     }
                 },
-                inputHandler: nil
+                inputHandler: { [weak self, weak tui] ch, screen in
+                    guard let self = self, let tui = tui else { return false }
+
+                    // Get filtered servers based on current mode
+                    let servers = tui.cacheManager.cachedServers
+                    let attachedServerIds = tui.selectionManager.attachedServerIds
+                    let filteredServers: [Server]
+                    switch tui.selectionManager.attachmentMode {
+                    case .attach:
+                        filteredServers = servers.filter { !attachedServerIds.contains($0.id) }
+                    case .detach:
+                        filteredServers = servers.filter { attachedServerIds.contains($0.id) }
+                    }
+                    let maxIndex = max(0, filteredServers.count - 1)
+
+                    switch ch {
+                    case Int32(259), Int32(107):  // UP arrow or k
+                        if tui.viewCoordinator.selectedIndex > 0 {
+                            tui.viewCoordinator.selectedIndex -= 1
+                        }
+                        return true
+
+                    case Int32(258), Int32(106):  // DOWN arrow or j
+                        if tui.viewCoordinator.selectedIndex < maxIndex {
+                            tui.viewCoordinator.selectedIndex += 1
+                        }
+                        return true
+
+                    case Int32(338):  // PAGE_DOWN
+                        let pageSize = 10
+                        tui.viewCoordinator.selectedIndex = min(tui.viewCoordinator.selectedIndex + pageSize, maxIndex)
+                        return true
+
+                    case Int32(339):  // PAGE_UP
+                        let pageSize = 10
+                        tui.viewCoordinator.selectedIndex = max(tui.viewCoordinator.selectedIndex - pageSize, 0)
+                        return true
+
+                    case Int32(262):  // HOME
+                        tui.viewCoordinator.selectedIndex = 0
+                        return true
+
+                    case Int32(360):  // END
+                        tui.viewCoordinator.selectedIndex = maxIndex
+                        return true
+
+                    case Int32(32):  // SPACE - Toggle server selection
+                        if tui.viewCoordinator.selectedIndex < filteredServers.count {
+                            let server = filteredServers[tui.viewCoordinator.selectedIndex]
+                            if tui.selectionManager.selectedServers.contains(server.id) {
+                                tui.selectionManager.selectedServers.remove(server.id)
+                            } else {
+                                tui.selectionManager.selectedServers.insert(server.id)
+                            }
+                        }
+                        return true
+
+                    case Int32(84):  // T - Toggle attach/detach mode
+                        if tui.selectionManager.attachmentMode == .attach {
+                            tui.selectionManager.attachmentMode = .detach
+                            tui.statusMessage = "Switched to DETACH mode"
+                        } else {
+                            tui.selectionManager.attachmentMode = .attach
+                            tui.statusMessage = "Switched to ATTACH mode"
+                        }
+                        // Reset selection when switching modes
+                        tui.viewCoordinator.selectedIndex = 0
+                        tui.selectionManager.selectedServers.removeAll()
+                        return true
+
+                    case Int32(10), Int32(13):  // ENTER - Apply attachment/detachment
+                        if !tui.selectionManager.selectedServers.isEmpty {
+                            await self.applyServerVolumeOperation(screen: screen)
+                        }
+                        return true
+
+                    case Int32(27):  // ESC - Back to volumes
+                        tui.changeView(to: .volumes, resetSelection: false)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
+            ),
+
+            // Volume Management View
+            ViewMetadata(
+                identifier: Views.management,
+                title: "Manage Volume Attachments",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .storage,
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
+                    await self.renderVolumeManagementView(
+                        tui: tui,
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleVolumeManagementInput(ch, screen: screen)
+                    return true
+                }
+            ),
+
+            // Volume Snapshot Management View
+            ViewMetadata(
+                identifier: Views.snapshotManagement,
+                title: "Create Volume Snapshot",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .storage,
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
+                    await self.renderVolumeSnapshotManagementView(
+                        tui: tui,
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleVolumeSnapshotManagementInput(ch, screen: screen)
+                    return true
+                }
+            ),
+
+            // Volume Backup Management View
+            ViewMetadata(
+                identifier: Views.backupManagement,
+                title: "Create Volume Backup",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .storage,
+                renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
+                    guard let self = self, let tui = tui else { return }
+                    await self.renderVolumeBackupManagementView(
+                        tui: tui,
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleVolumeBackupManagementInput(ch, screen: screen)
+                    return true
+                }
             )
         ]
     }
