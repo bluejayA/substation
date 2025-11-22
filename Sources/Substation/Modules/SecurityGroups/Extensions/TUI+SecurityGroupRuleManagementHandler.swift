@@ -14,12 +14,6 @@ import MemoryKit
 @MainActor
 extension TUI {
 
-    var securityGroupRuleListNavigationContext: NavigationContext {
-        guard let form = securityGroupRuleManagementForm else { return .custom }
-        let ruleCount = form.securityGroup.securityGroupRules?.count ?? 0
-        return .list(maxIndex: max(0, ruleCount - 1))
-    }
-
     /// Handle input for Security Group Rule Management using universal handler pattern
     /// This is a dual-mode handler: list navigation + form input
     internal func handleSecurityGroupRuleManagementInput(_ ch: Int32, screen: OpaquePointer?) async {
@@ -27,12 +21,24 @@ extension TUI {
 
         // Mode detection: list vs form
         if form.shouldShowRulesList() {
-            // LIST MODE: Handle list navigation
-            let context = securityGroupRuleListNavigationContext
-            if await handleSecurityGroupRuleListNavigation(ch, context: context) {
+            // LIST MODE: Handle list navigation using form's own methods
+            switch ch {
+            case Int32(259), Int32(107):  // UP arrow or k
+                form.moveSelectionUp()
+                securityGroupRuleManagementForm = form
                 await self.draw(screen: screen)
                 return
+
+            case Int32(258), Int32(106):  // DOWN arrow or j
+                form.moveSelectionDown()
+                securityGroupRuleManagementForm = form
+                await self.draw(screen: screen)
+                return
+
+            default:
+                break
             }
+
             // Handle list-specific keys (A/C for add, SPACE for edit, DELETE, ESC)
             await handleSecurityGroupRuleListInput(ch, screen: screen, form: &form)
             securityGroupRuleManagementForm = form
@@ -80,16 +86,6 @@ extension TUI {
         }
 
         securityGroupRuleManagementForm = form
-    }
-
-    /// Handle common navigation for rule list
-    private func handleSecurityGroupRuleListNavigation(_ ch: Int32, context: NavigationContext) async -> Bool {
-        switch context {
-        case .list(let maxIndex):
-            return await NavigationInputHandler.handleListNavigation(ch, maxIndex: maxIndex, tui: self)
-        default:
-            return false
-        }
     }
 
     /// Handle list-specific input keys

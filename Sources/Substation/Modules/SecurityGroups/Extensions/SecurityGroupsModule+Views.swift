@@ -97,7 +97,19 @@ extension SecurityGroupsModule {
                         selectedItems: tui.selectionManager.multiSelectedResourceIDs
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak self, weak tui] ch, _ in
+                    guard let self = self, let tui = tui else { return false }
+
+                    switch ch {
+                    case Int32(77):  // M - Manage security group rules
+                        Logger.shared.logUserAction("manage_security_group_rules", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.manageSecurityGroupRules(screen: nil)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
 
             // Security Group Detail View
@@ -212,6 +224,33 @@ extension SecurityGroupsModule {
                     }
                 },
                 inputHandler: nil
+            ),
+
+            // Security Group Rule Management View
+            ViewMetadata(
+                identifier: Views.ruleManagement,
+                title: "Manage Security Group Rules",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .network,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await SecurityGroupViews.drawSecurityGroupRuleManagement(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        form: tui.securityGroupRuleManagementForm!,
+                        cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleSecurityGroupRuleManagementInput(ch, screen: screen)
+                    return true
+                }
             )
         ]
     }
