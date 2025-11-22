@@ -104,6 +104,10 @@ final class ServersModule: OpenStackModule {
         let dataProvider = ServersDataProvider(module: self, tui: tui!)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
+
         // ServersModule configuration completed
         Logger.shared.logInfo("ServersModule configuration completed", context: [:])
         lastHealthCheck = Date()
@@ -159,10 +163,7 @@ final class ServersModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .compute
         ))
 
@@ -192,10 +193,7 @@ final class ServersModule: OpenStackModule {
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .compute
         ))
 
@@ -250,10 +248,7 @@ final class ServersModule: OpenStackModule {
                 let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                 await SwiftNCurses.render(Text("Console data not available").error(), on: surface, in: bounds)
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .compute
         ))
 

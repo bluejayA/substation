@@ -32,7 +32,7 @@ final class FlavorsModule: OpenStackModule {
     // MARK: - TUI Reference
 
     /// Reference to TUI system
-    private weak var tui: TUI?
+    internal weak var tui: TUI?
 
     // MARK: - Health Tracking
 
@@ -66,6 +66,10 @@ final class FlavorsModule: OpenStackModule {
         let dataProvider = FlavorsDataProvider(module: self, tui: tui)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
+
         lastHealthCheck = Date()
     }
 
@@ -93,10 +97,7 @@ final class FlavorsModule: OpenStackModule {
                     height: height
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .compute
         ))
 
@@ -115,10 +116,7 @@ final class FlavorsModule: OpenStackModule {
                     height: height
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .compute
         ))
 
@@ -220,7 +218,7 @@ final class FlavorsModule: OpenStackModule {
     ///   - startCol: Starting column for rendering
     ///   - width: Available width
     ///   - height: Available height
-    private func renderFlavorsList(
+    func renderFlavorsList(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -249,7 +247,7 @@ final class FlavorsModule: OpenStackModule {
     ///   - startCol: Starting column for rendering
     ///   - width: Available width
     ///   - height: Available height
-    private func renderFlavorDetail(
+    func renderFlavorDetail(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,

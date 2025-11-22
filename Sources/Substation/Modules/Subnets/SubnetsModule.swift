@@ -105,6 +105,10 @@ final class SubnetsModule: OpenStackModule {
         let dataProvider = SubnetsDataProvider(module: self, tui: tui!)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
+
         lastHealthCheck = Date()
     }
 

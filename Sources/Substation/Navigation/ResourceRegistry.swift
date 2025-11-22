@@ -33,7 +33,6 @@ final class ResourceRegistry: @unchecked Sendable {
 
         // Services
         .barbicanSecrets: ["secrets", "secret", "barbican", "b"],
-        .octavia: ["loadbalancers", "loadbalancer", "lb", "octavia", "o"],
         .swift: ["object storage", "swift", "objectstorage", "objects", "obj", "j"],
         .swiftBackgroundOperations: ["operations", "ops", "background", "tasks"],
         .performanceMetrics: ["performance", "metrics", "perf", "stats"],

@@ -81,6 +81,66 @@ final class ViewCoordinator {
         Logger.shared.logDebug("ViewCoordinator initialized")
     }
 
+    // MARK: - ViewIdentifier Support
+
+    /// Get the current view as a ViewIdentifier
+    ///
+    /// Converts the current ViewMode to its corresponding ViewIdentifier
+    /// for use with the dynamic view routing system.
+    var currentViewIdentifier: DynamicViewIdentifier {
+        return currentView.toViewIdentifier
+    }
+
+    /// Get the view metadata for the current view
+    ///
+    /// Returns the registered ViewMetadata if available in the ViewRegistry.
+    var currentViewMetadata: ViewMetadata? {
+        return ViewRegistry.shared.metadata(forId: currentView.viewIdentifierId)
+    }
+
+    /// Get the parent view identifier for the current view
+    ///
+    /// Returns the parent view's identifier if the current view has one defined
+    /// in its metadata.
+    var parentViewIdentifier: String? {
+        return currentViewMetadata?.parentViewId
+    }
+
+    /// Change to a new view using a ViewIdentifier
+    ///
+    /// Converts the ViewIdentifier to ViewMode for backward compatibility
+    /// and performs the view transition.
+    ///
+    /// - Parameters:
+    ///   - identifier: The view identifier to transition to
+    ///   - resetSelection: Whether to reset selection indices and scroll offsets
+    ///   - preserveStatus: Whether to keep the current status message
+    func changeView(to identifier: any ViewIdentifier, resetSelection: Bool = true, preserveStatus: Bool = false) {
+        // Convert to ViewMode for backward compatibility
+        guard let viewMode = ViewModeBridge.viewModeForId(identifier.id) else {
+            Logger.shared.logError("No ViewMode found for identifier: \(identifier.id)")
+            return
+        }
+
+        changeView(to: viewMode, resetSelection: resetSelection, preserveStatus: preserveStatus)
+    }
+
+    /// Navigate to parent view using metadata
+    ///
+    /// Uses the ViewMetadata's parentViewId to navigate back, falling back
+    /// to the previousView if no parent is defined.
+    func navigateToParent() {
+        // First try to use metadata-based parent navigation
+        if let parentId = parentViewIdentifier,
+           let parentMode = ViewModeBridge.viewModeForId(parentId) {
+            changeView(to: parentMode, resetSelection: false)
+            return
+        }
+
+        // Fall back to previous view
+        changeView(to: previousView, resetSelection: false)
+    }
+
     // MARK: - View Transition
 
     /// Change to a new view with optional selection reset and status preservation

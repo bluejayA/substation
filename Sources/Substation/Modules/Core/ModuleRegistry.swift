@@ -18,6 +18,17 @@ final class ModuleRegistry {
         Logger.shared.logInfo("[ModuleRegistry] Initializing module system")
 
         if FeatureFlags.useModuleSystem {
+            // Load configuration before loading modules
+            do {
+                try ModuleConfigurationManager.shared.loadConfiguration()
+                Logger.shared.logInfo("[ModuleRegistry] Module configuration loaded")
+            } catch {
+                Logger.shared.logWarning(
+                    "[ModuleRegistry] Failed to load configuration, using defaults",
+                    context: ["error": String(describing: error)]
+                )
+            }
+
             try await loadCoreModules()
         } else {
             Logger.shared.logInfo("[ModuleRegistry] Module system disabled by feature flag")
@@ -26,11 +37,39 @@ final class ModuleRegistry {
 
     /// Register a module
     func register(_ module: any OpenStackModule) async throws {
+        // Check if module is enabled in configuration
+        let configManager = ModuleConfigurationManager.shared
+        if !configManager.isModuleEnabled(module.identifier) {
+            Logger.shared.logInfo(
+                "[ModuleRegistry] Module '\(module.identifier)' is disabled in configuration, skipping"
+            )
+            return
+        }
+
         // Validate dependencies
         for dep in module.dependencies {
             guard modules[dep] != nil else {
                 throw ModuleError.missingDependency("Module '\(module.identifier)' requires '\(dep)' but it is not loaded")
             }
+        }
+
+        // Register configuration schema
+        let schema = module.configurationSchema
+        if !schema.entries.isEmpty {
+            configManager.registerSchema(schema, for: module.identifier)
+        }
+
+        // Load module configuration
+        let moduleConfig = configManager.configuration(for: module.identifier)
+        module.loadConfiguration(moduleConfig)
+
+        // Validate configuration against schema
+        let validationErrors = configManager.validateConfiguration(for: module.identifier)
+        if !validationErrors.isEmpty {
+            Logger.shared.logWarning(
+                "[ModuleRegistry] Configuration validation warnings for '\(module.identifier)'",
+                context: ["errors": validationErrors.joined(separator: "; ")]
+            )
         }
 
         // Configure module
@@ -113,6 +152,92 @@ final class ModuleRegistry {
         loadOrder.removeAll()
     }
 
+    // MARK: - Hot Reload Support
+
+    /// Reload a specific module by identifier
+    ///
+    /// This method performs a hot-reload of the specified module, preserving
+    /// state where possible and re-registering all components with the TUI.
+    ///
+    /// - Parameters:
+    ///   - identifier: The module identifier to reload
+    ///   - configuration: Optional reload configuration
+    /// - Returns: Result of the reload operation
+    func reloadModule(
+        _ identifier: String,
+        configuration: HotReloadConfiguration = .default
+    ) async -> HotReloadResult {
+        Logger.shared.logInfo("[ModuleRegistry] Reload requested for module: \(identifier)")
+
+        // Ensure hot-reload manager is initialized
+        if let tui = tui {
+            HotReloadManager.shared.initialize(moduleRegistry: self, tui: tui)
+        }
+
+        return await HotReloadManager.shared.reloadModule(identifier, configuration: configuration)
+    }
+
+    /// Reload all modules in dependency order
+    ///
+    /// This method performs a hot-reload of all registered modules, respecting
+    /// dependency order to ensure modules are reloaded after their dependencies.
+    ///
+    /// - Parameter configuration: Optional reload configuration
+    /// - Returns: Array of reload results for all modules
+    func reloadAll(
+        configuration: HotReloadConfiguration = .default
+    ) async -> [HotReloadResult] {
+        Logger.shared.logInfo("[ModuleRegistry] Reload all modules requested")
+
+        // Ensure hot-reload manager is initialized
+        if let tui = tui {
+            HotReloadManager.shared.initialize(moduleRegistry: self, tui: tui)
+        }
+
+        return await HotReloadManager.shared.reloadAll(configuration: configuration)
+    }
+
+    /// Check if a module supports hot-reload
+    ///
+    /// - Parameter identifier: The module identifier to check
+    /// - Returns: True if the module can be hot-reloaded
+    func canReload(_ identifier: String) -> Bool {
+        return HotReloadManager.shared.canReload(identifier)
+    }
+
+    /// Create a state snapshot for a module before operations
+    ///
+    /// This can be used to save state before potentially destructive operations.
+    ///
+    /// - Parameter identifier: The module identifier
+    /// - Returns: The saved state, or nil if not supported
+    func createStateSnapshot(_ identifier: String) async -> (any ModuleState)? {
+        return await HotReloadManager.shared.createStateSnapshot(identifier)
+    }
+
+    /// Restore a state snapshot for a module
+    ///
+    /// - Parameters:
+    ///   - identifier: The module identifier
+    ///   - state: The state to restore
+    /// - Returns: True if restoration was successful
+    func restoreStateSnapshot(_ identifier: String, state: any ModuleState) async -> Bool {
+        return await HotReloadManager.shared.restoreStateSnapshot(identifier, state: state)
+    }
+
+    /// Get reload status for all modules
+    ///
+    /// - Returns: Dictionary mapping module identifiers to their last reload result
+    func getReloadStatus() -> [String: HotReloadResult] {
+        var status: [String: HotReloadResult] = [:]
+        for identifier in loadOrder {
+            if let result = HotReloadManager.shared.getLastReloadResult(identifier) {
+                status[identifier] = result
+            }
+        }
+        return status
+    }
+
     /// Load all core modules in dependency order
     private func loadCoreModules() async throws {
         guard let tui = tui else {
@@ -121,6 +246,13 @@ final class ModuleRegistry {
 
         let enabledModules = FeatureFlags.enabledModules
         Logger.shared.logInfo("[ModuleRegistry] Loading \(enabledModules.count) enabled modules")
+
+        // Register standard batch operation builders before loading modules
+        // This enables the decentralized batch operation building system
+        registerStandardBatchOperationBuilders()
+        Logger.shared.logInfo(
+            "[ModuleRegistry] Registered standard batch operation builders"
+        )
 
         // Phase 1: Load modules with no dependencies
 

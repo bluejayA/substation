@@ -10,10 +10,12 @@ enum ActionType: String {
     case restart
     case manage
     case clearCache = "clear-cache"
+    case reload
+    case reloadAll = "reload-all"
 
     /// Returns all available action types
     static var all: [ActionType] {
-        return [.create, .delete, .refresh, .start, .stop, .restart, .manage, .clearCache]
+        return [.create, .delete, .refresh, .start, .stop, .restart, .manage, .clearCache, .reload, .reloadAll]
     }
 
     /// Returns the command name for this action (with colon prefix for display)
@@ -235,6 +237,10 @@ final class CommandActionHandler: @unchecked Sendable {
             return "Manage resource associations"
         case .clearCache:
             return "Clear all application caches"
+        case .reload:
+            return "Reload a specific module"
+        case .reloadAll:
+            return "Reload all modules"
         }
     }
 }

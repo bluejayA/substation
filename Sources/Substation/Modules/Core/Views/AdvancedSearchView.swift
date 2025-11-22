@@ -874,7 +874,7 @@ struct AdvancedSearchView {
         case .volumeSnapshot: return .volumes // Navigate to volumes list
         case .volumeBackup: return .volumes // Navigate to volumes list
         case .barbicanSecret: return .barbicanSecrets
-        case .loadBalancer: return .octavia
+        case .loadBalancer: return nil  // Octavia not yet implemented
         case .swiftContainer: return .swift
         case .swiftObject: return .swift
         }

@@ -51,6 +51,16 @@ class InputHandler {
             }
         }
 
+        // Check ViewRegistry metadata for dynamic input routing
+        let viewId = tui.viewCoordinator.currentView.viewIdentifierId
+        if let metadata = ViewRegistry.shared.metadata(forId: viewId),
+           let inputHandler = metadata.inputHandler {
+            let handled = await inputHandler(ch, screen)
+            if handled {
+                return
+            }
+        }
+
         // Advanced Search view input handling
         if tui.viewCoordinator.currentView == .advancedSearch {
             let handled = AdvancedSearchView.handleInput(ch)
@@ -231,6 +241,50 @@ class InputHandler {
                     tui.changeView(to: .welcome, resetSelection: true)
                     tui.unifiedInputState.clear()
                     tui.forceRedraw()
+                    return
+
+                case .reloadModule(let moduleName):
+                    // Handle module hot-reload
+                    Task {
+                        if let moduleName = moduleName {
+                            // Reload specific module
+                            tui.statusMessage = "Reloading module: \(moduleName)..."
+                            tui.forceRedraw()
+
+                            let result = await ModuleRegistry.shared.reloadModule(moduleName)
+                            switch result {
+                            case .success(let moduleId, let duration):
+                                let durationStr = String(format: "%.2f", duration)
+                                tui.statusMessage = "Module '\(moduleId)' reloaded successfully in \(durationStr)s"
+                            case .failure(let moduleId, let error):
+                                tui.statusMessage = "Failed to reload '\(moduleId)': \(error)"
+                            case .skipped(let moduleId, let reason):
+                                tui.statusMessage = "Reload skipped for '\(moduleId)': \(reason)"
+                            }
+                        } else {
+                            // Reload all modules
+                            tui.statusMessage = "Reloading all modules..."
+                            tui.forceRedraw()
+
+                            let results = await ModuleRegistry.shared.reloadAll()
+                            let successCount = results.filter {
+                                if case .success = $0 { return true }
+                                return false
+                            }.count
+                            let failureCount = results.filter {
+                                if case .failure = $0 { return true }
+                                return false
+                            }.count
+                            let skippedCount = results.filter {
+                                if case .skipped = $0 { return true }
+                                return false
+                            }.count
+
+                            tui.statusMessage = "Reload complete: \(successCount) success, \(failureCount) failed, \(skippedCount) skipped"
+                        }
+                        tui.unifiedInputState.clear()
+                        tui.forceRedraw()
+                    }
                     return
 
                 case .ignored:
@@ -664,9 +718,6 @@ class InputHandler {
                 activeFieldId: nil,
                 formState: FormBuilderState(fields: [])
             ))
-        } else if tui.viewCoordinator.currentView == .octavia && !tui.viewCoordinator.currentView.isDetailView {
-            Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".octaviaLoadBalancerCreate")
-            tui.changeView(to: .octaviaLoadBalancerCreate)
         } else if tui.viewCoordinator.currentView == .swift && !tui.viewCoordinator.currentView.isDetailView {
             Logger.shared.logNavigation("\(tui.viewCoordinator.currentView)", to: ".swiftContainerCreate")
             tui.changeView(to: .swiftContainerCreate)

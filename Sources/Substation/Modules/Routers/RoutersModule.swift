@@ -42,7 +42,7 @@ final class RoutersModule: OpenStackModule {
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
-    weak var tui: TUI?
+    internal weak var tui: TUI?
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -98,6 +98,10 @@ final class RoutersModule: OpenStackModule {
         let dataProvider = RoutersDataProvider(module: self, tui: tui!)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
+
         lastHealthCheck = Date()
     }
 
@@ -145,10 +149,7 @@ final class RoutersModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .network
         ))
 
@@ -176,10 +177,7 @@ final class RoutersModule: OpenStackModule {
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .network
         ))
 

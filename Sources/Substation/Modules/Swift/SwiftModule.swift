@@ -38,7 +38,9 @@ final class SwiftModule: OpenStackModule {
     /// Configure the module after initialization
     /// Performs any necessary setup, validation, and initialization tasks
     func configure() async throws {
-        _ = tui
+        guard tui != nil else {
+            throw ModuleError.invalidState("TUI reference is nil during configuration")
+        }
 
         Logger.shared.logInfo("SwiftModule configuration started", context: [:])
 
@@ -59,6 +61,10 @@ final class SwiftModule: OpenStackModule {
         // Register as data provider
         let dataProvider = SwiftDataProvider(module: self, tui: tui!)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
     }
 
     // MARK: - View Registration
@@ -87,10 +93,7 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { _, _ in
-                    // Let the default system handle input
-                    return false
-                },
+                inputHandler: nil, // Default system handles input
                 category: .storage
             ),
 
@@ -109,10 +112,7 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { _, _ in
-                    // Let the default system handle input
-                    return false
-                },
+                inputHandler: nil, // Default system handles input
                 category: .storage
             ),
 
@@ -131,10 +131,7 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { _, _ in
-                    // Let the default system handle input
-                    return false
-                },
+                inputHandler: nil, // Default system handles input
                 category: .storage
             ),
 
@@ -360,10 +357,7 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { _, _ in
-                    // Let the default system handle input
-                    return false
-                },
+                inputHandler: nil, // Default system handles input
                 category: .storage
             ),
 
@@ -382,10 +376,7 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { _, _ in
-                    // Let the default system handle input
-                    return false
-                },
+                inputHandler: nil, // Default system handles input
                 category: .storage
             )
         ]
@@ -632,10 +623,10 @@ final class SwiftModule: OpenStackModule {
         await tui?.cacheManager.resourceCache.setSwiftObjects(objects, forContainer: containerName)
     }
 
-    // MARK: - Private Render Methods
+    // MARK: - Render Methods
 
     /// Render the Swift container list view
-    private func renderSwiftContainerListView(
+    func renderSwiftContainerListView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -664,7 +655,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render the Swift container detail view
-    private func renderSwiftContainerDetailView(
+    func renderSwiftContainerDetailView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -703,7 +694,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render the Swift object detail view
-    private func renderSwiftObjectDetailView(
+    func renderSwiftObjectDetailView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -753,7 +744,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render container create form view
-    private func renderSwiftContainerCreateView(
+    func renderSwiftContainerCreateView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -772,7 +763,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render object upload form view
-    private func renderSwiftObjectUploadView(
+    func renderSwiftObjectUploadView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -791,7 +782,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render container download form view
-    private func renderSwiftContainerDownloadView(
+    func renderSwiftContainerDownloadView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -810,7 +801,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render object download form view
-    private func renderSwiftObjectDownloadView(
+    func renderSwiftObjectDownloadView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -829,7 +820,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render directory download form view
-    private func renderSwiftDirectoryDownloadView(
+    func renderSwiftDirectoryDownloadView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -848,7 +839,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render container metadata form view
-    private func renderSwiftContainerMetadataView(
+    func renderSwiftContainerMetadataView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -867,7 +858,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render object metadata form view
-    private func renderSwiftObjectMetadataView(
+    func renderSwiftObjectMetadataView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -886,7 +877,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render directory metadata form view
-    private func renderSwiftDirectoryMetadataView(
+    func renderSwiftDirectoryMetadataView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -905,7 +896,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render container web access form view
-    private func renderSwiftContainerWebAccessView(
+    func renderSwiftContainerWebAccessView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -924,7 +915,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render background operations list view
-    private func renderSwiftBackgroundOperationsView(
+    func renderSwiftBackgroundOperationsView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -948,7 +939,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render background operation detail view
-    private func renderSwiftBackgroundOperationDetailView(
+    func renderSwiftBackgroundOperationDetailView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,

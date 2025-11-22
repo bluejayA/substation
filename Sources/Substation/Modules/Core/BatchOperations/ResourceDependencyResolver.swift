@@ -283,7 +283,78 @@ actor ResourceDependencyResolver {
 
     // MARK: - Private Implementation
 
+    /// Build planned operations from a batch operation type
+    ///
+    /// This method first attempts to use the BatchOperationBuilderRegistry to find
+    /// a registered builder for the operation. If no builder is found, it falls back
+    /// to the legacy switch-based implementation for backwards compatibility.
+    ///
+    /// The registry-based approach allows modules to define their own operation
+    /// building logic, enabling true decentralization of batch operation types.
+    ///
+    /// - Parameter batchType: The batch operation type to build operations from
+    /// - Returns: Array of planned operations ready for execution
+    /// - Throws: BatchOperationError if operations cannot be built
     private func buildOperationsFromBatchType(_ batchType: BatchOperationType) async throws -> [PlannedOperation] {
+        // First, try to use the decentralized builder registry
+        let operations = await buildOperationsViaRegistry(batchType)
+        if let operations = operations {
+            Logger.shared.logDebug(
+                "ResourceDependencyResolver - Built \(operations.count) operations via registry"
+            )
+            return operations
+        }
+
+        // Fallback to legacy switch-based implementation
+        // This maintains backwards compatibility during the transition period
+        Logger.shared.logDebug(
+            "ResourceDependencyResolver - Using legacy builder for: \(batchType.description)"
+        )
+
+        return try buildOperationsLegacy(batchType)
+    }
+
+    /// Build operations using the decentralized builder registry
+    ///
+    /// Looks up a registered builder that can handle the batch operation type
+    /// and delegates the building to that builder.
+    ///
+    /// - Parameter batchType: The batch operation type to build
+    /// - Returns: Array of planned operations, or nil if no builder found
+    @MainActor
+    private func buildOperationsViaRegistry(
+        _ batchType: BatchOperationType
+    ) async -> [PlannedOperation]? {
+        guard let builder = BatchOperationBuilderRegistry.shared.builder(for: batchType) else {
+            Logger.shared.logDebug(
+                "ResourceDependencyResolver - No builder registered for: \(batchType.description)"
+            )
+            return nil
+        }
+
+        do {
+            return try await builder.buildOperations(for: batchType)
+        } catch {
+            Logger.shared.logError(
+                "ResourceDependencyResolver - Builder failed: \(error.localizedDescription)"
+            )
+            return nil
+        }
+    }
+
+    /// Legacy implementation of operation building
+    ///
+    /// This method contains the original switch-based implementation for building
+    /// operations. It is kept for backwards compatibility during the transition
+    /// to the decentralized builder registry.
+    ///
+    /// - Note: This method is deprecated and will be removed in a future version.
+    ///         Modules should register builders with BatchOperationBuilderRegistry instead.
+    ///
+    /// - Parameter batchType: The batch operation type to build
+    /// - Returns: Array of planned operations
+    /// - Throws: BatchOperationError if the operation type is not supported
+    private func buildOperationsLegacy(_ batchType: BatchOperationType) throws -> [PlannedOperation] {
         switch batchType {
         case .serverBulkDelete(let ids):
             return buildDeleteOperations(ids: ids, type: .server, idPrefix: "server")

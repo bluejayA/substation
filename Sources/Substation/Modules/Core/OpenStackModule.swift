@@ -42,6 +42,22 @@ protocol OpenStackModule {
 
     /// Module health check for monitoring
     func healthCheck() async -> ModuleHealthStatus
+
+    /// Configuration schema for validation
+    ///
+    /// Modules should provide a schema describing their expected configuration keys,
+    /// types, and default values. This enables configuration validation and
+    /// documentation generation.
+    var configurationSchema: ConfigurationSchema { get }
+
+    /// Load configuration for this module
+    ///
+    /// Called during module initialization to load configuration from the
+    /// ModuleConfigurationManager. Modules should apply configuration values
+    /// to their internal state.
+    ///
+    /// - Parameter config: Module-specific configuration
+    func loadConfiguration(_ config: ModuleConfig?)
 }
 
 // MARK: - Default Implementations
@@ -50,5 +66,25 @@ extension OpenStackModule {
     /// Default implementation returns empty array for modules without actions
     func registerActions() -> [ModuleActionRegistration] {
         return []
+    }
+
+    /// Default implementation returns an empty schema
+    ///
+    /// Modules that support configuration should override this property
+    /// to provide their configuration schema for validation.
+    var configurationSchema: ConfigurationSchema {
+        return ConfigurationSchema(entries: [])
+    }
+
+    /// Default implementation does nothing
+    ///
+    /// Modules that need to respond to configuration changes should
+    /// override this method to apply configuration values.
+    func loadConfiguration(_ config: ModuleConfig?) {
+        // Default: no configuration handling
+        Logger.shared.logDebug(
+            "Module '\(identifier)' has no configuration handler",
+            context: [:]
+        )
     }
 }

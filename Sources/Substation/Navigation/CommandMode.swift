@@ -45,6 +45,7 @@ final class CommandMode: @unchecked Sendable {
         case showShortcuts
         case showExamples
         case showWelcome
+        case reloadModule(String?)  // nil means reload all
     }
 
     func executeCommand(_ command: String) -> CommandResult {
@@ -86,6 +87,22 @@ final class CommandMode: @unchecked Sendable {
 
         if trimmed == "welcome" {
             return .showWelcome
+        }
+
+        // Reload commands
+        if trimmed == "reload" {
+            return .reloadModule(nil)
+        }
+
+        if trimmed.hasPrefix("reload ") {
+            let parts = trimmed.split(separator: " ", maxSplits: 1)
+            if parts.count == 2 {
+                let moduleName = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                if !moduleName.isEmpty {
+                    return .reloadModule(moduleName)
+                }
+            }
+            return .error("Usage: :reload or :reload <module-name>")
         }
 
         // Context switching commands

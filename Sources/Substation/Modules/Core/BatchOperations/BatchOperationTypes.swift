@@ -4,6 +4,35 @@ import OSClient
 // MARK: - Batch Operation Types
 
 /// Core batch operation types supported by the system
+///
+/// - Important: This centralized enum is being deprecated in favor of a decentralized
+///   approach where each module defines its own operation types and registers builders
+///   with the `BatchOperationBuilderRegistry`. New operation types should use the
+///   `BatchOperationBuilder` protocol instead of adding cases to this enum.
+///
+/// ## Migration Path
+///
+/// Instead of adding new cases to this enum, modules should:
+/// 1. Create a struct conforming to `BatchOperationBuilder`
+/// 2. Register the builder with `BatchOperationBuilderRegistry.shared.register()`
+/// 3. The `ResourceDependencyResolver` will automatically use registered builders
+///
+/// Existing cases will continue to work via the legacy fallback in
+/// `ResourceDependencyResolver.buildOperationsLegacy()`.
+///
+/// ## Example
+///
+/// ```swift
+/// // Old approach (deprecated)
+/// case myNewBulkDelete(ids: [String])
+///
+/// // New approach (preferred)
+/// struct MyNewBulkDeleteBuilder: BatchOperationBuilder {
+///     static let operationTypeIdentifier = "myNewBulkDelete"
+///     // ... implementation
+/// }
+/// BatchOperationBuilderRegistry.shared.register(MyNewBulkDeleteBuilder())
+/// ```
 public enum BatchOperationType: Sendable, Hashable {
     case serverBulkDelete(serverIDs: [String])
     case volumeBulkDelete(volumeIDs: [String])

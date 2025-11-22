@@ -1,17 +1,14 @@
 import Foundation
-import OSClient
 import SwiftNCurses
-
-import struct OSClient.Port
 
 enum ViewMode: CaseIterable {
     case loading, dashboard, advancedSearch, healthDashboard, servers, serverGroups, securityGroups,
         volumes, volumeArchives, images, flavors, subnets, ports, routers, floatingIPs, networks,
-        barbican, barbicanSecrets, octavia, swift, swiftBackgroundOperations,
+        barbican, barbicanSecrets, swift, swiftBackgroundOperations,
         performanceMetrics, serverDetail, serverConsole, serverGroupDetail, networkDetail,
         securityGroupDetail, volumeDetail, volumeArchiveDetail, imageDetail, flavorDetail,
         subnetDetail, portDetail, routerDetail, floatingIPDetail, healthDashboardServiceDetail,
-        barbicanSecretDetail, octaviaLoadBalancerDetail,
+        barbicanSecretDetail,
         swiftContainerDetail, swiftObjectDetail, swiftBackgroundOperationDetail, serverCreate,
         serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement,
         subnetCreate, volumeCreate, portCreate, routerCreate, floatingIPCreate, keyPairs,
@@ -21,7 +18,7 @@ enum ViewMode: CaseIterable {
         securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement,
         volumeServerManagement, floatingIPServerManagement, floatingIPPortManagement,
         portServerManagement, portAllowedAddressPairManagement, subnetRouterManagement,
-        flavorSelection, barbicanSecretCreate, octaviaLoadBalancerCreate,
+        flavorSelection, barbicanSecretCreate,
         swiftContainerCreate, swiftObjectUpload, swiftContainerDownload, swiftObjectDownload,
         swiftDirectoryDownload, swiftContainerMetadata, swiftObjectMetadata, swiftDirectoryMetadata,
         swiftContainerWebAccess
@@ -82,14 +79,11 @@ enum ViewMode: CaseIterable {
         case .healthDashboardServiceDetail: return "Service Details"
         case .barbican: return "Secrets"
         case .barbicanSecrets: return "Secrets"
-        case .octavia: return "Load Balancers"
         case .swift: return "Object Storage"
         case .barbicanSecretDetail: return "Secret Details"
-        case .octaviaLoadBalancerDetail: return "Load Balancer Details"
         case .swiftContainerDetail: return "Container Objects"
         case .swiftObjectDetail: return "Object Details"
         case .barbicanSecretCreate: return "Create Secret"
-        case .octaviaLoadBalancerCreate: return "Create Load Balancer"
         case .swiftContainerCreate: return "Create Container"
         case .swiftObjectUpload: return "Upload Object"
         case .swiftContainerDownload: return "Download Container"
@@ -136,8 +130,8 @@ enum ViewMode: CaseIterable {
             .securityGroupServerAttachment, .securityGroupServerManagement,
             .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement,
             .floatingIPPortManagement, .portServerManagement, .portAllowedAddressPairManagement,
-            .subnetRouterManagement, .barbicanSecretDetail, .octaviaLoadBalancerDetail,
-            .swiftObjectDetail, .swiftBackgroundOperationDetail, .barbicanSecretCreate, .octaviaLoadBalancerCreate,
+            .subnetRouterManagement, .barbicanSecretDetail,
+            .swiftObjectDetail, .swiftBackgroundOperationDetail, .barbicanSecretCreate,
             .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload,
             .swiftObjectDownload, .swiftDirectoryDownload, .swiftContainerMetadata,
             .swiftObjectMetadata, .swiftDirectoryMetadata, .performanceMetrics,
@@ -155,7 +149,7 @@ enum ViewMode: CaseIterable {
             .securityGroups, .serverGroups, .keyPairs, .images:
             return true
         // Service list views (barbicanSecrets and volumeArchives support multi-select)
-        case .barbican, .barbicanSecrets, .octavia, .swift,
+        case .barbican, .barbicanSecrets, .swift,
             .swiftContainerDetail, .volumeArchives:
             return true
         // Note: flavors excluded - read-only, managed by cloud admin
@@ -203,8 +197,6 @@ enum ViewMode: CaseIterable {
         case .barbicanSecrets: return .barbican
         case .barbicanSecretDetail: return .barbicanSecrets
         case .barbicanSecretCreate: return .barbicanSecrets
-        case .octaviaLoadBalancerDetail: return .octavia
-        case .octaviaLoadBalancerCreate: return .octavia
         case .swiftContainerDetail: return .swift
         case .swiftObjectDetail: return .swiftContainerDetail
         case .swiftBackgroundOperationDetail: return .swiftBackgroundOperations
@@ -262,6 +254,18 @@ struct MainPanelView {
             mainWidth: mainWidth, mainHeight: mainHeight)
     }
 
+    /// Renders the current view using the module system's ViewRegistry
+    ///
+    /// Views registered in the ViewRegistry are rendered via their module handlers.
+    /// Views not yet migrated to modules use the legacy switch statement fallback.
+    ///
+    /// - Parameters:
+    ///   - screen: The ncurses screen pointer
+    ///   - tui: The TUI instance containing application state
+    ///   - mainStartRow: Starting row position for the main panel
+    ///   - mainStartCol: Starting column position for the main panel
+    ///   - mainWidth: Width of the main panel in characters
+    ///   - mainHeight: Height of the main panel in characters
     private static func renderCurrentView(
         screen: OpaquePointer?, tui: TUI, mainStartRow: Int32, mainStartCol: Int32,
         mainWidth: Int32, mainHeight: Int32
@@ -273,278 +277,23 @@ struct MainPanelView {
             return
         }
 
-        // PRIORITY 2: Fall back to legacy switch statement for views not yet in modules
-        Logger.shared.logDebug("Rendering \(tui.viewCoordinator.currentView) via legacy switch statement")
-        switch tui.viewCoordinator.currentView {
-        case .loading:
-            await LoadingView.drawLoadingScreen(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, progressStep: tui.loadingProgress,
-                statusMessage: tui.loadingMessage)
-        case .dashboard:
-            await DashboardView.draw(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, resourceCounts: tui.resourceCounts,
-                cachedServers: tui.cacheManager.cachedServers, cachedNetworks: tui.cacheManager.cachedNetworks,
-                cachedVolumes: tui.cacheManager.cachedVolumes, cachedPorts: tui.cacheManager.cachedPorts,
-                cachedRouters: tui.cacheManager.cachedRouters, cachedComputeLimits: tui.cacheManager.cachedComputeLimits,
-                cachedNetworkQuotas: tui.cacheManager.cachedNetworkQuotas,
-                cachedVolumeQuotas: tui.cacheManager.cachedVolumeQuotas,
-                quotaScrollOffset: tui.viewCoordinator.quotaScrollOffset, tui: tui)
-        case .healthDashboard:
-            let telemetryActor = await tui.getTelemetryActor()
-            await HealthDashboardView.draw(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, telemetryActor: telemetryActor,
-                navigationState: tui.viewCoordinator.healthDashboardNavState, dataManager: tui.dataManager,
-                performanceMonitor: tui.renderCoordinator.performanceMonitor)
-        case .healthDashboardServiceDetail:
-            if let service = tui.viewCoordinator.selectedResource as? HealthDashboardService {
-                await HealthDashboardView.drawServiceDetail(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, service: service,
-                    scrollOffset: tui.viewCoordinator.detailScrollOffset)
-            }
-        case .help:
-            let contextView = tui.viewCoordinator.previousView != .help ? tui.viewCoordinator.previousView : .dashboard
-            await MiscViews.drawHelp(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, scrollOffset: tui.viewCoordinator.helpScrollOffset, currentView: contextView)
-        case .about:
-            await MiscViews.drawAbout(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, scrollOffset: tui.viewCoordinator.helpScrollOffset)
-        case .welcome:
-            let sections = WelcomeScreen.shared.getWelcomeSections()
-            let detailView = DetailView(
-                title: "Welcome to Substation",
-                sections: sections,
-                helpText: "Press ESC to return",
-                scrollOffset: tui.viewCoordinator.detailScrollOffset
-            )
-            await detailView.draw(
-                screen: screen,
-                startRow: mainStartRow,
-                startCol: mainStartCol,
-                width: mainWidth,
-                height: mainHeight
-            )
-        case .tutorial:
-            let sections = WelcomeScreen.shared.getTutorialSections()
-            let detailView = DetailView(
-                title: "Interactive Tutorial",
-                sections: sections,
-                helpText: "Press ESC to return",
-                scrollOffset: tui.viewCoordinator.detailScrollOffset
-            )
-            await detailView.draw(
-                screen: screen,
-                startRow: mainStartRow,
-                startCol: mainStartCol,
-                width: mainWidth,
-                height: mainHeight
-            )
-        case .shortcuts:
-            let sections = WelcomeScreen.shared.getShortcutsSections()
-            let detailView = DetailView(
-                title: "Command Shortcuts Reference",
-                sections: sections,
-                helpText: "Press ESC to return",
-                scrollOffset: tui.viewCoordinator.detailScrollOffset
-            )
-            await detailView.draw(
-                screen: screen,
-                startRow: mainStartRow,
-                startCol: mainStartCol,
-                width: mainWidth,
-                height: mainHeight
-            )
-        case .examples:
-            let sections = WelcomeScreen.shared.getExamplesSections()
-            let detailView = DetailView(
-                title: "Command Workflow Examples",
-                sections: sections,
-                helpText: "Press ESC to return",
-                scrollOffset: tui.viewCoordinator.detailScrollOffset
-            )
-            await detailView.draw(
-                screen: screen,
-                startRow: mainStartRow,
-                startCol: mainStartCol,
-                width: mainWidth,
-                height: mainHeight
-            )
-        case .advancedSearch:
-            await AdvancedSearchView.draw(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, tui: tui)
-        case .octavia:
-            await OctaviaViews.drawOctaviaLoadBalancerList(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, loadBalancers: tui.cacheManager.cachedLoadBalancers,
-                searchQuery: tui.searchQuery ?? "", scrollOffset: tui.viewCoordinator.scrollOffset,
-                selectedIndex: tui.viewCoordinator.selectedIndex, filterCache: tui.resourceNameCache)
-        case .octaviaLoadBalancerDetail:
-            if let lb = tui.viewCoordinator.selectedResource as? LoadBalancer {
-                await OctaviaViews.drawOctaviaLoadBalancerDetail(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, loadBalancer: lb)
-            }
-        case .octaviaLoadBalancerCreate:
-            await OctaviaViews.drawOctaviaLoadBalancerCreate(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight)
-        case .volumeArchives:
-            await VolumeArchiveViews.drawArchiveList(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, cachedVolumeSnapshots: tui.cacheManager.cachedVolumeSnapshots,
-                cachedVolumeBackups: tui.cacheManager.cachedVolumeBackups, cachedImages: tui.cacheManager.cachedImages,
-                searchQuery: tui.searchQuery, scrollOffset: tui.viewCoordinator.scrollOffset,
-                selectedIndex: tui.viewCoordinator.selectedIndex, multiSelectMode: tui.selectionManager.multiSelectMode,
-                selectedItems: tui.selectionManager.multiSelectedResourceIDs)
-        case .volumeArchiveDetail:
-            if let snapshot = tui.viewCoordinator.selectedResource as? VolumeSnapshot {
-                await VolumeArchiveViews.drawVolumeSnapshotDetail(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, snapshot: snapshot,
-                    scrollOffset: tui.viewCoordinator.detailScrollOffset)
-            } else if let backup = tui.viewCoordinator.selectedResource as? VolumeBackup {
-                await VolumeArchiveViews.drawVolumeBackupDetail(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, backup: backup,
-                    scrollOffset: tui.viewCoordinator.detailScrollOffset)
-            }
-        case .volumeManagement:
-            await VolumeManagementView.draw(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, form: tui.volumeManagementForm,
-                resourceNameCache: tui.resourceNameCache)
-        case .floatingIPServerSelect:
-            if let floatingIP = tui.viewCoordinator.selectedResource as? FloatingIP {
-                await FloatingIPViews.drawServerSelectionView(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, floatingIP: floatingIP,
-                    cachedServers: tui.cacheManager.cachedServers, cachedPorts: tui.cacheManager.cachedPorts,
-                    scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex)
-            }
-        case .networkServerAttachment:
-            await NetworkServerAttachmentView.draw(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, servers: tui.cacheManager.cachedServers,
-                selectedServers: tui.selectionManager.selectedServers, searchQuery: tui.searchQuery,
-                scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex)
-        case .securityGroupServerAttachment:
-            await SecurityGroupServerAttachmentView.draw(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, servers: tui.cacheManager.cachedServers,
-                selectedServers: tui.selectionManager.selectedServers, searchQuery: tui.searchQuery,
-                scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex)
-        case .securityGroupServerManagement:
-            if let securityGroup = tui.viewCoordinator.selectedResource as? SecurityGroup {
-                await SecurityGroupServerManagementView.draw(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, securityGroup: securityGroup,
-                    servers: tui.cacheManager.cachedServers, attachedServerIds: tui.selectionManager.attachedServerIds,
-                    selectedServers: tui.selectionManager.selectedServers, searchQuery: tui.searchQuery,
-                    scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex,
-                    mode: tui.selectionManager.attachmentMode, resourceResolver: tui.resourceResolver)
-            }
-        case .networkServerManagement:
-            if let network = tui.viewCoordinator.selectedResource as? Network {
-                await NetworkServerManagementView.draw(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, network: network,
-                    servers: tui.cacheManager.cachedServers, attachedServerIds: tui.selectionManager.attachedServerIds,
-                    selectedServers: tui.selectionManager.selectedServers, searchQuery: tui.searchQuery,
-                    scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex,
-                    mode: tui.selectionManager.attachmentMode, resourceResolver: tui.resourceResolver)
-            }
-        case .volumeServerManagement:
-            if let volume = tui.viewCoordinator.selectedResource as? Volume {
-                await VolumeServerManagementView.draw(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, volume: volume,
-                    servers: tui.cacheManager.cachedServers, attachedServerIds: tui.selectionManager.attachedServerIds,
-                    selectedServers: tui.selectionManager.selectedServers, searchQuery: tui.searchQuery,
-                    scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex,
-                    mode: tui.selectionManager.attachmentMode, resourceResolver: tui.resourceResolver)
-            }
-        case .floatingIPServerManagement:
-            if let floatingIP = tui.viewCoordinator.selectedResource as? FloatingIP {
-                await FloatingIPServerManagementView.draw(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, floatingIP: floatingIP,
-                    servers: tui.cacheManager.cachedServers, attachedServerId: tui.selectionManager.attachedServerId,
-                    selectedServerId: tui.selectionManager.selectedServerId, searchQuery: tui.searchQuery,
-                    scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex,
-                    mode: tui.selectionManager.attachmentMode, resourceResolver: tui.resourceResolver)
-            }
-        case .floatingIPPortManagement:
-            if let floatingIP = tui.viewCoordinator.selectedResource as? FloatingIP {
-                await FloatingIPPortManagementView.draw(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, floatingIP: floatingIP,
-                    ports: tui.cacheManager.cachedPorts, attachedPortId: tui.selectionManager.attachedPortId,
-                    selectedPortId: tui.selectionManager.selectedPortId, searchQuery: tui.searchQuery,
-                    scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex,
-                    mode: tui.selectionManager.attachmentMode, resourceResolver: tui.resourceResolver)
-            }
-        case .portServerManagement:
-            if let port = tui.viewCoordinator.selectedResource as? Port {
-                await PortServerManagementView.draw(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, port: port, servers: tui.cacheManager.cachedServers,
-                    attachedServerId: tui.selectionManager.attachedServerId, selectedServerId: tui.selectionManager.selectedServerId,
-                    searchQuery: tui.searchQuery, scrollOffset: tui.viewCoordinator.scrollOffset,
-                    selectedIndex: tui.viewCoordinator.selectedIndex, mode: tui.selectionManager.attachmentMode,
-                    resourceResolver: tui.resourceResolver)
-            }
-        case .portAllowedAddressPairManagement:
-            if let form = tui.allowedAddressPairForm {
-                await AllowedAddressPairManagementView.drawAllowedAddressPairManagement(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, form: form,
-                    resourceNameCache: tui.resourceNameCache)
-            }
-        case .subnetRouterManagement:
-            if let subnet = tui.viewCoordinator.selectedResource as? Subnet {
-                await SubnetRouterManagementView.draw(
-                    screen: screen, startRow: mainStartRow, startCol: mainStartCol,
-                    width: mainWidth, height: mainHeight, subnet: subnet,
-                    routers: tui.cacheManager.cachedRouters, attachedRouterIds: tui.selectionManager.attachedRouterIds,
-                    selectedRouterId: tui.selectionManager.selectedRouterId, searchQuery: tui.searchQuery,
-                    scrollOffset: tui.viewCoordinator.scrollOffset, selectedIndex: tui.viewCoordinator.selectedIndex,
-                    mode: tui.selectionManager.attachmentMode, resourceResolver: tui.resourceResolver)
-            }
-        case .flavorSelection:
-            await FlavorSelectionView.draw(
-                screen: screen, startRow: mainStartRow, startCol: mainStartCol, width: mainWidth,
-                height: mainHeight, flavors: tui.cacheManager.cachedFlavors,
-                workloadType: tui.serverCreateForm.workloadType,
-                flavorRecommendations: tui.serverCreateForm.flavorRecommendations,
-                selectedFlavorId: tui.serverCreateForm.selectedFlavorID,
-                selectedRecommendationIndex: tui.serverCreateForm.selectedRecommendationIndex,
-                selectedIndex: tui.viewCoordinator.selectedIndex, mode: tui.serverCreateForm.flavorSelectionMode,
-                scrollOffset: tui.viewCoordinator.scrollOffset, searchQuery: tui.searchQuery,
-                selectedCategoryIndex: tui.serverCreateForm.selectedCategoryIndex)
-        case .performanceMetrics:
-            let operations = tui.swiftBackgroundOps.getAllOperations()
-            let metricsService = PerformanceMetrics()
-            let summary = metricsService.calculate(from: operations)
-            await PerformanceMetricsView.draw(
-                screen: screen,
-                startRow: mainStartRow,
-                startCol: mainStartCol,
-                width: mainWidth,
-                height: mainHeight,
-                summary: summary,
-                scrollOffset: tui.viewCoordinator.scrollOffset
-            )
-
-        default:
-            // All other views are handled by modules via ViewRegistry
-            break
+        // PRIORITY 2: Check ViewRegistry metadata for dynamic view routing
+        let viewId = tui.viewCoordinator.currentView.viewIdentifierId
+        if let metadata = ViewRegistry.shared.metadata(forId: viewId) {
+            Logger.shared.logDebug("Rendering \(viewId) via metadata: \(metadata.title)")
+            await metadata.renderHandler(screen, mainStartRow, mainStartCol, mainWidth, mainHeight)
+            return
         }
+
+        // No handler found - log error and display message
+        Logger.shared.logError("No render handler found for view: \(viewId)")
+        let surface = SwiftNCurses.surface(from: screen)
+        let bounds = Rect(x: mainStartCol, y: mainStartRow, width: mainWidth, height: mainHeight)
+        await SwiftNCurses.render(
+            Text("View not registered: \(viewId)").error(),
+            on: surface,
+            in: bounds
+        )
     }
 
 }

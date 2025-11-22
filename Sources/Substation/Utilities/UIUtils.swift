@@ -136,13 +136,9 @@ struct UIUtils {
             return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
         case .barbicanSecrets:
             return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
-        case .octavia:
-            return "\(baseCommands) SPACE:details :create /:search ESC:back"
         case .swift:
             return "\(baseCommands) SPACE:details :create U:upload D:download :manage W:web-access :delete /:search ESC:back"
         case .barbicanSecretDetail:
-            return "\(baseCommands) ESC:back"
-        case .octaviaLoadBalancerDetail:
             return "\(baseCommands) ESC:back"
         case .swiftContainerDetail:
             return "\(baseCommands) U:upload D:download M:metadata :delete ESC:back"
@@ -152,8 +148,6 @@ struct UIUtils {
             return "\(baseCommands) UP/DOWN:scroll :cancel/remove ESC:back"
         case .barbicanSecretCreate:
             return "\(baseCommands) TAB/UP/DOWN:navigate ENTER:create ESC:cancel"
-        case .octaviaLoadBalancerCreate:
-            return "\(baseCommands) TAB:navigate ENTER:create ESC:cancel"
         case .swiftContainerCreate:
             return "\(baseCommands) TAB:navigate ENTER:create ESC:cancel"
         case .swiftContainerMetadata:

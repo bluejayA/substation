@@ -75,6 +75,10 @@ final class ServerGroupsModule: OpenStackModule {
         // Register as data provider
         let dataProvider = ServerGroupsDataProvider(module: self, tui: tui)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
+
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
     }
 
     // MARK: - View Registration
@@ -315,7 +319,7 @@ extension ServerGroupsModule {
     // MARK: - View Rendering Methods
 
     /// Render server groups list view
-    private func renderServerGroupsList(
+    func renderServerGroupsList(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -341,7 +345,7 @@ extension ServerGroupsModule {
     }
 
     /// Render server group detail view
-    private func renderServerGroupDetail(
+    func renderServerGroupDetail(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -375,7 +379,7 @@ extension ServerGroupsModule {
     }
 
     /// Render server group create form
-    private func renderServerGroupCreate(
+    func renderServerGroupCreate(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -395,7 +399,7 @@ extension ServerGroupsModule {
     }
 
     /// Render server group management view
-    private func renderServerGroupManagement(
+    func renderServerGroupManagement(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,

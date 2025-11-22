@@ -84,6 +84,10 @@ final class VolumesModule: OpenStackModule {
         let dataProvider = VolumesDataProvider(module: self, tui: tui!)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
+
         lastHealthCheck = Date()
     }
 
@@ -456,10 +460,10 @@ final class VolumesModule: OpenStackModule {
         )
     }
 
-    // MARK: - Private Render Methods
+    // MARK: - Render Methods
 
     /// Render the volume list view
-    private func renderVolumeListView(
+    func renderVolumeListView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -485,7 +489,7 @@ final class VolumesModule: OpenStackModule {
     }
 
     /// Render the volume detail view
-    private func renderVolumeDetailView(
+    func renderVolumeDetailView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -512,7 +516,7 @@ final class VolumesModule: OpenStackModule {
     }
 
     /// Render the volume create form view
-    private func renderVolumeCreateView(
+    func renderVolumeCreateView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -604,7 +608,7 @@ final class VolumesModule: OpenStackModule {
     }
 
     /// Render the volume archives (snapshots + backups) view
-    private func renderVolumeArchivesView(
+    func renderVolumeArchivesView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -630,7 +634,7 @@ final class VolumesModule: OpenStackModule {
     }
 
     /// Render the volume archive detail view
-    private func renderVolumeArchiveDetailView(
+    func renderVolumeArchiveDetailView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,

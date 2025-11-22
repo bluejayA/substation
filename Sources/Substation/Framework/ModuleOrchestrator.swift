@@ -39,6 +39,14 @@ final class ModuleOrchestrator {
 
             let allModules = ModuleRegistry.shared.allModules()
             Logger.shared.logInfo("Module system initialized: \(allModules.count) modules loaded")
+
+            // Register core system views with metadata
+            let coreViewMetadata = CoreViews.registerViewsEnhanced(tui: tui)
+            ViewRegistry.shared.register(metadataList: coreViewMetadata)
+            Logger.shared.logDebug("Registered \(coreViewMetadata.count) core view metadata entries")
+
+            // Log registration diagnostics
+            ViewRegistry.shared.logRegistrationStatus()
         } catch {
             Logger.shared.logError("Failed to initialize module system", context: [
                 "error": String(describing: error)

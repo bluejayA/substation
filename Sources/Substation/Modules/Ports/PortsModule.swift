@@ -101,6 +101,10 @@ final class PortsModule: OpenStackModule {
         let dataProvider = PortsDataProvider(module: self, tui: tui!)
         DataProviderRegistry.shared.register(dataProvider, from: identifier)
 
+        // Register enhanced views with metadata
+        let viewMetadata = registerViewsEnhanced()
+        ViewRegistry.shared.register(metadataList: viewMetadata)
+
         lastHealthCheck = Date()
     }
 
@@ -150,10 +154,7 @@ final class PortsModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .network
         ))
 
@@ -183,10 +184,7 @@ final class PortsModule: OpenStackModule {
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
-            inputHandler: { _, _ in
-                // Let the default system handle input
-                return false
-            },
+            inputHandler: nil, // Default system handles input
             category: .network
         ))
 
