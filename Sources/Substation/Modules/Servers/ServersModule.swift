@@ -159,10 +159,9 @@ final class ServersModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: { [weak tui] ch, screen in
-                guard let tui = tui else { return false }
-                await tui.inputHandler.handleInput(ch, screen: screen)
-                return true
+            inputHandler: { _, _ in
+                // Let the default system handle input
+                return false
             },
             category: .compute
         ))
@@ -193,10 +192,9 @@ final class ServersModule: OpenStackModule {
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
-            inputHandler: { [weak tui] ch, screen in
-                guard let tui = tui else { return false }
-                await tui.inputHandler.handleInput(ch, screen: screen)
-                return true
+            inputHandler: { _, _ in
+                // Let the default system handle input
+                return false
             },
             category: .compute
         ))
@@ -252,10 +250,9 @@ final class ServersModule: OpenStackModule {
                 let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
                 await SwiftNCurses.render(Text("Console data not available").error(), on: surface, in: bounds)
             },
-            inputHandler: { [weak tui] ch, screen in
-                guard let tui = tui else { return false }
-                await tui.inputHandler.handleInput(ch, screen: screen)
-                return true
+            inputHandler: { _, _ in
+                // Let the default system handle input
+                return false
             },
             category: .compute
         ))

@@ -119,10 +119,9 @@ final class FloatingIPsModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: { [weak tui] ch, screen in
-                guard let tui = tui else { return false }
-                await tui.inputHandler.handleInput(ch, screen: screen)
-                return true
+            inputHandler: { _, _ in
+                // Let the default system handle input
+                return false
             },
             category: .network
         ))
@@ -148,10 +147,9 @@ final class FloatingIPsModule: OpenStackModule {
                     scrollOffset: tui.viewCoordinator.detailScrollOffset
                 )
             },
-            inputHandler: { [weak tui] ch, screen in
-                guard let tui = tui else { return false }
-                await tui.inputHandler.handleInput(ch, screen: screen)
-                return true
+            inputHandler: { _, _ in
+                // Let the default system handle input
+                return false
             },
             category: .network
         ))

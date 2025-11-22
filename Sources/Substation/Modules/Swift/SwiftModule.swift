@@ -87,10 +87,9 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { [weak tui] ch, screen in
-                    guard let tui = tui else { return false }
-                    await tui.inputHandler.handleInput(ch, screen: screen)
-                    return true
+                inputHandler: { _, _ in
+                    // Let the default system handle input
+                    return false
                 },
                 category: .storage
             ),
@@ -110,10 +109,9 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { [weak tui] ch, screen in
-                    guard let tui = tui else { return false }
-                    await tui.inputHandler.handleInput(ch, screen: screen)
-                    return true
+                inputHandler: { _, _ in
+                    // Let the default system handle input
+                    return false
                 },
                 category: .storage
             ),
@@ -133,10 +131,9 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { [weak tui] ch, screen in
-                    guard let tui = tui else { return false }
-                    await tui.inputHandler.handleInput(ch, screen: screen)
-                    return true
+                inputHandler: { _, _ in
+                    // Let the default system handle input
+                    return false
                 },
                 category: .storage
             ),
@@ -363,10 +360,9 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { [weak tui] ch, screen in
-                    guard let tui = tui else { return false }
-                    await tui.inputHandler.handleInput(ch, screen: screen)
-                    return true
+                inputHandler: { _, _ in
+                    // Let the default system handle input
+                    return false
                 },
                 category: .storage
             ),
@@ -386,10 +382,9 @@ final class SwiftModule: OpenStackModule {
                         height: height
                     )
                 },
-                inputHandler: { [weak tui] ch, screen in
-                    guard let tui = tui else { return false }
-                    await tui.inputHandler.handleInput(ch, screen: screen)
-                    return true
+                inputHandler: { _, _ in
+                    // Let the default system handle input
+                    return false
                 },
                 category: .storage
             )
