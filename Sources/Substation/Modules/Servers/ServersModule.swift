@@ -48,10 +48,20 @@ final class ServersModule: OpenStackModule {
     /// Module dependencies - Servers depends on multiple foundational modules
     let dependencies: [String] = ["networks", "images", "flavors", "keypairs", "volumes", "securitygroups"]
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.servers, .serverDetail, .serverResize, .serverCreate, .serverConsole,
+                .serverSnapshotManagement, .serverSecurityGroups, .serverNetworkInterfaces,
+                .serverGroupManagement]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Servers module
+    internal var formState = ServersFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

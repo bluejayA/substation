@@ -39,10 +39,18 @@ final class RoutersModule: OpenStackModule {
     /// Module dependencies - Routers depends on Networks for external gateway configuration
     let dependencies: [String] = ["networks"]
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.routers, .routerDetail, .routerCreate]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Routers module
+    internal var formState = RoutersFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

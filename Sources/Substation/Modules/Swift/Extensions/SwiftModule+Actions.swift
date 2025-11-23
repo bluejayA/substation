@@ -285,17 +285,36 @@ extension SwiftModule {
         operation.status = SwiftBackgroundOperation.OperationStatus.running
 
         do {
-            // If container has objects, delete them first
-            if hasObjects {
-                // Fetch objects
+            var totalDeletedCount = 0
+            var totalFailedCount = 0
+
+            // Keep deleting objects until container is empty
+            // This handles pagination (Swift returns max ~10000 objects per list call)
+            while true {
+                // Check for cancellation
+                if operation.status == SwiftBackgroundOperation.OperationStatus.cancelled {
+                    tui.statusMessage = "Container deletion cancelled"
+                    return
+                }
+
+                // Fetch current objects in container
                 let objects = try await tui.client.swift.listObjects(containerName: containerName)
-                let totalObjects = objects.count
 
-                // Update operation total
-                operation.totalBytes = Int64(totalObjects)
+                // If no objects remain, we're done with object deletion
+                if objects.isEmpty {
+                    Logger.shared.logDebug("Container '\(containerName)' is now empty after deleting \(totalDeletedCount) objects")
+                    break
+                }
 
-                var deletedCount = 0
-                var failedCount = 0
+                let batchSize = objects.count
+                Logger.shared.logDebug("Deleting batch of \(batchSize) objects from '\(containerName)'")
+
+                // Update operation total (estimate based on what we've seen)
+                let estimatedTotal = totalDeletedCount + totalFailedCount + batchSize
+                operation.totalBytes = Int64(estimatedTotal)
+
+                var batchDeletedCount = 0
+                var batchFailedCount = 0
 
                 // Use TaskGroup for concurrent object deletion
                 await withTaskGroup(of: (success: Bool, objectName: String).self) { group in
@@ -326,19 +345,19 @@ extension SwiftModule {
                         // Check for cancellation
                         if operation.status == SwiftBackgroundOperation.OperationStatus.cancelled {
                             group.cancelAll()
-                            tui.statusMessage = "Container deletion cancelled"
                             return
                         }
 
                         if result.success {
-                            deletedCount += 1
+                            batchDeletedCount += 1
                         } else {
-                            failedCount += 1
+                            batchFailedCount += 1
                         }
 
                         // Update progress
-                        operation.progress = Double(deletedCount + failedCount) / Double(totalObjects)
-                        operation.bytesTransferred = Int64(deletedCount + failedCount)
+                        let totalProcessed = totalDeletedCount + totalFailedCount + batchDeletedCount + batchFailedCount
+                        operation.progress = Double(totalProcessed) / Double(estimatedTotal)
+                        operation.bytesTransferred = Int64(totalProcessed)
                         tui.markNeedsRedraw()
 
                         // Start next delete if available
@@ -360,8 +379,16 @@ extension SwiftModule {
                     }
                 }
 
-                if failedCount > 0 {
-                    Logger.shared.logWarning("Deleted \(deletedCount) objects, \(failedCount) failed")
+                totalDeletedCount += batchDeletedCount
+                totalFailedCount += batchFailedCount
+
+                // If we had failures in this batch, abort before trying to delete more
+                if batchFailedCount > 0 {
+                    Logger.shared.logWarning("Batch deletion had \(batchFailedCount) failures, aborting container deletion")
+                    operation.markFailed(error: "Failed to delete \(totalFailedCount) objects")
+                    tui.statusMessage = "Failed to delete container: \(totalFailedCount) objects could not be deleted"
+                    tui.markNeedsRedraw()
+                    return
                 }
             }
 
@@ -371,13 +398,13 @@ extension SwiftModule {
                 return
             }
 
-            // Now delete the container
+            // All objects deleted successfully, now delete the container
             try await tui.client.swift.deleteContainer(containerName: containerName)
 
             // Mark operation as completed
             operation.markCompleted()
             operation.progress = 1.0
-            tui.statusMessage = "Container '\(containerName)' deleted successfully"
+            tui.statusMessage = "Container '\(containerName)' deleted successfully (\(totalDeletedCount) objects)"
             tui.markNeedsRedraw()
 
             // Refresh container cache from server
@@ -386,7 +413,7 @@ extension SwiftModule {
 
             Logger.shared.logUserAction("container_deleted", details: [
                 "containerName": containerName,
-                "objectsDeleted": operation.bytesTransferred
+                "objectsDeleted": totalDeletedCount
             ])
         } catch {
             operation.markFailed(error: error.localizedDescription)
@@ -629,13 +656,26 @@ extension SwiftModule {
             helpText: "Press ESC or ENTER to close"
         )
 
-        // Draw the detail view
+        // Calculate main panel coordinates (accounting for sidebar)
+        let sidebarWidth = LayoutUtilities.shared.calculateSidebarWidth(screenCols: tui.screenCols)
+        let mainStartCol: Int32 = sidebarWidth > 0 ? sidebarWidth + 1 : 0
+        let mainWidth = tui.screenCols - mainStartCol
+
+        // Clear only the main panel area to preserve sidebar
+        // Row 0 is header, content starts at row 2 for proper top padding
+        let surface = SwiftNCurses.surface(from: screen)
+        let contentStartRow: Int32 = 2
+        let mainPanelBounds = Rect(x: mainStartCol, y: contentStartRow, width: mainWidth, height: tui.screenRows - contentStartRow - 2)
+        surface.clear(rect: mainPanelBounds)
+
+        // Draw the detail view in the main panel area
+        // Leave 2 rows at bottom for status bar
         await detailView.draw(
             screen: screen,
-            startRow: 2,
-            startCol: 2,
-            width: tui.screenCols - 4,
-            height: tui.screenRows - 4
+            startRow: contentStartRow,
+            startCol: mainStartCol,
+            width: mainWidth,
+            height: tui.screenRows - contentStartRow - 2
         )
         SwiftNCurses.refresh(WindowHandle(screen))
 

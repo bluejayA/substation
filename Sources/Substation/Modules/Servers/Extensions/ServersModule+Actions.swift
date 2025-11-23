@@ -1043,6 +1043,48 @@ extension ServersModule {
     }
 }
 
+// MARK: - Confirmation Dialog Implementations
+
+extension ServersModule {
+    /// Display a confirmation prompt for server operations
+    ///
+    /// Displays a warning-styled prompt at the bottom of the screen asking
+    /// the user to confirm an operation on the specified server. The prompt
+    /// waits for user input and returns true only if the user presses 'Y' or 'y'.
+    ///
+    /// - Parameters:
+    ///   - tui: The TUI instance for accessing screen dimensions and rendering
+    ///   - itemName: The name of the server being operated on
+    ///   - screen: The ncurses screen pointer
+    ///   - state: The operation state description (e.g., "restart", "delete")
+    /// - Returns: True if the user confirmed with 'Y' or 'y', false otherwise
+    internal func confirmServer(tui: TUI, _ itemName: String, screen: OpaquePointer?, state: String) async -> Bool {
+        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
+        defer {
+            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
+        }
+
+        let surface = SwiftNCurses.surface(from: screen)
+        let promptLine = tui.screenRows - 2
+        let promptBounds = Rect(x: 0, y: promptLine, width: tui.screenCols, height: 1)
+
+        // Display confirmation prompt using SwiftNCurses
+        let promptText = " \(state.capitalized) '\(itemName)'? Press Y to confirm, any other key to cancel: "
+        let promptComponent = Text(promptText).warning()
+
+        surface.clear(rect: promptBounds)
+        await SwiftNCurses.render(promptComponent, on: surface, in: promptBounds)
+
+        let ch = SwiftNCurses.getInput(WindowHandle(screen))
+
+        // Clear prompt
+        surface.clear(rect: promptBounds)
+
+        // Only Y (both uppercase and lowercase) confirms restart
+        return ch == Int32(89) || ch == Int32(121) // 'Y' or 'y'
+    }
+}
+
 // MARK: - Network Interface Action Implementations
 
 extension ServersModule {

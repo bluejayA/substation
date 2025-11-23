@@ -70,9 +70,6 @@ final class TUI {
     private var sessionMetrics = SessionMetrics()
     internal var running = true
 
-    // Phase 2: Render state tracking to prevent background interference
-    internal var isFloatingIPViewRendering = false
-
     // Floating IP server selection state
     internal var searchQuery: String?
     internal var statusMessage: String?
@@ -82,17 +79,6 @@ final class TUI {
     internal var showUnifiedInput: Bool = true // Always show the input bar
     internal lazy var commandMode: CommandMode = CommandMode()
     internal lazy var contextSwitcher: ContextSwitcher = ContextSwitcher(cloudConfigManager: CloudConfigManager())
-
-    // Background operations tracking
-    internal lazy var swiftBackgroundOps: SwiftBackgroundOperationsManager = SwiftBackgroundOperationsManager()
-
-    // Active upload tracking (for status bar display)
-    internal var activeUploadMessage: String? = nil
-    internal var activeUploadTask: Task<Void, Never>? = nil
-
-    // Active download tracking (for status bar display)
-    internal var activeDownloadMessage: String? = nil
-    internal var activeDownloadTask: Task<Void, Never>? = nil
 
     // Telemetry actor for health monitoring
     internal func getTelemetryActor() async -> TelemetryActor? {
@@ -111,119 +97,6 @@ final class TUI {
     internal var loadingProgress: Int = 0
     internal var loadingMessage: String?
     internal var initialDataLoaded = false
-
-    // Server creation form state
-    internal var serverCreateForm = ServerCreateForm()
-    internal var serverCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Network creation form state
-    internal var networkCreateForm = NetworkCreateForm()
-    internal var networkCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Security group creation form state
-    internal var securityGroupCreateForm = SecurityGroupCreateForm()
-    internal var securityGroupCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Subnet creation form state
-    internal var subnetCreateForm = SubnetCreateForm()
-    internal var subnetCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Server resize form state
-    internal var serverResizeForm = ServerResizeForm()
-
-    // Security group management form state
-    internal var securityGroupForm = SecurityGroupManagementForm()
-    internal var securityGroupRuleManagementForm: SecurityGroupRuleManagementForm?
-
-    // Snapshot management form state
-    internal var snapshotManagementForm = SnapshotManagementForm()
-    internal var snapshotManagementFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Volume snapshot management form state
-    internal var volumeSnapshotManagementForm = VolumeSnapshotManagementForm()
-    internal var volumeSnapshotManagementFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Volume backup management form state
-    internal var volumeBackupManagementForm = VolumeBackupManagementForm()
-    internal var volumeBackupManagementFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Network interface management form state
-    internal var networkInterfaceForm = NetworkInterfaceManagementForm()
-
-    // Volume management form state
-    internal var volumeManagementForm = VolumeManagementForm()
-
-    // Allowed address pair management form state
-    internal var allowedAddressPairForm: AllowedAddressPairManagementForm?
-
-    // Volume snapshot list state
-    internal var selectedVolumeForSnapshots: Volume? = nil
-    internal var selectedSnapshotsForDeletion: Set<String> = []
-
-    // Key pair creation form state
-    internal var keyPairCreateForm = KeyPairCreateForm()
-    internal var keyPairCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Volume creation form state
-    internal var volumeCreateForm = VolumeCreateForm()
-    internal var volumeCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Port creation form state
-    internal var portCreateForm = PortCreateForm()
-    internal var portCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Floating IP creation form state
-    internal var floatingIPCreateForm = FloatingIPCreateForm()
-    internal var floatingIPCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Router creation form state
-    internal var routerCreateForm = RouterCreateForm()
-    internal var routerCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Server group creation form state
-    internal var serverGroupCreateForm = ServerGroupCreateForm()
-    internal var serverGroupCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Server group management form state
-    internal var serverGroupManagementForm = ServerGroupManagementForm()
-
-    // Barbican secret creation form state
-    internal var barbicanSecretCreateForm = BarbicanSecretCreateForm()
-    internal var barbicanSecretCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift container creation form state
-    internal var swiftContainerCreateForm = SwiftContainerCreateForm()
-    internal var swiftContainerCreateFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift container metadata form state
-    internal var swiftContainerMetadataForm = SwiftContainerMetadataForm()
-    internal var swiftContainerMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift container web access form state
-    internal var swiftContainerWebAccessForm = SwiftContainerWebAccessForm()
-    internal var swiftContainerWebAccessFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift object metadata form state
-    internal var swiftObjectMetadataForm = SwiftObjectMetadataForm()
-    internal var swiftObjectMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift directory metadata form state
-    internal var swiftDirectoryMetadataForm = SwiftDirectoryMetadataForm()
-    internal var swiftDirectoryMetadataFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift object upload form state
-    internal var swiftObjectUploadForm = SwiftObjectUploadForm()
-    internal var swiftObjectUploadFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift container download form state
-    internal var swiftContainerDownloadForm = SwiftContainerDownloadForm()
-    internal var swiftContainerDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
-
-    // Swift object download form state
-    internal var swiftObjectDownloadForm = SwiftObjectDownloadForm()
-    internal var swiftObjectDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
-    internal var swiftDirectoryDownloadForm = SwiftDirectoryDownloadForm()
-    internal var swiftDirectoryDownloadFormState: FormBuilderState = FormBuilderState(fields: [])
 
     // Debug mode flag
     private var debugMode: Bool = false
@@ -300,14 +173,9 @@ final class TUI {
         )
 
         Logger.shared.logDebug("Initializing resource resolver")
-        // Initialize with empty arrays first (will be populated after data loads)
+        // Initialize with CacheManager for dynamic resource access
         self.resourceResolver = ResourceResolver(
-            cachedServers: [],
-            cachedNetworks: [],
-            cachedImages: [],
-            cachedFlavors: [],
-            cachedSubnets: [],
-            cachedSecurityGroups: [],
+            cacheManager: self.cacheManager,
             resourceNameCache: self.resourceNameCache,
             client: self.client
         )
@@ -327,9 +195,7 @@ final class TUI {
 
         // Setup enhanced features
         Logger.shared.logDebug("Setting up enhanced features")
-        setupMemoryPressureMonitoring()
-        setupPerformanceMonitoring()
-        setupUserFeedbackIntegration()
+        setupPerformanceOptimizationNotifications()
 
         // Initialize SearchEngine with MemoryKit cache
         Logger.shared.logDebug("Initializing SearchEngine with MemoryKit cache")
@@ -377,22 +243,7 @@ final class TUI {
 
     // MARK: - Enhanced Setup Methods
 
-    private func setupMemoryPressureMonitoring() {
-        // MemoryKit provides its own monitoring and cleanup
-        // No additional setup needed
-    }
-
-    private func setupPerformanceMonitoring() {
-        // Performance monitoring is available but not started automatically
-        // to reduce CPU overhead. Call performanceMonitor.startMonitoring()
-        // manually if needed for debugging or profiling.
-        Logger.shared.logDebug("Performance monitoring configured but not started automatically")
-
-        // Note: Enhanced monitoring features would be added here when
-        // PerformanceMonitor supports threshold configuration and alert handlers
-    }
-
-    private func setupUserFeedbackIntegration() {
+    private func setupPerformanceOptimizationNotifications() {
         // Configure user feedback system with enhanced error handling
         Logger.shared.logDebug("Configuring user feedback integration")
         userFeedback.setStatusMessage("System initialized", type: .info)
@@ -409,15 +260,6 @@ final class TUI {
             logger: ConsoleLogger()
         )
 
-        // Setup performance optimization notifications
-        setupPerformanceOptimizationNotifications()
-
-        // MemoryKit integration complete via SubstationMemoryContainer
-        // Error recovery and performance monitoring handled through memoryContainer
-        Logger.shared.logDebug("TUI initialization complete - MemoryKit integration active")
-    }
-
-    private func setupPerformanceOptimizationNotifications() {
         // Listen for performance optimization events
         let observer1 = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("PerformanceOptimizationStarted"),
@@ -490,6 +332,10 @@ final class TUI {
             }
         }
         notificationObservers.append(observer5)
+
+        // MemoryKit integration complete via SubstationMemoryContainer
+        // Error recovery and performance monitoring handled through memoryContainer
+        Logger.shared.logDebug("TUI initialization complete - MemoryKit integration active")
     }
 
     @MainActor
@@ -552,6 +398,40 @@ final class TUI {
     /// Mark view transition for full screen redraw
     internal func markViewTransition() {
         renderCoordinator.markViewTransition()
+    }
+
+    /// Refresh the current view by clearing its cache and fetching fresh data
+    ///
+    /// This method clears the cache for the current view and immediately fetches
+    /// new data from the server. If the active module provides a navigation provider,
+    /// the refresh is delegated to the module.
+    internal func refreshCurrentView() async {
+        let currentView = viewCoordinator.currentView
+
+        Logger.shared.logUserAction("refresh_view", details: ["view": "\(currentView)"])
+
+        // Try to delegate to module's navigation provider
+        if let provider = getActiveNavigationProvider() {
+            do {
+                try await provider.refresh()
+                let itemCount = provider.itemCount
+                statusMessage = "Refreshed: \(itemCount) items"
+                forceRedraw()
+                return
+            } catch {
+                statusMessage = "Refresh failed: \(error.localizedDescription)"
+                Logger.shared.logError("Module refresh failed: \(error)")
+                forceRedraw()
+                return
+            }
+        }
+
+        // Fallback: Clear cache for views without module navigation providers
+        // This handles core views that don't have associated modules
+        await cacheManager.clearAllCaches()
+        statusMessage = "Cache cleared - data will reload"
+
+        forceRedraw()
     }
 
     // Cycle through available refresh intervals
@@ -829,68 +709,48 @@ final class TUI {
         await inputHandler.handleInput(ch, screen: screen)
     }
 
-    // Helper to get max index based on current view (simplified for sync performance)
-    private func getMaxIndexForCurrentView() -> Int {
-        switch viewCoordinator.currentView {
-        case .servers: return cacheManager.cachedServers.count
-        case .volumes: return cacheManager.cachedVolumes.count
-        case .networks: return cacheManager.cachedNetworks.count
-        case .images: return cacheManager.cachedImages.count
-        case .flavors: return cacheManager.cachedFlavors.count
-        case .floatingIPs: return cacheManager.cachedFloatingIPs.count
-        case .routers: return cacheManager.cachedRouters.count
-        case .securityGroups: return cacheManager.cachedSecurityGroups.count
-        case .keyPairs: return cacheManager.cachedKeyPairs.count
-        case .ports: return cacheManager.cachedPorts.count
-        case .subnets: return cacheManager.cachedSubnets.count
-        case .serverGroups: return cacheManager.cachedServerGroups.count
-        case .barbicanSecrets: return cacheManager.cachedSecrets.count
-        case .swift: return cacheManager.cachedSwiftContainers.count
-        case .swiftContainerDetail: return cacheManager.cachedSwiftObjects?.count ?? 0
-        default: return 0
-        }
+    /// Get the active module's navigation provider for the current view
+    ///
+    /// Dynamically routes to the appropriate module based on registered view modes.
+    /// Modules register their handled views during initialization, eliminating
+    /// the need for hardcoded switch statements.
+    ///
+    /// - Returns: The navigation provider for the active module, or nil if not available
+    private func getActiveNavigationProvider() -> (any ModuleNavigationProvider)? {
+        return ModuleRegistry.shared.navigationProvider(for: viewCoordinator.currentView)
     }
 
+    /// Gets the maximum index for the current view
+    ///
+    /// Delegates to the active module's navigation provider for item count.
+    /// All resource-based views are handled by their respective modules.
+    ///
+    /// - Returns: The number of items in the current view
+    private func getMaxIndexForCurrentView() -> Int {
+        // Delegate to module's navigation provider
+        if let provider = getActiveNavigationProvider() {
+            return provider.itemCount
+        }
 
+        // Core views without module association return 0
+        return 0
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    /// Gets the maximum selection index for the current view
+    ///
+    /// Delegates to the active module's navigation provider for the max selection index.
+    /// This accounts for search filtering and returns the appropriate upper bound
+    /// for navigation within the current view.
+    ///
+    /// - Returns: The maximum valid selection index (item count - 1), or 0 if empty
     internal func getMaxSelectionIndex() -> Int {
-        return UIUtils.getMaxSelectionIndex(
-            for: viewCoordinator.currentView,
-            cachedServers: cacheManager.cachedServers,
-            cachedNetworks: cacheManager.cachedNetworks,
-            cachedVolumes: cacheManager.cachedVolumes,
-            cachedImages: cacheManager.cachedImages,
-            cachedFlavors: cacheManager.cachedFlavors,
-            cachedKeyPairs: cacheManager.cachedKeyPairs,
-            cachedSubnets: cacheManager.cachedSubnets,
-            cachedPorts: cacheManager.cachedPorts,
-            cachedRouters: cacheManager.cachedRouters,
-            cachedFloatingIPs: cacheManager.cachedFloatingIPs,
-            cachedServerGroups: cacheManager.cachedServerGroups,
-            cachedSecurityGroups: cacheManager.cachedSecurityGroups,
-            cachedSecrets: cacheManager.cachedSecrets,
-            cachedVolumeSnapshots: cacheManager.cachedVolumeSnapshots,
-            cachedVolumeBackups: cacheManager.cachedVolumeBackups,
-            cachedSwiftContainers: cacheManager.cachedSwiftContainers,
-            cachedSwiftObjects: cacheManager.cachedSwiftObjects,
-            searchQuery: searchQuery,
-            resourceResolver: resourceResolver,
-            swiftNavState: viewCoordinator.swiftNavState
-        )
+        // Delegate to module's navigation provider
+        if let provider = getActiveNavigationProvider() {
+            return provider.maxSelectionIndex
+        }
+
+        // Core views without module association return 0
+        return 0
     }
 
     internal func calculateMaxDetailScrollOffset() -> Int {
@@ -972,22 +832,6 @@ final class TUI {
         return max(0, totalQuotaItems - visibleQuotaItems)
     }
 
-    internal func getSelectedImage() -> Image? {
-        let filteredImages = cacheManager.cachedImages.filter { image in
-            if searchQuery?.isEmpty ?? true {
-                return true
-            }
-            let name = image.name ?? ""
-            let id = image.id
-            let query = searchQuery ?? ""
-            return name.localizedCaseInsensitiveContains(query) ||
-                   id.localizedCaseInsensitiveContains(query)
-        }
-
-        guard viewCoordinator.selectedIndex < filteredImages.count else { return nil }
-        return filteredImages[viewCoordinator.selectedIndex]
-    }
-
     // MARK: - View Management
     internal func changeView(to newView: ViewMode, resetSelection: Bool = true, preserveStatus: Bool = false) {
         if viewCoordinator.currentView != newView && viewCoordinator.currentView != .help {
@@ -1018,29 +862,10 @@ final class TUI {
             statusMessage = nil
         }
 
-        // Ensure data is loaded for specific views
+        // Delegate data loading to module's navigation provider
         Task {
-            switch newView {
-            case .barbicanSecrets, .barbican:
-                if cacheManager.cachedSecrets.isEmpty {
-                    Logger.shared.logInfo("Loading Barbican secrets data on view change")
-                    let _ = await DataProviderRegistry.shared.fetchData(for: "secrets", priority: .onDemand, forceRefresh: true)
-                }
-            case .images:
-                if cacheManager.cachedImages.isEmpty {
-                    Logger.shared.logInfo("Loading images data on view change")
-                    let _ = await DataProviderRegistry.shared.fetchData(for: "images", priority: .onDemand, forceRefresh: true)
-                }
-            case .swiftContainerDetail:
-                // Load objects for the selected container using navigation state
-                if let containerName = viewCoordinator.swiftNavState.currentContainer {
-                    Logger.shared.logInfo("Loading Swift objects for container: \(containerName)")
-                    if let swiftModule = ModuleRegistry.shared.module(for: "swift") as? SwiftModule {
-                        await swiftModule.fetchSwiftObjects(containerName: containerName, priority: "interactive")
-                    }
-                }
-            default:
-                break
+            if let provider = getActiveNavigationProvider() {
+                await provider.ensureDataLoaded(tui: self)
             }
         }
 
@@ -1051,159 +876,42 @@ final class TUI {
 
         // Force full screen redraw for view transitions to prevent artifacts
         markViewTransition()
-
-        // Ensure security groups are loaded when entering port creation view
-        if newView == .portCreate && cacheManager.cachedSecurityGroups.isEmpty {
-            Task {
-                let _ = await DataProviderRegistry.shared.fetchData(for: "securitygroups", priority: .onDemand, forceRefresh: true)
-            }
-        }
     }
 
     // MARK: - Detail View Management
+
+    /// Opens the detail view for the currently selected resource
+    ///
+    /// This method delegates to module navigation providers for resource-specific detail views.
+    /// Each module implements its own `openDetailView(tui:)` method to handle filtering,
+    /// selection validation, and view transitions. Only special cases that are not handled
+    /// by modules have fallback implementations here.
     internal func openDetailView() {
         guard !viewCoordinator.currentView.isDetailView else { return }
 
-        let filteredResources: [Any]
-        let targetDetailView: ViewMode
+        // Delegate to module's navigation provider
+        // All resource-based views are handled by their respective module navigation providers
+        if let provider = getActiveNavigationProvider() {
+            if provider.openDetailView(tui: self) {
+                return
+            }
+        }
 
+        // Fallback for views without module navigation providers
         switch viewCoordinator.currentView {
-        case .servers:
-            filteredResources = FilterUtils.filterServers(cacheManager.cachedServers, query: searchQuery)
-            targetDetailView = .serverDetail
-        case .serverGroups:
-            filteredResources = FilterUtils.filterServerGroups(cacheManager.cachedServerGroups, query: searchQuery)
-            targetDetailView = .serverGroupDetail
-        case .networks:
-            filteredResources = FilterUtils.filterNetworks(cacheManager.cachedNetworks, query: searchQuery)
-            targetDetailView = .networkDetail
-        case .securityGroups:
-            filteredResources = FilterUtils.filterSecurityGroups(cacheManager.cachedSecurityGroups, query: searchQuery)
-            targetDetailView = .securityGroupDetail
-        case .volumes:
-            filteredResources = FilterUtils.filterVolumes(cacheManager.cachedVolumes, query: searchQuery)
-            targetDetailView = .volumeDetail
-        case .images:
-            filteredResources = FilterUtils.filterImages(cacheManager.cachedImages, query: searchQuery)
-            targetDetailView = .imageDetail
-        case .flavors:
-            filteredResources = FilterUtils.filterFlavors(cacheManager.cachedFlavors, query: searchQuery)
-            targetDetailView = .flavorDetail
-        case .subnets:
-            filteredResources = FilterUtils.filterSubnets(cacheManager.cachedSubnets, query: searchQuery)
-            targetDetailView = .subnetDetail
-        case .ports:
-            filteredResources = FilterUtils.filterPorts(cacheManager.cachedPorts, query: searchQuery)
-            targetDetailView = .portDetail
-        case .routers:
-            filteredResources = FilterUtils.filterRouters(cacheManager.cachedRouters, query: searchQuery)
-            targetDetailView = .routerDetail
-        case .keyPairs:
-            filteredResources = FilterUtils.filterKeyPairs(cacheManager.cachedKeyPairs, query: searchQuery)
-            targetDetailView = .keyPairDetail
-        case .floatingIPs:
-            filteredResources = FilterUtils.filterFloatingIPs(cacheManager.cachedFloatingIPs, query: searchQuery)
-            targetDetailView = .floatingIPDetail
         case .healthDashboard:
-            // Use the selected service from health dashboard navigation state
+            // Health dashboard is a core view without a module, handle directly
             if let selectedService = viewCoordinator.healthDashboardNavState.selectedService {
                 viewCoordinator.selectedResource = selectedService
                 changeView(to: .healthDashboardServiceDetail, resetSelection: false)
                 viewCoordinator.detailScrollOffset = 0
-                return
-            } else {
-                return // No service selected
             }
-        case .barbicanSecrets:
-            // Apply the same filtering logic as used in UIUtils.swift
-            let filteredSecrets = searchQuery?.isEmpty ?? true ? cacheManager.cachedSecrets : cacheManager.cachedSecrets.filter { secret in
-                (secret.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false) ||
-                (secret.secretType?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false)
-            }
-            filteredResources = filteredSecrets
-            targetDetailView = .barbicanSecretDetail
-        case .volumeArchives:
-            // Build unified archive list (snapshots + backups + server backups)
-            var archives: [Any] = []
-            archives.append(contentsOf: cacheManager.cachedVolumeSnapshots)
-            archives.append(contentsOf: cacheManager.cachedVolumeBackups)
-
-            // Add server backups (images with image_type == "snapshot")
-            let serverBackups = cacheManager.cachedImages.filter { image in
-                if let properties = image.properties,
-                   let imageType = properties["image_type"],
-                   imageType == "snapshot" {
-                    return true
-                }
-                return false
-            }
-            archives.append(contentsOf: serverBackups)
-
-            // Sort by creation date (newest first)
-            archives.sort { (a, b) -> Bool in
-                let aDate = getArchiveCreationDate(a)
-                let bDate = getArchiveCreationDate(b)
-                return aDate > bDate
-            }
-
-            // Apply search filter if needed
-            if let query = searchQuery, !query.isEmpty {
-                let lowercaseQuery = query.lowercased()
-                archives = archives.filter { archive in
-                    if let snapshot = archive as? VolumeSnapshot {
-                        return (snapshot.name?.lowercased().contains(lowercaseQuery) ?? false) ||
-                               (snapshot.status?.lowercased().contains(lowercaseQuery) ?? false)
-                    } else if let backup = archive as? VolumeBackup {
-                        return (backup.name?.lowercased().contains(lowercaseQuery) ?? false) ||
-                               (backup.status?.lowercased().contains(lowercaseQuery) ?? false)
-                    } else if let image = archive as? Image {
-                        return (image.name?.lowercased().contains(lowercaseQuery) ?? false) ||
-                               (image.status?.lowercased().contains(lowercaseQuery) ?? false)
-                    }
-                    return false
-                }
-            }
-
-            filteredResources = archives
-            targetDetailView = .volumeArchiveDetail
-        case .swift:
-            // Swift containers require special handling (navigateIntoContainer, fetchSwiftObjects)
-            // that is done in the SwiftModule's ViewRegistry inputHandler, not here
             return
-        case .swiftContainerDetail:
-            // When in container detail view, navigating opens object detail
-            if let objects = cacheManager.cachedSwiftObjects {
-                let filteredObjects = searchQuery?.isEmpty ?? true ? objects : objects.filter { object in
-                    object.name?.lowercased().contains(searchQuery?.lowercased() ?? "") ?? false
-                }
-                filteredResources = filteredObjects
-                targetDetailView = .swiftObjectDetail
-            } else {
-                return
-            }
+
         default:
-            return // No detail view available for this view type
+            // No detail view available for this view type
+            return
         }
-
-        // Helper function to get creation date from archive item
-        func getArchiveCreationDate(_ archive: Any) -> Date {
-            if let snapshot = archive as? VolumeSnapshot {
-                return snapshot.createdAt ?? Date.distantPast
-            } else if let backup = archive as? VolumeBackup {
-                return backup.createdAt ?? Date.distantPast
-            } else if let image = archive as? Image {
-                return image.createdAt ?? Date.distantPast
-            }
-            return Date.distantPast
-        }
-
-        // Check if we have resources and a valid selection
-        guard !filteredResources.isEmpty && viewCoordinator.selectedIndex < filteredResources.count else { return }
-
-        // Set the selected resource and change to detail view
-        viewCoordinator.selectedResource = filteredResources[viewCoordinator.selectedIndex]
-        changeView(to: targetDetailView, resetSelection: false)
-        viewCoordinator.detailScrollOffset = 0 // Reset detail scroll when opening
     }    // Immediate refresh for better real-time feedback after operations
 
     internal func refreshAfterOperation() {
@@ -1240,7 +948,6 @@ final class TUI {
         loadingProgress = 4
         loadingMessage = "Ready!"
         await draw(screen: screen)
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
 
         // Mark initial loading as complete and switch to dashboard
         initialDataLoaded = true
@@ -1379,294 +1086,6 @@ final class TUI {
             Logger.shared.logWarning("Screen draw exceeded performance target: \(String(format: "%.1f", totalDrawDuration * 1000))ms")
         }
     }
-
-    internal func confirmServer(_ itemName: String, screen: OpaquePointer?, state: String) async -> Bool {
-        let _ = SwiftNCurses.setNodelay(WindowHandle(screen), false)
-        defer {
-            let _ = SwiftNCurses.setNodelay(WindowHandle(screen), true)
-        }
-
-        let surface = SwiftNCurses.surface(from: screen)
-        let promptLine = screenRows - 2
-        let promptBounds = Rect(x: 0, y: promptLine, width: screenCols, height: 1)
-
-        // Display confirmation prompt using SwiftNCurses
-        let promptText = " \(state.capitalized) '\(itemName)'? Press Y to confirm, any other key to cancel: "
-        let promptComponent = Text(promptText).warning()
-
-        surface.clear(rect: promptBounds)
-        await SwiftNCurses.render(promptComponent, on: surface, in: promptBounds)
-
-        let ch = SwiftNCurses.getInput(WindowHandle(screen))
-
-        // Clear prompt
-        surface.clear(rect: promptBounds)
-
-        // Only Y (both uppercase and lowercase) confirms restart
-        return ch == Int32(89) || ch == Int32(121) // 'Y' or 'y'
-    }
-
-
-    internal func generateFlavorRecommendations(for workloadType: WorkloadType, screen: OpaquePointer?) async {
-        // Check if we have cached recommendations for this workload type
-        if let cachedRecs = cacheManager.cachedFlavorRecommendations[workloadType], !cachedRecs.isEmpty {
-            Logger.shared.logDebug("Using cached flavor recommendations for \(workloadType.displayName)")
-            serverCreateForm.flavorRecommendations = cachedRecs
-            statusMessage = "Loaded \(cachedRecs.count) cached recommendations for \(workloadType.displayName)"
-            forceRedraw() // Force immediate UI refresh for cached recommendations
-            await self.draw(screen: screen)
-            return
-        }
-
-        statusMessage = "Generating comprehensive flavor recommendations..."
-        await self.draw(screen: screen)
-
-        do {
-            var recommendations: [FlavorRecommendation] = []
-
-            // Generate recommendations for different usage scenarios
-            let scenarios = generateWorkloadScenarios(for: workloadType)
-
-            for (index, scenario) in scenarios.enumerated() {
-                statusMessage = "Analyzing scenario \(index + 1)/\(scenarios.count): \(scenario.name)..."
-                await self.draw(screen: screen)
-
-                let recommendation = try await client.suggestOptimalSize(
-                    workloadType: workloadType,
-                    expectedLoad: scenario.loadProfile,
-                    budget: scenario.budget
-                )
-
-                // Enhance the recommendation with scenario context
-                let enhancedRecommendation = FlavorRecommendation(
-                    recommendedFlavor: recommendation.recommendedFlavor,
-                    alternativeFlavors: recommendation.alternativeFlavors,
-                    reasoningScore: recommendation.reasoningScore,
-                    reasoning: "SCENARIO: \(scenario.name)\n\(scenario.description)\n\n\(recommendation.reasoning)",
-                    estimatedMonthlyCost: recommendation.estimatedMonthlyCost,
-                    performanceProfile: recommendation.performanceProfile
-                )
-
-                recommendations.append(enhancedRecommendation)
-            }
-
-            // Update the form's workload type to match the selected one
-            serverCreateForm.workloadType = workloadType
-
-            // Sort recommendations by score (best first)
-            let sortedRecommendations = recommendations.sorted { $0.reasoningScore > $1.reasoningScore }
-            serverCreateForm.setFlavorRecommendations(sortedRecommendations)
-
-            // Cache the generated recommendations for future use
-            cacheManager.cachedFlavorRecommendations[workloadType] = sortedRecommendations
-            Logger.shared.logDebug("Cached \(sortedRecommendations.count) recommendations for \(workloadType.displayName)")
-
-            statusMessage = "Generated \(recommendations.count) flavor recommendations for \(workloadType.displayName)"
-        } catch {
-            statusMessage = "Failed to generate recommendations: \(error.localizedDescription)"
-            serverCreateForm.clearFlavorRecommendations()
-        }
-        forceRedraw() // Force immediate UI refresh for newly generated recommendations
-        await self.draw(screen: screen)
-    }
-
-    internal func generateWorkloadScenarios(for workloadType: WorkloadType) -> [(name: String, description: String, loadProfile: LoadProfile, budget: Budget)] {
-        let defaultBudget = serverCreateForm.optimizationBudget ?? Budget(
-            maxMonthlyCost: 1000.0,
-            currency: "USD"
-        )
-
-        switch workloadType {
-        case .compute:
-            return [
-                (
-                    name: "Light Computing",
-                    description: "Basic CPU tasks, development, testing",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.6,
-                        memoryUtilization: 0.4,
-                        diskIOPS: 500,
-                        networkThroughput: 50,
-                        concurrentUsers: 5
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 0.5, currency: "USD")
-                ),
-                (
-                    name: "Intensive Computing",
-                    description: "Heavy calculations, batch processing, compilation",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.9,
-                        memoryUtilization: 0.6,
-                        diskIOPS: 1000,
-                        networkThroughput: 100,
-                        concurrentUsers: 20
-                    ),
-                    budget: defaultBudget
-                ),
-                (
-                    name: "High-Performance Computing",
-                    description: "Scientific computing, simulations, rendering",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.95,
-                        memoryUtilization: 0.8,
-                        diskIOPS: 2000,
-                        networkThroughput: 200,
-                        concurrentUsers: 50
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 2.0, currency: "USD")
-                )
-            ]
-
-        case .memory:
-            return [
-                (
-                    name: "Medium Memory Load",
-                    description: "Application caching, small databases",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.4,
-                        memoryUtilization: 0.7,
-                        diskIOPS: 800,
-                        networkThroughput: 100,
-                        concurrentUsers: 25
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 0.7, currency: "USD")
-                ),
-                (
-                    name: "High Memory Load",
-                    description: "In-memory databases, big data analytics",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.5,
-                        memoryUtilization: 0.9,
-                        diskIOPS: 1500,
-                        networkThroughput: 200,
-                        concurrentUsers: 100
-                    ),
-                    budget: defaultBudget
-                ),
-                (
-                    name: "Extreme Memory Load",
-                    description: "Large in-memory datasets, real-time analytics",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.6,
-                        memoryUtilization: 0.95,
-                        diskIOPS: 2500,
-                        networkThroughput: 500,
-                        concurrentUsers: 200
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 2.5, currency: "USD")
-                )
-            ]
-
-        case .storage:
-            return [
-                (
-                    name: "Moderate I/O",
-                    description: "File servers, document storage",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.3,
-                        memoryUtilization: 0.4,
-                        diskIOPS: 2000,
-                        networkThroughput: 200,
-                        concurrentUsers: 50
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 0.6, currency: "USD")
-                ),
-                (
-                    name: "High I/O",
-                    description: "Database servers, backup systems",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.5,
-                        memoryUtilization: 0.6,
-                        diskIOPS: 5000,
-                        networkThroughput: 500,
-                        concurrentUsers: 100
-                    ),
-                    budget: defaultBudget
-                ),
-                (
-                    name: "Extreme I/O",
-                    description: "High-performance databases, distributed storage",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.6,
-                        memoryUtilization: 0.7,
-                        diskIOPS: 10000,
-                        networkThroughput: 1000,
-                        concurrentUsers: 250
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 2.0, currency: "USD")
-                )
-            ]
-
-        case .network:
-            return [
-                (
-                    name: "Web Application",
-                    description: "Standard web servers, API services",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.5,
-                        memoryUtilization: 0.5,
-                        diskIOPS: 1000,
-                        networkThroughput: 500,
-                        concurrentUsers: 100
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 0.7, currency: "USD")
-                ),
-                (
-                    name: "High-Traffic Web",
-                    description: "Load balancers, CDN, high-traffic sites",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.6,
-                        memoryUtilization: 0.6,
-                        diskIOPS: 2000,
-                        networkThroughput: 2000,
-                        concurrentUsers: 500
-                    ),
-                    budget: defaultBudget
-                ),
-                (
-                    name: "Network Gateway",
-                    description: "Routers, gateways, network appliances",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.7,
-                        memoryUtilization: 0.4,
-                        diskIOPS: 1500,
-                        networkThroughput: 5000,
-                        concurrentUsers: 1000
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 1.5, currency: "USD")
-                )
-            ]
-
-        default:
-            // Balanced, GPU, Accelerated workloads
-            return [
-                (
-                    name: "Standard Workload",
-                    description: "Balanced resource usage, general applications",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.6,
-                        memoryUtilization: 0.6,
-                        diskIOPS: 1000,
-                        networkThroughput: 200,
-                        concurrentUsers: 50
-                    ),
-                    budget: defaultBudget
-                ),
-                (
-                    name: "Heavy Workload",
-                    description: "Resource-intensive applications",
-                    loadProfile: LoadProfile(
-                        cpuUtilization: 0.8,
-                        memoryUtilization: 0.8,
-                        diskIOPS: 2000,
-                        networkThroughput: 500,
-                        concurrentUsers: 100
-                    ),
-                    budget: Budget(maxMonthlyCost: defaultBudget.maxMonthlyCost * 1.5, currency: "USD")
-                )
-            ]
-        }
-    }
 }
 
 // MARK: - Supporting Types
@@ -1677,7 +1096,3 @@ private struct SessionMetrics {
     var connectionErrors = 0
     var frameCount = 0
 }
-
-
-
-

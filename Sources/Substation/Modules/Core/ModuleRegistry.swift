@@ -10,6 +10,9 @@ final class ModuleRegistry {
     private var loadOrder: [String] = []
     private weak var tui: TUI?
 
+    /// Mapping from ViewMode to module identifier for dynamic navigation routing
+    private var viewModeToModule: [ViewMode: String] = [:]
+
     private init() {}
 
     /// Initialize registry with TUI context
@@ -116,6 +119,31 @@ final class ModuleRegistry {
         if !actions.isEmpty {
             Logger.shared.logDebug("[ModuleRegistry] Registered \(actions.count) actions for \(module.identifier)", context: [:])
         }
+
+        // Register view mode mappings for dynamic navigation routing
+        let handledViews = module.handledViewModes
+        for viewMode in handledViews {
+            viewModeToModule[viewMode] = module.identifier
+        }
+
+        if !handledViews.isEmpty {
+            Logger.shared.logDebug("[ModuleRegistry] Registered \(handledViews.count) view modes for \(module.identifier)", context: [:])
+        }
+    }
+
+    /// Get navigation provider for a specific view mode
+    ///
+    /// Dynamically routes to the appropriate module based on registered view modes.
+    /// This eliminates the need for hardcoded switch statements in TUI.swift.
+    ///
+    /// - Parameter viewMode: The current view mode
+    /// - Returns: The navigation provider for the module that handles this view, or nil
+    func navigationProvider(for viewMode: ViewMode) -> (any ModuleNavigationProvider)? {
+        guard let moduleIdentifier = viewModeToModule[viewMode],
+              let module = modules[moduleIdentifier] else {
+            return nil
+        }
+        return module.navigationProvider
     }
 
     /// Get module by identifier
@@ -132,6 +160,13 @@ final class ModuleRegistry {
     func unload(_ identifier: String) async {
         guard let module = modules[identifier] else { return }
         await module.cleanup()
+
+        // Remove view mode mappings for this module
+        let handledViews = module.handledViewModes
+        for viewMode in handledViews {
+            viewModeToModule.removeValue(forKey: viewMode)
+        }
+
         modules.removeValue(forKey: identifier)
         loadOrder.removeAll { $0 == identifier }
         Logger.shared.logInfo("[ModuleRegistry] Unloaded module: \(identifier)")
@@ -150,6 +185,7 @@ final class ModuleRegistry {
     func clear() {
         modules.removeAll()
         loadOrder.removeAll()
+        viewModeToModule.removeAll()
     }
 
     // MARK: - Hot Reload Support

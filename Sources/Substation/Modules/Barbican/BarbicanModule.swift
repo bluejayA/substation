@@ -28,10 +28,18 @@ final class BarbicanModule: OpenStackModule {
     /// Module dependencies (Barbican has no dependencies)
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.barbican, .barbicanSecrets, .barbicanSecretDetail, .barbicanSecretCreate]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Barbican module
+    internal var formState = BarbicanFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

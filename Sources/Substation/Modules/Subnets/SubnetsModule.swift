@@ -44,10 +44,18 @@ final class SubnetsModule: OpenStackModule {
     /// Module dependencies - Subnets depends on Networks as parent resource
     let dependencies: [String] = ["networks"]
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.subnets, .subnetDetail, .subnetCreate, .subnetRouterManagement]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Subnets module
+    internal var formState = SubnetsFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

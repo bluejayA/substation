@@ -225,12 +225,7 @@ final class ContextSwitcher: @unchecked Sendable {
 
             // Update ResourceResolver with new client
             tui.resourceResolver = ResourceResolver(
-                cachedServers: tui.cacheManager.cachedServers,
-                cachedNetworks: tui.cacheManager.cachedNetworks,
-                cachedImages: tui.cacheManager.cachedImages,
-                cachedFlavors: tui.cacheManager.cachedFlavors,
-                cachedSubnets: tui.cacheManager.cachedSubnets,
-                cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups,
+                cacheManager: tui.cacheManager,
                 resourceNameCache: tui.resourceNameCache,
                 client: newClient
             )
@@ -259,12 +254,7 @@ final class ContextSwitcher: @unchecked Sendable {
                 maxConcurrency: 10
             )
             tui.resourceResolver = ResourceResolver(
-                cachedServers: tui.cacheManager.cachedServers,
-                cachedNetworks: tui.cacheManager.cachedNetworks,
-                cachedImages: tui.cacheManager.cachedImages,
-                cachedFlavors: tui.cacheManager.cachedFlavors,
-                cachedSubnets: tui.cacheManager.cachedSubnets,
-                cachedSecurityGroups: tui.cacheManager.cachedSecurityGroups,
+                cacheManager: tui.cacheManager,
                 resourceNameCache: tui.resourceNameCache,
                 client: previousClient
             )

@@ -478,8 +478,8 @@ final class ViewCoordinator {
 
             // Sort by creation date (newest first)
             archives.sort { (a, b) -> Bool in
-                let aDate = getArchiveCreationDate(a)
-                let bDate = getArchiveCreationDate(b)
+                let aDate = ArchiveUtilities.getArchiveCreationDate(a)
+                let bDate = ArchiveUtilities.getArchiveCreationDate(b)
                 return aDate > bDate
             }
 
@@ -532,22 +532,5 @@ final class ViewCoordinator {
         selectedResource = filteredResources[selectedIndex]
         changeView(to: targetDetailView, resetSelection: false)
         detailScrollOffset = 0 // Reset detail scroll when opening
-    }
-
-    // MARK: - Private Helpers
-
-    /// Get the creation date from an archive item
-    ///
-    /// - Parameter archive: The archive item (VolumeSnapshot, VolumeBackup, or Image)
-    /// - Returns: The creation date or distant past if not available
-    private func getArchiveCreationDate(_ archive: Any) -> Date {
-        if let snapshot = archive as? VolumeSnapshot {
-            return snapshot.createdAt ?? Date.distantPast
-        } else if let backup = archive as? VolumeBackup {
-            return backup.createdAt ?? Date.distantPast
-        } else if let image = archive as? Image {
-            return image.createdAt ?? Date.distantPast
-        }
-        return Date.distantPast
     }
 }

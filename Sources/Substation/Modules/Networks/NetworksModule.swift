@@ -41,10 +41,19 @@ final class NetworksModule: OpenStackModule {
     /// Module dependencies - Networks has no dependencies as it is a base module
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.networks, .networkDetail, .networkCreate, .networkServerAttachment,
+                .networkServerManagement]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Networks module
+    internal var formState = NetworksFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

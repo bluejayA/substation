@@ -42,10 +42,19 @@ final class PortsModule: OpenStackModule {
     /// Module dependencies - Ports depends on Networks module
     let dependencies: [String] = ["networks"]
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.ports, .portDetail, .portCreate, .portServerManagement,
+                .portAllowedAddressPairManagement]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Ports module
+    internal var formState = PortsFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

@@ -574,8 +574,8 @@ extension VolumesModule {
 
         // Sort by creation date
         archives.sort { (a, b) -> Bool in
-            let aDate = getArchiveCreationDate(a)
-            let bDate = getArchiveCreationDate(b)
+            let aDate = ArchiveUtilities.getArchiveCreationDate(a)
+            let bDate = ArchiveUtilities.getArchiveCreationDate(b)
             return aDate > bDate
         }
 
@@ -702,21 +702,6 @@ extension VolumesModule {
         } else {
             tui.statusMessage = "Cannot delete server backups from Volume Archives view"
         }
-    }
-
-    /// Get the creation date from an archive item
-    ///
-    /// - Parameter archive: The archive item (VolumeSnapshot, VolumeBackup, or Image)
-    /// - Returns: The creation date, or distant past if unavailable
-    private func getArchiveCreationDate(_ archive: Any) -> Date {
-        if let snapshot = archive as? VolumeSnapshot {
-            return snapshot.createdAt ?? Date.distantPast
-        } else if let backup = archive as? VolumeBackup {
-            return backup.createdAt ?? Date.distantPast
-        } else if let image = archive as? Image {
-            return image.createdAt ?? Date.distantPast
-        }
-        return Date.distantPast
     }
 
     /// Execute volume snapshot creation

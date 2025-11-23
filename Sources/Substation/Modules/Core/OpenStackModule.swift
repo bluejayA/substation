@@ -58,6 +58,21 @@ protocol OpenStackModule {
     ///
     /// - Parameter config: Module-specific configuration
     func loadConfiguration(_ config: ModuleConfig?)
+
+    /// Navigation provider for this module
+    ///
+    /// Returns self if the module conforms to ModuleNavigationProvider,
+    /// allowing the TUI to delegate navigation operations to the module.
+    /// Modules that implement navigation functionality should conform to
+    /// ModuleNavigationProvider and return self here.
+    var navigationProvider: (any ModuleNavigationProvider)? { get }
+
+    /// View modes handled by this module
+    ///
+    /// Returns the set of ViewMode cases that this module handles.
+    /// This is used by the ModuleRegistry to dynamically route navigation
+    /// operations to the appropriate module without hardcoded switch statements.
+    var handledViewModes: Set<ViewMode> { get }
 }
 
 // MARK: - Default Implementations
@@ -86,5 +101,22 @@ extension OpenStackModule {
             "Module '\(identifier)' has no configuration handler",
             context: [:]
         )
+    }
+
+    /// Default implementation returns nil
+    ///
+    /// Modules that implement ModuleNavigationProvider should override
+    /// this property to return self. This enables the TUI to delegate
+    /// navigation operations to the module.
+    var navigationProvider: (any ModuleNavigationProvider)? {
+        return nil
+    }
+
+    /// Default implementation returns empty set
+    ///
+    /// Modules should override this property to return the set of ViewMode
+    /// cases they handle. This enables dynamic routing of navigation operations.
+    var handledViewModes: Set<ViewMode> {
+        return []
     }
 }

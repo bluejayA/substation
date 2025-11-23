@@ -262,6 +262,19 @@ class InputHandler {
                     }
                     return
 
+                case .refreshView:
+                    // Refresh the current view by clearing cache and fetching fresh data
+                    Task {
+                        tui.statusMessage = "Refreshing..."
+                        tui.forceRedraw()
+
+                        await tui.refreshCurrentView()
+
+                        tui.unifiedInputState.clear()
+                        tui.forceRedraw()
+                    }
+                    return
+
                 case .ignored:
                     break
                 }

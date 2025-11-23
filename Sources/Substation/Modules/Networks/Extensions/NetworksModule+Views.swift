@@ -181,7 +181,7 @@ extension NetworksModule {
             ViewMetadata(
                 identifier: Views.serverManagement,
                 title: "Server Management",
-                parentViewId: Views.detail.id,
+                parentViewId: Views.list.id,
                 isDetailView: false,
                 supportsMultiSelect: true,
                 category: .network,
@@ -206,7 +206,11 @@ extension NetworksModule {
                         )
                     }
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleNetworkServerManagementInput(ch, screen: screen)
+                    return true
+                }
             )
         ]
     }

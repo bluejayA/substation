@@ -31,6 +31,11 @@ final class ImagesModule: OpenStackModule {
     /// Module dependencies (Images has no dependencies)
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.images, .imageDetail]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles

@@ -29,6 +29,11 @@ final class FlavorsModule: OpenStackModule {
     /// Module dependencies (none for flavors)
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.flavors, .flavorDetail, .flavorSelection]
+    }
+
     // MARK: - TUI Reference
 
     /// Reference to TUI system

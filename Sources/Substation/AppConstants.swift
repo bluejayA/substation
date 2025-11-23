@@ -4,17 +4,6 @@ import Foundation
 /// Centralizes configuration paths, app metadata, and system defaults
 enum AppConstants {
 
-    // MARK: - Application Info
-
-    /// Application name
-    static let appName = "Substation"
-
-    /// Application version
-    static let appVersion = "2.0.0"
-
-    /// Application identifier
-    static let appIdentifier = "com.openstack.substation"
-
     // MARK: - Configuration Paths
 
     /// Base configuration directory path
@@ -41,27 +30,6 @@ enum AppConstants {
     static var welcomeMarkerPath: String {
         return "\(configDirectory)/.welcome_shown"
     }
-
-    /// OpenStack clouds configuration path (standard location)
-    /// Location: ~/.config/openstack/clouds.yaml
-    static var cloudsConfigPath: String {
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(homeDir)/.config/openstack/clouds.yaml"
-    }
-
-    // MARK: - Default Values
-
-    /// Default command history size
-    static let defaultCommandHistorySize = 50
-
-    /// Default navigation mode
-    static let defaultNavigationMode = "commandOnly"
-
-    /// Default tab completion enabled
-    static let defaultTabCompletionEnabled = true
-
-    /// Default command history enabled
-    static let defaultCommandHistoryEnabled = true
 
     // MARK: - Directory Management
 

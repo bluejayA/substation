@@ -29,11 +29,20 @@ final class FloatingIPsModule: OpenStackModule {
     /// Module dependencies - requires Networks module
     let dependencies: [String] = ["networks"]
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.floatingIPs, .floatingIPDetail, .floatingIPCreate, .floatingIPServerSelect,
+                .floatingIPServerManagement, .floatingIPPortManagement]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     /// Note: Internal access to allow extension in separate file to access this property
     internal weak var tui: TUI?
+
+    /// Form state container for FloatingIPs module
+    internal var formState = FloatingIPsFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

@@ -31,10 +31,20 @@ final class SecurityGroupsModule: OpenStackModule {
     /// Module dependencies (Security Groups has no dependencies)
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.securityGroups, .securityGroupDetail, .securityGroupCreate,
+                .securityGroupRuleManagement, .securityGroupServerAttachment,
+                .securityGroupServerManagement]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Security Groups module
+    internal var formState = SecurityGroupsFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

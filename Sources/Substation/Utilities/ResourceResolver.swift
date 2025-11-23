@@ -1,33 +1,37 @@
 import Foundation
 import OSClient
 
+/// Resolves resource names from UUIDs using cached data
+///
+/// This struct dynamically accesses cached data from the CacheManager,
+/// ensuring it always has the latest cached resources without needing
+/// to be recreated when cache updates occur.
 @MainActor
 struct ResourceResolver {
-    private let cachedServers: [Server]
-    private let cachedNetworks: [Network]
-    private let cachedImages: [Image]
-    private let cachedFlavors: [Flavor]
-    private let cachedSubnets: [Subnet]
-    private let cachedSecurityGroups: [SecurityGroup]
+    private let cacheManager: CacheManager
     private let resourceNameCache: ResourceNameCache
     private let client: OSClient
 
+    /// Dynamic accessors for cached resources from CacheManager
+    private var cachedServers: [Server] { cacheManager.cachedServers }
+    private var cachedNetworks: [Network] { cacheManager.cachedNetworks }
+    private var cachedImages: [Image] { cacheManager.cachedImages }
+    private var cachedFlavors: [Flavor] { cacheManager.cachedFlavors }
+    private var cachedSubnets: [Subnet] { cacheManager.cachedSubnets }
+    private var cachedSecurityGroups: [SecurityGroup] { cacheManager.cachedSecurityGroups }
+
+    /// Initialize with CacheManager for dynamic resource access
+    ///
+    /// - Parameters:
+    ///   - cacheManager: The cache manager holding all cached resources
+    ///   - resourceNameCache: Cache for resolved resource names
+    ///   - client: The OpenStack client
     init(
-        cachedServers: [Server],
-        cachedNetworks: [Network],
-        cachedImages: [Image],
-        cachedFlavors: [Flavor],
-        cachedSubnets: [Subnet],
-        cachedSecurityGroups: [SecurityGroup],
+        cacheManager: CacheManager,
         resourceNameCache: ResourceNameCache,
         client: OSClient
     ) {
-        self.cachedServers = cachedServers
-        self.cachedNetworks = cachedNetworks
-        self.cachedImages = cachedImages
-        self.cachedFlavors = cachedFlavors
-        self.cachedSubnets = cachedSubnets
-        self.cachedSecurityGroups = cachedSecurityGroups
+        self.cacheManager = cacheManager
         self.resourceNameCache = resourceNameCache
         self.client = client
     }

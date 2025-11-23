@@ -28,11 +28,19 @@ final class KeyPairsModule: OpenStackModule {
     /// Module dependencies (KeyPairs has no dependencies)
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.keyPairs, .keyPairDetail, .keyPairCreate]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     /// Note: Internal access to allow extension in separate file to access this property
     internal weak var tui: TUI?
+
+    /// Form state container for KeyPairs module
+    internal var formState = KeyPairsFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

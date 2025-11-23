@@ -16,10 +16,22 @@ final class SwiftModule: OpenStackModule {
     let version: String = "1.0.0"
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.swift, .swiftContainerDetail, .swiftObjectDetail, .swiftContainerCreate,
+                .swiftObjectUpload, .swiftObjectDownload, .swiftDirectoryDownload,
+                .swiftContainerDownload, .swiftContainerMetadata, .swiftObjectMetadata,
+                .swiftDirectoryMetadata, .swiftContainerWebAccess, .swiftBackgroundOperations,
+                .swiftBackgroundOperationDetail]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Swift module
+    internal var formState = SwiftFormState()
 
     /// Background sync task for keeping active container cache up to date
     private var backgroundSyncTask: Task<Void, Never>?
@@ -215,7 +227,7 @@ final class SwiftModule: OpenStackModule {
     /// - Parameters:
     ///   - containerName: Name of the container
     ///   - objects: All objects in the container
-    private func prefetchSubdirectoryTrees(containerName: String, objects: [SwiftObject]) async {
+    func prefetchSubdirectoryTrees(containerName: String, objects: [SwiftObject]) async {
         // Build tree for root path to identify top-level directories
         let rootTree = SwiftTreeItem.buildTree(from: objects, currentPath: "")
 

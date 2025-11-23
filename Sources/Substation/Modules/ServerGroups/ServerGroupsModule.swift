@@ -22,10 +22,18 @@ final class ServerGroupsModule: OpenStackModule {
     /// Module dependencies (none for server groups)
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.serverGroups, .serverGroupDetail, .serverGroupCreate]
+    }
+
     // MARK: - TUI Reference
 
     /// Reference to TUI system
     internal weak var tui: TUI?
+
+    /// Form state container for ServerGroups module
+    internal var formState = ServerGroupsFormState()
 
     // MARK: - Initialization
 

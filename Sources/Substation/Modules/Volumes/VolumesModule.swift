@@ -32,10 +32,20 @@ final class VolumesModule: OpenStackModule {
     /// Module dependencies (Volumes has no dependencies)
     let dependencies: [String] = []
 
+    /// View modes handled by this module
+    var handledViewModes: Set<ViewMode> {
+        return [.volumes, .volumeDetail, .volumeCreate, .volumeArchives, .volumeArchiveDetail,
+                .volumeManagement, .volumeServerManagement, .volumeSnapshotManagement,
+                .volumeBackupManagement]
+    }
+
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Volumes module
+    internal var formState = VolumesFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?

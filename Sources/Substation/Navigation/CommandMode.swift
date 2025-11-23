@@ -46,6 +46,7 @@ final class CommandMode: @unchecked Sendable {
         case showExamples
         case showWelcome
         case reloadModule(String?)  // nil means reload all
+        case refreshView
     }
 
     func executeCommand(_ command: String) -> CommandResult {
@@ -103,6 +104,11 @@ final class CommandMode: @unchecked Sendable {
                 }
             }
             return .error("Usage: :reload or :reload <module-name>")
+        }
+
+        // Refresh command - clear cache and reload current view data
+        if trimmed == "refresh" || trimmed == "r" {
+            return .refreshView
         }
 
         // Context switching commands
@@ -371,15 +377,34 @@ final class CommandMode: @unchecked Sendable {
 
     // MARK: - Context-Aware Suggestions
 
-    func getContextualSuggestions(currentView: ViewMode) -> [String] {
-        // Suggest related resources based on current view
+    /// Get contextual command suggestions based on the current view
+    ///
+    /// This method queries the active module's navigation provider for suggestions
+    /// if available, otherwise falls back to hardcoded suggestions based on view type.
+    ///
+    /// - Parameters:
+    ///   - currentView: The current view mode
+    ///   - navigationProvider: Optional navigation provider from the active module
+    /// - Returns: Array of suggested command strings
+    func getContextualSuggestions(currentView: ViewMode, navigationProvider: (any ModuleNavigationProvider)? = nil) -> [String] {
+        // Try to get suggestions from module's navigation provider
+        if let provider = navigationProvider {
+            let suggestions = provider.getContextualSuggestions()
+            if !suggestions.isEmpty {
+                return suggestions
+            }
+        }
+
+        // Fallback: Suggest related resources based on current view
         switch currentView {
-        case .servers:
-            return ["flavors", "images", "servergroups", "volumes"]
-        case .networks:
-            return ["subnets", "ports", "routers", "floatingips"]
-        case .volumes:
+        case .servers, .serverDetail, .serverResize, .serverCreate, .serverConsole:
+            return ["flavors", "images", "servergroups", "volumes", "networks", "securitygroups"]
+        case .networks, .networkDetail, .networkCreate:
+            return ["subnets", "ports", "routers", "floatingips", "securitygroups"]
+        case .volumes, .volumeDetail, .volumeCreate:
             return ["servers", "images", "archives"]
+        case .swift, .swiftContainerDetail:
+            return ["volumes", "images", "servers"]
         case .dashboard:
             return ["servers", "networks", "volumes", "topology"]
         default:
