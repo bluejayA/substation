@@ -92,6 +92,9 @@ extension SwiftModule {
                             tui.viewCoordinator.isLoadingSwiftObjects = true
                         }
 
+                        // Clear VirtualScrollManager before navigating to new container
+                        tui.viewCoordinator.swiftNavState.clearVirtualScrollManager()
+
                         tui.viewCoordinator.swiftNavState.navigateIntoContainer(containerName)
                         tui.changeView(to: .swiftContainerDetail, resetSelection: true)
                         // Set selectedResource AFTER changeView because resetSelection clears it

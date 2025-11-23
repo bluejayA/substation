@@ -17,6 +17,18 @@ public final class SwiftNavigationState {
     /// Example: ["dir1", "dir2"] represents path "dir1/dir2/"
     private(set) var currentPath: [String]
 
+    // MARK: - Virtual Scroll Manager Persistence
+
+    /// Persisted VirtualScrollManager for efficient rendering of large lists
+    /// This is preserved across renders to avoid recreation overhead
+    internal var virtualScrollManager: VirtualScrollManager<SwiftTreeItem>?
+
+    /// Track the last data hash to detect when manager needs updating
+    private var lastDataHash: Int = 0
+
+    /// Track the last viewport height to detect config changes
+    private var lastViewportHeight: Int = 0
+
     /// Full path string with trailing slash (e.g., "dir1/dir2/")
     public var currentPathString: String {
         guard !currentPath.isEmpty else { return "" }
@@ -113,6 +125,7 @@ public final class SwiftNavigationState {
         Logger.shared.logDebug("Resetting navigation to container list")
         currentContainer = nil
         currentPath = []
+        clearVirtualScrollManager()
     }
 
     /// Reset to container root (keeps container, clears path)
@@ -148,5 +161,79 @@ public final class SwiftNavigationState {
         } else {
             return "Objects in: \(breadcrumb)"
         }
+    }
+
+    // MARK: - Virtual Scroll Manager Management
+
+    /// Get or create a VirtualScrollManager for the current data
+    ///
+    /// - Parameters:
+    ///   - items: The filtered items to display
+    ///   - viewportHeight: The current viewport height
+    /// - Returns: A configured VirtualScrollManager, reused if data hasn't changed
+    internal func getOrCreateVirtualScrollManager(
+        for items: [SwiftTreeItem],
+        viewportHeight: Int
+    ) -> VirtualScrollManager<SwiftTreeItem> {
+        // Calculate a simple hash based on item count and first/last item IDs
+        // This is faster than hashing all items
+        var hasher = Hasher()
+        hasher.combine(items.count)
+        if let first = items.first {
+            hasher.combine(first.id)
+        }
+        if let last = items.last {
+            hasher.combine(last.id)
+        }
+        // Include path in hash to detect navigation changes
+        hasher.combine(currentPathString)
+        let dataHash = hasher.finalize()
+
+        // Check if we can reuse the existing manager
+        if let existingManager = virtualScrollManager,
+           dataHash == lastDataHash,
+           viewportHeight == lastViewportHeight {
+            Logger.shared.logDebug("SwiftNavigationState - Reusing VirtualScrollManager (items: \(items.count))")
+            return existingManager
+        }
+
+        // Create new manager with updated configuration
+        let config = VirtualScrollConfig(
+            viewportHeight: viewportHeight,
+            bufferSize: 10,
+            minimumItemHeight: 1,
+            maxRenderItems: 50,
+            scrollSensitivity: 1.0
+        )
+
+        let manager = VirtualScrollManager<SwiftTreeItem>(config: config)
+        manager.updateData(items)
+
+        // Store for reuse
+        virtualScrollManager = manager
+        lastDataHash = dataHash
+        lastViewportHeight = viewportHeight
+
+        Logger.shared.logDebug("SwiftNavigationState - Created new VirtualScrollManager (items: \(items.count), viewport: \(viewportHeight))")
+        return manager
+    }
+
+    /// Clear the VirtualScrollManager when navigation changes
+    internal func clearVirtualScrollManager() {
+        virtualScrollManager = nil
+        lastDataHash = 0
+        lastViewportHeight = 0
+        Logger.shared.logDebug("SwiftNavigationState - Cleared VirtualScrollManager")
+    }
+
+    /// Check if VirtualScrollManager needs to be updated
+    ///
+    /// - Parameters:
+    ///   - itemCount: Current number of items
+    ///   - viewportHeight: Current viewport height
+    /// - Returns: true if the manager needs to be recreated
+    internal func needsManagerUpdate(itemCount: Int, viewportHeight: Int) -> Bool {
+        guard virtualScrollManager != nil else { return true }
+        return viewportHeight != lastViewportHeight
     }
 }

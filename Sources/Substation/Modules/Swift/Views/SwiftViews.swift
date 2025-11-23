@@ -79,7 +79,7 @@ struct SwiftViews {
 
         Logger.shared.logDebug("Rendering Swift object list: \(filteredItems.count) items (from \(objects.count) objects)")
 
-        // Create VirtualScrollManager for large lists (over 100 items)
+        // Use persisted VirtualScrollManager for large lists (over 100 items)
         var virtualManager: VirtualScrollManager<SwiftTreeItem>? = nil
         var effectiveScrollOffset = scrollOffset
 
@@ -95,15 +95,11 @@ struct SwiftViews {
                 Logger.shared.logDebug("SwiftViews - Viewport height adjusted: \(calculatedHeight) -> \(viewportHeight) (screen height: \(height))")
             }
 
-            let config = VirtualScrollConfig(
-                viewportHeight: viewportHeight,
-                bufferSize: 10,
-                minimumItemHeight: 1,
-                maxRenderItems: 50,
-                scrollSensitivity: 1.0
+            // Get or create VirtualScrollManager from navigation state (persisted across renders)
+            virtualManager = navState.getOrCreateVirtualScrollManager(
+                for: filteredItems,
+                viewportHeight: viewportHeight
             )
-            virtualManager = VirtualScrollManager<SwiftTreeItem>(config: config)
-            virtualManager?.updateData(filteredItems)
 
             // Calculate scroll position that keeps selectedIndex in view
             // Use validated index to prevent negative calculations
@@ -124,7 +120,8 @@ struct SwiftViews {
                 await manager.scrollToItem(index: effectiveScrollOffset)
             }
         } else {
-            // For smaller lists, still validate scroll offset
+            // For smaller lists, clear the virtual scroll manager and validate scroll offset
+            navState.clearVirtualScrollManager()
             let visibleItems = max(5, Int(height) - 10)
             let maxScrollOffset = max(0, filteredItems.count - visibleItems)
             effectiveScrollOffset = max(0, min(scrollOffset, maxScrollOffset))
