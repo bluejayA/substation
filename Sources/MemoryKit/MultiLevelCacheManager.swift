@@ -207,8 +207,8 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         if let cacheDir = configuration.l3CacheDirectory {
             self.l3CacheDirectory = cacheDir
         } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            self.l3CacheDirectory = appSupport.appendingPathComponent("MemoryKit/multi-level-cache")
+            let homeDir = FileManager.default.homeDirectoryForCurrentUser
+            self.l3CacheDirectory = homeDir.appendingPathComponent(".config/substation/multi-level-cache")
         }
 
         // Create cache directory if needed
