@@ -29,9 +29,12 @@ extension TUI {
                 // Receive formState and form as parameters to avoid exclusivity violation
                 self.routerCreateFormState = formState
                 self.routerCreateForm = form
-                if let module = ModuleRegistry.shared.module(for: "routers") as? RoutersModule {
-                    await module.submitRouterCreation(screen: screen)
+                guard let module = ModuleRegistry.shared.module(for: "routers") as? RoutersModule else {
+                    Logger.shared.logError("Failed to get RoutersModule from registry", context: [:])
+                    self.statusMessage = "Error: Routers module not available"
+                    return
                 }
+                await module.submitRouterCreation(screen: screen)
             },
             onCancel: {
                 self.changeView(to: .routers, resetSelection: false)

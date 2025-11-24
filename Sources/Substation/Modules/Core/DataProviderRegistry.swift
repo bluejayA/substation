@@ -233,7 +233,8 @@ extension DataProviderRegistry {
         ])
 
         // Phase 3: Expensive resources (in background)
-        Task.detached { [weak self] in
+        // Use Task with explicit MainActor hop for any UI state updates
+        Task { @MainActor [weak self] in
             await self?.fetchExpensiveResourcesBackground(forceRefresh: forceRefresh)
         }
 

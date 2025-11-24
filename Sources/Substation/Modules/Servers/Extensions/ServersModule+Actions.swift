@@ -1,10 +1,5 @@
 // Sources/Substation/Modules/Servers/ServersModule+Actions.swift
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
 import OSClient
 import SwiftNCurses
 import MemoryKit
@@ -952,9 +947,9 @@ extension ServersModule {
             tui.snapshotManagementForm.successMessage = "Snapshot '\(snapshotName)' created successfully (ID: \(imageID))"
             tui.statusMessage = "[SUCCESS] Snapshot '\(snapshotName)' created successfully for '\(serverName)' (ID: \(imageID))"
 
-            // Show success message briefly
+            // Show success message briefly using non-blocking async sleep
             await tui.draw(screen: screen)
-            usleep(2_000_000) // Show success message for 2 seconds
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // Show success message for 2 seconds
 
             // Trigger accelerated refresh to show state transitions
             tui.refreshAfterOperation()
@@ -1015,9 +1010,9 @@ extension ServersModule {
             }
             tui.statusMessage = statusMsg
 
-            // Show error message briefly then return to servers view
+            // Show error message briefly then return to servers view using non-blocking async sleep
             await tui.draw(screen: screen)
-            usleep(3_000_000) // Show error message for 3 seconds
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // Show error message for 3 seconds
             Logger.shared.logError("snapshot_creation_failed", error: error, context: ["serverID": server.id])
 
             // Reset form and return to servers view
@@ -1030,9 +1025,9 @@ extension ServersModule {
             tui.snapshotManagementForm.errorMessage = "Failed to create snapshot '\(snapshotName)': \(error.localizedDescription)"
             tui.statusMessage = "[ERROR] Failed to create snapshot '\(snapshotName)' for '\(serverName)': \(error.localizedDescription)"
 
-            // Show error message briefly then return to servers view
+            // Show error message briefly then return to servers view using non-blocking async sleep
             await tui.draw(screen: screen)
-            usleep(3_000_000) // Show error message for 3 seconds
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // Show error message for 3 seconds
             Logger.shared.logError("snapshot_creation_failed", error: error, context: ["serverID": server.id])
 
             // Reset form and return to servers view

@@ -234,7 +234,13 @@ final class CommandMode: @unchecked Sendable {
     func clearHistory() {
         commandHistory.removeAll()
         historyIndex = 0
-        try? FileManager.default.removeItem(atPath: historyFilePath)
+        do {
+            if FileManager.default.fileExists(atPath: historyFilePath) {
+                try FileManager.default.removeItem(atPath: historyFilePath)
+            }
+        } catch {
+            Logger.shared.logError("Failed to remove command history file at \(historyFilePath)", error: error)
+        }
         historyLoaded = true
     }
 

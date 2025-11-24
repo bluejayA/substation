@@ -34,9 +34,12 @@ extension TUI {
                 // Receive formState and form as parameters to avoid exclusivity violation
                 self.snapshotManagementFormState = formState
                 self.snapshotManagementForm = form
-                if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
-                    await module.executeSnapshotCreation(screen: screen)
+                guard let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule else {
+                    Logger.shared.logError("Failed to get ServersModule from registry", context: [:])
+                    self.statusMessage = "Error: Servers module not available"
+                    return
                 }
+                await module.executeSnapshotCreation(screen: screen)
             },
             onCancel: {
                 self.changeView(to: .serverSnapshotManagement, resetSelection: false)

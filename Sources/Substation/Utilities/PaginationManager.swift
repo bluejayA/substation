@@ -283,8 +283,14 @@ class PaginationManager<T: Sendable> {
 
         // Start prefetching adjacent pages
         if config.enableBackgroundLoading {
-            Task { await prefetchPage(targetPage + 1) }
-            Task { await prefetchPage(targetPage - 1) }
+            Task { [weak self] in
+                guard let self else { return }
+                await self.prefetchPage(targetPage + 1)
+            }
+            Task { [weak self] in
+                guard let self else { return }
+                await self.prefetchPage(targetPage - 1)
+            }
         }
     }
 
@@ -316,7 +322,10 @@ class PaginationManager<T: Sendable> {
 
             // Start background prefetching if enabled and dataset is large
             if config.enableBackgroundLoading && totalCount > config.pageSize {
-                Task { await prefetchPage(1) }
+                Task { [weak self] in
+                    guard let self else { return }
+                    await self.prefetchPage(1)
+                }
             }
 
         } catch {
@@ -403,8 +412,9 @@ class PaginationManager<T: Sendable> {
 
         Logger.shared.logDebug("PaginationManager - Prefetching page \(pageNumber)")
 
-        let task = Task {
-            await loadPage(pageNumber)
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.loadPage(pageNumber)
         }
         prefetchTasks.insert(task)
     }

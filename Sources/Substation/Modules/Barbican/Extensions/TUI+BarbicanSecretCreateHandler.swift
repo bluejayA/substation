@@ -23,15 +23,9 @@ extension TUI {
             return
         }
 
-        // Special handling for legacy date selection mode
+        // Special handling for date selection mode
         if barbicanSecretCreateForm.dateSelectionMode {
             await handleDateSelectionInput(ch, screen: screen)
-            return
-        }
-
-        // Special handling for legacy selection mode
-        if barbicanSecretCreateForm.selectionMode {
-            await handleLegacySelectionInput(ch, screen: screen)
             return
         }
 
@@ -41,7 +35,7 @@ extension TUI {
 
         // Custom key handler for special field behaviors
         let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout BarbicanSecretCreateFormAdapter, OpaquePointer?) async -> Bool = { ch, formState, formAdapter, screen in
-            // SPACE on special fields enters their special modes
+            // SPACE on payload field enters payload edit mode
             if ch == Int32(32) && !formState.isCurrentFieldActive() {
                 if let field = formState.getCurrentField() {
                     if case .text(let textField) = field,
@@ -49,26 +43,47 @@ extension TUI {
                         formAdapter.form.payloadEditMode = true
                         await self.draw(screen: screen)
                         return true
-                    } else if case .info(let infoField) = field,
-                              infoField.id == BarbicanSecretCreateFieldId.expirationDate.rawValue {
-                        formAdapter.form.enterSelectionMode()
-                        await self.draw(screen: screen)
-                        return true
                     }
                 }
             }
 
-            // ENTER on file path field loads file
+            // ENTER on expiration selector with "Set Custom Date" enters date selection mode
             if (ch == Int32(10) || ch == Int32(13)) && formState.isCurrentFieldActive() {
-                if let field = formState.getCurrentField(),
-                   case .text(let textField) = field,
-                   textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
-                    if let error = formAdapter.form.loadPayloadFromFile() {
-                        self.statusMessage = error
-                    } else {
-                        self.statusMessage = "File loaded successfully"
+                if let field = formState.getCurrentField() {
+                    // Handle expiration date selector confirmation
+                    if case .selector(let selectorField) = field,
+                       selectorField.id == BarbicanSecretCreateFieldId.expirationDate.rawValue {
+                        // Check if "Set Custom Date" is selected
+                        if let selectorState = formState.selectorStates[selectorField.id] {
+                            let highlightedIndex = selectorState.highlightedIndex
+                            let items = ExpirationOption.allCases
+                            if highlightedIndex < items.count {
+                                let selectedOption = items[highlightedIndex]
+                                if selectedOption == .setCustomDate {
+                                    // Update form state to reflect selection
+                                    formAdapter.form.hasExpiration = true
+                                    // Enter date selection mode
+                                    formAdapter.form.dateSelectionMode = true
+                                    formAdapter.form.dateSelectionIndex = 0
+                                    await self.draw(screen: screen)
+                                    return true
+                                } else {
+                                    // No expiration selected
+                                    formAdapter.form.hasExpiration = false
+                                }
+                            }
+                        }
                     }
-                    return false // Let universal handler continue with deactivation
+                    // Handle file path field - loads file
+                    if case .text(let textField) = field,
+                       textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
+                        if let error = formAdapter.form.loadPayloadFromFile() {
+                            self.statusMessage = error
+                        } else {
+                            self.statusMessage = "File loaded successfully"
+                        }
+                        return false // Let universal handler continue with deactivation
+                    }
                 }
             }
 
@@ -157,35 +172,6 @@ extension TUI {
         case Int32(27): // ESC - Cancel date selection
             self.barbicanSecretCreateForm.hasExpiration = false
             self.barbicanSecretCreateForm.exitDateSelectionMode()
-            await self.draw(screen: screen)
-
-        default:
-            break
-        }
-    }
-
-    // MARK: - Legacy Selection Input Handler
-
-    private func handleLegacySelectionInput(_ ch: Int32, screen: OpaquePointer?) async {
-        switch ch {
-        case Int32(258): // DOWN
-            self.barbicanSecretCreateForm.nextSelectionItem()
-            await self.draw(screen: screen)
-
-        case Int32(259): // UP
-            self.barbicanSecretCreateForm.previousSelectionItem()
-            await self.draw(screen: screen)
-
-        case Int32(32): // SPACE - Toggle selection
-            self.barbicanSecretCreateForm.toggleSelectionConfirmation()
-            await self.draw(screen: screen)
-
-        case Int32(10), Int32(13): // ENTER - Confirm selection
-            self.barbicanSecretCreateForm.confirmSelection()
-            await self.draw(screen: screen)
-
-        case Int32(27): // ESC - Cancel selection
-            self.barbicanSecretCreateForm.exitSelectionMode()
             await self.draw(screen: screen)
 
         default:

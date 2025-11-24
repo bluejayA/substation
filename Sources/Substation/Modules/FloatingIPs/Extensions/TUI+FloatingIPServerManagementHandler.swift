@@ -69,9 +69,12 @@ extension TUI {
             },
             onEnter: {
                 self.renderCoordinator.needsRedraw = true
-                if let module = ModuleRegistry.shared.module(for: "floatingips") as? FloatingIPsModule {
-                    await module.performFloatingIPServerManagement()
+                guard let module = ModuleRegistry.shared.module(for: "floatingips") as? FloatingIPsModule else {
+                    Logger.shared.logError("Failed to get FloatingIPsModule from registry", context: [:])
+                    self.statusMessage = "Error: Floating IPs module not available"
+                    return
                 }
+                await module.performFloatingIPServerManagement()
             },
             additionalHandling: { ch in
                 // Handle TAB for mode switching

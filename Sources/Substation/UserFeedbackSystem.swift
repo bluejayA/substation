@@ -9,8 +9,9 @@ typealias UIPosition = Position
 // MARK: - User Feedback System
 
 /// Comprehensive user feedback and notification system
+/// Thread-safe through MainActor isolation - all access must be from MainActor
 @MainActor
-public final class UserFeedbackSystem: Sendable {
+public final class UserFeedbackSystem {
     public var currentNotifications: [Notification] = []
     public var currentModal: Modal?
     public var statusBarMessage: StatusMessage?
@@ -37,7 +38,12 @@ public final class UserFeedbackSystem: Sendable {
 
     /// Show an error notification
     public func showError(_ message: String, error: (any Error)? = nil, duration: TimeInterval? = nil) {
-        let fullMessage = error != nil ? "\(message): \(error!.localizedDescription)" : message
+        let fullMessage: String
+        if let error = error {
+            fullMessage = "\(message): \(error.localizedDescription)"
+        } else {
+            fullMessage = message
+        }
         let notification = Notification(
             id: UUID().uuidString,
             type: .error,
@@ -254,9 +260,10 @@ public final class UserFeedbackSystem: Sendable {
 
         // Auto-dismiss if duration is set
         if let duration = notification.duration {
-            let task = Task {
+            let task = Task { [weak self] in
+                guard let self else { return }
                 try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-                dismissNotification(id: notification.id)
+                self.dismissNotification(id: notification.id)
             }
             notificationTasks[notification.id] = task
         }
@@ -831,7 +838,8 @@ public final class EnhancedErrorHandler {
             confirmText: "Retry",
             cancelText: "Cancel"
         ) {
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 do {
                     try await onRetry()
                     await MainActor.run {

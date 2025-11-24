@@ -103,9 +103,8 @@ public final class SwiftNavigationState {
     /// - Returns: true if navigation occurred, false if already at top level
     @discardableResult
     public func navigateUp() -> Bool {
-        if !currentPath.isEmpty {
+        if let removed = currentPath.popLast() {
             // Navigate up one directory level
-            let removed = currentPath.removeLast()
             Logger.shared.logDebug("Navigated up from directory: \(removed), new path: \(currentPathString)")
             return true
         } else if currentContainer != nil {

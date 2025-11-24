@@ -96,14 +96,8 @@ struct BarbicanSecretCreateForm: FormViewModel {
     var currentField: BarbicanSecretCreateField = .name
     var fieldEditMode: Bool = false
     var payloadEditMode: Bool = false // Special mode for multi-line payload editing
-
-    // Legacy selection mode implementation (still actively used)
-    // TODO: Migrate to modern FormSelector pattern used by other forms
-    // Custom selection UI handles expiration date picker and enum field options
-    var selectionMode: Bool = false // Special mode for selection windows (legacy)
-    var selectionIndex: Int = 0 // Current selection index in selection mode
-    var selectionConfirmed: Int? = nil // Index of item selected for confirmation
     var dateSelectionMode: Bool = false // Special mode for date selection
+    var dateSelectionIndex: Int = 0 // Current date field index (0=month, 1=day, 2=year, 3=hour, 4=minute)
 
     // Payload input buffering for performance
     var payloadBuffer: String = ""
@@ -122,6 +116,7 @@ struct BarbicanSecretCreateForm: FormViewModel {
     var errorMessage: String? = nil
     var isLoading: Bool = false
 
+    /// Navigates to the next field in the form
     mutating func nextField() {
         let fields = BarbicanSecretCreateField.allCases
         if let currentIndex = fields.firstIndex(of: currentField) {
@@ -130,9 +125,9 @@ struct BarbicanSecretCreateForm: FormViewModel {
         }
         fieldEditMode = false
         payloadEditMode = false
-        selectionMode = false
     }
 
+    /// Navigates to the previous field in the form
     mutating func previousField() {
         let fields = BarbicanSecretCreateField.allCases
         if let currentIndex = fields.firstIndex(of: currentField) {
@@ -141,7 +136,6 @@ struct BarbicanSecretCreateForm: FormViewModel {
         }
         fieldEditMode = false
         payloadEditMode = false
-        selectionMode = false
     }
 
     mutating func togglePayloadContentType() {
@@ -213,168 +207,13 @@ struct BarbicanSecretCreateForm: FormViewModel {
         payloadEditMode = false
     }
 
+    /// Exits any active edit mode in the form
     mutating func exitEditMode() {
         fieldEditMode = false
         payloadEditMode = false
-        selectionMode = false
         dateSelectionMode = false
     }
 
-    mutating func enterSelectionMode() {
-        selectionMode = true
-        selectionIndex = getCurrentSelectionIndex()
-        fieldEditMode = false
-        payloadEditMode = false
-    }
-
-    mutating func exitSelectionMode() {
-        selectionMode = false
-        dateSelectionMode = false
-        selectionIndex = 0
-        selectionConfirmed = nil
-    }
-
-    mutating func nextSelectionItem() {
-        let maxIndex = getSelectionOptionsCount() - 1
-        selectionIndex = min(selectionIndex + 1, maxIndex)
-    }
-
-    mutating func previousSelectionItem() {
-        selectionIndex = max(selectionIndex - 1, 0)
-    }
-
-    mutating func toggleSelectionConfirmation() {
-        if selectionConfirmed == selectionIndex {
-            selectionConfirmed = nil // Deselect if already selected
-        } else {
-            selectionConfirmed = selectionIndex // Select current item for confirmation
-        }
-    }
-
-    mutating func confirmSelection() {
-        guard let confirmedIndex = selectionConfirmed else { return }
-
-        switch currentField {
-        case .payloadContentType:
-            payloadContentType = SecretPayloadContentType.allCases[confirmedIndex]
-        case .payloadContentEncoding:
-            payloadContentEncoding = SecretPayloadContentEncoding.allCases[confirmedIndex]
-        case .secretType:
-            secretType = SecretType.allCases[confirmedIndex]
-        case .algorithm:
-            algorithm = SecretAlgorithm.allCases[confirmedIndex]
-        case .mode:
-            mode = SecretMode.allCases[confirmedIndex]
-        case .bitLength:
-            let validBitLengths = [128, 192, 256, 512, 1024, 2048, 3072, 4096]
-            bitLength = validBitLengths[confirmedIndex]
-        case .expirationDate:
-            if confirmedIndex == 0 {
-                hasExpiration = false // "No Expiration"
-            } else {
-                hasExpiration = true // "Set Custom Date"
-                dateSelectionMode = true // Enter date selection mode
-                selectionMode = false
-                selectionIndex = 0 // Start with first date field (month)
-                selectionConfirmed = nil
-                return // Don't exit selection mode yet, enter date mode
-            }
-        default:
-            break
-        }
-        exitSelectionMode()
-    }
-
-    mutating func selectCurrentItem() {
-        // Legacy method - now just confirms current selection immediately
-        selectionConfirmed = selectionIndex
-        confirmSelection()
-    }
-
-    func getSelectionOptionsCount() -> Int {
-        switch currentField {
-        case .payloadContentType:
-            return SecretPayloadContentType.allCases.count
-        case .payloadContentEncoding:
-            return SecretPayloadContentEncoding.allCases.count
-        case .secretType:
-            return SecretType.allCases.count
-        case .algorithm:
-            return SecretAlgorithm.allCases.count
-        case .mode:
-            return SecretMode.allCases.count
-        case .bitLength:
-            return 8 // [128, 192, 256, 512, 1024, 2048, 3072, 4096]
-        case .expirationDate:
-            return 2 // ["No Expiration", "Set Custom Date"]
-        default:
-            return 0
-        }
-    }
-
-    func getSelectionOptions() -> [String] {
-        switch currentField {
-        case .payloadContentType:
-            return SecretPayloadContentType.allCases.map { $0.title }
-        case .payloadContentEncoding:
-            return SecretPayloadContentEncoding.allCases.map { $0.title }
-        case .secretType:
-            return SecretType.allCases.map { $0.title }
-        case .algorithm:
-            return SecretAlgorithm.allCases.map { $0.title }
-        case .mode:
-            return SecretMode.allCases.map { $0.title }
-        case .bitLength:
-            return ["128", "192", "256", "512", "1024", "2048", "3072", "4096"]
-        case .expirationDate:
-            return ["No Expiration", "Set Custom Date"]
-        default:
-            return []
-        }
-    }
-
-    func getCurrentSelectionValue() -> String {
-        switch currentField {
-        case .payloadContentType:
-            return payloadContentType.title
-        case .payloadContentEncoding:
-            return payloadContentEncoding.title
-        case .secretType:
-            return secretType.title
-        case .algorithm:
-            return algorithm.title
-        case .mode:
-            return mode.title
-        case .bitLength:
-            return String(bitLength)
-        case .expirationDate:
-            return hasExpiration ? "Set Custom Date" : "No Expiration"
-        default:
-            return ""
-        }
-    }
-
-    func getCurrentSelectionIndex() -> Int {
-        switch currentField {
-        case .payloadContentType:
-            return SecretPayloadContentType.allCases.firstIndex(of: payloadContentType) ?? 0
-        case .payloadContentEncoding:
-            return SecretPayloadContentEncoding.allCases.firstIndex(of: payloadContentEncoding) ?? 0
-        case .secretType:
-            return SecretType.allCases.firstIndex(of: secretType) ?? 0
-        case .algorithm:
-            return SecretAlgorithm.allCases.firstIndex(of: algorithm) ?? 0
-        case .mode:
-            return SecretMode.allCases.firstIndex(of: mode) ?? 0
-        case .bitLength:
-            let validBitLengths = [128, 192, 256, 512, 1024, 2048, 3072, 4096]
-            return validBitLengths.firstIndex(of: bitLength) ?? 0
-        case .expirationDate:
-            return hasExpiration ? 1 : 0 // 0="No Expiration", 1="Set Custom Date"
-        default:
-            return 0
-        }
-    }
 
     func validate() -> [String] {
         var errors: [String] = []
@@ -493,17 +332,21 @@ struct BarbicanSecretCreateForm: FormViewModel {
         return calendar.date(from: dateComponents)
     }
 
-    // Date selection navigation methods
+    // MARK: - Date Selection Navigation Methods
+
+    /// Navigates to the next date field in the date picker
     mutating func nextDateField() {
-        selectionIndex = min(selectionIndex + 1, 4) // 0=month, 1=day, 2=year, 3=hour, 4=minute
+        dateSelectionIndex = min(dateSelectionIndex + 1, 4) // 0=month, 1=day, 2=year, 3=hour, 4=minute
     }
 
+    /// Navigates to the previous date field in the date picker
     mutating func previousDateField() {
-        selectionIndex = max(selectionIndex - 1, 0)
+        dateSelectionIndex = max(dateSelectionIndex - 1, 0)
     }
 
+    /// Increases the value of the currently selected date field
     mutating func increaseDateFieldValue() {
-        switch selectionIndex {
+        switch dateSelectionIndex {
         case 0: // Month
             expirationMonth = min(expirationMonth + 1, 12)
         case 1: // Day
@@ -519,8 +362,9 @@ struct BarbicanSecretCreateForm: FormViewModel {
         }
     }
 
+    /// Decreases the value of the currently selected date field
     mutating func decreaseDateFieldValue() {
-        switch selectionIndex {
+        switch dateSelectionIndex {
         case 0: // Month
             expirationMonth = max(expirationMonth - 1, 1)
         case 1: // Day
@@ -536,9 +380,10 @@ struct BarbicanSecretCreateForm: FormViewModel {
         }
     }
 
+    /// Exits date selection mode and resets the date selection index
     mutating func exitDateSelectionMode() {
         dateSelectionMode = false
-        selectionIndex = 0
+        dateSelectionIndex = 0
     }
 
     // Payload buffer management for performance
@@ -663,8 +508,9 @@ struct BarbicanSecretCreateForm: FormViewModel {
         }
     }
 
+    /// Determines if the form is currently in a special input mode
     func isInSpecialMode() -> Bool {
-        return fieldEditMode || payloadEditMode || dateSelectionMode || selectionMode
+        return fieldEditMode || payloadEditMode || dateSelectionMode
     }
 
     private func getFieldConfiguration(for field: BarbicanSecretCreateField) -> FormFieldConfiguration {
@@ -978,15 +824,27 @@ struct BarbicanSecretCreateForm: FormViewModel {
             scrollOffset: formState.selectorStates[modeFieldId]?.scrollOffset ?? 0
         )))
 
-        // Expiration Date (Info field - special handling needed)
+        // Expiration Date (Selector)
         let expirationFieldId = BarbicanSecretCreateFieldId.expirationDate.rawValue
-        fields.append(.info(FormFieldInfo(
+        let expirationItems = ExpirationOption.allCases.map { $0 as any FormSelectorItem }
+        fields.append(.selector(FormFieldSelector(
             id: expirationFieldId,
             label: BarbicanSecretCreateField.expirationDate.title,
-            value: hasExpiration ? "Set Custom Date" : "No Expiration",
+            items: expirationItems,
+            selectedItemId: hasExpiration ? ExpirationOption.setCustomDate.rawValue : ExpirationOption.noExpiration.rawValue,
+            isRequired: false,
             isVisible: true,
             isSelected: selectedFieldId == expirationFieldId,
-            style: .info
+            isActive: activeFieldId == expirationFieldId,
+            validationError: nil,
+            columns: [
+                FormSelectorItemColumn(header: "OPTION", width: 25) { item in
+                    (item as? ExpirationOption)?.title ?? ""
+                }
+            ],
+            searchQuery: formState.selectorStates[expirationFieldId]?.searchQuery,
+            highlightedIndex: formState.selectorStates[expirationFieldId]?.highlightedIndex ?? 0,
+            scrollOffset: formState.selectorStates[expirationFieldId]?.scrollOffset ?? 0
         )))
 
         return fields
@@ -1056,6 +914,14 @@ extension BarbicanSecretCreateForm {
                     if let selectedId = selectorField.selectedItemId,
                        let m = SecretMode(rawValue: selectedId) {
                         self.mode = m
+                    }
+                } else if selectorField.id == BarbicanSecretCreateFieldId.expirationDate.rawValue {
+                    if let selectedId = selectorField.selectedItemId {
+                        if selectedId == ExpirationOption.setCustomDate.rawValue {
+                            self.hasExpiration = true
+                        } else {
+                            self.hasExpiration = false
+                        }
                     }
                 }
             default:

@@ -72,10 +72,10 @@ actor TextIndex {
 
         for word in queryWords {
             if let wordKeys = wordIndex[word] {
-                if candidateKeys == nil {
-                    candidateKeys = wordKeys
+                if let existing = candidateKeys {
+                    candidateKeys = existing.intersection(wordKeys)
                 } else {
-                    candidateKeys = candidateKeys!.intersection(wordKeys)
+                    candidateKeys = wordKeys
                 }
             } else {
                 // Word not found, no results possible

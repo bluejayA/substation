@@ -289,7 +289,7 @@ extension KeyPairsModule {
 
             return true
         } catch {
-            // Log error but don't fail the whole operation
+            Logger.shared.logError("Failed to save private key to \(keyPairName)", error: error, context: ["operation": "savePrivateKeyToFile"])
             return false
         }
     }
@@ -326,7 +326,7 @@ extension KeyPairsModule {
 
             return true
         } catch {
-            // Log error but don't fail the whole operation
+            Logger.shared.logError("Failed to save public key to \(keyPairName).pub", error: error, context: ["operation": "savePublicKeyToFile"])
             return false
         }
     }

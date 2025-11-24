@@ -209,7 +209,7 @@ struct FormSelector<Item: FormSelectableItem> {
         overhead += 1  // Separator
         overhead += 1  // Bottom instructions (1 top padding)
         if tabs.count > 1 { overhead += 1 }  // Tab indicator
-        if searchQuery != nil && !searchQuery!.isEmpty { overhead += 1 }  // Search indicator
+        if searchQuery?.isEmpty == false { overhead += 1 }  // Search indicator
         if validationError != nil { overhead += 1 }  // Validation error
 
         // Calculate visible range - use all available space minus overhead

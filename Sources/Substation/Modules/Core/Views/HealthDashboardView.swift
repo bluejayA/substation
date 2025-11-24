@@ -37,7 +37,8 @@ struct HealthDashboardView {
     }
 
     /// Dashboard navigation state
-    final class NavigationState: @unchecked Sendable {
+    @MainActor
+    final class NavigationState {
         var currentSection: DashboardSection = .services
         var selectedIndex: Int = 0
         var scrollOffset: Int = 0
@@ -224,6 +225,7 @@ struct HealthDashboardView {
     }
 
     /// Get maximum items for current section for bounds checking
+    @MainActor
     private static func getMaxItemsForSection(_ section: DashboardSection, telemetryActor: TelemetryActor?, navigationState: NavigationState? = nil) -> Int {
         // Use actual counts if available, otherwise return safe defaults
         switch section {
@@ -248,6 +250,7 @@ struct HealthDashboardView {
     }
 
     /// Get visible items for current section for scrolling calculations
+    @MainActor
     private static func getVisibleItemsForSection(_ section: DashboardSection, navigationState: NavigationState? = nil) -> Int {
         switch section {
         case .overview: return 1 // Only the overview summary is selectable
@@ -1368,6 +1371,7 @@ Press [ESC] to close this window
     }
 
     /// Reset navigation state for dashboard entry
+    @MainActor
     static func resetNavigationState(_ navigationState: NavigationState) {
         navigationState.currentSection = .overview
         navigationState.resetSelection()
@@ -1586,11 +1590,11 @@ Press [ESC] to close this window
 
                 // Try to find metrics by service type (compute, network, etc) or by name
                 var responseTimes: [Double]? = serviceMetrics[serviceName.lowercased()]
-                if responseTimes == nil || responseTimes!.isEmpty {
+                if responseTimes?.isEmpty ?? true {
                     // Try matching by service type
                     responseTimes = serviceMetrics[serviceType]
                 }
-                if responseTimes == nil || responseTimes!.isEmpty {
+                if responseTimes?.isEmpty ?? true {
                     // Try common OpenStack service name mappings
                     let serviceMapping: [String: String] = [
                         "compute": "nova",

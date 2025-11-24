@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 /// Thread-safe state container
 final class LockedState<T>: @unchecked Sendable {
@@ -54,7 +59,10 @@ public final class Logger: Sendable {
         if !FileManager.default.fileExists(atPath: logFileURL.path) {
             let fileCreated = FileManager.default.createFile(atPath: logFileURL.path, contents: nil, attributes: nil)
             if !fileCreated {
-                print("Warning: Failed to create log file at \(logFileURL.path)")
+                // Log to stderr since Logger is not yet configured - include errno for diagnostics
+                let errorCode = errno
+                let errorDescription = String(cString: strerror(errorCode))
+                fputs("ERROR: Failed to create log file at \(logFileURL.path): \(errorDescription) (errno: \(errorCode))\n", stderr)
             }
         }
     }

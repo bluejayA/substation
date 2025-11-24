@@ -264,6 +264,8 @@ extension TUI {
                 markNeedsRedraw()
 
                 // Sleep to allow UI updates and avoid busy-waiting
+                // Note: try? is acceptable here as Task.sleep only throws CancellationError,
+                // and we want the upload loop to continue even if sleep is interrupted
                 try? await Task.sleep(nanoseconds: UInt64(updateInterval * 1_000_000_000))
             }
 

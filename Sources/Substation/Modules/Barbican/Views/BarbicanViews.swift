@@ -284,17 +284,10 @@ struct BarbicanViews {
             return
         }
 
-        // Handle legacy date selection mode
+        // Handle date selection mode
         if form.dateSelectionMode {
             await drawDateSelectionWindow(screen: screen, startRow: startRow, startCol: startCol,
                                         width: width, height: height, form: form)
-            return
-        }
-
-        // Handle legacy selection mode
-        if form.selectionMode {
-            await drawSelectionWindow(screen: screen, startRow: startRow, startCol: startCol,
-                                    width: width, height: height, form: form)
             return
         }
 
@@ -490,72 +483,6 @@ struct BarbicanViews {
     }
 
     @MainActor
-    private static func drawSelectionWindow(
-        screen: OpaquePointer?,
-        startRow: Int32,
-        startCol: Int32,
-        width: Int32,
-        height: Int32,
-        form: BarbicanSecretCreateForm
-    ) async {
-        let surface = SwiftNCurses.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        let fieldTitle = form.currentField.title
-        components.append(Text("Select \(fieldTitle)").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
-
-        // Instructions
-        components.append(Text("Use UP/DOWN to navigate, SPACE to select, ENTER to confirm, ESC to cancel").secondary())
-        components.append(Text(""))
-
-        // Selection options with checkbox syntax
-        let options = form.getSelectionOptions()
-        let currentValue = form.getCurrentSelectionValue()
-
-        for (index, option) in options.enumerated() {
-            let isNavigated = index == form.selectionIndex
-            let isCurrent = option == currentValue
-            let isConfirmed = form.selectionConfirmed == index
-
-            // Show different states
-            let checkbox: String
-            if isConfirmed {
-                checkbox = "[X]" // Selected for confirmation
-            } else if isCurrent {
-                checkbox = "[*]" // Current value but not selected
-            } else {
-                checkbox = "[ ]" // Not selected
-            }
-
-            let prefix = isNavigated ? ">> " : "   "
-            let style: TextStyle = isNavigated ? .accent :
-                                  (isConfirmed ? .success :
-                                  (isCurrent ? .info : .secondary))
-
-            components.append(Text("\(prefix)\(checkbox) \(option)").styled(style))
-        }
-
-        // Footer
-        components.append(Text(""))
-        components.append(Text("Current value: \(currentValue)").info())
-        if let confirmedIndex = form.selectionConfirmed {
-            let confirmedValue = options[confirmedIndex]
-            components.append(Text("Selected for confirmation: \(confirmedValue)").success())
-        } else {
-            components.append(Text("No selection made (press SPACE to select)").muted())
-        }
-
-        // Render the selection window
-        let selectionComponent = VStack(spacing: 0, children: components)
-            .padding(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
-
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftNCurses.render(selectionComponent, on: surface, in: bounds)
-    }
-
-    @MainActor
     private static func drawDateSelectionWindow(
         screen: OpaquePointer?,
         startRow: Int32,
@@ -586,7 +513,7 @@ struct BarbicanViews {
 
         for (index, field) in dateFields.enumerated() {
             let (label, value, _, _) = field
-            let isSelected = index == form.selectionIndex
+            let isSelected = index == form.dateSelectionIndex
             let prefix = isSelected ? ">> " : "   "
             let style: TextStyle = isSelected ? .accent : .secondary
             let valueDisplay = isSelected ? "[\(value)]" : "\(value)" // Highlight selected value

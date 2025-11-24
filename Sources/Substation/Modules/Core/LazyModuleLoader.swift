@@ -416,8 +416,8 @@ final class LazyModuleLoader {
 
     /// Process the preload queue
     private func processPreloadQueue() async {
-        guard let request = loadQueue.first else { return }
-        loadQueue.removeFirst()
+        guard !loadQueue.isEmpty else { return }
+        let request = loadQueue.removeFirst()
 
         // Skip if already loaded or loading
         if loadedModules.contains(request.identifier) || loadingModules.contains(request.identifier) {

@@ -84,8 +84,9 @@ public struct VirtualScrollView<Item: Sendable, ItemView: Component>: Component 
 // MARK: - Virtual List Controller
 
 /// Controller for managing virtual scrolling state and behavior
+/// Thread-safe through MainActor isolation - all state mutations are synchronized
 @MainActor
-public final class VirtualListController: @unchecked Sendable {
+public final class VirtualListController {
 
     // MARK: - MemoryKit Integration
 
@@ -129,8 +130,9 @@ public final class VirtualListController: @unchecked Sendable {
         validateScroll()
 
         // Cache the updated state
-        Task {
-            await cacheCurrentState()
+        Task { [weak self] in
+            guard let self else { return }
+            await self.cacheCurrentState()
         }
     }
 
@@ -139,8 +141,9 @@ public final class VirtualListController: @unchecked Sendable {
         if selectedIndex > 0 {
             selectedIndex -= 1
             ensureSelectionVisible()
-            Task {
-                await cacheCurrentState()
+            Task { [weak self] in
+                guard let self else { return }
+                await self.cacheCurrentState()
             }
         }
     }
@@ -150,8 +153,9 @@ public final class VirtualListController: @unchecked Sendable {
         if selectedIndex < itemCount - 1 {
             selectedIndex += 1
             ensureSelectionVisible()
-            Task {
-                await cacheCurrentState()
+            Task { [weak self] in
+                guard let self else { return }
+                await self.cacheCurrentState()
             }
         }
     }
@@ -160,8 +164,9 @@ public final class VirtualListController: @unchecked Sendable {
     public func moveSelection(to index: Int) {
         selectedIndex = max(0, min(index, itemCount - 1))
         ensureSelectionVisible()
-        Task {
-            await cacheCurrentState()
+        Task { [weak self] in
+            guard let self else { return }
+            await self.cacheCurrentState()
         }
     }
 
@@ -170,8 +175,9 @@ public final class VirtualListController: @unchecked Sendable {
         let pageSize = Int(viewportHeight / itemHeight)
         scrollOffset = max(0, scrollOffset - pageSize)
         selectedIndex = max(0, selectedIndex - pageSize)
-        Task {
-            await cacheCurrentState()
+        Task { [weak self] in
+            guard let self else { return }
+            await self.cacheCurrentState()
         }
     }
 
@@ -181,8 +187,9 @@ public final class VirtualListController: @unchecked Sendable {
         let maxScroll = max(0, itemCount - Int(viewportHeight / itemHeight))
         scrollOffset = min(maxScroll, scrollOffset + pageSize)
         selectedIndex = min(itemCount - 1, selectedIndex + pageSize)
-        Task {
-            await cacheCurrentState()
+        Task { [weak self] in
+            guard let self else { return }
+            await self.cacheCurrentState()
         }
     }
 
@@ -190,8 +197,9 @@ public final class VirtualListController: @unchecked Sendable {
     public func scrollToTop() {
         scrollOffset = 0
         selectedIndex = 0
-        Task {
-            await cacheCurrentState()
+        Task { [weak self] in
+            guard let self else { return }
+            await self.cacheCurrentState()
         }
     }
 
@@ -200,8 +208,9 @@ public final class VirtualListController: @unchecked Sendable {
         let visibleItems = Int(viewportHeight / itemHeight)
         scrollOffset = max(0, itemCount - visibleItems)
         selectedIndex = max(0, itemCount - 1)
-        Task {
-            await cacheCurrentState()
+        Task { [weak self] in
+            guard let self else { return }
+            await self.cacheCurrentState()
         }
     }
 
@@ -389,7 +398,9 @@ public struct ScrollIndicator: Component {
 // MARK: - List Search Integration
 
 /// Search functionality for virtual lists
-public final class ListSearchController: @unchecked Sendable {
+/// Thread-safe through MainActor isolation - all state mutations are synchronized
+@MainActor
+public final class ListSearchController {
 
     // MARK: - MemoryKit Integration
 

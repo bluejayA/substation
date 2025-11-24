@@ -121,9 +121,12 @@ extension TUI {
             }
         case Int32(10): // ENTER - apply changes
             renderCoordinator.needsRedraw = true
-            if let module = ModuleRegistry.shared.module(for: "subnets") as? SubnetsModule {
-                await module.performSubnetRouterManagement()
+            guard let module = ModuleRegistry.shared.module(for: "subnets") as? SubnetsModule else {
+                Logger.shared.logError("Failed to get SubnetsModule from registry", context: [:])
+                statusMessage = "Error: Subnets module not available"
+                return
             }
+            await module.performSubnetRouterManagement()
         case Int32(27): // ESC - back to subnet list
             _ = await handleSubnetRouterManagementEscape()
         default:

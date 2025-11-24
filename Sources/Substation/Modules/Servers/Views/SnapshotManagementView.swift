@@ -34,7 +34,7 @@ struct SnapshotManagementView {
 
         // Build header info text
         let serverText = "Server: \(server.name ?? "Unknown")"
-        let statusText = server.status != nil ? " | Status: \(server.status!)" : ""
+        let statusText = server.status.map { " | Status: \($0)" } ?? ""
         let headerText = "Create Server Snapshot - \(serverText)\(statusText)"
 
         // Build form fields with state

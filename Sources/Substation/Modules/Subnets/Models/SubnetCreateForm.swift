@@ -281,6 +281,7 @@ struct SubnetCreateForm: FormViewModel {
         // Validate the IPv6 part (should be 6 groups or less with ::)
         if ipv6Part.contains("::") {
             let parts = ipv6Part.components(separatedBy: "::")
+            guard !parts.isEmpty else { return false }
             if parts.count > 2 { return false }
 
             let leftGroups = parts[0].isEmpty ? [] : parts[0].components(separatedBy: ":")

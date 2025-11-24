@@ -633,7 +633,8 @@ public class RenderingOptimizer {
         let timerInterval = interval ?? batchTimeout
         batchTimer = createCompatibleTimer(interval: timerInterval, repeats: true, action: { [weak self] in
             guard let self = self else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 await self.processPendingOperations(force: false)
             }
         })

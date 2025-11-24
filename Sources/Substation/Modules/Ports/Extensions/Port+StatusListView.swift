@@ -36,8 +36,8 @@ extension PortViews {
                     header: "IP ADDRESS",
                     width: 15,
                     getValue: { port in
-                        if let fixedIps = port.fixedIps, !fixedIps.isEmpty {
-                            return fixedIps[0].ipAddress
+                        if let ipAddress = port.fixedIps?.first?.ipAddress {
+                            return ipAddress
                         }
                         return "N/A"
                     },

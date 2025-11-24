@@ -83,9 +83,12 @@ extension TUI {
                 await self.draw(screen: screen)
             case Int32(10), Int32(13): // ENTER - Apply confirm or revert
                 renderCoordinator.needsRedraw = true
-                if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
-                    await module.applyServerResize(screen: screen)
+                guard let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule else {
+                    Logger.shared.logError("Failed to get ServersModule from registry", context: [:])
+                    self.statusMessage = "Error: Servers module not available"
+                    return
                 }
+                await module.applyServerResize(screen: screen)
             default:
                 break
             }
@@ -102,9 +105,12 @@ extension TUI {
             case Int32(10), Int32(13): // ENTER - Apply resize
                 renderCoordinator.needsRedraw = true
                 if serverResizeForm.hasPendingChanges() {
-                    if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
-                        await module.applyServerResize(screen: screen)
+                    guard let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule else {
+                        Logger.shared.logError("Failed to get ServersModule from registry", context: [:])
+                        self.statusMessage = "Error: Servers module not available"
+                        return
                     }
+                    await module.applyServerResize(screen: screen)
                 }
             default:
                 break

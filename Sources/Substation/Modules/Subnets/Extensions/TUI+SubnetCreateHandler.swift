@@ -28,9 +28,12 @@ extension TUI {
                 // Receive formState and form as parameters to avoid exclusivity violation
                 self.subnetCreateFormState = formState
                 self.subnetCreateForm = form
-                if let module = ModuleRegistry.shared.module(for: "subnets") as? SubnetsModule {
-                    await module.submitSubnetCreation(screen: screen)
+                guard let module = ModuleRegistry.shared.module(for: "subnets") as? SubnetsModule else {
+                    Logger.shared.logError("Failed to get SubnetsModule from registry", context: [:])
+                    self.statusMessage = "Error: Subnets module not available"
+                    return
                 }
+                await module.submitSubnetCreation(screen: screen)
             },
             onCancel: {
                 self.changeView(to: .subnets, resetSelection: false)

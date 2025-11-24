@@ -434,7 +434,12 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
             if parts.count > 2 { return false }
 
             let leftGroups = parts[0].isEmpty ? [] : parts[0].components(separatedBy: ":")
-            let rightGroups = parts.count > 1 && !parts[1].isEmpty ? parts[1].components(separatedBy: ":") : []
+            let rightGroups: [String]
+            if let secondPart = parts.dropFirst().first, !secondPart.isEmpty {
+                rightGroups = secondPart.components(separatedBy: ":")
+            } else {
+                rightGroups = []
+            }
 
             // Should have at most 6 groups total (since IPv4 takes 2 groups worth)
             if leftGroups.count + rightGroups.count > 5 {

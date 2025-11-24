@@ -334,11 +334,12 @@ public final class PerformanceMonitor: @unchecked Sendable {
 
         isMonitoring = true
 
-        monitoringTask = Task {
-            while !Task.isCancelled && isMonitoring {
-                await collectMetrics()
-                await analyzePerformance()
-                await checkAlerts()
+        monitoringTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled && self.isMonitoring {
+                await self.collectMetrics()
+                await self.analyzePerformance()
+                await self.checkAlerts()
 
                 if configuration.enableAutoTuning {
                     await performanceTuner?.autoTune(
@@ -1558,6 +1559,8 @@ private class AlertManager {
 
 // MARK: - Metrics History Management
 
+/// Manages historical metrics data with thread-safe access via MainActor isolation
+@MainActor
 private class MetricsHistory {
     private var systemMetrics: [PerformanceMonitor.SystemMetrics] = []
     private var applicationMetrics: [PerformanceMonitor.ApplicationMetrics] = []

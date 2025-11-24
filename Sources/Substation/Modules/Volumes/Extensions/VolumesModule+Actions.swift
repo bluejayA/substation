@@ -1,10 +1,5 @@
 // Sources/Substation/Modules/Volumes/VolumesModule+Actions.swift
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
 import OSClient
 import SwiftNCurses
 import MemoryKit
@@ -488,7 +483,7 @@ extension VolumesModule {
 
             // Show success message briefly
             await tui.draw(screen: screen)
-            usleep(2_000_000) // Show success message for 2 seconds
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // Show success message for 2 seconds
 
             // Reset form and return to volumes view
             tui.volumeBackupManagementForm.reset()

@@ -270,7 +270,8 @@ final class TUI {
                   let userInfo = notification.userInfo,
                   let optimization = userInfo["optimization"] as? String else { return }
 
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 self.userFeedback.showInfo("Auto-tuning: \(optimization)", duration: 3.0)
                 self.userFeedback.setStatusMessage("Optimizing performance...", type: .info)
             }
@@ -286,7 +287,8 @@ final class TUI {
                   let userInfo = notification.userInfo,
                   let optimization = userInfo["optimization"] as? String else { return }
 
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 self.userFeedback.showSuccess("Optimization completed: \(optimization)", duration: 2.0)
                 self.userFeedback.setStatusMessage("Performance optimized", type: .success)
             }
@@ -300,7 +302,8 @@ final class TUI {
             queue: .main
         ) { [weak self] notification in
             guard let self = self else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 // Reduce animation frequency in the UI
                 self.handleAnimationOptimization()
             }
@@ -313,7 +316,8 @@ final class TUI {
             queue: .main
         ) { [weak self] notification in
             guard let self = self else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 // Optimize rendering frequency
                 self.handleRenderingOptimization()
             }
@@ -326,7 +330,8 @@ final class TUI {
             queue: .main
         ) { [weak self] notification in
             guard let self = self else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 // Clear UI-related caches
                 self.handleUICacheClearing()
             }

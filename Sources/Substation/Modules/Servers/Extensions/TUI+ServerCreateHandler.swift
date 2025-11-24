@@ -126,9 +126,12 @@ extension TUI {
                 // Sync state before submission
                 self.serverCreateFormState = formState
                 self.serverCreateForm = form
-                if let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule {
-                    await module.createServer()
+                guard let module = ModuleRegistry.shared.module(for: "servers") as? ServersModule else {
+                    Logger.shared.logError("Failed to get ServersModule from registry", context: [:])
+                    self.statusMessage = "Error: Servers module not available"
+                    return
                 }
+                await module.createServer()
             },
             onCancel: {
                 self.viewCoordinator.currentView = .servers

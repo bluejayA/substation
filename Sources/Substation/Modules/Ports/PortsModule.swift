@@ -421,7 +421,7 @@ final class PortsModule: OpenStackModule {
         let ports = tui.cacheManager.cachedPorts
         let activePorts = ports.filter { $0.status?.uppercased() == "ACTIVE" }
         let downPorts = ports.filter { $0.status?.uppercased() == "DOWN" }
-        let boundPorts = ports.filter { $0.bindingHostId != nil && !$0.bindingHostId!.isEmpty }
+        let boundPorts = ports.filter { $0.bindingHostId?.isEmpty == false }
 
         metrics["activePortCount"] = activePorts.count
         metrics["downPortCount"] = downPorts.count
@@ -559,11 +559,11 @@ final class PortsModule: OpenStackModule {
         stats["total"] = ports.count
         stats["active"] = ports.filter { $0.status?.uppercased() == "ACTIVE" }.count
         stats["down"] = ports.filter { $0.status?.uppercased() == "DOWN" }.count
-        stats["bound"] = ports.filter { $0.bindingHostId != nil && !$0.bindingHostId!.isEmpty }.count
+        stats["bound"] = ports.filter { $0.bindingHostId?.isEmpty == false }.count
         stats["withSecurity"] = ports.filter { $0.portSecurityEnabled == true }.count
 
         // Device attachment distribution
-        let attachedPorts = ports.filter { $0.deviceId != nil && !$0.deviceId!.isEmpty }
+        let attachedPorts = ports.filter { $0.deviceId?.isEmpty == false }
         stats["attached"] = attachedPorts.count
         stats["unattached"] = ports.count - attachedPorts.count
 

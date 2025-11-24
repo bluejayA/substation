@@ -70,9 +70,12 @@ extension TUI {
                 if let currentForm = self.allowedAddressPairForm {
                     if currentForm.hasPendingChanges() {
                         Task {
-                            if let module = ModuleRegistry.shared.module(for: "ports") as? PortsModule {
-                                await module.applyAllowedAddressPairChanges(screen: screen)
+                            guard let module = ModuleRegistry.shared.module(for: "ports") as? PortsModule else {
+                                Logger.shared.logError("Failed to get PortsModule from registry", context: [:])
+                                self.statusMessage = "Error: Ports module not available"
+                                return
                             }
+                            await module.applyAllowedAddressPairChanges(screen: screen)
                         }
                     } else {
                         self.statusMessage = "No changes to apply - use SPACE to toggle ports, ESC to cancel"

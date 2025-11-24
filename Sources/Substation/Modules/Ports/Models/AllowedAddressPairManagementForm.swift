@@ -84,7 +84,7 @@ struct AllowedAddressPairManagementForm {
 
         if alreadyHasSourceIP {
             if selectedTargetPorts.contains(portId) {
-                return .pendingRemoval  // [−] - Will remove source IP from this port
+                return .pendingRemoval  // [-] - Will remove source IP from this port
             } else {
                 return .currentlyUsed   // [*] - Already has source IP
             }
