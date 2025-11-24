@@ -19,7 +19,8 @@ The main entry point for all OpenStack operations.
 ### Initialization
 
 ```swift
-public actor OpenStackClient {
+@MainActor
+public final class OpenStackClient: @unchecked Sendable {
     /// Connect to OpenStack with configuration and credentials
     public static func connect(
         config: OpenStackConfig,

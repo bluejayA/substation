@@ -188,10 +188,11 @@ let status: ServerStatus = server.status  // Enum, not string
 
 ### 2. Actor-Based Concurrency
 
-All service clients are actors for thread safety:
+All service clients use @MainActor for thread safety:
 
 ```swift
-public actor OpenStackClient { }
+@MainActor
+public final class OpenStackClient: @unchecked Sendable { }
 public actor NovaService { }
 public actor ServerManager { }
 

@@ -199,11 +199,11 @@ Directory download   | 0ms           | Async + concurrent
 
 ```
 Without ETAG Optimization:
-|████████████████████████████████████████| 100% - Full transfers
+|########################################| 100% - Full transfers
 
 With ETAG Optimization (10% change rate):
-|████|                                    | 10% - Actual transfers
-    |████████████████████████████████████| 90% - Skipped
+|####|                                    | 10% - Actual transfers
+    |####################################| 90% - Skipped
 ```
 
 ### Throughput Benchmarks

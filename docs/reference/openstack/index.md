@@ -30,9 +30,7 @@ Substation is tested and supported with:
 | **Cinder** | Block Storage | v3 | Full support |
 | **Glance** | Image | v2 | Partial support |
 | **Barbican** | Key Manager | v1 | Full support |
-| **Octavia** | Load Balancer | v2 | planned |
-| **Swift** | Object Storage | v1 | planned |
-| **Heat** | Orchestration | v1 | planned |
+| **Swift** | Object Storage | v1 | Full support |
 
 ### Service Capabilities Detail
 
@@ -116,21 +114,6 @@ Substation is tested and supported with:
 - Secret types (symmetric, asymmetric, certificate, passphrase)
 - ACL management
 - Secret metadata
-
-#### Octavia (Load Balancer)
-
-**Full Resource Support:**
-
-- Load Balancers: List, create, delete, update
-- Listeners: Create, update, delete
-- Pools: Create, update, delete, manage members
-- Health Monitors: Create, update, delete
-
-**Advanced Features:**
-
-- L7 policies and rules
-- Load balancer statistics
-- Amphora management
 
 #### Swift (Object Storage)
 
@@ -283,7 +266,6 @@ graph TB
         Image[image/glance]
         Identity[identity/keystone]
         KeyManager[key-manager/barbican]
-        LoadBalancer[load-balancer/octavia]
         ObjectStorage[object-store/swift]
     end
 

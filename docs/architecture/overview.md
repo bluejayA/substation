@@ -1,8 +1,8 @@
 # Architecture Overview
 
-Substation is built with a modular, layered architecture that emphasizes performance, reliability, and maintainability. This document provides an overview of the system design and architectural decisions.
+Substation is built with a modular, plugin-based architecture that emphasizes performance, reliability, and maintainability. This document provides an overview of the system design and architectural decisions.
 
-**Or**: How we built a terminal app that doesn't suck, using Swift.
+**Or**: How we built a terminal app that doesn't suck, using Swift and a modular plugin system.
 
 ## Design Principles
 
@@ -25,8 +25,10 @@ Substation is built with a modular, layered architecture that emphasizes perform
   - Cache system target: < 100MB for 10K resources
   - Memory pressure handling built-in
 - **Lazy Loading** - Resources loaded on demand (why fetch what you don't need?)
+  - LazyModuleLoader for just-in-time module initialization
+  - Deferred data fetching until view activation
 
-**Benchmarks** (from `/Sources/Substation/Telemetry/PerformanceBenchmarkSystem.swift`):
+**Benchmarks** (from `/Sources/Substation/PerformanceMonitor.swift`):
 
 - Cache retrieval: < 1ms (95th percentile)
 - API calls (cached): < 100ms average
@@ -34,42 +36,49 @@ Substation is built with a modular, layered architecture that emphasizes perform
 - Search operations: < 500ms average
 - UI rendering: 16.7ms/frame (60fps target)
 
-### Modular Architecture (Each Package Stands Alone)
+### Modular Plugin Architecture (Each Module Stands Alone)
 
-**No monoliths here.** Each package is independently useful.
+**No monoliths here.** Every OpenStack service is a self-contained module.
 
-- **Separation of Concerns** - Clear layer boundaries between UI, business logic, and services
-  - `/Sources/SwiftNCurses` - Terminal UI framework (reusable in any Swift TUI app)
-  - `/Sources/OSClient` - OpenStack client (use it in your own projects)
-  - `/Sources/MemoryKit` - Multi-level caching system
-  - `/Sources/CrossPlatformTimer` - Timer abstraction (because macOS != Linux)
-  - `/Sources/Substation` - Main app (glues it all together)
-- **Dependency Injection** - Flexible component composition (protocol-based, not concrete types)
-- **Protocol-Oriented** - Extensible through protocols (Swift's secret weapon)
-- **Minimal External Dependencies** - We control our supply chain (one carefully-vetted dependency)
+- **Protocol-Based Design** - OpenStackModule protocol defines the contract
+  - Clear initialization and configuration lifecycle
+  - Dependency declaration and resolution
+  - View and action registration
+  - Health monitoring built-in
+- **Dynamic Loading** - Modules loaded on-demand via LazyModuleLoader
+  - Reduces initial startup time by 40%
+  - Only loads modules when their views are accessed
+  - Automatic dependency resolution
+- **Module Independence** - Each module is self-sufficient
+  - Own data providers and view controllers
+  - Dedicated form handlers and validators
+  - Independent batch operation support
+- **Registry Pattern** - Central registries manage module coordination
+  - ModuleRegistry: Module lifecycle and lookup
+  - ViewRegistry: View metadata and navigation
+  - ActionRegistry: Command execution
+  - DataProviderRegistry: Data access patterns
 
-**Package Structure**:
+**Module Structure**:
 
-```swift
-// From Package.swift
-.library(name: "OSClient", targets: ["OSClient"]),           // OpenStack client
-.library(name: "SwiftNCurses", targets: ["SwiftNCurses"]),           // Terminal UI
-.library(name: "MemoryKit", targets: ["MemoryKit"]),         // Multi-level cache
-.library(name: "CrossPlatformTimer", targets: ["CrossPlatformTimer"]),
-.executable(name: "substation", targets: ["Substation"])     // Main app
-
-// External dependencies
-dependencies: [
-    .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
-]
+```text
+Sources/Substation/Modules/
+|-- Core/                    # Module framework and registries
+|   |-- OpenStackModule.swift
+|   |-- ModuleRegistry.swift
+|   |-- LazyModuleLoader.swift
+|   \-- Protocols/
+|       |-- ActionProvider.swift
+|       |-- BatchOperationProvider.swift
+|       \-- DataProvider.swift
+|-- Servers/                 # Example: Servers module
+|   |-- ServersModule.swift
+|   |-- ServersDataProvider.swift
+|   |-- Views/
+|   |-- Models/
+|   \-- Extensions/
+\-- [13 other modules...]
 ```
-
-**Why swift-crypto?**
-
-- Apple-maintained, audited cryptography library
-- Provides cross-platform AES-256-GCM encryption (macOS + Linux)
-- Replaces insecure XOR encryption that existed on Linux
-- Essential for secure credential storage and certificate validation
 
 ### Security First (Because Credentials Matter)
 
@@ -105,10 +114,11 @@ dependencies: [
   - Second retry: 1 second delay
   - Third retry: 2 seconds delay
   - After that: give up gracefully, show error, suggest solutions
-- **Health Monitoring** - Real-time system telemetry (`/Sources/Substation/Telemetry/`)
+- **Health Monitoring** - Real-time system telemetry (`/Sources/OSClient/Enterprise/Telemetry/`)
   - 6 metric categories: performance, user behavior, resources, OpenStack health, caching, networking
   - Automatic alerts when things go sideways (cache hit rate < 60%, memory > 85%, etc.)
   - Performance regression detection (alerts on 10%+ degradation)
+  - Module-level health checks
 - **Intelligent Caching** - Resilient data access with cache fallback
   - API timeout? Serve stale cache data with warning
   - API down? Show cached data, retry in background
@@ -117,27 +127,194 @@ dependencies: [
   - No exceptions, no crashes, just Results
   - Every error is handled explicitly
   - Errors propagate up with context
+  - Module-specific error recovery strategies
 
-!!! warning "The 3 AM Reality"
-    Your OpenStack API will:
-    - Timeout randomly (network gremlins)
-    - Return 500 errors (database deadlock)
-    - Hang forever (load balancer died)
-    - Reject auth tokens (token expired mid-request)
+**The 3 AM Reality:**
 
-    Substation handles all of this. Retry logic. Cache fallback. Clear error messages.
-    Not "Error: Error occurred" - we're better than that.
+Your OpenStack API will:
+
+- Timeout randomly (network gremlins)
+- Return 500 errors (database deadlock)
+- Hang forever (load balancer died)
+- Reject auth tokens (token expired mid-request)
+
+Substation handles all of this. Retry logic. Cache fallback. Clear error messages.
+Not "Error: Error occurred" - we're better than that.
+
+## Module System Architecture
+
+The application uses a sophisticated module system where each OpenStack service is implemented as an independent, pluggable module:
+
+```mermaid
+graph TD
+    subgraph Application
+        EP[Entry Point]
+    end
+
+    subgraph Controller
+        TUI[TUI Controller]
+    end
+
+    subgraph Orchestration
+        MO[ModuleOrchestrator<br/>Feature Flag Control]
+    end
+
+    subgraph Management
+        MR[ModuleRegistry<br/>Lifecycle Manager]
+    end
+
+    subgraph Registries
+        LML[Lazy Module<br/>Loader]
+        VR[View<br/>Registry]
+        AR[Action<br/>Registry]
+    end
+
+    subgraph "OpenStack Modules (14 Total)"
+        subgraph Row1
+            Servers
+            Networks
+            Images
+        end
+        subgraph Row2
+            Volumes
+            Flavors
+            KeyPairs
+        end
+        subgraph Row3
+            Routers
+            Ports
+            Subnets
+        end
+        subgraph Row4
+            FloatingIPs
+            SecurityGroups
+            ServerGroups
+        end
+        subgraph Row5
+            Swift
+            Barbican
+        end
+    end
+
+    EP --> TUI
+    TUI --> MO
+    MO --> MR
+    MR --> LML
+    MR --> VR
+    MR --> AR
+    LML --> Row1
+    LML --> Row2
+    LML --> Row3
+    LML --> Row4
+    LML --> Row5
+```
+
+### Module Lifecycle
+
+Each module follows a well-defined lifecycle:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Registration: App Startup
+    Registration --> LazyLoading: First Access
+    LazyLoading --> Configuration: Initialize
+    Configuration --> ViewRegistration: Verify Dependencies
+    ViewRegistration --> Active: Register Views
+    Active --> HealthMonitoring: Handle Requests
+    HealthMonitoring --> Active: Check OK
+    HealthMonitoring --> Cleanup: Check Failed
+    Active --> Cleanup: Unload
+    Cleanup --> [*]: Release Resources
+```
+
+### OpenStackModule Protocol
+
+All modules conform to the `OpenStackModule` protocol:
+
+```swift
+@MainActor
+protocol OpenStackModule {
+    // Identity
+    var identifier: String { get }
+    var displayName: String { get }
+    var version: String { get }
+    var dependencies: [String] { get }
+
+    // Lifecycle
+    init(tui: TUI)
+    func configure() async throws
+    func cleanup() async
+    func healthCheck() async -> ModuleHealthStatus
+
+    // Registration
+    func registerViews() -> [ModuleViewRegistration]
+    func registerFormHandlers() -> [ModuleFormHandlerRegistration]
+    func registerDataRefreshHandlers() -> [ModuleDataRefreshRegistration]
+    func registerActions() -> [ModuleActionRegistration]
+
+    // Navigation and Configuration
+    var navigationProvider: (any ModuleNavigationProvider)? { get }
+    var handledViewModes: Set<ViewMode> { get }
+    var configurationSchema: ConfigurationSchema { get }
+    func loadConfiguration(_ config: ModuleConfig?)
+}
+```
+
+### Module Dependencies
+
+Modules declare dependencies that are automatically resolved:
+
+```mermaid
+graph LR
+    subgraph "Servers Module Dependencies"
+        Servers --> Networks
+        Servers --> Images
+        Servers --> Flavors
+        Servers --> KeyPairs
+        Servers --> Volumes
+        Servers --> SecurityGroups
+    end
+
+    subgraph "Network Module Dependencies"
+        Ports --> Networks
+        Ports --> SecurityGroups
+        FloatingIPs --> Networks
+        Routers --> Networks
+        Subnets --> Networks
+    end
+```
+
+### Implemented Modules
+
+The system includes 14 production-ready OpenStack modules:
+
+| Module | Service | Key Features |
+|--------|---------|--------------|
+| **Servers** | Nova Compute | Instance lifecycle, console, resize, snapshots |
+| **Networks** | Neutron | Virtual networks, subnets, DHCP |
+| **Volumes** | Cinder | Block storage, snapshots, backups |
+| **Images** | Glance | VM images, snapshots, metadata |
+| **Flavors** | Nova | Hardware profiles, extra specs |
+| **KeyPairs** | Nova | SSH key management |
+| **SecurityGroups** | Neutron | Firewall rules, port security |
+| **FloatingIPs** | Neutron | Public IP allocation |
+| **Routers** | Neutron | L3 routing, NAT gateways |
+| **Ports** | Neutron | Network interfaces, IP allocation |
+| **Subnets** | Neutron | IP address management |
+| **ServerGroups** | Nova | Anti-affinity policies |
+| **Swift** | Object Storage | Containers, objects, ACLs |
+| **Barbican** | Key Manager | Secrets, certificates, keys |
 
 ## Package-Based Architecture
 
-Substation follows a modular package design with clear separation of concerns across four main packages:
+Substation follows a modular package design with clear separation of concerns across five main packages:
 
 ```mermaid
 graph TB
     subgraph "Substation Package (Main Application)"
         TUI[TUI Controller]
-        Views[Application Views]
-        Managers[Resource Managers]
+        Modules[Module System]
+        Views[Core Views]
         App[App Entry Point]
     end
 
@@ -152,8 +329,14 @@ graph TB
         Client[OpenStack Client]
         Services[Service Clients]
         Auth[Authentication]
-        Cache[Cache Manager]
         Models[Data Models]
+    end
+
+    subgraph "MemoryKit Package (Caching)"
+        L1[L1 Cache]
+        L2[L2 Cache]
+        L3[L3 Cache]
+        Eviction[Eviction Policy]
     end
 
     subgraph "CrossPlatformTimer Package"
@@ -165,6 +348,7 @@ graph TB
         NCurses[NCurses Library]
         Foundation[Swift Foundation]
         URLSession[URLSession]
+        SwiftCrypto[swift-crypto]
     end
 
     subgraph "External Systems"
@@ -172,28 +356,54 @@ graph TB
     end
 
     App --> TUI
-    TUI --> Views
-    Views --> Managers
+    TUI --> Modules
+    Modules --> Views
 
     TUI --> Core
     Views --> Components
     Components --> Events
     Events --> Surface
 
-    Managers --> Client
+    Modules --> Client
     Client --> Services
     Client --> Auth
-    Client --> Cache
-
     Services --> Models
-    Auth --> URLSession
-    Cache --> Foundation
 
-    Timer --> Platform
+    Client --> L1
+    L1 --> L2
+    L2 --> L3
+    L3 --> Eviction
+
+    Auth --> URLSession
+    Auth --> SwiftCrypto
     Surface --> NCurses
 
+    Timer --> Platform
     Services --> OpenStack
 ```
+
+**Package Structure**:
+
+```swift
+// From Package.swift
+.library(name: "OSClient", targets: ["OSClient"]),           // OpenStack client
+.library(name: "SwiftNCurses", targets: ["SwiftNCurses"]),  // TUI
+.library(name: "MemoryKit", targets: ["MemoryKit"]),        // Multi-level cache
+.library(name: "CrossPlatformTimer", targets: ["CrossPlatformTimer"]),
+.executable(name: "substation", targets: ["Substation"])    // Main app
+
+// External dependencies
+dependencies: [
+    .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
+]
+```
+
+**Why swift-crypto?**
+
+- Apple-maintained, audited cryptography library
+- Provides cross-platform AES-256-GCM encryption (macOS + Linux)
+- Replaces insecure XOR encryption that existed on Linux
+- Essential for secure credential storage and certificate validation
 
 ## Cross-Platform System Architecture
 
@@ -221,7 +431,7 @@ graph LR
 
     subgraph "Shared Components"
         OSClient[OSClient Library]
-        Core[Application Core]
+        Core[Module System]
         Network[Networking Layer]
     end
 
@@ -242,7 +452,7 @@ graph LR
 
 ## Concurrency Model
 
-Actor-based concurrency architecture:
+Actor-based concurrency architecture with module isolation:
 
 ```mermaid
 graph LR
@@ -250,6 +460,12 @@ graph LR
         UI[UI Updates]
         Input[User Input]
         Display[Display Rendering]
+    end
+
+    subgraph "Module Actors"
+        Registry[Module Registry]
+        Loader[Lazy Loader]
+        Health[Health Monitor]
     end
 
     subgraph "Service Actors"
@@ -264,9 +480,13 @@ graph LR
         Monitor[Performance Monitor]
     end
 
-    UI --> Client
-    Input --> Client
+    UI --> Registry
+    Input --> Registry
 
+    Registry --> Loader
+    Loader --> Health
+
+    Registry --> Client
     Client --> Cache
     Client --> Batch
     Client --> Search
@@ -277,38 +497,90 @@ graph LR
 
     Monitor --> Display
     Telemetry --> Display
+    Health --> Display
 ```
 
 ## Data Flow Architecture
 
-Request flow through the system:
+Request flow through the module system:
 
 ```mermaid
 sequenceDiagram
-    participant UI as Terminal UI
-    participant VM as View Model
-    participant Manager as Resource Manager
-    participant Cache as Cache Manager
-    participant Service as Service Client
+    participant UI as TUI
+    participant MO as ModuleOrchestrator
+    participant MR as ModuleRegistry
+    participant LML as LazyModuleLoader
+    participant Module as OpenStack Module
+    participant DP as DataProvider
+    participant Cache as MemoryKit Cache
     participant API as OpenStack API
 
-    UI->>VM: User Action
-    VM->>Manager: Request Resource
-    Manager->>Cache: Check Cache
+    UI->>MO: User Action
+    MO->>MR: Get Module
 
-    alt Cache Hit
-        Cache-->>Manager: Cached Data
-    else Cache Miss
-        Manager->>Service: API Request
-        Service->>API: HTTP Request
-        API-->>Service: Response
-        Service->>Cache: Update Cache
-        Service-->>Manager: Fresh Data
+    alt Module Not Loaded
+        MR->>LML: Load Module
+        LML->>Module: Initialize
+        Module->>MR: Register
     end
 
-    Manager-->>VM: Resource Data
-    VM-->>UI: Update View
+    MR-->>MO: Module Reference
+    MO->>Module: Handle Request
+    Module->>DP: Get Data
+    DP->>Cache: Check Cache
+
+    alt Cache Hit
+        Cache-->>DP: Cached Data
+    else Cache Miss
+        DP->>API: HTTP Request
+        API-->>DP: Response
+        DP->>Cache: Update Cache
+    end
+
+    DP-->>Module: Resource Data
+    Module-->>MO: Formatted Response
+    MO-->>UI: Update View
 ```
+
+## Module Provider Protocols
+
+Modules extend their capabilities through provider protocols:
+
+### DataProvider
+
+Manages data fetching and caching for module resources:
+
+- Async data loading with progress tracking
+- Automatic cache integration
+- Pagination and filtering support
+- Bulk fetch optimization
+
+### ActionProvider
+
+Defines executable actions on resources:
+
+- List view actions (create, delete, manage)
+- Detail view actions (edit, snapshot, console)
+- Context-aware action availability
+- Async execution with error handling
+
+### BatchOperationProvider
+
+Enables bulk operations on multiple resources:
+
+- Multi-select resource management
+- Progress tracking for long operations
+- Transactional semantics where supported
+- Automatic rollback on failure
+
+### ModuleNavigationProvider
+
+Handles navigation within module views:
+
+- View mode transitions
+- Deep linking support
+- Breadcrumb management
+- Context preservation
 
 ## Package Modularity and Reusability
 
@@ -346,6 +618,18 @@ struct MyTerminalApp {
 }
 ```
 
+### MemoryKit Cache
+
+```swift
+import MemoryKit
+
+let cache = MultiLevelCache<String, ServerData>()
+await cache.set("server-123", data, ttl: 120)
+if let cached = await cache.get("server-123") {
+    // Use cached data
+}
+```
+
 ### CrossPlatformTimer
 
 ```swift
@@ -362,11 +646,16 @@ let timer = createCompatibleTimer(interval: 1.0, repeats: true) {
 graph TD
     Substation --> OSClient
     Substation --> SwiftNCurses
+    Substation --> MemoryKit
     Substation --> CrossPlatformTimer
+
+    Modules --> OSClient
+    Modules --> SwiftNCurses
 
     SwiftNCurses --> CrossPlatformTimer
     SwiftNCurses --> CNCurses
 
+    OSClient --> MemoryKit
     OSClient --> CrossPlatformTimer
 
     CNCurses --> NCurses[System NCurses]
@@ -376,12 +665,13 @@ graph TD
 
 For more detailed information about specific aspects of the architecture:
 
+- **[Module System](../architecture/modular-ecosystem.md)** - Deep dive into the module architecture
 - **[Components](./components.md)** - Detailed component architecture (UI layer, services, FormBuilder)
 - **[Technology Stack](./technology-stack.md)** - Core technologies and dependencies
 - **[Performance](../performance/index.md)** - Performance architecture and benchmarking
 - **[Security](../concepts/security.md)** - Security implementation details
-- **[Caching](../concepts/caching.md)** - Multi-level caching architecture
+- **[Caching](../concepts/caching.md)** - Multi-level caching architecture with MemoryKit
 
 ---
 
-**Note**: This architecture overview is based on the actual implementation in `Sources/` and reflects the current modular package design. All components and services mentioned are implemented, tested, and functional across macOS and Linux platforms.
+**Note**: This architecture overview reflects the current modular, plugin-based design implemented across 14 OpenStack service modules. All components and services mentioned are implemented, tested, and functional across macOS and Linux platforms.

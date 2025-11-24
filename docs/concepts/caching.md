@@ -18,10 +18,24 @@ Substation is designed to achieve **up to 60-80% API call reduction** through Me
 
 Substation implements a three-tier cache system, similar to CPU cache architecture:
 
-```
-Request → L1 Cache → L2 Cache → L3 Cache → API
-         (< 1ms)    (~5ms)     (~20ms)    (2+ sec)
-    (target 80%)(target 15%)(target 3%)(target 2%)
+```mermaid
+flowchart LR
+    A[Request] --> B[L1 Cache<br/>< 1ms<br/>target 80%]
+    B -->|miss| C[L2 Cache<br/>~5ms<br/>target 15%]
+    C -->|miss| D[L3 Cache<br/>~20ms<br/>target 3%]
+    D -->|miss| E[OpenStack API<br/>2+ seconds<br/>target 2%]
+
+    B -->|hit| F[Response]
+    C -->|hit| F
+    D -->|hit| F
+    E --> F
+
+    style A fill:#e1f5ff
+    style B fill:#e8f5e9
+    style C fill:#fff4e1
+    style D fill:#f3e5f5
+    style E fill:#ffebee
+    style F fill:#e1f5ff
 ```
 
 #### L1 Cache (Memory - Hot Data)
@@ -414,6 +428,6 @@ All cache operations are **actor-based**:
 
 ---
 
-**Remember**: Caching is the secret to Substation's performance. 60-80% fewer API calls means your OpenStack cluster thanks you, and your operations are lightning fast.
+**Remember**: Caching is the secret to Substation's performance. With the design target of 60-80% fewer API calls, your OpenStack cluster thanks you, and your operations are lightning fast.
 
 *Cache wisely, operate swiftly.*

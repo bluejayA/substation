@@ -24,7 +24,7 @@ Design principles and high-level architecture:
 
 Detailed component architecture and implementation:
 
-- **Terminal UI Layer (SwiftNCurses)** - Rendering pipeline, UI components, event system
+- **TUI Layer (SwiftNCurses)** - Rendering pipeline, UI components, event system
 - **OSClient Service Layer** - OpenStack service clients, data managers, caching
 - **Substation Service Layer** - Resource operations, server actions, UI helpers
 - **FormBuilder System** - Declarative forms, field types, type-safe rendering
@@ -98,7 +98,7 @@ graph TD
 
 ```mermaid
 sequenceDiagram
-    participant UI as Terminal UI
+    participant UI as TUI
     participant VM as View Model
     participant Manager as Resource Manager
     participant Cache as Cache Manager

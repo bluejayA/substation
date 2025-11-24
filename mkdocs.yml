@@ -108,6 +108,9 @@ nav:
     - System Architecture: architecture/overview.md
     - Components: architecture/components.md
     - Technology Stack: architecture/technology-stack.md
+    - Navigation System: architecture/navigation.md
+    - Modular Ecosystem: architecture/modular-ecosystem.md
+    - Memory Management: architecture/memory-management.md
     - Object Storage: architecture/object-storage.md
 
   - Performance:
@@ -123,12 +126,33 @@ nav:
       - Quick Reference: reference/api/index.md
       - OSClient Library: reference/api/osclient.md
       - SwiftNCurses Framework: reference/api/SwiftNCurses.md
+      - MemoryKit: reference/api/memorykit.md
       - Integration Guide: reference/api/integration.md
+    - Framework:
+      - Registries: reference/framework/registries.md
+      - Universal Form Handler: reference/framework/universal-form-handler.md
+    - Modules:
+      - Module Catalog: reference/modules/index.md
+      - Servers: reference/modules/servers.md
+      - Volumes: reference/modules/volumes.md
+      - Networks: reference/modules/networks.md
+      - Subnets: reference/modules/subnets.md
+      - Routers: reference/modules/routers.md
+      - Ports: reference/modules/ports.md
+      - Floating IPs: reference/modules/floatingips.md
+      - Security Groups: reference/modules/securitygroups.md
+      - Server Groups: reference/modules/servergroups.md
+      - Images: reference/modules/images.md
+      - Flavors: reference/modules/flavors.md
+      - Key Pairs: reference/modules/keypairs.md
+      - Object Storage: reference/modules/swift.md
+      - Secrets: reference/modules/barbican.md
     - Operators:
       - Keyboard Shortcuts: reference/operators/keyboard-shortcuts.md
       - Common Workflows: reference/operators/workflows.md
     - Developers:
       - Overview: reference/developers/index.md
+      - Module Development Guide: reference/developers/module-development-guide.md
       - FormBuilder Guide: reference/developers/formbuilder-guide.md
       - FormTextField Guide: reference/developers/formtextfield-guide.md
       - FormSelector Guide: reference/developers/formselector-guide.md

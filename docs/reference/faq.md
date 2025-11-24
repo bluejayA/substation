@@ -191,10 +191,10 @@ Press `h` in Substation to view the Health Dashboard and check cache hit rate.
 
    ```yaml
    # Correct
-   auth_url: https://keystone.example.com:5000/v3  ✓
+   auth_url: https://keystone.example.com:5000/v3  [x]
 
    # Wrong
-   auth_url: https://keystone.example.com:5000     ✗
+   auth_url: https://keystone.example.com:5000     [ ]
    ```
 
 2. **Missing domain fields** - Required even for default domain:

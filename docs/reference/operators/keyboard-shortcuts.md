@@ -7,6 +7,7 @@ Complete keyboard shortcut reference and navigation guide for Substation. Master
 Substation uses **command-driven navigation** as the modern, primary interface:
 
 **Command Input (`:command`)** - The primary navigation method
+
 - Type `:` to enter command mode
 - Type the command name (`:servers`, `:networks`, etc.)
 - Press Enter to navigate
@@ -16,6 +17,7 @@ Substation uses **command-driven navigation** as the modern, primary interface:
 - Context-aware commands like `:create` adapt to your current view
 
 **Context Actions (Uppercase Keys)** - Secondary, view-specific actions
+
 - Uppercase keys (C, D, S, T, R, etc.) trigger actions
 - Only available in relevant views
 - Examples: `C` for Create, `S` for Start Server, `R` for Restart
@@ -44,21 +46,25 @@ Press `:` to enter command input - the primary way to navigate and execute actio
 ### Command Discovery Features
 
 **Tab Completion:**
+
 - Press `:` then `Tab` to see all available commands
 - Type `:serv` then `Tab` to complete to `:servers`
 - Press `Tab` multiple times to cycle through matches
 
 **Fuzzy Matching:**
+
 - `:servrs` suggests `:servers` (handles typos)
 - `:netwrk` suggests `:networks`
 - `:vols` suggests `:volumes`
 
 **Command History:**
+
 - Press `Up Arrow` to cycle through previous commands
 - Press `Down Arrow` to cycle forward
 - History persists between sessions
 
 **Multiple Aliases:**
+
 - `:servers`, `:srv`, `:s`, `:nova` all work
 - `:networks`, `:net`, `:n`, `:neutron` all work
 - `:volumes`, `:vol`, `:v`, `:cinder` all work
@@ -73,21 +79,20 @@ Press `:` to enter command input - the primary way to navigate and execute actio
 | `:volumes` | `:volume`, `:vol`, `:v`, `:cinder` | Navigate to volumes view |
 | `:images` | `:image`, `:img`, `:i`, `:glance` | Navigate to images view |
 | `:flavors` | `:flavor`, `:flv`, `:f`, `:novaflavors`, `:novaflavor` | Navigate to flavors view |
-| `:securitygroups` | `:securitygroup`, `:secgroups`, `:secgroup`, `:sec`, `:e`, `:neutronsecuritygroups`, `:neutronsecuritygroup` | Navigate to security groups |
-| `:servergroups` | `:servergroup`, `:srvgrp`, `:sg`, `:g`, `:novaservergroups`, `:novaservergroup` | Navigate to server groups |
+| `:security groups` | `:securitygroups`, `:securitygroup`, `:secgroups`, `:secgroup`, `:sec`, `:e`, `:neutronsecuritygroups`, `:neutronsecuritygroup` | Navigate to security groups |
+| `:server groups` | `:servergroups`, `:servergroup`, `:srvgrp`, `:sg`, `:g`, `:novaservergroups`, `:novaservergroup` | Navigate to server groups |
 | `:subnets` | `:subnet`, `:sub`, `:u`, `:neutronsubnets`, `:neutronsubnet` | Navigate to subnets view |
 | `:ports` | `:port`, `:p`, `:neutronports`, `:neutronport` | Navigate to ports view |
 | `:routers` | `:router`, `:rtr`, `:r`, `:neutronrouters`, `:neutronrouter` | Navigate to routers view |
 | `:floatingips` | `:floatingip`, `:fips`, `:fip`, `:floating`, `:l`, `:neutronfloatingips`, `:neutronfloatingip` | Navigate to floating IPs |
 | `:keypairs` | `:keypair`, `:keys`, `:key`, `:kp`, `:k`, `:novakeypairs`, `:novakeypair` | Navigate to key pairs |
-| `:barbican` | `:secrets`, `:secret`, `:b` | Navigate to secrets |
-| `:octavia` | `:loadbalancers`, `:loadbalancer`, `:lb`, `:o` | Navigate to load balancers |
-| `:swift` | `:objectstorage`, `:objects`, `:obj`, `:j` | Navigate to object storage |
+| `:secrets` | `:secret`, `:barbican`, `:b` | Navigate to secrets (Barbican) |
+| `:object storage` | `:swift`, `:objectstorage`, `:objects`, `:obj`, `:j` | Navigate to object storage (Swift) |
 | `:operations` | `:ops`, `:background`, `:tasks` | Navigate to Swift background operations |
 | `:performance` | `:metrics`, `:perf`, `:stats` | Navigate to performance metrics |
 | `:health` | `:healthdashboard`, `:h` | Navigate to health dashboard |
 | `:search` | `:find`, `:z` | Navigate to advanced search |
-| `:archives` | `:archive`, `:arch`, `:m`, `:volumearchives`, `:volumearchive`, `:cinderbackups`, `:cinderbackup` | Navigate to volume archives |
+| `:volume archives` | `:archives`, `:archive`, `:arch`, `:m`, `:volumearchives`, `:volumearchive`, `:cinderbackups`, `:cinderbackup` | Navigate to volume archives (backups) |
 | `:help` | `:?` | Show help |
 | `:about` | - | Show about/version information |
 
@@ -115,6 +120,7 @@ These commands adapt to your current view:
 | `:restart` | `:reboot` | Restart server | Server view |
 | `:refresh` | `:reload` | Refresh current view | All views |
 | `:clear-cache` | `:clearcache`, `:cc` | Purge all caches | All views |
+| `:reload-all` | - | Reload all modules | All views (advanced) |
 | `:manage` | `:edit` | Manage resource | Context-specific |
 
 ### System Commands
@@ -126,6 +132,7 @@ These commands adapt to your current view:
 | `:help` | `:?` | Show help | All views |
 
 **Note:** The following action commands mentioned in earlier versions are NOT currently implemented:
+
 - `:attach` / `:connect` - Use `:manage` instead in Volume/Network views
 - `:detach` / `:disconnect` - Use `:manage` instead in Volume/Network views
 - `:snapshot` / `:snap` - Not available via command mode (use keyboard shortcuts)
@@ -172,27 +179,27 @@ Print this and tape it to your monitor (we won't judge).
 
 ### Context Action Keys
 
-These uppercase keys trigger actions ONLY in relevant views:
+These keys trigger actions in relevant views. Note: Most actions use lowercase keys, with uppercase reserved for potentially dangerous operations.
 
 | Key | Action | Available In |
 |-----|--------|--------------|
-| `C` | Create new resource | All resource list views |
-| `Del` or `D` | Delete selected resource | All resource views (D only in Swift for download) |
-| `S` | Start server | Server views |
-| `T` | Stop server | Server views |
-| `R` | Restart server | Server views |
-| `M` | Manage resource | Security Groups, FloatingIPs, Ports, Networks, Volumes, Subnets, Swift |
+| `c` | Create new resource | FloatingIPs, Ports, Servers (use `:create` command in other views) |
+| `Del` or `d` | Delete selected resource | Volumes (archives), Swift (containers/objects), FloatingIPs, Ports |
+| `s` | Start server | Server views |
+| `S` | Stop server | Server views (uppercase = potentially destructive) |
+| `r` | Reboot server | Server views |
+| `R` | Resize server | Server views (uppercase = significant change) |
+| `a` | Attach/Assign | Volumes (attach to server), SecurityGroups (server attachments), FloatingIPs (server assignment), Ports (server assignment) |
+| `m` | Manage attachments | Volumes (manage server attachments) |
+| `p` | Port/Pair management | FloatingIPs (port assignment), Ports (allowed address pairs) |
+| `r` | Manage rules | SecurityGroups |
 | `A` | Cycle auto-refresh interval | All views (5s/10s/30s/60s/off) |
-| `P` | Create snapshot | Server, Volume views; Manage port assignment in FloatingIP view |
-| `B` | Create backup | Volume views |
-| `L` | View server logs | Server views |
-| `O` | View server console | Server views |
-| `U` | Upload object | Swift views |
-| `W` | Web access management | Swift container views |
-| `Z` | Resize server | Server views |
-| `E` | Manage allowed address pairs | Port views |
+| `n` | Create snapshot | Server views |
+| `b` | Create backup | Volume views |
+| `l` | View console logs | Server views |
+| `c` | Open console | Server views (context-dependent with create) |
 
-**Note**: Lowercase letters (a-z) do NOT trigger navigation or actions. Use command mode instead (`:servers`, `:networks`, etc.)
+**Note**: Navigation is done via command mode (`:servers`, `:networks`, etc.), NOT single lowercase keys.
 
 #### Global Actions
 
@@ -212,8 +219,8 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Action | Vim Users Note |
 |-----|--------|----------------|
-| `↑` or `k` | Move up | Vim muscle memory works |
-| `↓` or `j` | Move down | Vim muscle memory works |
+| `^` or `k` | Move up | Vim muscle memory works |
+| `v` or `j` | Move down | Vim muscle memory works |
 | `Page Up` | Scroll up one page | - |
 | `Page Down` | Scroll down one page | - |
 | `Home` or `g` | Jump to top | Vim-style |
@@ -247,8 +254,10 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Command Equivalent | Action | Context |
 |-----|-------------------|--------|---------|
-| `C` | `:create` | Create | All resource lists |
-| `Del` or `D` | `:delete` | Delete | All resources (confirmation required) |
+| `c` | `:create` | Create | Some modules (FloatingIPs, Ports, Servers); use `:create` command in other views |
+| `Del` or `d` | `:delete` | Delete | Module-specific (Volumes/archives, Swift, FloatingIPs, Ports); confirmation required |
+
+**Note**: Not all modules register keyboard shortcuts for create/delete. Use command mode (`:create`, `:delete`) for universal access to these actions.
 
 ## Context-Specific Shortcuts
 
@@ -258,14 +267,15 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `C` | Create server | Full server creation form |
+| `:create` | Create server | Full server creation form (no keyboard shortcut) |
 | `Del` | Delete server | Confirmation required (or bulk delete in multi-select) |
-| `S` | Start server | Power on |
-| `T` | Stop server | Graceful shutdown |
-| `R` | Restart server | Reboot (soft by default) |
-| `L` | View console logs | Last 100 lines |
-| `P` | Create snapshot | Create image from server |
-| `Z` | Resize server | Change flavor |
+| `s` | Start server | Power on |
+| `S` | Stop server | Graceful shutdown (uppercase = destructive) |
+| `r` | Reboot server | Reboot (soft by default) |
+| `l` | View console logs | Last 100 lines |
+| `n` | Create snapshot | Create image from server |
+| `R` | Resize server | Change flavor (uppercase = significant change) |
+| `c` | Open console | Access server console |
 | `Ctrl-X` | Multi-select mode | Bulk operations on multiple servers |
 
 ### Server Groups View (`:servergroups`)
@@ -288,21 +298,27 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `C` | Create security group | Name and description |
+| `:create` | Create security group | Name and description (no keyboard shortcut) |
 | `Del` | Delete security group | Can't delete 'default' |
-| `M` | Manage rules | Add/remove firewall rules |
+| `r` | Manage rules | Add/remove firewall rules |
+| `a` | Manage server attachments | Attach/detach from servers |
 
 ### Volumes View (`:volumes`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `C` | Create volume | Size, type, bootable option |
+| `:create` | Create volume | Size, type, bootable option (no keyboard shortcut) |
 | `Del` | Delete volume | Must be detached first (or bulk delete in multi-select) |
-| `M` | Attach to server | Select server and device |
-| `X` | Detach from server | Unmount first! |
-| `P` | Create snapshot | Volume backup |
-| `B` | Create backup | Volume backup |
+| `a` | Attach to server | Select server and device |
+| `m` | Manage server attachments | View and manage volume attachments |
+| `b` | Create backup | Volume backup |
 | `Ctrl-X` | Multi-select mode | Bulk operations on multiple volumes |
+
+#### Volume Archives View (`:volumearchives`)
+
+| Key | Action | Notes |
+|-----|--------|-------|
+| `d` | Delete archive | Delete backup/archive |
 
 ### Images View (`:images`)
 
@@ -332,10 +348,10 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `C` | Create port | Manual port creation |
-| `Del` | Delete port | Detach from server first |
-| `E` | Manage allowed address pairs | Configure allowed address pairs |
-| `M` | Manage port server assignment | Assign to server |
+| `c` | Create port | Manual port creation |
+| `d` | Delete port | Detach from server first |
+| `p` | Manage allowed address pairs | Configure allowed address pairs |
+| `a` | Manage server assignment | Assign port to server |
 | `Space` | View port details | MAC, IPs, security groups |
 
 ### Routers View (`:routers`)
@@ -351,10 +367,10 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `C` | Allocate floating IP | From external pool |
-| `Del` | Release floating IP | Returns to pool |
-| `M` | Manage floating IP server assignment | Attach to instance |
-| `P` | Manage floating IP port assignment | Attach to port |
+| `c` | Allocate floating IP | From external pool |
+| `d` | Release floating IP | Returns to pool |
+| `a` | Manage server assignment | Attach to instance |
+| `p` | Manage port assignment | Attach to port |
 
 ### Barbican View (`:barbican`)
 
@@ -364,32 +380,20 @@ These uppercase keys trigger actions ONLY in relevant views:
 | `Del` | Delete secret | Permanent deletion |
 | `Space` | View secret metadata | Metadata only, not payload |
 
-### Octavia View (`:octavia`)
-
-| Key | Action | Notes |
-|-----|--------|-------|
-| `C` | Create load balancer | VIP, provider, flavor |
-| `Del` | Delete load balancer | Removes all listeners/pools |
-| `L` | Manage listeners | Add/remove listeners |
-| `P` | Manage pools | Backend server pools |
-| `M` | Manage members | Pool members |
-
 ### Swift View (`:swift`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `C` | Create container | Object storage container |
-| `Del` | Delete container/object | Must be empty for containers |
-| `U` | Upload object | File upload to container |
-| `D` | Download object | Save object to disk |
-| `W` | Web access management | Configure web access for containers |
-| `M` | Manage container metadata | Edit container metadata |
+| `:create` | Create container | Object storage container (no keyboard shortcut) |
+| `d` | Delete container/object | Must be empty for containers |
+
+**Note**: Upload, download, web access, and metadata management operations are accessed through detail views and forms, not keyboard shortcuts.
 
 ### Health Dashboard (`:health`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `↑/↓` | Navigate metrics | Scroll through metrics |
+| `^/v` | Navigate metrics | Scroll through metrics |
 | `Space` | View metric details | Detailed metric breakdown |
 
 ### Advanced Search (`:search`)
@@ -398,7 +402,7 @@ These uppercase keys trigger actions ONLY in relevant views:
 |-----|--------|-------|
 | Type query | Search across services | Searches all OpenStack services |
 | `Enter` | Execute search | Start cross-service search |
-| `↑/↓` | Navigate results | Browse search results |
+| `^/v` | Navigate results | Browse search results |
 | `Space` | View result details | Inspect found resource |
 | `Esc` | Close search | Return to previous view |
 
@@ -410,7 +414,7 @@ These uppercase keys trigger actions ONLY in relevant views:
 |-----|--------|-------|
 | `Tab` | Next field | Move to next form field |
 | `Shift+Tab` | Previous field | Move to previous field |
-| `↑/↓` | Move between fields | Alternative navigation |
+| `^/v` | Move between fields | Alternative navigation |
 | `Space` | Activate field | Toggle/selector activation |
 | `Enter` | Enter edit mode | For text fields |
 | `Esc` | Exit edit mode | Cancel form or exit field |
@@ -419,7 +423,7 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `←/→` | Move cursor | Character-by-character |
+| `<-/->` | Move cursor | Character-by-character |
 | `Home` | Start of line | Jump to beginning |
 | `End` | End of line | Jump to end |
 | `Backspace` | Delete before cursor | Standard deletion |
@@ -431,7 +435,7 @@ These uppercase keys trigger actions ONLY in relevant views:
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `↑/↓` | Navigate items | Browse available items |
+| `^/v` | Navigate items | Browse available items |
 | `Page Up/Down` | Scroll page | Fast scrolling |
 | `Space` | Select/Deselect | Toggle selection |
 | `Enter` | Confirm selection | Accept and close |
@@ -450,7 +454,7 @@ Lowercase letters (s, n, v, etc.) do NOT navigate - use `:servers`, `:networks`,
 
 ```bash
 :servers          # Navigate to servers view
-↑/↓               # Select a server
+^/v               # Select a server
 S                 # Start the selected server (uppercase context action)
 ```
 
@@ -458,7 +462,7 @@ S                 # Start the selected server (uppercase context action)
 
 ```bash
 :servers          # Navigate to servers view
-↑/↓               # Select a server
+^/v               # Select a server
 :start            # Start the selected server
 ```
 
@@ -493,7 +497,7 @@ Enter             # Submit form
 
 ```bash
 :volumes          # Navigate to any resource view
-↑/↓               # Select resource
+^/v               # Select resource
 Space             # View details
 Esc               # Return to list
 ```
@@ -512,8 +516,8 @@ For vim users (muscle memory is real):
 
 | Vim Key | Standard Key | Action |
 |---------|--------------|--------|
-| `j` | `↓` | Move down |
-| `k` | `↑` | Move up |
+| `j` | `v` | Move down |
+| `k` | `^` | Move up |
 | `g` | `Home` | Jump to top |
 | `G` | `End` | Jump to bottom |
 | `Esc` | `Esc` | Exit/Cancel (works everywhere) |
@@ -591,7 +595,6 @@ Press `/` in any list:
 - Results organized by service priority
 
 **Use when**: You don't know which service has the resource or need comprehensive search.
-
 
 ## Auto-Refresh Configuration
 
@@ -676,7 +679,7 @@ Actions:     C Del Space ? q                      (Create, Delete, Details, Help
 Search:      / :search                            (Local, Advanced search)
 Commands:    : (then cmd name)                    (Command input - :ctx, :servers, :create, etc.)
 Refresh:     :refresh :clear-cache                (Refresh view, Cache purge)
-Movement:    ↑↓ j k Page-Up/Dn                     (List navigation)
+Movement:    ^v j k Page-Up/Dn                     (List navigation)
 Bulk Ops:    Ctrl-X Space Del                     (Multi-select, Select, Bulk delete)
 Cloud:       :ctx <cloud>                         (Switch between clouds)
 Server Mgmt: S T R                                (Start, Stop, Restart - uppercase context actions)

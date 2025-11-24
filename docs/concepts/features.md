@@ -358,12 +358,12 @@ See [Developer Documentation](../reference/developers/index.md) for implementati
 | Feature | Substation | Horizon | OpenStack CLI |
 |---------|------------|---------|---------------|
 | Interface | Terminal UI | Web UI | CLI |
-| Real-time Updates | ✓ | ✓ | ✗ |
-| Batch Operations | ✓ | Limited | ✗ |
+| Real-time Updates | [x] | [x] | [ ] |
+| Batch Operations | [x] | Limited | [ ] |
 | Performance | Excellent | Good | Fair |
 | Learning Curve | Low | Low | Medium |
-| Automation | ✓ | ✗ | ✓ |
-| Cache-Based Offline | ✓ | ✗ | ✗ |
+| Automation | [x] | [ ] | [x] |
+| Cache-Based Offline | [x] | [ ] | [ ] |
 
 ## Upcoming Features
 

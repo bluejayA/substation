@@ -299,10 +299,10 @@ OpenStackConfig(
 
 **How to respond**:
 
-- Low cache hit rate → Increase TTLs or investigate churn
-- High memory usage → Reduce cache sizes or increase eviction threshold
-- Slow API → Check OpenStack service health
-- High search timeouts → Check network or service health
+- Low cache hit rate -> Increase TTLs or investigate churn
+- High memory usage -> Reduce cache sizes or increase eviction threshold
+- Slow API -> Check OpenStack service health
+- High search timeouts -> Check network or service health
 
 ### Regular Benchmark Reviews
 
@@ -405,9 +405,9 @@ OpenStackConfig(
 
 **Consider system resources**:
 
-- Low RAM → Reduce cache sizes
-- Fast CPU → Increase concurrency
-- Slow network → Increase timeouts
+- Low RAM -> Reduce cache sizes
+- Fast CPU -> Increase concurrency
+- Slow network -> Increase timeouts
 - Monitor resource usage
 
 ### 4. Maintenance Tasks

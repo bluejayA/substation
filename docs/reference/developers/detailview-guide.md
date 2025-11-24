@@ -721,7 +721,7 @@ func handleScroll(direction: ScrollDirection) {
 ## Component Source Code
 
 - [Sources/Substation/Components/DetailView.swift](https://github.com/cloudnull/substation/blob/main/Sources/Substation/Components/DetailView.swift) - Core component
-- [Sources/Substation/Views/ServerViews.swift](https://github.com/cloudnull/substation/blob/main/Sources/Substation/Views/ServerViews.swift) - Example usage (drawServerDetail function)
+- [Sources/Substation/Modules/Servers/Views/ServerViews.swift](https://github.com/cloudnull/substation/blob/main/Sources/Substation/Modules/Servers/Views/ServerViews.swift) - Example usage (drawServerDetail function)
 
 ## Summary
 

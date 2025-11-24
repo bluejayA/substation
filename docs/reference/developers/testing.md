@@ -183,13 +183,13 @@ Test files are organized by component:
 
 ```
 Tests/
-├── OSClientTests/
-│   ├── OSClientTests.swift
-│   └── MemoryManagementTests.swift
-├── SubstationTests/
-│   └── EnhancedCloudConfigTests.swift
-└── TUITests/
-    └── TUITests.swift
+|-- OSClientTests/
+|   |-- OSClientTests.swift
+|   +-- MemoryManagementTests.swift
+|-- SubstationTests/
+|   +-- EnhancedCloudConfigTests.swift
++-- TUITests/
+    +-- TUITests.swift
 ```
 
 ### Basic Test Template
@@ -439,7 +439,7 @@ rm -rf .build/
 
 1. Check that all test dependencies are available
 2. Ensure `@testable import` statements are correct
-3. Verify Swift version compatibility (requires Swift 6.1+)
+3. Verify Swift version compatibility (requires Swift 6.1)
 
 ```bash
 # Check Swift version

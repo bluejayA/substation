@@ -35,21 +35,21 @@ Press `/` in any list view:
 
 ```
 In servers list:
-Press / → type "web" → Shows only servers with "web" in name
+Press / -> type "web" -> Shows only servers with "web" in name
 ```
 
 **Status Filtering:**
 
 ```
 In servers list:
-Press / → type "error" → Shows servers in ERROR state
+Press / -> type "error" -> Shows servers in ERROR state
 ```
 
 **Pattern Matching:**
 
 ```
 In networks list:
-Press / → type "192.168" → Shows networks with this IP range
+Press / -> type "192.168" -> Shows networks with this IP range
 ```
 
 ### Limitations
@@ -75,26 +75,26 @@ Use `:search<Enter>` (or `:find<Enter>` or `:z<Enter>`) for advanced search:
    - Keystone (Identity)
    - Swift (Object Storage)
 4. Results aggregated and displayed
-5. Typical response time: < 500ms (with caching)
+5. Target response time: < 500ms (with caching)
 
 ### Parallel Search Architecture
 
 **Sequential Search (Old Way):**
 
 ```
-Nova (2s) → Neutron (2s) → Cinder (2s) → Glance (2s) → Keystone (2s) → Swift (2s)
+Nova (2s) -> Neutron (2s) -> Cinder (2s) -> Glance (2s) -> Keystone (2s) -> Swift (2s)
 Total: 12+ seconds
 ```
 
 **Parallel Search (Substation Way):**
 
 ```
-Nova (2s) ┐
-Neutron (2s)├─ All in parallel
-Cinder (2s) │
-Glance (2s) ├─ Results as they come
-Keystone (2s)│
-Swift (2s)  ┘
+Nova (2s) +
+Neutron (2s)|- All in parallel
+Cinder (2s) |
+Glance (2s) |- Results as they come
+Keystone (2s)|
+Swift (2s)  +
 Total: 2 seconds (fastest service) to 5 seconds (timeout)
 ```
 
@@ -186,7 +186,7 @@ Match: name contains "web"
 Score: 50
 ```
 
-**Results sorted by**: Priority → Relevance Score → Name
+**Results sorted by**: Priority -> Relevance Score -> Name
 
 ### Timeout Handling
 
@@ -213,7 +213,7 @@ Score: 50
 **Find Production Resources:**
 
 ```
-Press z → type "prod" → Enter
+Press z -> type "prod" -> Enter
 Results:
 - Servers: prod-web-01, prod-db-01, prod-cache-01
 - Networks: production-network, prod-dmz
@@ -223,7 +223,7 @@ Results:
 **Find by IP Address:**
 
 ```
-Press z → type "192.168.1" → Enter
+Press z -> type "192.168.1" -> Enter
 Results:
 - Networks with this CIDR
 - Servers with this IP
@@ -233,7 +233,7 @@ Results:
 **Find by State:**
 
 ```
-Press z → type "error" → Enter
+Press z -> type "error" -> Enter
 Results:
 - Servers in ERROR state
 - Volumes in error state
@@ -243,7 +243,7 @@ Results:
 **Find by Type:**
 
 ```
-Press z → type "ubuntu" → Enter
+Press z -> type "ubuntu" -> Enter
 Results:
 - Images: Ubuntu 22.04, Ubuntu 20.04
 - Servers running Ubuntu images
@@ -477,7 +477,7 @@ Okay: "ubuntu"           (all ubuntu resources)
 
 ### ParallelSearchEngine
 
-Located in `/Sources/Substation/Search/ParallelSearchEngine.swift`
+Located in `/Sources/Substation/Search/SearchEngine.swift`
 
 **Configuration:**
 

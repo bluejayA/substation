@@ -11,14 +11,14 @@
 
 ## Features
 
-- ✅ **Visual cursor** with position tracking
-- ✅ **Input history** (UP/DOWN arrows to browse previous values)
-- ✅ **Full cursor movement** (LEFT/RIGHT, HOME/END)
-- ✅ **Character editing** (INSERT, DELETE, BACKSPACE)
-- ✅ **Validation display** with inline error messages
-- ✅ **State indicators** (selected, active, error states)
-- ✅ **Max width/length** constraints
-- ✅ **Placeholder support** with activation hints
+- [x] **Visual cursor** with position tracking
+- [x] **Input history** (UP/DOWN arrows to browse previous values)
+- [x] **Full cursor movement** (LEFT/RIGHT, HOME/END)
+- [x] **Character editing** (INSERT, DELETE, BACKSPACE)
+- [x] **Validation display** with inline error messages
+- [x] **State indicators** (selected, active, error states)
+- [x] **Max width/length** constraints
+- [x] **Placeholder support** with activation hints
 
 ## Basic Usage
 
@@ -441,10 +441,10 @@ default:
 ### 1. Always Use State Management
 
 ```swift
-// ✅ Good - uses FormTextFieldState
+// [x] Good - uses FormTextFieldState
 var nameFieldState = FormTextFieldState(initialValue: "")
 
-// ❌ Bad - manual state tracking is error-prone
+// [ ] Bad - manual state tracking is error-prone
 var nameValue: String = ""
 var nameCursor: Int = 0
 var nameHistory: [String] = []
@@ -479,10 +479,10 @@ maxWidth: 30
 ### 4. Provide Clear Placeholders
 
 ```swift
-// ✅ Good - descriptive
+// [x] Good - descriptive
 placeholder: "Enter network name (e.g., public-network)"
 
-// ❌ Bad - vague
+// [ ] Bad - vague
 placeholder: "Name"
 ```
 

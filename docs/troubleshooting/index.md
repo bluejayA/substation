@@ -59,6 +59,7 @@ Substation does NOT enforce OpenStack version requirements. It will attempt to c
 ### Older Releases
 
 If you're running older OpenStack releases:
+
 - **Queens to Stein**: Should work with most features
 - **Pike or older**: May have compatibility issues with newer API features
 - **Pre-Queens**: Not supported (requires Keystone v3)
@@ -66,6 +67,7 @@ If you're running older OpenStack releases:
 ### Troubleshooting Version Issues
 
 If you encounter errors, check:
+
 1. Keystone API version (must be v3) - check your `auth_url` ends with `/v3`
 2. Service availability - some features require specific services (Swift, Barbican, etc.)
 3. API microversions - newer operations may not work on older OpenStack
@@ -108,11 +110,11 @@ substation test-connection --cloud production
 ```yaml
 # Correct format (includes /v3)
 auth:
-  auth_url: https://keystone.example.com:5000/v3  ✓
+  auth_url: https://keystone.example.com:5000/v3  [OK]
 
 # Incorrect format
 auth:
-  auth_url: https://keystone.example.com:5000     ✗
+  auth_url: https://keystone.example.com:5000     [X]
 ```
 
 2. **Check Network Access:**

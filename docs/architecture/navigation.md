@@ -32,13 +32,13 @@ Substation uses a **VIM-inspired command-driven navigation system** that provide
 
 ### Key Features
 
-✅ Command-based navigation (`:resource-name`)
-✅ Fuzzy matching with ranked scoring
-✅ Tab completion for commands
-✅ Command history (up/down arrows)
-✅ Real-time sidebar filtering
-✅ Cross-service search
-✅ ID-based selection (persists through filtering)
+[x] Command-based navigation (`:resource-name`)
+[x] Fuzzy matching with ranked scoring
+[x] Tab completion for commands
+[x] Command history (up/down arrows)
+[x] Real-time sidebar filtering
+[x] Cross-service search
+[x] ID-based selection (persists through filtering)
 
 ---
 
@@ -46,51 +46,47 @@ Substation uses a **VIM-inspired command-driven navigation system** that provide
 
 ### High-Level Components
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   User Input                         │
-└────────────────────┬────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│              InputPriority                           │
-│  (Classifies keys: navigation/text/command)         │
-└────────────────────┬────────────────────────────────┘
-                     │
-        ┌────────────┼────────────┐
-        ▼            ▼            ▼
-┌──────────┐  ┌──────────┐  ┌──────────┐
-│ Layer 1  │  │ Layer 2  │  │ Layer 3  │
-│Navigation│  │  Unified │  │ Fallback │
-│  Keys    │  │  Input   │  │ Handlers │
-└────┬─────┘  └────┬─────┘  └────┬─────┘
-     │             │             │
-     ▼             ▼             ▼
-┌─────────────────────────────────────────────────────┐
-│              Action Execution                        │
-│  • Navigate to view                                  │
-│  • Execute command                                   │
-│  • Perform search                                    │
-└─────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[User Input] --> B[InputPriority<br/>Classifies keys: navigation/text/command]
+    B --> C[Layer 1<br/>Navigation Keys]
+    B --> D[Layer 2<br/>Unified Input]
+    B --> E[Layer 3<br/>Fallback Handlers]
+    C --> F[Action Execution]
+    D --> F
+    E --> F
+    F --> G[Navigate to view]
+    F --> H[Execute command]
+    F --> I[Perform search]
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#e8f5e9
+    style D fill:#e8f5e9
+    style E fill:#e8f5e9
+    style F fill:#f3e5f5
+    style G fill:#fce4ec
+    style H fill:#fce4ec
+    style I fill:#fce4ec
 ```
 
 ### Directory Structure
 
 ```
 Sources/Substation/
-├── Navigation/
-│   ├── CommandMode.swift         # Command parsing & execution
-│   ├── ResourceRegistry.swift    # Resource aliases & fuzzy matching
-│   ├── InputPriority.swift       # Input classification system
-│   └── LayoutUtilities.swift     # Layout helpers
-├── Views/
-│   ├── UnifiedInputView.swift    # Unified input state management
-│   ├── AdvancedSearchView.swift  # Cross-service search
-│   └── SidebarView.swift         # Navigation sidebar with filtering
-└── Search/
-    ├── SearchModels.swift        # Search data structures
-    ├── SearchEngine.swift        # Search execution
-    └── SearchIndex.swift         # Search indexing
+|-- Navigation/
+|   |-- CommandMode.swift         # Command parsing & execution
+|   |-- ResourceRegistry.swift    # Resource aliases & fuzzy matching
+|   |-- InputPriority.swift       # Input classification system
+|   +-- LayoutUtilities.swift     # Layout helpers
+|-- Views/
+|   |-- UnifiedInputView.swift    # Unified input state management
+|   |-- AdvancedSearchView.swift  # Cross-service search
+|   +-- SidebarView.swift         # Navigation sidebar with filtering
++-- Search/
+    |-- SearchModels.swift        # Search data structures
+    |-- SearchEngine.swift        # Search execution
+    +-- SearchIndex.swift         # Search indexing
 ```
 
 ---
@@ -114,17 +110,17 @@ Sources/Substation/
 
 ```swift
 // Exact match
-let view = ResourceRegistry.shared.resolve("servers")  // → .servers
+let view = ResourceRegistry.shared.resolve("servers")  // -> .servers
 
 // Alias match
-let view = ResourceRegistry.shared.resolve("srv")      // → .servers
+let view = ResourceRegistry.shared.resolve("srv")      // -> .servers
 
 // Fuzzy match
-let suggestion = ResourceRegistry.shared.fuzzyMatch("servrs")  // → "servers"
+let suggestion = ResourceRegistry.shared.fuzzyMatch("servrs")  // -> "servers"
 
 // Ranked matches for prefix
 let matches = ResourceRegistry.shared.rankedMatches(for: "fla")
-// → [(command: "flavors", score: 99, viewMode: .flavors), ...]
+// -> [(command: "flavors", score: 99, viewMode: .flavors), ...]
 ```
 
 **Data Structure**:
@@ -145,7 +141,7 @@ private let resourceMap: [ViewMode: [String]] = [
 
 **Key Features**:
 
-- Command execution (`:servers` → navigate to servers)
+- Command execution (`:servers` -> navigate to servers)
 - Command history (up to 50 entries)
 - Tab completion with cycling
 - Special commands (`:q`, `:help`, `:commands`)
@@ -158,28 +154,30 @@ let commandMode = CommandMode()
 
 // Execute command
 let result = commandMode.executeCommand("servers")
-// → .navigateToView(.servers)
+// -> .navigateToView(.servers)
 
 // Tab completion
 let completion = commandMode.completeCommand("fla")
-// → "flavors"
+// -> "flavors"
 
 // History navigation
-let previous = commandMode.previousCommand()  // → "networks"
+let previous = commandMode.previousCommand()  // -> "networks"
 ```
 
 **Command Flow**:
 
-```
-User types ":servers" + Enter
-    ↓
-executeCommand("servers")
-    ↓
-ResourceRegistry.resolve("servers")
-    ↓
-Return .navigateToView(.servers)
-    ↓
-TUI.changeView(to: .servers)
+```mermaid
+flowchart TD
+    A[User types ':servers' + Enter] --> B[executeCommand 'servers']
+    B --> C[ResourceRegistry.resolve 'servers']
+    C --> D[Return .navigateToView .servers]
+    D --> E[TUI.changeView to: .servers]
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#e8f5e9
+    style D fill:#f3e5f5
+    style E fill:#fce4ec
 ```
 
 ### 3. InputPriority
@@ -233,7 +231,7 @@ printableRange:    32...126                      // Alphanumeric
 
 **Purpose**: Unified input state management across all views.
 
-**Location**: `Sources/Substation/Views/UnifiedInputView.swift`
+**Location**: `Sources/Substation/Modules/Core/Views/UnifiedInputView.swift`
 
 **Key Features**:
 
@@ -277,7 +275,7 @@ case .cancelled:
 
 **Purpose**: Cross-service search with filtering and navigation.
 
-**Location**: `Sources/Substation/Views/AdvancedSearchView.swift`
+**Location**: `Sources/Substation/Modules/Core/Views/AdvancedSearchView.swift`
 
 **Key Features**:
 
@@ -402,50 +400,26 @@ return handleNavigationInput(key)  // Handles arrow keys in specific contexts
 
 ### Input Flow Diagram
 
-```
-┌──────────────┐
-│ Key Press    │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────────────────────┐
-│ InputPriority.classify(key)  │
-└──────┬───────────────────────┘
-       │
-       ├─ navigation? ──────────┐
-       ├─ textInput?  ──────┐   │
-       ├─ command?   ────┐  │   │
-       └─ fallback? ──┐  │  │   │
-                      │  │  │   │
-       ┌──────────────┘  │  │   │
-       ▼                 │  │   │
-┌────────────┐           │  │   │
-│  Layer 3   │           │  │   │
-│  Fallback  │           │  │   │
-└────────────┘           │  │   │
-                         │  │   │
-       ┌─────────────────┘  │   │
-       ▼                    │   │
-┌────────────┐              │   │
-│  Layer 2   │              │   │
-│  Unified   │              │   │
-│   Input    │              │   │
-└────────────┘              │   │
-                            │   │
-       ┌────────────────────┘   │
-       ▼                        │
-┌────────────┐                  │
-│  Command   │                  │
-│   Mode     │                  │
-└────────────┘                  │
-                                │
-       ┌────────────────────────┘
-       ▼
-┌────────────┐
-│  Layer 1   │
-│ Navigation │
-│   Handler  │
-└────────────┘
+```mermaid
+flowchart TD
+    A[Key Press] --> B[InputPriority.classify key]
+    B -->|navigation?| C[Layer 1<br/>Navigation Handler]
+    B -->|command?| D[Command Mode]
+    B -->|textInput?| E[Layer 2<br/>Unified Input]
+    B -->|fallback?| F[Layer 3<br/>Fallback]
+
+    C --> G[Execute Action]
+    D --> G
+    E --> G
+    F --> G
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#e8f5e9
+    style D fill:#e8f5e9
+    style E fill:#e8f5e9
+    style F fill:#e8f5e9
+    style G fill:#f3e5f5
 ```
 
 ### Best Practices
@@ -493,20 +467,22 @@ inputState.displayText = ":"
 
 ### Command Execution Flow
 
-```
-User types ":servers" + Enter
-    ↓
-UnifiedInputView detects command input
-    ↓
-Returns .commandEntered("servers")
-    ↓
-CommandMode.executeCommand("servers")
-    ↓
-ResourceRegistry.resolve("servers")
-    ↓
-Returns .navigateToView(.servers)
-    ↓
-TUI.changeView(to: .servers)
+```mermaid
+flowchart TD
+    A[User types ':servers' + Enter] --> B[UnifiedInputView detects command input]
+    B --> C[Returns .commandEntered 'servers']
+    C --> D[CommandMode.executeCommand 'servers']
+    D --> E[ResourceRegistry.resolve 'servers']
+    E --> F[Returns .navigateToView .servers]
+    F --> G[TUI.changeView to: .servers]
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#fff4e1
+    style D fill:#e8f5e9
+    style E fill:#e8f5e9
+    style F fill:#f3e5f5
+    style G fill:#fce4ec
 ```
 
 ### Supported Commands
@@ -514,27 +490,27 @@ TUI.changeView(to: .servers)
 #### Navigation Commands
 
 ```
-:servers      → Navigate to Servers view
-:networks     → Navigate to Networks view
-:volumes      → Navigate to Volumes view
-:images       → Navigate to Images view
-:flavors      → Navigate to Flavors view
+:servers      -> Navigate to Servers view
+:networks     -> Navigate to Networks view
+:volumes      -> Navigate to Volumes view
+:images       -> Navigate to Images view
+:flavors      -> Navigate to Flavors view
 ... (see ResourceRegistry for full list)
 ```
 
 #### Special Commands
 
 ```
-:help         → Show help view
-:q, :quit     → Quit application
-:commands     → List all available commands
+:help         -> Show help view
+:q, :quit     -> Quit application
+:commands     -> List all available commands
 ```
 
 #### Future Commands (Planned)
 
 ```
-:ctx          → List available cloud contexts
-:ctx <name>   → Switch to cloud context
+:ctx          -> List available cloud contexts
+:ctx <name>   -> Switch to cloud context
 ```
 
 ### Tab Completion
@@ -551,20 +527,20 @@ TUI.changeView(to: .servers)
 
 ```
 User types: ":ser"
-Presses Tab: → "servers"
-Presses Tab: → "servergroups"
-Presses Tab: → "servers" (cycles back)
+Presses Tab: -> "servers"
+Presses Tab: -> "servergroups"
+Presses Tab: -> "servers" (cycles back)
 ```
 
 **Implementation**:
 
 ```swift
 let completion = commandMode.completeCommand("ser")
-// → "servers" (first match)
+// -> "servers" (first match)
 
 // Get all matches
 let matches = commandMode.getCompletionMatches()
-// → ["servers", "servergroups", "securitygroups"]
+// -> ["servers", "servergroups", "securitygroups"]
 ```
 
 ### Command History
@@ -584,8 +560,8 @@ let matches = commandMode.getCompletionMatches()
 commandMode.executeCommand("servers")
 commandMode.executeCommand("networks")
 
-let prev = commandMode.previousCommand()  // → "networks"
-let prev2 = commandMode.previousCommand() // → "servers"
+let prev = commandMode.previousCommand()  // -> "networks"
+let prev2 = commandMode.previousCommand() // -> "servers"
 ```
 
 ---
@@ -604,20 +580,23 @@ The search system provides cross-service resource search across all 19 OpenStack
 
 ### Search Flow
 
-```
-User types in search box
-    ↓
-UnifiedInputView handles text input (.updated)
-    ↓
-performClientSideFilter() (immediate)
-    ↓
-scheduleSearch() (200ms debounce)
-    ↓
-performSearch() → API calls
-    ↓
-searchResults updated
-    ↓
-Display results
+```mermaid
+flowchart TD
+    A[User types in search box] --> B[UnifiedInputView handles text input .updated]
+    B --> C[performClientSideFilter immediate]
+    B --> D[scheduleSearch 200ms debounce]
+    C --> E[Display filtered results]
+    D --> F[performSearch - API calls]
+    F --> G[searchResults updated]
+    G --> E
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#e8f5e9
+    style D fill:#e8f5e9
+    style E fill:#fce4ec
+    style F fill:#f3e5f5
+    style G fill:#f3e5f5
 ```
 
 ### Search Architecture

@@ -67,7 +67,8 @@ public actor CoreTokenManager {
 **Example:**
 
 ```swift
-// Service actor for API calls
+// Service class for API calls
+@MainActor
 public actor OpenStackClientCore {
     private let tokenManager: CoreTokenManager
 
@@ -511,9 +512,9 @@ Not "mostly zero". Not "zero except that one". **ZERO**.
 
 Warnings become bugs in production. Examples:
 
-- Concurrency warnings → race conditions
-- Memory warnings → leaks or crashes
-- Type warnings → runtime errors
+- Concurrency warnings -> race conditions
+- Memory warnings -> leaks or crashes
+- Type warnings -> runtime errors
 
 **Build Script:**
 
@@ -536,7 +537,7 @@ echo "SUCCESS: Zero warnings"
 
 ### Performance: Built-in Telemetry and Monitoring
 
-**Real-Time Metrics** (`/Sources/Substation/Telemetry/`):
+**Real-Time Metrics** (`/Sources/OSClient/Enterprise/Telemetry/`):
 
 - Cache hit rates (L1/L2/L3)
 - API response times (p50, p95, p99)

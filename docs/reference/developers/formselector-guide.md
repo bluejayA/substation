@@ -11,15 +11,15 @@
 
 ## Features
 
-- ✅ **Multi-column display** with headers
-- ✅ **Search/filter** by typing to narrow results
-- ✅ **Single and multi-select** modes
-- ✅ **Scrolling** with scroll indicators
-- ✅ **Checkbox indicators** for selection state
-- ✅ **Tab support** for multiple selection modes
-- ✅ **Keyboard navigation** (UP/DOWN, SPACE, ENTER)
-- ✅ **Empty state handling**
-- ✅ **Real-time filtering**
+- [x] **Multi-column display** with headers
+- [x] **Search/filter** by typing to narrow results
+- [x] **Single and multi-select** modes
+- [x] **Scrolling** with scroll indicators
+- [x] **Checkbox indicators** for selection state
+- [x] **Tab support** for multiple selection modes
+- [x] **Keyboard navigation** (UP/DOWN, SPACE, ENTER)
+- [x] **Empty state handling**
+- [x] **Real-time filtering**
 
 ## Basic Usage
 
@@ -273,7 +273,7 @@ Select Image
 
 Browse and select item. SPACE: select, ENTER: confirm
 [ ] Name                           Size       Status
-────────────────────────────────────────────────────────
+--------------------------------------------------------
 [ ] Ubuntu 22.04 LTS              10GB       active
 [X] Debian 12                     8GB        active
 [ ] CentOS Stream 9               12GB       active
@@ -291,7 +291,7 @@ Select Security Groups
 
 Browse and select items. SPACE: toggle, ENTER: confirm
 [ ] Name                           Description
-────────────────────────────────────────────────────────
+--------------------------------------------------------
 [X] default                        Default security group
 [X] web-servers                    HTTP/HTTPS access
 [ ] ssh-access                     SSH access only
@@ -311,7 +311,7 @@ Select Source
 Mode: [Images] (TAB to switch)
 Browse and select item. SPACE: select, ENTER: confirm
 [ ] Name                           Size       Status
-────────────────────────────────────────────────────────
+--------------------------------------------------------
 [ ] Ubuntu 22.04 LTS              10GB       active
 [X] Debian 12                     8GB        active
 
@@ -326,7 +326,7 @@ Select Image
 Browse and select item. SPACE: select, ENTER: confirm
 Search: ubuntu_
 [ ] Name                           Size       Status
-────────────────────────────────────────────────────────
+--------------------------------------------------------
 [ ] Ubuntu 22.04 LTS              10GB       active
 [ ] Ubuntu 20.04 LTS              8GB        active
 
@@ -660,7 +660,7 @@ func handleImageSelectorInput(_ keyCode: Int32, form: inout ServerCreateForm) {
 ### 1. Always Implement FormSelectableItem
 
 ```swift
-// ✅ Good - proper protocol conformance
+// [x] Good - proper protocol conformance
 extension Network: FormSelectableItem {
     var id: String { self.id }
     var sortKey: String { name ?? "Unknown" }
@@ -670,19 +670,19 @@ extension Network: FormSelectableItem {
     }
 }
 
-// ❌ Bad - missing protocol conformance
+// [ ] Bad - missing protocol conformance
 // Will not compile
 ```
 
 ### 2. Use Descriptive Column Headers
 
 ```swift
-// ✅ Good - clear headers
+// [x] Good - clear headers
 FormSelectorColumn(header: "Name", width: 30)
 FormSelectorColumn(header: "vCPUs", width: 8)
 FormSelectorColumn(header: "RAM (MB)", width: 12)
 
-// ❌ Bad - vague headers
+// [ ] Bad - vague headers
 FormSelectorColumn(header: "Data", width: 30)
 FormSelectorColumn(header: "Info", width: 20)
 ```
@@ -690,12 +690,12 @@ FormSelectorColumn(header: "Info", width: 20)
 ### 3. Set Appropriate Column Widths
 
 ```swift
-// ✅ Good - balanced widths
+// [x] Good - balanced widths
 FormSelectorColumn(header: "Name", width: 30)      // Main identifier
 FormSelectorColumn(header: "Status", width: 10)    // Short status
 FormSelectorColumn(header: "Description", width: 40)  // Longer text
 
-// ❌ Bad - imbalanced
+// [ ] Bad - imbalanced
 FormSelectorColumn(header: "Name", width: 10)      // Too narrow
 FormSelectorColumn(header: "Status", width: 40)    // Too wide for status
 ```

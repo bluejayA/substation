@@ -274,13 +274,13 @@ func matchesSearch(_ query: String) -> Bool {
 
 **Simple forms**:
 
-- `/Sources/Substation/ViewModels/NetworkCreateForm.swift` - Name, MTU, port security
-- `/Sources/Substation/ViewModels/RouterCreateForm.swift` - Name, gateway, conditional fields
+- `/Sources/Substation/Modules/Networks/Models/NetworkCreateForm.swift` - Name, MTU, port security
+- `/Sources/Substation/Modules/Routers/Models/RouterCreateForm.swift` - Name, gateway, conditional fields
 
 **Complex forms**:
 
-- `/Sources/Substation/Views/ServerCreateView.swift` - Images, flavors, networks, security groups
-- `/Sources/Substation/ViewModels/SubnetCreateForm.swift` - IP validation, CIDR, allocation pools
+- `/Sources/Substation/Modules/Servers/Views/ServerCreateView.swift` - Images, flavors, networks, security groups
+- `/Sources/Substation/Modules/Subnets/Models/SubnetCreateForm.swift` - IP validation, CIDR, allocation pools
 
 ## Troubleshooting
 

@@ -1,9 +1,9 @@
-# Substation - OpenStack Terminal UI
+# Substation - OpenStack TUI
 
 ![Substation Logo](assets/substation-logo-icon.png#only-light)
 ![Substation Logo](assets/substation-logo-icon-lt.png#only-dark)
 
-## Terminal Interface for OpenStack Cloud Management
+## TUI (Terminal User Interface) for OpenStack Cloud Management
 
 Substation is a comprehensive terminal user interface for OpenStack that provides operators with powerful, efficient, and intuitive cloud infrastructure management capabilities.
 
@@ -68,7 +68,7 @@ Substation is a comprehensive terminal user interface for OpenStack that provide
 ### Advanced Features
 
 - **Intelligent Caching** - Multi-level (L1/L2/L3) cache hierarchy
-- **Parallel Search** - Cross-service search in < 500ms
+- **Parallel Search** - Cross-service search in < 500ms (target)
 - **Batch Operations** - Process 100+ resources simultaneously
 - **Real-time Updates** - Auto-refresh with configurable intervals
 - **Health Monitoring** - Performance metrics and alerting

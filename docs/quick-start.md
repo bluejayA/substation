@@ -25,7 +25,7 @@ chmod +x substation
 sudo mv substation /usr/local/bin/
 ```
 
-### Option 3: Build from Source** (requires Swift 6.1+)
+### Option 3: Build from Source (requires Swift 6.1)
 
 ```bash
 git clone https://github.com/cloudnull/substation.git
@@ -91,7 +91,7 @@ Substation uses **command input** as the primary navigation method. Press `:` to
 
 - **Discoverable**: Tab completion shows all options
 - **Forgiving**: Fuzzy matching handles typos (`:servrs` suggests `:servers`)
-- **Progressive**: Learn full names first, then shortcuts (`:servers` → `:srv` → `:s`)
+- **Progressive**: Learn full names first, then shortcuts (`:servers` -> `:srv` -> `:s`)
 - **Context-Aware**: Commands like `:create` adapt to your current view
 
 ### Navigation Basics
@@ -113,7 +113,7 @@ Use command input for all navigation:
 
 1. Enter command input: `:`
 2. Navigate to servers: `servers<Enter>` (or press `Tab` to see all views)
-3. Use `↑/↓` to navigate
+3. Use `Up/Down` to navigate
 4. Press `Space` for details
 5. Press `Esc` to go back
 
@@ -141,12 +141,22 @@ Or use advanced search:
 | Command | Aliases | Description |
 |---------|---------|-------------|
 | `:dashboard` | `:dash`, `:d` | Dashboard overview |
-| `:servers` | `:srv`, `:s`, `:nova` | Servers view |
-| `:networks` | `:net`, `:n`, `:neutron` | Networks view |
-| `:volumes` | `:vol`, `:v`, `:cinder` | Volumes view |
-| `:images` | `:img`, `:i`, `:glance` | Images view |
-| `:flavors` | `:flav`, `:f` | Flavors view |
-| `:securitygroups` | `:secgroups`, `:sg`, `:e` | Security groups |
+| `:servers` | `:srv`, `:s`, `:nova` | Servers (compute instances) |
+| `:networks` | `:net`, `:n`, `:neutron` | Networks |
+| `:subnets` | `:sub`, `:u` | Subnets |
+| `:routers` | `:rtr`, `:r` | Routers |
+| `:ports` | `:port`, `:p` | Network ports |
+| `:floatingips` | `:fips`, `:fip`, `:l` | Floating IPs |
+| `:securitygroups` | `:secgroups`, `:sec`, `:e` | Security groups |
+| `:volumes` | `:vol`, `:v`, `:cinder` | Volumes (block storage) |
+| `:images` | `:img`, `:i`, `:glance` | Images |
+| `:flavors` | `:flav`, `:f` | Flavors (instance sizes) |
+| `:keypairs` | `:keys`, `:kp`, `:k` | SSH keypairs |
+| `:servergroups` | `:srvgrp`, `:sg`, `:g` | Server groups (affinity) |
+| `:swift` | `:objectstorage`, `:obj`, `:j` | Object storage |
+| `:barbican` | `:secrets`, `:b` | Secrets management |
+| `:health` | `:healthdashboard`, `:h` | Health dashboard |
+| `:performance` | `:metrics`, `:perf`, `:stats` | Performance metrics |
 
 ### Action Commands (Context-Aware)
 
@@ -158,13 +168,14 @@ Or use advanced search:
 | `:stop` | `:shutdown` | Stop server | Server view |
 | `:restart` | `:reboot` | Restart server | Server view |
 | `:refresh` | `:reload` | Refresh view | All views |
-| `:cache-purge` | `:clear-cache` | Purge all caches | All views |
+| `:cache-purge` | `:clear-cache`, `:cc` | Purge all caches | All views |
+| `:reload-all` | - | Reload all modules | All views (advanced) |
 
 ### Global Actions
 
 | Key | Command Equivalent | Action |
 |-----|-------------------|--------|
-| `↑/↓` | - | Navigate lists |
+| `Up/Down` | - | Navigate lists |
 | `Space` | - | View details |
 | `/` | - | Local search |
 | `?` | `:help` | Context help |
@@ -177,7 +188,7 @@ Or use advanced search:
 1. Launch Substation: `substation --cloud mycloud`
 2. Enter command input: `:`
 3. Navigate: `servers<Enter>` (or `srv<Enter>` or `s<Enter>`)
-4. Use `↑/↓` to navigate
+4. Use `Up/Down` to navigate
 5. Press `Space` for server details
 
 ### Create a Resource
@@ -209,10 +220,10 @@ Or use advanced search:
 
 ```yaml
 # Correct
-auth_url: https://keystone.example.com:5000/v3  ✓
+auth_url: https://keystone.example.com:5000/v3  [OK]
 
 # Wrong
-auth_url: https://keystone.example.com:5000     ✗
+auth_url: https://keystone.example.com:5000     [X]
 ```
 
 ### Slow Performance

@@ -484,25 +484,25 @@ openstack --os-cloud mycloud server list
 ```
 Performance Issue
     |
-    ├─ Memory High?
-    │   ├─ Yes → Press 'c' to purge cache → Reduce TTLs → Increase eviction threshold
-    │   └─ No → Continue
+    |- Memory High?
+    |   |- Yes -> Press 'c' to purge cache -> Reduce TTLs -> Increase eviction threshold
+    |   +- No -> Continue
     |
-    ├─ API Slow?
-    │   ├─ Yes → Check OpenStack health → Check network → Enable wiretap
-    │   └─ No → Continue
+    |- API Slow?
+    |   |- Yes -> Check OpenStack health -> Check network -> Enable wiretap
+    |   +- No -> Continue
     |
-    ├─ Cache Hit Rate Low?
-    │   ├─ Yes → Increase TTLs → Reduce eviction → Check for high churn
-    │   └─ No → Continue
+    |- Cache Hit Rate Low?
+    |   |- Yes -> Increase TTLs -> Reduce eviction -> Check for high churn
+    |   +- No -> Continue
     |
-    ├─ Search Slow?
-    │   ├─ Yes → Check service health → Use specific queries → Check cache
-    │   └─ No → Continue
+    |- Search Slow?
+    |   |- Yes -> Check service health -> Use specific queries -> Check cache
+    |   +- No -> Continue
     |
-    └─ UI Sluggish?
-        ├─ Yes → Reduce auto-refresh → Check terminal → Reduce data volume
-        └─ No → Report issue (might be a bug)
+    +- UI Sluggish?
+        |- Yes -> Reduce auto-refresh -> Check terminal -> Reduce data volume
+        +- No -> Report issue (might be a bug)
 ```
 
 ---

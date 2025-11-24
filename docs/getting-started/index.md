@@ -1,6 +1,6 @@
 # Getting Started with Substation
 
-Welcome to Substation! This guide will help you understand the concepts and get started with the OpenStack Terminal UI.
+Welcome to Substation! This guide will help you understand the concepts and get started with the OpenStack TUI (Terminal User Interface).
 
 ## Overview
 
@@ -115,13 +115,9 @@ Substation emphasizes **command-based navigation** as the primary method. This a
    - Faster typing with shorter names
    - Still clear what you're doing
 
-3. **Week 3**: Try short aliases (`:s`, `:n`, `:v`)
-   - Very fast navigation
-   - Requires some memorization
-
-4. **Week 4+**: Graduate to single-key shortcuts (`s`, `n`, `v`)
-   - Muscle memory speed for power users
-   - Optional - use only when comfortable
+3. **Week 3+**: Master short aliases (`:s`, `:n`, `:v`)
+   - Very fast navigation for experienced users
+   - Command input remains the primary method
 
 ### 4. Navigate Between Views
 
@@ -135,14 +131,13 @@ Substation emphasizes **command-based navigation** as the primary method. This a
 | `:volumes` | `:vol`, `:v`, `:cinder` | Block storage |
 | `:images` | `:img`, `:i`, `:glance` | OS images and snapshots |
 | `:flavors` | `:flav`, `:f` | Instance sizes/types |
-| `:servergroups` | `:srvgroups`, `:g` | Anti-affinity groups |
-| `:securitygroups` | `:secgroups`, `:sg`, `:e` | Firewall rules |
+| `:servergroups` | `:srvgroups`, `:sg`, `:g` | Anti-affinity groups |
+| `:securitygroups` | `:secgroups`, `:e` | Firewall rules |
 | `:subnets` | `:sub`, `:u` | Network subnets |
 | `:ports` | `:p` | Network interfaces |
 | `:routers` | `:rtr`, `:r` | Virtual routers |
 | `:floatingips` | `:fips`, `:l` | Public IP addresses |
 | `:barbican` | `:secrets`, `:b` | Secrets management |
-| `:octavia` | `:loadbalancers`, `:lbs`, `:o` | Load balancers |
 | `:swift` | `:objects`, `:j` | Object storage |
 
 ### 5. Working with Resource Lists
@@ -150,7 +145,7 @@ Substation emphasizes **command-based navigation** as the primary method. This a
 **Navigate Lists:**
 
 ```text
-↑/↓ or j/k    Move selection up/down
+^/v or j/k    Move selection up/down
 Page Up/Down  Scroll by page
 Home/End      Jump to start/end
 ```
@@ -179,7 +174,7 @@ Esc           Clear search
 ```text
 :search<Enter>     Open advanced search (or :find<Enter> or :z<Enter>)
 Type query         Searches Nova, Neutron, Cinder, Glance, Keystone, Swift
-Enter              Execute search (< 500ms typical)
+Enter              Execute search (< 500ms target)
 ```
 
 ### 7. Refreshing Data
@@ -219,9 +214,6 @@ These commands adapt to your current view:
 | `:start` | `:boot` | Start server | Server view |
 | `:stop` | `:shutdown` | Stop server | Server view |
 | `:restart` | `:reboot` | Restart server | Server view |
-| `:attach` | `:connect` | Attach volume/network | Volume/Network view |
-| `:detach` | `:disconnect` | Detach volume/network | Volume/Network view |
-| `:snapshot` | `:snap` | Create snapshot | Server/Volume view |
 
 #### Other Creation Workflows
 
@@ -239,6 +231,7 @@ These commands adapt to your current view:
 | `:quit` | `:exit`, `:q` | Exit Substation |
 | `:refresh` | `:reload` | Refresh current view data |
 | `:cache-purge` | `:clear-cache` | Clear ALL caches (use when data is stale) |
+| `:reload-all` | - | Reload all modules (advanced) |
 | `:search` | `:find`, `:z` | Cross-service search |
 | `:dashboard` | `:dash`, `:d` | Return to dashboard |
 
@@ -246,7 +239,7 @@ These commands adapt to your current view:
 
 | Key | Action | Alternative |
 |-----|--------|-------------|
-| `↑/↓` | Navigate up/down | `j/k` (vim-style) |
+| `^/v` | Navigate up/down | `j/k` (vim-style) |
 | `Page Up/Down` | Scroll by page | - |
 | `Home/End` | Jump to start/end | `g/G` (vim-style) |
 | `Space` | View details | `Enter` |
@@ -259,8 +252,6 @@ These commands adapt to your current view:
 |---------|---------|---------|
 | `:create` | `:new`, `:add` | Create resource in any list |
 | `:delete` | `:remove`, `:rm` | Delete selected resource |
-| `:attach` | `:connect` | Attach volume/network |
-| `:detach` | `:disconnect` | Detach volume/network |
 
 ## Common Workflows
 
@@ -273,7 +264,7 @@ substation --cloud mycloud
 # Enter command input and navigate to servers
 :servers<Enter>     # Or :srv<Enter> or :s<Enter>
 
-# Use ↑/↓ to navigate
+# Use ^/v to navigate
 # Press Space to view details
 # Press Esc to go back
 ```
@@ -321,19 +312,19 @@ substation --cloud mycloud
 ```bash
 # Start server
 :servers<Enter>     # Navigate to servers
-# Select stopped server with ↑/↓
+# Select stopped server with ^/v
 :start<Enter>       # Start server (or :boot<Enter>)
 
 # Stop server
-# Select running server with ↑/↓
+# Select running server with ^/v
 :stop<Enter>        # Stop server (or :shutdown<Enter>)
 
 # Restart server
-# Select running server with ↑/↓
+# Select running server with ^/v
 :restart<Enter>     # Restart server (or :reboot<Enter>)
 
 # Delete server
-# Select server to delete with ↑/↓
+# Select server to delete with ^/v
 :delete<Enter>      # Delete server (confirmation required)
 ```
 
@@ -388,7 +379,7 @@ Now that you're up and running, explore:
 
 Understanding these concepts will help you use Substation effectively:
 
-- **[Caching](../concepts/caching.md)** - How the multi-level cache reduces API calls by 60-80%
+- **[Caching](../concepts/caching.md)** - How the multi-level cache is designed to reduce API calls by 60-80%
 - **[Search](../concepts/search.md)** - Local search vs. cross-service advanced search
 - **[Security](../concepts/security.md)** - How credentials are protected and encrypted
 - **[Features](../concepts/features.md)** - Complete feature overview

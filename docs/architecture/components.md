@@ -1,8 +1,8 @@
 # Component Architecture
 
-This document provides a detailed view of Substation's component architecture, including the Terminal UI layer, service layer, and form building system.
+This document provides a detailed view of Substation's component architecture, including the TUI layer, service layer, and form building system.
 
-## Terminal UI Layer (SwiftNCurses)
+## TUI Layer (SwiftNCurses)
 
 The custom-built SwiftNCurses framework provides a cross-platform terminal UI abstraction:
 
@@ -454,7 +454,7 @@ This creates a fully functional, type-safe form with:
 
 ## Caching Architecture (MemoryKit)
 
-The multi-layer caching system reduces API calls by 60-80%:
+The multi-layer caching system is designed to reduce API calls by 60-80%:
 
 ```mermaid
 graph TB

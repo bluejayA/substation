@@ -20,7 +20,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 2. Press `:` to enter command input
 3. Type `servers` (or press Tab to see all commands)
 4. Press `Enter` to navigate to servers view
-5. Use `↑/↓` to navigate
+5. Use `^/v` to navigate
 6. Press `Space` to view details
 
 **Command Discovery:**
@@ -66,14 +66,14 @@ Substation emphasizes **command-based navigation** as the primary method for all
 **Start Server:**
 
 1. Navigate to server list: `:servers<Enter>`
-2. Select stopped server with `↑/↓`
+2. Select stopped server with `^/v`
 3. Start server: `:start<Enter>` (or `:boot<Enter>`)
 4. Confirm if prompted
 
 **Stop Server:**
 
 1. Navigate to server list: `:servers<Enter>`
-2. Select running server with `↑/↓`
+2. Select running server with `^/v`
 3. Stop server: `:stop<Enter>` (or `:shutdown<Enter>`)
 4. Confirm if prompted
 
@@ -97,8 +97,8 @@ Substation emphasizes **command-based navigation** as the primary method for all
 
 1. Navigate to server list: `:servers<Enter>`
 2. Select server
-3. View logs: `:console<Enter>` (or `:logs<Enter>`)
-4. View console output
+3. Press `Space` or `Enter` to view server details
+4. Use keyboard shortcuts to access console (see module-specific shortcuts)
 5. Press `Esc` to close
 
 **Command Discovery Tips:**
@@ -113,7 +113,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 
 1. Navigate to servers: `:servers<Enter>`
 2. Select server to snapshot
-3. Create snapshot: `:snapshot<Enter>` (or `:snap<Enter>`)
+3. Use keyboard shortcut or action menu to create snapshot
 4. Enter snapshot name
 5. Snapshot creates in background
 6. Check images: `:images<Enter>` to see snapshot
@@ -121,7 +121,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 ### Resize Server
 
 1. Select server to resize
-2. Resize: `:resize<Enter>`
+2. Use keyboard shortcut or action menu to resize
 3. Select new flavor
 4. Confirm resize
 5. Verify resize (or revert if issues)
@@ -185,7 +185,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 
 1. Navigate to subnets: `:subnets<Enter>`
 2. Select subnet to attach
-3. Attach: `:attach<Enter>` (or `:connect<Enter>`)
+3. Use keyboard shortcut or action menu to attach
 4. Select target router
 5. Confirm attachment
 
@@ -232,7 +232,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 
 1. Navigate to floating IPs: `:floatingips<Enter>`
 2. Select unassociated IP
-3. Associate: `:attach<Enter>` (or `:connect<Enter>`)
+3. Use keyboard shortcut or action menu to associate
 4. Select target server
 5. Select server port
 6. Confirm association
@@ -240,7 +240,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 **Disassociate Floating IP:**
 
 1. Select associated floating IP
-2. Detach: `:detach<Enter>`
+2. Use keyboard shortcut or action menu to disassociate
 3. Confirm disassociation
 4. IP returned to pool
 
@@ -272,7 +272,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 
 1. Navigate to volumes: `:volumes<Enter>`
 2. Select available volume
-3. Attach: `:attach<Enter>` (or `:connect<Enter>`)
+3. Use keyboard shortcut or action menu to attach
 4. Select target server
 5. Optionally specify device path
 6. Confirm attachment
@@ -280,14 +280,14 @@ Substation emphasizes **command-based navigation** as the primary method for all
 ### Detach Volume from Server
 
 1. Select attached volume
-2. Detach: `:detach<Enter>` (or `:disconnect<Enter>`)
+2. Use keyboard shortcut or action menu to detach
 3. Confirm detachment
 4. Volume returns to available state
 
 ### Create Volume Snapshot
 
 1. Select volume to snapshot
-2. Create snapshot: `:snapshot<Enter>` (or `:snap<Enter>`)
+2. Use keyboard shortcut or action menu to create snapshot
 3. Enter snapshot name
 4. Snapshot created
 5. View in volume snapshots list
@@ -295,7 +295,7 @@ Substation emphasizes **command-based navigation** as the primary method for all
 ### Extend Volume Size
 
 1. Select volume to extend
-2. Extend: `:resize<Enter>`
+2. Use keyboard shortcut or action menu to extend
 3. Enter new size (must be larger)
 4. Confirm extension
 5. Volume size updated
@@ -363,7 +363,7 @@ Esc                  Clear search filter
    - Images (Glance)
    - Users (Keystone)
    - Containers (Swift)
-5. Navigate results with `↑/↓`
+5. Navigate results with `^/v`
 6. Press `Space` for details
 
 **Command Aliases:**
@@ -389,7 +389,7 @@ Esc                  Clear search filter
 
 2. **View Console Logs:**
    - Select server
-   - View logs: `:console<Enter>` (or `:logs<Enter>`)
+   - Use keyboard shortcut to view console logs
    - Review boot sequence
    - Look for errors
 
@@ -446,7 +446,7 @@ Substation supports multi-select for bulk operations:
 
 1. Navigate to resource list (e.g., `:servers<Enter>`)
 2. Enter multi-select mode: Press `Ctrl-X`
-3. Use `↑/↓` to navigate
+3. Use `^/v` to navigate
 4. Press `Space` to select/deselect items
 5. Delete selected: `:delete<Enter>` (or press `Del`)
 6. Exit multi-select: Press `Ctrl-X` or `Esc`

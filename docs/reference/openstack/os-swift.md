@@ -326,13 +326,13 @@ func testEndToEndUpload() async throws {
 
 ### 1. Metadata Headers
 
-❌ Wrong:
+[ ] Wrong:
 
 ```swift
 headers["metadata-key"] = "value"
 ```
 
-✅ Correct:
+[x] Correct:
 
 ```swift
 headers["X-Container-Meta-key"] = "value"  // For containers
@@ -341,13 +341,13 @@ headers["X-Object-Meta-key"] = "value"     // For objects
 
 ### 2. URL Encoding
 
-❌ Wrong:
+[ ] Wrong:
 
 ```swift
 let path = "/\(container)/\(object)"
 ```
 
-✅ Correct:
+[x] Correct:
 
 ```swift
 let encodedContainer = container.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? container
@@ -357,13 +357,13 @@ let path = "/\(encodedContainer)/\(encodedObject)"
 
 ### 3. Empty Container Deletion
 
-❌ Wrong:
+[ ] Wrong:
 
 ```swift
 try await deleteContainer(containerName: "test")
 ```
 
-✅ Correct:
+[x] Correct:
 
 ```swift
 // Delete all objects first
@@ -377,14 +377,14 @@ try await deleteContainer(containerName: "test")
 
 ### 4. Large File Handling
 
-❌ Wrong:
+[ ] Wrong:
 
 ```swift
 let data = try Data(contentsOf: largeFileURL)  // Loads entire file into memory
 try await uploadObject(request: UploadSwiftObjectRequest(..., data: data))
 ```
 
-✅ Correct:
+[x] Correct:
 
 ```swift
 let fileSize = try FileManager.default.attributesOfItem(atPath: path)[.size] as! Int64

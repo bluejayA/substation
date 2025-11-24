@@ -199,15 +199,15 @@ Substation categorizes transfer errors for intelligent handling:
 During batch operations, errors are tracked and summarized:
 
 ```swift
-// Error tracking in SwiftTransferProgressTracker
+// Error tracking within Swift module handlers
 private var errorsByCategory: [String: Int] = [:]
 private var detailedErrors: [(file: String, category: String, message: String)] = []
 
 // After operation completion
-let summary = await tracker.getErrorSummary()
+let summary = getErrorSummary()
 // Returns: ["Network Error": 3, "Not Found": 2]
 
-let report = await tracker.getDetailedErrorReport()
+let report = getDetailedErrorReport()
 // Returns formatted report with all error details
 ```
 
@@ -285,22 +285,24 @@ Large transfer operations (container downloads, bulk uploads) run in the backgro
 
 ### Progress Tracking
 
-The `SwiftTransferProgressTracker` actor provides thread-safe progress tracking:
+**Note**: Progress tracking functionality is integrated within the Swift module form handlers rather than existing as a separate `SwiftTransferProgressTracker` class. The conceptual architecture below describes the logical design:
+
+Progress tracking provides thread-safe state management:
 
 ```swift
-actor SwiftTransferProgressTracker {
-    // Track completed, failed, skipped counts
-    // Track total bytes transferred
-    // Track active file names
-    // Aggregate errors by category
+// Conceptual design (integrated within Swift module handlers)
+// Track completed, failed, skipped counts
+// Track total bytes transferred
+// Track active file names
+// Aggregate errors by category
 
-    func fileStarted(_ fileName: String)
-    func fileCompleted(_ fileName: String, bytes: Int64, skipped: Bool)
-    func fileFailed(_ fileName: String, error: TransferError?)
-    func getProgress() -> TransferProgress
-    func getErrorSummary() -> [String: Int]
-    func getDetailedErrorReport() -> String
-}
+// Functions provided by form handlers:
+// - fileStarted(_ fileName: String)
+// - fileCompleted(_ fileName: String, bytes: Int64, skipped: Bool)
+// - fileFailed(_ fileName: String, error: TransferError?)
+// - getProgress() -> TransferProgress
+// - getErrorSummary() -> [String: Int]
+// - getDetailedErrorReport() -> String
 ```
 
 **TransferProgress Structure:**
@@ -351,9 +353,11 @@ await withThrowingTaskGroup(of: Void.self) { group in
 
 Object names may contain special characters that need encoding:
 
+**Note**: Storage helper functionality is integrated within the Swift module rather than existing as a separate `SwiftStorageHelpers` class.
+
 ```swift
-// Encode object name preserving path structure
-let encoded = SwiftStorageHelpers.encodeObjectName("dir/file with spaces.txt")
+// Encode object name preserving path structure (integrated in Swift module)
+let encoded = encodeObjectName("dir/file with spaces.txt")
 // Result: "dir/file%20with%20spaces.txt"
 
 // Characters encoded: spaces, #, ?, &, =
@@ -365,7 +369,8 @@ let encoded = SwiftStorageHelpers.encodeObjectName("dir/file with spaces.txt")
 Before operations, object names are validated for security and correctness:
 
 ```swift
-let (valid, reason) = SwiftStorageHelpers.validateObjectName(objectName)
+// Validation integrated in Swift module handlers
+let (valid, reason) = validateObjectName(objectName)
 
 if !valid {
     throw TransferError.validation(reason: reason!)
@@ -394,7 +399,7 @@ Object names can simulate directories using forward slashes:
 
 ```swift
 // Preserve directory structure
-let destPath = SwiftStorageHelpers.buildDestinationPath(
+let destPath = buildDestinationPath(
     objectName: "logs/2024/01/app.log",
     destinationBase: "/downloads",
     preserveStructure: true
@@ -402,7 +407,7 @@ let destPath = SwiftStorageHelpers.buildDestinationPath(
 // Result: "/downloads/logs/2024/01/app.log"
 
 // Flatten directory structure
-let destPath = SwiftStorageHelpers.buildDestinationPath(
+let destPath = buildDestinationPath(
     objectName: "logs/2024/01/app.log",
     destinationBase: "/downloads",
     preserveStructure: false
@@ -415,7 +420,7 @@ let destPath = SwiftStorageHelpers.buildDestinationPath(
 Substation automatically detects content types based on file extensions:
 
 ```swift
-let contentType = SwiftStorageHelpers.detectContentType(for: fileURL)
+let contentType = detectContentType(for: fileURL)
 ```
 
 **Supported Categories:**
@@ -435,7 +440,7 @@ let contentType = SwiftStorageHelpers.detectContentType(for: fileURL)
 **Content Type Validation:**
 
 ```swift
-let isValid = SwiftStorageHelpers.validateContentType("text/plain")
+let isValid = validateContentType("text/plain")
 // Validates format: type/subtype
 // Checks valid type category
 // Validates character set
@@ -448,10 +453,10 @@ let isValid = SwiftStorageHelpers.validateContentType("text/plain")
 Human-readable file size display with configurable precision:
 
 ```swift
-let size = SwiftStorageHelpers.formatFileSize(1_536_000, precision: 2)
+let size = formatFileSize(1_536_000, precision: 2)
 // Returns: "1.46 MB"
 
-let size = SwiftStorageHelpers.formatFileSize(1_536_000, precision: 1)
+let size = formatFileSize(1_536_000, precision: 1)
 // Returns: "1.5 MB"
 ```
 
@@ -468,7 +473,7 @@ let size = SwiftStorageHelpers.formatFileSize(1_536_000, precision: 1)
 Display transfer speeds during operations:
 
 ```swift
-let rate = SwiftStorageHelpers.formatTransferRate(2_097_152.0, precision: 2)
+let rate = formatTransferRate(2_097_152.0, precision: 2)
 // Returns: "2.00 MB/s"
 ```
 

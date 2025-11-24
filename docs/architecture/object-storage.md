@@ -26,9 +26,7 @@ graph TB
         BgModel["SwiftBackgroundOperation<br/>- Operation tracking<br/>- State management<br/>- Cancellation support"]
     end
 
-    subgraph Utilities["Utilities and Helpers Layer"]
-        Progress["SwiftTransferProgressTracker (actor)<br/>- Thread-safe tracking<br/>- Error aggregation<br/>- Completion counting"]
-        Helpers["SwiftStorageHelpers<br/>- File size formatting<br/>- Content type detection<br/>- Path validation<br/>- URL encoding"]
+    subgraph Utilities["Utilities Layer"]
         Hash["FileHashUtility<br/>- MD5 computation (streaming)<br/>- ETAG comparison"]
         Error["TransferError<br/>- Error categorization<br/>- Retry recommendation<br/>- User-facing messages"]
     end
@@ -48,16 +46,6 @@ graph TB
     Utilities --> OSClient
     OSClient --> API
 
-    Upload -.-> Progress
-    Download -.-> Progress
-    Container -.-> Progress
-    Directory -.-> Progress
-
-    Upload -.-> Helpers
-    Download -.-> Helpers
-    Container -.-> Helpers
-    Directory -.-> Helpers
-
     Upload -.-> Hash
     Download -.-> Hash
     Container -.-> Hash
@@ -75,15 +63,17 @@ graph TB
 
 #### SwiftViews
 
-**File**: `Sources/Substation/Views/SwiftViews.swift`
+**File**: `Sources/Substation/Modules/Swift/Views/SwiftViews.swift`
 
 **Responsibilities:**
+
 - Render container and object lists
 - Display action menus for Swift operations
 - Handle user input and navigation
 - Integrate with SwiftNCurses framework
 
 **Key Components:**
+
 ```swift
 struct SwiftContainerListView: View {
     // Display list of containers
@@ -98,6 +88,7 @@ struct SwiftObjectListView: View {
 ```
 
 **Design Patterns:**
+
 - MVVM (Model-View-ViewModel)
 - SwiftUI-style declarative views via SwiftNCurses
 - Reactive state management
@@ -105,16 +96,19 @@ struct SwiftObjectListView: View {
 #### Background Operations Views
 
 **Files**:
-- `Sources/Substation/Views/SwiftBackgroundOperationsView.swift`
-- `Sources/Substation/Views/SwiftBackgroundOperationDetailView.swift`
+
+- `Sources/Substation/Modules/Swift/Views/SwiftBackgroundOperationsView.swift`
+- `Sources/Substation/Modules/Swift/Views/SwiftBackgroundOperationDetailView.swift`
 
 **Responsibilities:**
+
 - Display list of active/completed background operations
 - Show detailed progress for individual operations
 - Provide cancellation controls
 - Display error summaries
 
 **Key Features:**
+
 ```swift
 struct SwiftBackgroundOperationsView: View {
     // List of operations with status icons
@@ -139,6 +133,7 @@ Form handlers bridge the UI and business logic, orchestrating operations.
 **File**: `Sources/Substation/FormHandlers/TUI+SwiftObjectUploadHandler.swift`
 
 **Responsibilities:**
+
 - Collect file selection from user
 - Validate file paths
 - Create background upload operation
@@ -146,6 +141,7 @@ Form handlers bridge the UI and business logic, orchestrating operations.
 - Set Content-Type headers
 
 **Key Functions:**
+
 ```swift
 func handleSwiftObjectUpload(container: String) async {
     // 1. Present file picker
@@ -171,11 +167,13 @@ graph LR
 #### Download Handlers
 
 **Files**:
+
 - `Sources/Substation/FormHandlers/TUI+SwiftObjectDownloadHandler.swift`
 - `Sources/Substation/FormHandlers/TUI+SwiftContainerDownloadHandler.swift`
 - `Sources/Substation/FormHandlers/TUI+SwiftDirectoryDownloadHandler.swift`
 
 **Responsibilities:**
+
 - Collect destination path
 - List objects to download
 - Create background download operation
@@ -208,12 +206,14 @@ graph LR
 **File**: `Sources/Substation/FormHandlers/TUI+SwiftContainerWebAccessHandler.swift`
 
 **Responsibilities:**
+
 - Configure container for static website hosting
 - Set read ACLs
 - Configure index and error pages
 - Enable/disable web access
 
 **Configuration:**
+
 ```swift
 // Enable web access
 X-Container-Read: .r:*,.rlistings
@@ -225,9 +225,10 @@ X-Container-Meta-Web-Error: error.html
 
 #### Background Operations Manager
 
-**Model File**: `Sources/Substation/Models/SwiftBackgroundOperation.swift`
+**Model File**: `Sources/Substation/Modules/Swift/Models/SwiftBackgroundOperation.swift`
 
 **Data Structure:**
+
 ```swift
 struct SwiftBackgroundOperation: Identifiable, Sendable {
     let id: UUID
@@ -256,6 +257,7 @@ struct SwiftBackgroundOperation: Identifiable, Sendable {
 ```
 
 **State Management:**
+
 ```swift
 // Managed in TUI class
 @Published var backgroundOperations: [SwiftBackgroundOperation] = []
@@ -272,100 +274,14 @@ if let index = backgroundOperations.firstIndex(where: { $0.id == id }) {
 ```
 
 **Concurrency:**
+
 - Operations run in separate async tasks
 - Actor-based progress tracking
 - Task cancellation support via Task.isCancelled
 
 ### Utilities Layer
 
-#### SwiftTransferProgressTracker
-
-**File**: `Sources/Substation/Utilities/SwiftTransferProgressTracker.swift`
-
-**Design**: Actor for thread-safe state management
-
-**Architecture:**
-```swift
-actor SwiftTransferProgressTracker {
-    // State (private, actor-isolated)
-    private var completedCount: Int
-    private var failedCount: Int
-    private var skippedCount: Int
-    private var completedBytes: Int64
-    private var failedFiles: [String]
-    private var currentlyProcessing: Set<String>
-    private var errorsByCategory: [String: Int]
-    private var detailedErrors: [(file: String, category: String, message: String)]
-
-    // Interface (async, synchronized by actor)
-    func fileStarted(_ fileName: String)
-    func fileCompleted(_ fileName: String, bytes: Int64, skipped: Bool)
-    func fileFailed(_ fileName: String, error: TransferError?)
-    func getProgress() -> TransferProgress
-    func getErrorSummary() -> [String: Int]
-    func getDetailedErrorReport() -> String
-    func reset()
-}
-```
-
-**Actor Benefits:**
-- Eliminates data races
-- No explicit locks required
-- Swift concurrency integration
-- Type-safe isolation
-
-**Usage Pattern:**
-```swift
-let tracker = SwiftTransferProgressTracker()
-
-// From concurrent tasks
-await tracker.fileStarted("file1.txt")
-// ... perform transfer ...
-await tracker.fileCompleted("file1.txt", bytes: 1024, skipped: false)
-
-// Query progress
-let progress = await tracker.getProgress()
-updateUI(progress)
-```
-
-#### SwiftStorageHelpers
-
-**File**: `Sources/Substation/Utilities/SwiftStorageHelpers.swift`
-
-**Design**: Static utility enum (namespace)
-
-**Categories:**
-
-1. **File Size Formatting**
-   ```swift
-   static func formatFileSize(_ bytes: Int64, precision: Int = 2) -> String
-   static func formatTransferRate(_ bytesPerSecond: Double, precision: Int = 2) -> String
-   ```
-
-2. **Content Type Detection**
-   ```swift
-   static func detectContentType(for url: URL) -> String
-   static func validateContentType(_ contentType: String) -> Bool
-   ```
-
-3. **Object Name Encoding**
-   ```swift
-   static func encodeObjectName(_ name: String) -> String
-   static func decodeObjectName(_ name: String) -> String
-   static func validateObjectName(_ name: String) -> (valid: Bool, reason: String?)
-   ```
-
-4. **Path Utilities**
-   ```swift
-   static func extractFileName(from objectName: String) -> String
-   static func buildDestinationPath(objectName: String, destinationBase: String, preserveStructure: Bool) -> String
-   ```
-
-**Why Enum?**
-- Prevents instantiation (no state)
-- Provides namespace
-- Groups related utilities
-- Swift best practice for utility functions
+**Note**: Progress tracking, file size formatting, content type detection, and path validation are handled directly within the form handlers and Swift module. These utilities were integrated into the modular architecture rather than existing as separate utility classes.
 
 #### FileHashUtility
 
@@ -374,6 +290,7 @@ updateUI(progress)
 **Design**: Static utility enum with streaming MD5 computation
 
 **Key Function:**
+
 ```swift
 static func computeMD5(for url: URL) throws -> String {
     // Stream file in 1MB chunks
@@ -383,22 +300,25 @@ static func computeMD5(for url: URL) throws -> String {
 ```
 
 **Memory Efficiency:**
+
 - O(1) memory regardless of file size
 - 1MB buffer size (tunable)
 - No loading entire file into memory
 
 **Performance:**
+
 - ~500 MB/s on modern hardware
 - Linear time complexity O(n)
 - Minimal overhead
 
 #### TransferError
 
-**File**: `Sources/Substation/Models/TransferError.swift`
+**File**: `Sources/Substation/Modules/Swift/Models/TransferError.swift`
 
 **Design**: Error enum with categorization
 
 **Error Cases:**
+
 ```swift
 enum TransferError: Error, Sendable {
     case network(underlying: Error, context: String)
@@ -412,6 +332,7 @@ enum TransferError: Error, Sendable {
 ```
 
 **Computed Properties:**
+
 ```swift
 var userFacingMessage: String {
     // Friendly message for UI display
@@ -431,6 +352,7 @@ var retryRecommendation: String {
 ```
 
 **Error Creation:**
+
 ```swift
 static func from(error: Error, context: String, filePath: String?, objectName: String?) -> TransferError {
     // Analyze error and categorize
@@ -448,6 +370,7 @@ static func from(error: Error, context: String, filePath: String?, objectName: S
 **Design**: Service class wrapping OpenStack Swift API
 
 **Key Methods:**
+
 ```swift
 class SwiftService {
     func listContainers() async throws -> [Container]
@@ -462,12 +385,14 @@ class SwiftService {
 ```
 
 **Responsibilities:**
+
 - HTTP request construction
 - Authentication token management
 - Response parsing
 - Error handling
 
 **Integration:**
+
 - Uses OSClientAdapter for auth
 - Leverages MicroversionManager for API versioning
 - Integrates with cache manager
@@ -569,6 +494,7 @@ graph TD
 ### TaskGroup for Parallel Operations
 
 **Pattern:**
+
 ```swift
 await withThrowingTaskGroup(of: Void.self) { group in
     var activeCount = 0
@@ -598,6 +524,7 @@ await withThrowingTaskGroup(of: Void.self) { group in
 ```
 
 **Benefits:**
+
 - Bounded concurrency (max 10)
 - Cancellation support
 - Error propagation
@@ -606,6 +533,7 @@ await withThrowingTaskGroup(of: Void.self) { group in
 ### Actor-Based State Management
 
 **Pattern:**
+
 ```swift
 actor SwiftTransferProgressTracker {
     private var state: TrackerState
@@ -624,6 +552,7 @@ actor SwiftTransferProgressTracker {
 ```
 
 **Benefits:**
+
 - Thread safety without locks
 - Race-free by design
 - Swift 6 concurrency compliance
@@ -632,6 +561,7 @@ actor SwiftTransferProgressTracker {
 ### Sendable Types for Concurrency
 
 **Pattern:**
+
 ```swift
 struct TransferProgress: Sendable {
     // All properties are Sendable
@@ -649,6 +579,7 @@ enum TransferError: Error, Sendable {
 ```
 
 **Benefits:**
+
 - Compile-time concurrency safety
 - Safe to pass across concurrency domains
 - Swift 6 strict concurrency mode compatible
@@ -658,6 +589,7 @@ enum TransferError: Error, Sendable {
 ### Background Operation State
 
 **State Transitions:**
+
 ```
        [Created]
            |
@@ -672,6 +604,7 @@ enum TransferError: Error, Sendable {
 ```
 
 **State Storage:**
+
 ```swift
 // In TUI class
 @Published var backgroundOperations: [SwiftBackgroundOperation] = []
@@ -686,6 +619,7 @@ func updateOperationProgress(id: UUID, progress: TransferProgress) {
 ```
 
 **Publisher Pattern:**
+
 - SwiftUI/SwiftNCurses observes `@Published` properties
 - Automatic UI updates on state changes
 - Thread-safe via MainActor isolation
@@ -693,6 +627,7 @@ func updateOperationProgress(id: UUID, progress: TransferProgress) {
 ### Progress Tracking State
 
 **Isolated in Actor:**
+
 ```swift
 actor SwiftTransferProgressTracker {
     // All state is private and actor-isolated
@@ -712,6 +647,7 @@ actor SwiftTransferProgressTracker {
 ```
 
 **Immutable Snapshots:**
+
 - Progress queries return immutable struct
 - Safe to pass to UI layer
 - No shared mutable state
@@ -721,6 +657,7 @@ actor SwiftTransferProgressTracker {
 ### Adding New Operation Types
 
 **Steps:**
+
 1. Add case to `SwiftBackgroundOperation.OperationType`
 2. Create form handler in `Sources/Substation/FormHandlers/`
 3. Implement operation logic with progress tracking
@@ -728,6 +665,7 @@ actor SwiftTransferProgressTracker {
 5. Register in action menu
 
 **Example: Adding Bulk Delete**
+
 ```swift
 // 1. Add operation type
 enum OperationType {
@@ -764,6 +702,7 @@ func handleSwiftBulkDelete(container: String, objects: [String]) async {
 ### Adding New Error Categories
 
 **Steps:**
+
 1. Add case to `TransferError` enum
 2. Update `userFacingMessage` property
 3. Update `categoryName` property
@@ -772,6 +711,7 @@ func handleSwiftBulkDelete(container: String, objects: [String]) async {
 6. Update `from()` factory method for detection
 
 **Example: Adding Quota Exceeded**
+
 ```swift
 enum TransferError: Error, Sendable {
     case quotaExceeded(limit: Int64, used: Int64)
@@ -801,11 +741,13 @@ var retryRecommendation: String {
 ### Adding New Content Types
 
 **Steps:**
+
 1. Update `detectContentType(for:)` in `SwiftStorageHelpers`
 2. Add new file extension cases
 3. Return appropriate MIME type
 
 **Example: Adding New Video Format**
+
 ```swift
 static func detectContentType(for url: URL) -> String {
     let ext = url.pathExtension.lowercased()
@@ -822,11 +764,13 @@ static func detectContentType(for url: URL) -> String {
 ### Adding Progress Callbacks
 
 **Steps:**
+
 1. Add callback property to tracker
 2. Invoke callback on state changes
 3. Subscribe to callbacks in UI layer
 
 **Example: Real-Time Progress Updates**
+
 ```swift
 actor SwiftTransferProgressTracker {
     var progressCallback: ((TransferProgress) -> Void)?
@@ -854,6 +798,7 @@ tracker.progressCallback = { progress in
 ### Factory Pattern
 
 **TransferError Creation:**
+
 ```swift
 static func from(error: Error, context: String, ...) -> TransferError {
     // Analyzes error and creates appropriate TransferError case
@@ -863,6 +808,7 @@ static func from(error: Error, context: String, ...) -> TransferError {
 ### Actor Pattern
 
 **Thread-Safe State Management:**
+
 ```swift
 actor SwiftTransferProgressTracker {
     // All state automatically synchronized
@@ -872,6 +818,7 @@ actor SwiftTransferProgressTracker {
 ### Strategy Pattern
 
 **ETAG Optimization:**
+
 ```swift
 if etagOptimizationEnabled {
     // Use ETAG comparison strategy
@@ -883,6 +830,7 @@ if etagOptimizationEnabled {
 ### Observer Pattern
 
 **SwiftUI/SwiftNCurses Integration:**
+
 ```swift
 @Published var backgroundOperations: [SwiftBackgroundOperation]
 // UI automatically observes and updates
@@ -891,6 +839,7 @@ if etagOptimizationEnabled {
 ### Builder Pattern
 
 **URL Request Construction:**
+
 ```swift
 var request = URLRequest(url: url)
 request.httpMethod = "PUT"
@@ -903,12 +852,14 @@ request.setValue(etag, forHTTPHeaderField: "If-None-Match")
 ### Unit Testing
 
 **Testable Components:**
+
 - `SwiftStorageHelpers` static functions
 - `TransferError` categorization logic
 - Path validation
 - Content type detection
 
 **Example:**
+
 ```swift
 func testFormatFileSize() {
     let result = SwiftStorageHelpers.formatFileSize(1_536_000, precision: 2)
@@ -925,6 +876,7 @@ func testValidateObjectName() {
 ### Integration Testing
 
 **Test Scenarios:**
+
 - Upload with ETAG match (skip)
 - Upload with ETAG mismatch (transfer)
 - Download with local file match (skip)
@@ -934,6 +886,7 @@ func testValidateObjectName() {
 ### Actor Testing
 
 **Pattern:**
+
 ```swift
 func testProgressTracker() async {
     let tracker = SwiftTransferProgressTracker()
@@ -952,11 +905,13 @@ func testProgressTracker() async {
 ### Memory Efficiency
 
 **Streaming Operations:**
+
 - MD5 computed in chunks (1MB buffer)
 - File transfers use streaming
 - No loading entire files into memory
 
 **Bounded Concurrency:**
+
 - Max 10 concurrent operations
 - Prevents memory explosion
 - Predictable resource usage
@@ -964,11 +919,13 @@ func testProgressTracker() async {
 ### CPU Efficiency
 
 **Parallel Processing:**
+
 - TaskGroup distributes work across cores
 - Concurrent MD5 computation for multiple files
 - Efficient use of multi-core systems
 
 **Minimal Overhead:**
+
 - Static utility functions (no allocation)
 - Actor synchronization (efficient serialization)
 - Lightweight progress structures
@@ -976,11 +933,13 @@ func testProgressTracker() async {
 ### Network Efficiency
 
 **ETAG Optimization:**
+
 - Lightweight HEAD requests (200 bytes)
 - Skip full transfers when possible
 - 50-90% bandwidth savings
 
 **Connection Reuse:**
+
 - HTTP keep-alive
 - HTTP/2 multiplexing
 - Reduced connection overhead
@@ -990,6 +949,7 @@ func testProgressTracker() async {
 ### Path Traversal Prevention
 
 **Validation:**
+
 ```swift
 func validateObjectName(_ name: String) -> (valid: Bool, reason: String?) {
     if name.contains("../") || name.contains("..\\") {
@@ -1002,6 +962,7 @@ func validateObjectName(_ name: String) -> (valid: Bool, reason: String?) {
 ### Input Sanitization
 
 **URL Encoding:**
+
 ```swift
 func encodeObjectName(_ name: String) -> String {
     // Percent-encode special characters
@@ -1012,6 +973,7 @@ func encodeObjectName(_ name: String) -> String {
 ### Error Information Disclosure
 
 **User-Facing Messages:**
+
 ```swift
 var userFacingMessage: String {
     // Return safe, informative message
