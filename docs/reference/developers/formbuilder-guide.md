@@ -4,6 +4,8 @@
 
 The **FormBuilder** component provides a unified, consistent API for creating forms across all OpenStack services in the Substation UI. It consolidates all form field types into a single component with built-in validation, navigation, and state management.
 
+You could build all this yourself. You could spend weeks implementing text editing, navigation, validation, and state management. Or you could use FormBuilder and ship your feature today. Your choice.
+
 ## Features
 
 - **Unified API**: Single component for all form field types

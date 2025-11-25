@@ -1,6 +1,6 @@
 # OSClient API Reference
 
-Complete API reference for the OpenStackClient library, service clients, and data models.
+This is the API reference for OSClient. If you're looking for how-to guidance, check the integration guide first. This covers the complete OpenStackClient library API, service clients, and data models.
 
 ## Package Overview
 
@@ -1239,6 +1239,6 @@ let server = try await client.nova.createServer(request: createRequest)
 
 **See Also**:
 
-- [SwiftNCurses Framework API](SwiftNCurses.md) - Terminal UI framework
+- [SwiftNCurses Framework API](swiftncurses.md) - Terminal UI framework
 - [Integration Guide](integration.md) - CrossPlatformTimer and integration examples
 - [API Reference Index](index.md) - Quick reference and navigation

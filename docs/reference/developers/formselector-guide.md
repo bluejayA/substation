@@ -4,6 +4,8 @@
 
 **FormSelector** is a powerful selection component for choosing items from large lists with multi-column display, search/filter capabilities, and support for both single and multi-select modes. It's used extensively for selecting resources like networks, images, flavors, and security groups.
 
+Selecting from thousands of resources without search is user torture. FormSelector handles search, scrolling, multi-column display, and multi-select so your users don't quit in frustration.
+
 ## Location
 
 - **Component:** [Sources/Substation/Components/FormSelector.swift](https://github.com/cloudnull/substation/blob/main/Sources/Substation/Components/FormSelector.swift)

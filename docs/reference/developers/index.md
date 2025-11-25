@@ -22,13 +22,7 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 
 **When to use it**: Every single time you need a form. No exceptions. Don't be clever.
 
-**Read this first** - FormBuilder is the brain of your forms. It handles:
-
-- Form layout and rendering
-- Field navigation (Tab, Shift-Tab, arrow keys)
-- Validation and error display
-- State management
-- Submission handling
+**Read this first** - FormBuilder is the brain of your forms. It handles form layout and rendering, field navigation with Tab, Shift-Tab, and arrow keys, validation with error display, state management, and submission handling. You don't want to build this yourself. We already did it. Use it.
 
 ### [FormTextField Guide](formtextfield-guide.md)
 
@@ -36,13 +30,7 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 
 **When to use it**: Any time you need string input. Names, IPs, CIDRs, descriptions, UUIDs.
 
-**Read this** when you need:
-
-- Text input fields
-- Proper cursor handling
-- Input history (UP/DOWN arrows)
-- Inline validation
-- Home/End/Left/Right navigation
+**Read this** when you need text input fields with proper cursor handling, input history using UP and DOWN arrows, inline validation, and Home/End/Left/Right navigation. It handles the tedious stuff so you can focus on your actual business logic.
 
 ### [FormSelector Guide](formselector-guide.md)
 
@@ -50,13 +38,7 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 
 **When to use it**: Selecting resources. Any resource. Images, networks, flavors, security groups, availability zones.
 
-**Read this** when you need:
-
-- Resource selection from large lists
-- Multi-column display
-- Search/filter functionality
-- Multi-select capability
-- Handling 10,000+ items
+**Read this** when you need resource selection from large lists. It provides multi-column display, search and filter functionality, multi-select capability, and can handle 10,000+ items without breaking a sweat. Yes, we tested it.
 
 ### [StatusListView Guide](statuslistview-guide.md)
 
@@ -64,13 +46,7 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 
 **When to use it**: Building primary list views for resources (servers, volumes, networks, images).
 
-**Read this** when you need:
-
-- Primary resource list views
-- StatusIcon + text columns
-- Automatic filtering and scrolling
-- Consistent list rendering
-- 80-90% code reduction
+**Read this** when building primary resource list views. StatusListView handles StatusIcon plus text columns, automatic filtering and scrolling, and consistent list rendering. It'll reduce your code by 80-90%. Seriously.
 
 ### [DetailView Guide](detailview-guide.md)
 
@@ -78,13 +54,7 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 
 **When to use it**: Building detail screens for resources (server details, volume details, network details).
 
-**Read this** when you need:
-
-- Detail screens with consistent formatting
-- Section-based information organization
-- Automatic field label and value formatting
-- Scrolling for large content
-- 70-85% code reduction
+**Read this** when you need detail screens with consistent formatting. It provides section-based information organization, automatic field label and value formatting, and scrolling for large content. Another 70-85% code reduction. You're welcome.
 
 ### [Testing Guide](testing.md)
 
@@ -92,13 +62,7 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 
 **When to use it**: Before contributing code, after making changes, when adding new features.
 
-**Read this** when you need:
-
-- Run the test suite
-- Write new tests
-- Understand test coverage
-- Debug failing tests
-- Set up CI/CD
+**Read this** to run the test suite, write new tests, understand test coverage, debug failing tests, or set up CI/CD. If you're not testing, you're guessing.
 
 ## Quick Start: Create Your First Form in 5 Minutes
 
@@ -261,7 +225,7 @@ func matchesSearch(_ query: String) -> Bool {
 
 ## Component Source Code
 
-**Study these when the guides aren't enough**:
+Study these when the guides aren't enough. The code is well-commented and shows you exactly how things work under the hood.
 
 - `/Sources/Substation/Components/FormBuilder.swift` - Main form builder
 - `/Sources/Substation/Components/FormBuilderState.swift` - State management
@@ -286,44 +250,27 @@ func matchesSearch(_ query: String) -> Bool {
 
 ### "My field isn't accepting input!"
 
-**Check**:
+**Check**: Is `isActive` true? Is `isSelected` true? Are you calling `handleCharacterInput()`?
 
-1. Is `isActive` true?
-2. Is `isSelected` true?
-3. Are you calling `handleCharacterInput()`?
-4. Is your event loop actually calling your input handler?
-
-**Fix**: Set both `isSelected: true` and `isActive: true` when editing.
+**Fix**: Set both `isSelected: true` and `isActive: true` when editing. If your event loop isn't calling your input handler, that's your problem right there.
 
 ### "Search doesn't work!"
 
-**Check**:
+**Check**: Does your type implement `FormSelectableItem`? Is `matchesSearch()` actually implemented? Are you updating `searchQuery` in the selector state?
 
-1. Does your type implement `FormSelectableItem`?
-2. Is `matchesSearch()` actually implemented?
-3. Are you updating `searchQuery` in the selector state?
-
-**Fix**: Implement the protocol correctly. See the guide.
+**Fix**: Implement the protocol correctly. See the guide. Copy a working example if you have to.
 
 ### "Validation errors don't show!"
 
-**Check**:
+**Check**: Is `validationError` set on the field? Is `showValidationErrors: true` on FormBuilder? Is your validation function actually running?
 
-1. Is `validationError` set on the field?
-2. Is `showValidationErrors: true` on FormBuilder?
-3. Is your validation function actually running?
-
-**Fix**: Set `validationError` on the field AND `showValidationErrors` on the builder.
+**Fix**: Set `validationError` on the field AND `showValidationErrors` on the builder. Both are required.
 
 ### "My selector shows nothing!"
 
-**Check**:
+**Check**: Is `items` array empty? Did you forget to set `isVisible: true`? Did your search filter everything out?
 
-1. Is `items` array empty?
-2. Did you forget to set `isVisible: true`?
-3. Did your search filter everything out?
-
-**Fix**: Debug your data flow. Items need to exist and be visible.
+**Fix**: Debug your data flow. Items need to exist and be visible. Print statements are your friend.
 
 ## Related Documentation
 
@@ -333,10 +280,7 @@ func matchesSearch(_ query: String) -> Bool {
 
 ## Questions?
 
-1. **Read the component guides first** - They have detailed examples
-2. **Look at existing forms** - Copy patterns that work
-3. **Check the source** - It's well-commented
-4. **Ask in PR** - We're here to help
+Read the component guides first - they have detailed examples. Look at existing forms and copy patterns that work. Check the source code - it's well-commented. Ask in your PR if you're stuck - we're here to help.
 
 ---
 

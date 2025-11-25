@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API reference for Substation's packages: OSClient, SwiftNCurses, and CrossPlatformTimer.
+This is the complete API reference for Substation's packages: OSClient, SwiftNCurses, and CrossPlatformTimer. If you're looking for how-to guidance, start with the integration guide. This is the dry technical stuff.
 
 ## Quick Reference
 
@@ -63,7 +63,7 @@ let timer = createCompatibleTimer(interval: 5.0, repeats: true) {
 - Handle OpenStack errors
 - Monitor API performance
 
-### [SwiftNCurses - Terminal UI Framework](SwiftNCurses.md)
+### [SwiftNCurses - Terminal UI Framework](swiftncurses.md)
 
 **What's in it**:
 

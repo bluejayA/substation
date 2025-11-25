@@ -6,45 +6,15 @@
 
 ---
 
-## Table of Contents
+Navigating a complex OpenStack environment through a terminal UI could easily become a disaster of nested menus and forgotten keyboard shortcuts. We took a different approach: build a VIM-inspired command system that feels natural to anyone who's spent time in a terminal. Type `:servers` and you're looking at your server list. Type `:fla` and fuzzy matching figures out you meant "flavors". Press `:` and start typing to activate command mode, or use single-key shortcuts for the most common operations.
 
-1. [Overview](#overview)
-2. [Architecture](#architecture)
-3. [Components](#components)
-4. [Input Handling](#input-handling)
-5. [Command System](#command-system)
-6. [Search System](#search-system)
-7. [Adding New Resources](#adding-new-resources)
-8. [Testing](#testing)
-9. [Troubleshooting](#troubleshooting)
-
----
-
-## Overview
-
-Substation uses a **VIM-inspired command-driven navigation system** that provides:
-
-- **Command Input**: Type `:servers` to navigate to any resource
-- **Fuzzy Matching**: Type `:fla` and it matches "flavors"
-- **Aliases**: Multiple ways to reach the same resource (e.g., `servers`, `srv`, `s`)
-- **Advanced Search**: Cross-service search across all 19 OpenStack resource types
-- **Keyboard Navigation**: Single-key shortcuts and arrow key navigation
-
-### Key Features
-
-[x] Command-based navigation (`:resource-name`)
-[x] Fuzzy matching with ranked scoring
-[x] Tab completion for commands
-[x] Command history (up/down arrows)
-[x] Real-time sidebar filtering
-[x] Cross-service search
-[x] ID-based selection (persists through filtering)
-
----
+The system we built combines command-driven navigation with real-time search across all resource types. It's fast, it's discoverable, and it doesn't require memorizing a hundred keyboard shortcuts. This document explains how it all fits together.
 
 ## Architecture
 
-### High-Level Components
+The navigation system works in layers. Input comes in as raw key presses, gets classified by priority (is this a navigation key that needs immediate handling, or text input for the search box?), routes through the appropriate handler, and triggers an action. The three-layer priority model ensures navigation keys like Enter and arrow keys work consistently, text input gets delegated to the unified input handler, and view-specific fallbacks catch anything that doesn't fit the standard patterns.
+
+Here's the flow at a high level. When you press a key, InputPriority classifies it into one of four categories: navigation keys that need immediate handling, text input that should go to the search box, command keys that activate command mode, or fallback keys for view-specific handlers. Each classification routes to the appropriate layer, which executes the action and updates the UI.
 
 ```mermaid
 flowchart TD
@@ -70,7 +40,7 @@ flowchart TD
     style I fill:#fce4ec
 ```
 
-### Directory Structure
+The directory structure keeps navigation concerns isolated and organized. CommandMode handles command parsing and execution, ResourceRegistry maps aliases to views with fuzzy matching, InputPriority provides the classification system, and LayoutUtilities helps with layout calculations. Views live in their own directory, and search components get their own namespace.
 
 ```
 Sources/Substation/
@@ -89,24 +59,15 @@ Sources/Substation/
     +-- SearchIndex.swift         # Search indexing
 ```
 
----
+## Core Components
 
-## Components
+### ResourceRegistry: Mapping Commands to Views
 
-### 1. ResourceRegistry
+The ResourceRegistry is the heart of the command system. It maintains a comprehensive map of command aliases to view modes, implements fuzzy matching with Levenshtein distance, ranks matches by score, and categorizes commands into logical groups (Compute, Networking, Storage, Services, Utilities). When you type `:srv`, the registry knows you probably meant "servers" and suggests it. When you type `:servrs` with a typo, it still figures out what you meant.
 
-**Purpose**: Maps command aliases to view modes with fuzzy matching support.
+The registry provides several ways to resolve commands. Exact matches return instantly if you type the full command name. Alias matches work for any registered alias (so "srv", "s", and "nova" all resolve to the servers view). Fuzzy matches use Levenshtein distance to find close matches even with typos. And ranked matches return scored results for prefix-based completion.
 
-**Location**: `Sources/Substation/Navigation/ResourceRegistry.swift`
-
-**Key Features**:
-
-- Comprehensive alias mapping (e.g., `servers`, `server`, `srv`, `s`, `nova`)
-- Fuzzy matching with Levenshtein distance
-- Ranked match scoring (0-100)
-- Command categorization (Compute, Networking, Storage, Services, Utilities)
-
-**Example Usage**:
+Here's how you use it in practice. Exact matches are straightforward: pass a string, get a view mode back. Fuzzy matching tries to figure out what you meant when the exact match fails. Ranked matches power the tab completion system by returning all possible matches scored by relevance.
 
 ```swift
 // Exact match
@@ -123,7 +84,7 @@ let matches = ResourceRegistry.shared.rankedMatches(for: "fla")
 // -> [(command: "flavors", score: 99, viewMode: .flavors), ...]
 ```
 
-**Data Structure**:
+The data structure is simple but effective. Each view mode maps to an array of command aliases. When you add a new resource type, you just add it to this map with whatever aliases make sense. The fuzzy matching and ranking logic handles everything else.
 
 ```swift
 private let resourceMap: [ViewMode: [String]] = [
@@ -133,67 +94,39 @@ private let resourceMap: [ViewMode: [String]] = [
 ]
 ```
 
-### 2. CommandMode
+### CommandMode: Parsing and Executing Commands
 
-**Purpose**: Command parsing, execution, and history management.
+CommandMode handles everything related to command execution. It parses user input, maintains command history (up to 50 entries), implements tab completion with cycling, supports special commands like `:q` and `:help`, and provides contextual suggestions based on what you're typing.
 
-**Location**: `Sources/Substation/Navigation/CommandMode.swift`
-
-**Key Features**:
-
-- Command execution (`:servers` -> navigate to servers)
-- Command history (up to 50 entries)
-- Tab completion with cycling
-- Special commands (`:q`, `:help`, `:commands`)
-- Contextual suggestions
-
-**Example Usage**:
-
-```swift
-let commandMode = CommandMode()
-
-// Execute command
-let result = commandMode.executeCommand("servers")
-// -> .navigateToView(.servers)
-
-// Tab completion
-let completion = commandMode.completeCommand("fla")
-// -> "flavors"
-
-// History navigation
-let previous = commandMode.previousCommand()  // -> "networks"
-```
-
-**Command Flow**:
+The command execution flow is straightforward. You type `:servers` and press Enter, UnifiedInputView detects command input and returns it, CommandMode executes the command by resolving it through ResourceRegistry, the registry returns a view mode, and TUI changes to that view. The whole process feels instant because there's no network involved until you actually render the view.
 
 ```mermaid
 flowchart TD
-    A[User types ':servers' + Enter] --> B[executeCommand 'servers']
-    B --> C[ResourceRegistry.resolve 'servers']
-    C --> D[Return .navigateToView .servers]
-    D --> E[TUI.changeView to: .servers]
+    A[User types ':servers' + Enter] --> B[UnifiedInputView detects command input]
+    B --> C[Returns .commandEntered 'servers']
+    C --> D[CommandMode.executeCommand 'servers']
+    D --> E[ResourceRegistry.resolve 'servers']
+    E --> F[Returns .navigateToView .servers]
+    F --> G[TUI.changeView to: .servers]
 
     style A fill:#e1f5ff
     style B fill:#fff4e1
-    style C fill:#e8f5e9
-    style D fill:#f3e5f5
-    style E fill:#fce4ec
+    style C fill:#fff4e1
+    style D fill:#e8f5e9
+    style E fill:#e8f5e9
+    style F fill:#f3e5f5
+    style G fill:#fce4ec
 ```
 
-### 3. InputPriority
+Tab completion is one of those features that seems simple but makes a huge difference in usability. Press Tab while typing a command and you'll see the first matching command. Press Tab again and it cycles through all matches, showing you a hint like "Tab: servers (1/3)" so you know where you are in the list. It's the kind of feature that becomes muscle memory after a few uses.
 
-**Purpose**: Centralized input key classification and priority management.
+### InputPriority: Classifying Key Presses
 
-**Location**: `Sources/Substation/Navigation/InputPriority.swift`
+InputPriority solves a problem that plagued earlier versions of the code: how do you know which handler should process a key press? The solution is classification. Every key gets classified into one of four categories based on predefined key sets, and the classification determines which layer handles it.
 
-**Key Features**:
+Navigation keys (Enter, arrows, Page Up/Down) need immediate handling and bypass other processing. Text input keys (alphanumerics, backspace) go to UnifiedInputView for state management. Command keys (colon) activate command mode. And fallback keys go to view-specific handlers for custom behavior.
 
-- Key classification (navigation, textInput, command, fallback)
-- Predefined key sets for each category
-- Human-readable key descriptions
-- Debug logging support
-
-**Example Usage**:
+Here's how you use InputPriority in a view. Classify the key first, then switch on the classification to determine which handler processes it. Navigation keys typically get handled first to ensure immediate response. Text input delegates to UnifiedInputView. And fallback keys go to view-specific logic.
 
 ```swift
 let priority = InputPriority.classify(key)
@@ -217,30 +150,13 @@ case .fallback:
 }
 ```
 
-**Key Categories**:
+The key sets are defined explicitly so there's no ambiguity about what goes where. Navigation keys are the obvious ones: Enter (both key codes), arrow keys, and Page Up/Down. Text editing keys include backspace and cursor movement. Command keys are just the colon. Control keys are ESC and Tab. And printable keys are the standard ASCII alphanumerics.
 
-```swift
-navigationKeys:    [10, 13, 258, 259, 338, 339]  // Enter, arrows, Page Up/Down
-textEditingKeys:   [127, 8, 260, 261]            // Backspace, cursor movement
-commandKeys:       [58]                          // : (colon)
-controlKeys:       [27, 9]                       // ESC, Tab
-printableRange:    32...126                      // Alphanumeric
-```
+### UnifiedInputView: Managing Input State
 
-### 4. UnifiedInputView
+UnifiedInputView provides centralized input state management across all views. It tracks the display text and cursor position, detects command input automatically when you type `:`, manages the text buffer, and reports results through a clean enum so callers know exactly what happened.
 
-**Purpose**: Unified input state management across all views.
-
-**Location**: `Sources/Substation/Modules/Core/Views/UnifiedInputView.swift`
-
-**Key Features**:
-
-- Input state tracking (displayText, cursor, mode)
-- Command input detection (auto-activates on `:`)
-- Text buffer management
-- Result reporting via InputResult enum
-
-**InputState Structure**:
+The input state structure captures everything needed to manage text input. Display text is what the user sees, cursor position tracks where they're typing, isActive indicates whether the input box has focus, isCommandMode switches to true when command input is detected, and placeholder provides helpful hints when the box is empty.
 
 ```swift
 struct InputState {
@@ -252,40 +168,13 @@ struct InputState {
 }
 ```
 
-**Usage Pattern**:
+The usage pattern is consistent across all views. You maintain an input state variable, pass it to UnifiedInputView.handleInput (which mutates it in place), and then switch on the result to know what action to take. Updated means the text changed. SearchEntered means the user pressed Enter while searching. CommandEntered means they pressed Enter after typing a command. Cancelled means they pressed ESC to clear.
 
-```swift
-var state = inputState
-let result = UnifiedInputView.handleInput(key, state: &state)
+### AdvancedSearchView: Cross-Service Search
 
-switch result {
-case .updated:
-    // Text changed
-case .searchEntered(let query):
-    // User pressed Enter in search mode
-case .commandEntered(let command):
-    // User pressed Enter after typing a command
-case .cancelled:
-    // User pressed ESC
-// ... etc
-}
-```
+AdvancedSearchView implements the search functionality that spans all 19 OpenStack resource types. It performs client-side filtering for instant feedback, debounces API searches by 200ms to avoid hammering the API, uses ID-based selection that persists through filtering, and provides navigation to resource detail views.
 
-### 5. AdvancedSearchView
-
-**Purpose**: Cross-service search with filtering and navigation.
-
-**Location**: `Sources/Substation/Modules/Core/Views/AdvancedSearchView.swift`
-
-**Key Features**:
-
-- Cross-service search (19 resource types)
-- Client-side filtering
-- ID-based selection (persists through filtering)
-- Debounced search (200ms)
-- Navigation to resource detail views
-
-**Selection Architecture**:
+The selection architecture deserves explanation because it's more sophisticated than it looks. We store the selected resource ID, not the array index. This means when you filter the results, your selection stays on the same resource even though its index might change. Helper functions translate between IDs and indices, and moving selection up or down updates the ID to match the new position.
 
 ```swift
 // ID-based selection (survives filtering)
@@ -298,31 +187,15 @@ private static func getSelectedIndex(in results: [SearchResult]) -> Int {
 }
 ```
 
----
+## Input Handling: The 3-Layer Model
 
-## Input Handling
+Input handling uses a priority-based delegation model to ensure the right handler processes each key press. The model has three layers with decreasing priority.
 
-### 3-Layer Priority Model
+### Layer 1: View-Specific Navigation
 
-Input handling uses a priority-based delegation model to ensure the right handler processes each key press.
+Layer 1 handles navigation keys that require immediate response. This includes Enter for navigating to selected items, arrow keys for moving selection, and Page Up/Down for fast navigation. Views use this layer when navigation must happen before other processing, when default behavior needs to be overridden, or when view-specific navigation logic is required.
 
-#### Layer 1: View-Specific Navigation (Highest Priority)
-
-**Responsibility**: Handle navigation keys that require immediate response.
-
-**Keys Handled**:
-
-- Enter (10, 13): Navigate to selected item
-- Arrow keys (258, 259): Move selection up/down
-- Page Up/Down (338, 339): Fast navigation
-
-**When to Use**:
-
-- When navigation must happen BEFORE other processing
-- When default behavior needs to be overridden
-- When view-specific navigation logic is required
-
-**Example** (AdvancedSearchView):
+Here's an example from AdvancedSearchView. When in main search mode and InputPriority says it's a navigation key, we check if it's Enter and if we have results. If both are true, we navigate to the detail view and return true to indicate we handled the input. Otherwise, we fall through to Layer 2.
 
 ```swift
 static func handleInput(_ key: Int32) -> Bool {
@@ -342,243 +215,45 @@ static func handleInput(_ key: Int32) -> Bool {
 }
 ```
 
-#### Layer 2: UnifiedInputView State Management (Medium Priority)
+### Layer 2: UnifiedInputView State Management
 
-**Responsibility**: Handle text input, command input state, and cursor management.
+Layer 2 handles text input, command input state, and cursor management. This layer processes alphanumerics for text input, backspace for deleting characters, arrow keys for cursor movement, colon for activating command input, ESC for canceling, and Tab for completion. Use this layer for standard text input, command input activation, and cursor management.
 
-**Keys Handled**:
+The usage pattern is consistent. If we're in the appropriate mode, we delegate to UnifiedInputView.handleInput and switch on the result. Updated means we should refresh any client-side filtering and schedule a debounced search. CommandEntered means we should execute the command. The other result cases handle their respective scenarios.
 
-- Alphanumeric (32-126): Text input
-- Backspace (127, 8): Delete characters
-- Arrow keys (260, 261): Cursor movement
-- Colon (58): Activate command input
-- ESC (27): Cancel/clear
-- Tab (9): Completion
+### Layer 3: Fallback Handlers
 
-**When to Use**:
+Layer 3 handles view-specific keys not covered by Layers 1 and 2. This includes view-specific shortcuts, special function keys, and legacy key bindings. It's the catch-all for anything that doesn't fit the standard patterns.
 
-- For standard text input
-- For command input activation
-- For cursor management
-
-**Example**:
-
-```swift
-// Layer 2: Delegate to UnifiedInputView
-if inMainSearchMode {
-    let result = UnifiedInputView.handleInput(key, state: &inputState)
-
-    switch result {
-    case .updated:
-        performClientSideFilter()
-        scheduleSearch()
-        return true
-    case .commandEntered(let cmd):
-        executeCommand(cmd)
-        return true
-    // ... handle other results
-    }
-}
-```
-
-#### Layer 3: Fallback Handlers (Lowest Priority)
-
-**Responsibility**: Handle view-specific keys not covered by Layers 1 & 2.
-
-**When to Use**:
-
-- View-specific shortcuts
-- Special function keys
-- Legacy key bindings
-
-**Example**:
-
-```swift
-// Layer 3: Fallback to legacy handlers
-return handleNavigationInput(key)  // Handles arrow keys in specific contexts
-```
-
-### Input Flow Diagram
-
-```mermaid
-flowchart TD
-    A[Key Press] --> B[InputPriority.classify key]
-    B -->|navigation?| C[Layer 1<br/>Navigation Handler]
-    B -->|command?| D[Command Mode]
-    B -->|textInput?| E[Layer 2<br/>Unified Input]
-    B -->|fallback?| F[Layer 3<br/>Fallback]
-
-    C --> G[Execute Action]
-    D --> G
-    E --> G
-    F --> G
-
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#e8f5e9
-    style D fill:#e8f5e9
-    style E fill:#e8f5e9
-    style F fill:#e8f5e9
-    style G fill:#f3e5f5
-```
-
-### Best Practices
-
-1. **Always check priority first**:
-
-   ```swift
-   let priority = InputPriority.classify(key)
-   ```
-
-2. **Handle navigation keys in Layer 1**:
-   - Enter, arrows should be handled before UnifiedInputView
-   - Prevents unwanted side effects
-
-3. **Use UnifiedInputView for text**:
-   - Don't reimplement text input logic
-   - Let UnifiedInputView manage command input detection
-
-4. **Log for debugging**:
-
-   ```swift
-   InputPriority.logInput(key, layer: "MyView", handled: true)
-   ```
-
-5. **Document override reasons**:
-   - If handling a key in Layer 1, explain why
-   - See AdvancedSearchView for examples
-
----
+The fallback pattern is simple: if neither Layer 1 nor Layer 2 handled the key, call your view-specific handler. This might handle arrow keys in specific contexts, single-key shortcuts, or any other custom behavior your view needs.
 
 ## Command System
 
-### Activating Command Input
+### Activating Command Mode
 
-**Trigger**: Type `:` (colon)
-
-**Visual Indicator**: Input prompt changes from `>` to `:`
-
-**State Change**:
-
-```swift
-inputState.isCommandInput = true
-inputState.displayText = ":"
-```
-
-### Command Execution Flow
-
-```mermaid
-flowchart TD
-    A[User types ':servers' + Enter] --> B[UnifiedInputView detects command input]
-    B --> C[Returns .commandEntered 'servers']
-    C --> D[CommandMode.executeCommand 'servers']
-    D --> E[ResourceRegistry.resolve 'servers']
-    E --> F[Returns .navigateToView .servers]
-    F --> G[TUI.changeView to: .servers]
-
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#fff4e1
-    style D fill:#e8f5e9
-    style E fill:#e8f5e9
-    style F fill:#f3e5f5
-    style G fill:#fce4ec
-```
+Command mode activates when you type `:` (colon). The visual indicator changes from `>` to `:` in the input prompt, and the state updates to reflect command input mode. It's a small detail but it makes the mode clear at a glance.
 
 ### Supported Commands
 
-#### Navigation Commands
-
-```
-:servers      -> Navigate to Servers view
-:networks     -> Navigate to Networks view
-:volumes      -> Navigate to Volumes view
-:images       -> Navigate to Images view
-:flavors      -> Navigate to Flavors view
-... (see ResourceRegistry for full list)
-```
-
-#### Special Commands
-
-```
-:help         -> Show help view
-:q, :quit     -> Quit application
-:commands     -> List all available commands
-```
-
-#### Future Commands (Planned)
-
-```
-:ctx          -> List available cloud contexts
-:ctx <name>   -> Switch to cloud context
-```
+Navigation commands cover all the resource types we support. `:servers` goes to servers, `:networks` to networks, `:volumes` to volumes, and so on. Special commands include `:help` for the help view, `:q` or `:quit` to exit, and `:commands` to list all available commands. Future commands will include `:ctx` to list cloud contexts and `:ctx <name>` to switch contexts.
 
 ### Tab Completion
 
-**Trigger**: Press Tab while entering a command
+Tab completion makes command entry fast and accurate. Press Tab while entering a command and you'll see the first matching command. Press Tab again and it cycles through all matches. The system displays hints like "Tab: servers (1/3)" so you know there are three matches and you're looking at the first one.
 
-**Behavior**:
-
-1. First Tab: Show first matching command
-2. Subsequent Tabs: Cycle through all matches
-3. Displays hint: "Tab: servers (1/3)"
-
-**Example**:
-
-```
-User types: ":ser"
-Presses Tab: -> "servers"
-Presses Tab: -> "servergroups"
-Presses Tab: -> "servers" (cycles back)
-```
-
-**Implementation**:
-
-```swift
-let completion = commandMode.completeCommand("ser")
-// -> "servers" (first match)
-
-// Get all matches
-let matches = commandMode.getCompletionMatches()
-// -> ["servers", "servergroups", "securitygroups"]
-```
+The example flow shows how this feels in practice. You type `:ser`, press Tab, and it completes to "servers". Press Tab again and it cycles to "servergroups". Press Tab once more and it cycles back to "servers". It's fast, predictable, and saves typing.
 
 ### Command History
 
-**Navigation**:
-
-- **Up Arrow**: Previous command
-- **Down Arrow**: Next command
-
-**Limit**: 50 commands (configurable)
-
-**Persistence**: In-memory only (resets on restart)
-
-**Example**:
-
-```swift
-commandMode.executeCommand("servers")
-commandMode.executeCommand("networks")
-
-let prev = commandMode.previousCommand()  // -> "networks"
-let prev2 = commandMode.previousCommand() // -> "servers"
-```
-
----
+Command history keeps your last 50 commands in memory. Navigate with up arrow for previous commands and down arrow for next commands. The limit is configurable but 50 is enough for most sessions. Persistence is in-memory only so history resets on restart, which is fine for a TUI that typically runs for short sessions.
 
 ## Search System
 
-### Overview
-
-The search system provides cross-service resource search across all 19 OpenStack resource types with:
-
-- **Fuzzy search**: Partial matching
-- **Real-time filtering**: Client-side filtering as you type
-- **Debounced search**: 200ms delay to avoid excessive API calls
-- **ID-based selection**: Selection persists through filtering
-- **Navigation**: Enter key navigates to selected resource
+The search system provides cross-service resource search across all 19 OpenStack resource types. Fuzzy search enables partial matching, real-time filtering provides instant client-side filtering as you type, debounced search waits 200ms after you stop typing to avoid excessive API calls, ID-based selection persists through filtering, and navigation takes you to the selected resource.
 
 ### Search Flow
+
+Here's how a search flows through the system. You type in the search box, UnifiedInputView handles the text input and returns updated, we perform client-side filtering immediately for instant feedback, we schedule a search with 200ms debounce, the client-side filter displays results right away, the debounced search fires if you've stopped typing, we perform the API search across services, update searchResults with the response, and display the combined filtered results.
 
 ```mermaid
 flowchart TD
@@ -599,250 +274,40 @@ flowchart TD
     style G fill:#f3e5f5
 ```
 
-### Search Architecture
+### Client-Side Filtering vs Debounced Search
 
-#### Client-Side Filtering
+Client-side filtering runs on every keystroke for instant feedback, operates on up to 1000 cached results, and provides immediate visual response. Debounced API search waits 200ms after you stop typing, searches across all 19 resource types, and updates the results with fresh data from the API.
 
-**When**: On every keystroke
-**Purpose**: Instant feedback while typing
-**Limit**: Up to 1000 results
+The debouncing logic is straightforward. Cancel any existing search task, create a new task that sleeps for 200ms, then perform the search if the task hasn't been cancelled. This prevents us from firing a new API request on every keystroke while still making search feel responsive.
 
-```swift
-private static func performClientSideFilter() {
-    let query = inputState.searchQuery
+### Resource Types
 
-    filteredResults = searchResults.filter { result in
-        let name = (result.name ?? result.resourceId).lowercased()
-        let resourceType = result.resourceType.displayName.lowercased()
-
-        return name.contains(queryLower) ||
-               resourceType.contains(queryLower) ||
-               // ... other fields
-    }
-}
-```
-
-#### Debounced API Search
-
-**When**: 200ms after user stops typing
-**Purpose**: Avoid excessive API calls
-**Scope**: All 19 resource types
-
-```swift
-private static func scheduleSearch() {
-    searchDebounceTask?.cancel()
-    searchDebounceTask = Task {
-        try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms
-        await performSearch()
-    }
-}
-```
-
-### Supported Resource Types
-
-1. **Compute**: servers, server_groups, flavors, keypairs
-2. **Networking**: networks, subnets, routers, ports, floating_ips, security_groups
-3. **Storage**: volumes, volume_snapshots, volume_backups, images
-4. **Services**: barbican_secrets, barbican_containers, load_balancers, swift_containers, swift_objects
+We search across four categories of OpenStack resources. Compute includes servers, server groups, flavors, and keypairs. Networking covers networks, subnets, routers, ports, floating IPs, and security groups. Storage includes volumes, volume snapshots, volume backups, and images. Services covers Barbican secrets and containers, load balancers, and Swift containers and objects.
 
 ### Selection Behavior
 
-**ID-Based Selection**: Selection is tied to resource ID, not array index.
+ID-based selection is one of those details that elevates the user experience from "functional" to "polished". Selection ties to resource ID, not array index, which means selection persists when filtering results. There's no manual index clamping needed, and the UX is intuitive: your selection stays where you put it even as the filtered results change.
 
-**Benefits**:
+The implementation stores the selected resource ID, converts to index for display using a helper function, and moves selection by updating the ID to match the new position. When you filter, the selection stays on the same resource (if it's still in the results) or defaults to the first result if your previous selection got filtered out.
 
-- Selection persists when filtering results
-- No manual index clamping needed
-- Intuitive UX
+## Performance
 
-**Implementation**:
+Fuzzy matching runs in O(n) time where n is the number of aliases (about 50). This is fast enough that it feels instant. If we ever needed to optimize, we could add early exit when we have enough good matches, but so far it hasn't been necessary.
 
-```swift
-// Store selected resource ID
-private static var selectedResourceId: String? = nil
+Search performance is where the debouncing and client-side filtering really pay off. The 200ms delay avoids excessive API calls, client-side filtering provides immediate feedback without any network traffic, and the 1000-result limit keeps the UI responsive even with large datasets.
 
-// Convert to index for display
-private static func getSelectedIndex(in results: [SearchResult]) -> Int {
-    guard let resourceId = selectedResourceId else { return 0 }
-    return results.firstIndex { $0.resourceId == resourceId } ?? 0
-}
-
-// Move selection up/down
-private static func moveSelection(by offset: Int, in results: [SearchResult]) {
-    let currentIndex = getSelectedIndex(in: results)
-    let newIndex = max(0, min(currentIndex + offset, results.count - 1))
-    selectedResourceId = results[newIndex].resourceId
-}
-```
-
-### Navigation from Search
-
-**Trigger**: Press Enter on selected result
-**Behavior**: Navigate to resource's list view (not detail view)
-**Reason**: User sees resource in context, can then press Space for details
-
-```swift
-private static func navigateToDetailView() {
-    let selectedResult = resultsToShow[selectedIndex]
-
-    // Map to list view (not detail)
-    if let listView = mapResourceToDetailView(selectedResult.resourceType) {
-        // Find resource in cache and set selectedIndex
-        selectResourceInCache(tui, selectedResult)
-
-        // Navigate to list view
-        tui.changeView(to: listView)
-    }
-}
-```
-
----
+If search ever becomes slow, we have several knobs to turn: reduce resultsPerPage (default 20), increase searchDebounceDelay (default 200ms), or disable cross-service search for specific queries. So far we haven't needed to touch these.
 
 ## Adding New Resources
 
-### 1. Add to ResourceRegistry
+Adding a new resource type to the navigation system is straightforward. You add the aliases to ResourceRegistry, add a ViewMode case if it's a new type, optionally add search support if the resource should be searchable, implement the view, and test that commands, completion, and fuzzy matching work.
 
-```swift
-// In ResourceRegistry.swift
-private let resourceMap: [ViewMode: [String]] = [
-    // ... existing entries ...
-    .myNewResource: ["mynewresource", "mynew", "mr", "new"],
-]
-```
+The process takes about 15 minutes for a simple resource type. Add the aliases to the resource map, add the ViewMode case with title and key, add the SearchResourceType enum case, implement indexing logic, add to AdvancedSearchView's initialization, create the view, and test all the navigation paths.
 
-### 2. Add ViewMode (if new)
+## Related Documentation
 
-```swift
-// In MainPanelView.swift
-enum ViewMode: CaseIterable {
-    // ... existing cases ...
-    case myNewResource
+For more context on the broader architecture and how navigation fits into the overall system:
 
-    var title: String {
-        switch self {
-        // ... existing cases ...
-        case .myNewResource: return "My New Resource"
-        }
-    }
-
-    var key: String {
-        switch self {
-        // ... existing cases ...
-        case .myNewResource: return "[m]"
-        }
-    }
-}
-```
-
-### 3. Add to Search (Optional)
-
-If the resource should be searchable:
-
-**a) Add SearchResourceType**:
-
-```swift
-// In SearchModels.swift
-enum SearchResourceType: String, Codable {
-    // ... existing cases ...
-    case myNewResource = "my_new_resource"
-
-    var displayName: String {
-        switch self {
-        // ... existing cases ...
-        case .myNewResource: return "MyNewResource"
-        }
-    }
-}
-```
-
-**b) Add indexing logic**:
-
-```swift
-// In SearchIndex.swift
-private func indexMyNewResource(_ resource: MyNewResource) async {
-    let text = buildMyNewResourceText(resource)
-    let entry = SearchIndexEntry(
-        resourceId: resource.id,
-        resourceType: .myNewResource,
-        text: text,
-        // ... other fields
-    )
-    entries.append(entry)
-}
-```
-
-**c) Add to AdvancedSearchView**:
-
-```swift
-// In AdvancedSearchView.swift
-private static func initializeSearchEngineIfNeeded() async {
-    // ... existing code ...
-
-    for resource in tui.cachedMyNewResources {
-        // Add to searchable resources
-    }
-}
-```
-
-### 4. Add View Implementation
-
-Create the view file and implement the rendering logic.
-
-### 5. Test
-
-- `:mynewresource` navigates correctly
-- Search includes the new resource type
-- Tab completion works
-- Fuzzy matching works
-
----
-
-## Performance Considerations
-
-### Fuzzy Matching Optimization
-
-**Current**: O(n) where n = number of aliases (~50)
-
-**Optimization** (if needed):
-
-```swift
-// Early exit when we have enough good matches
-func rankedMatches(for query: String, limit: Int? = 10) -> [...] {
-    var matches: [...] = []
-    var perfectMatches = 0
-
-    for (viewMode, aliases) in resourceMap {
-        for alias in aliases {
-            let score = matchScore(command: alias, query: query)
-            if score > 0 {
-                matches.append(...)
-                if score == 100 { perfectMatches += 1 }
-
-                // Early exit if we have enough perfect matches
-                if let limit = limit, perfectMatches >= limit {
-                    break
-                }
-            }
-        }
-    }
-    return matches
-}
-```
-
-### Search Performance
-
-**Debouncing**: 200ms delay avoids excessive API calls
-**Client-side filtering**: Immediate feedback without API calls
-**Limit**: 1000 results max for client-side filtering
-
-**If search is slow**:
-
-1. Reduce `resultsPerPage` (default: 20)
-2. Increase `searchDebounceDelay` (default: 200ms)
-3. Disable cross-service search for specific queries
-
----
-
-## References
-
+- [Architecture Overview](./overview.md) - High-level design principles
+- [Component Architecture](./components.md) - UI component details
 - [Swift 6.1 Documentation](https://swift.org/documentation/)

@@ -1,6 +1,6 @@
 # Common Workflows
 
-Everyday OpenStack operations with Substation.
+Everyday OpenStack operations with Substation. This is your quick reference. Print it, bookmark it, tattoo it on your arm. Whatever helps you remember.
 
 ## Command-Based Workflows
 
@@ -372,10 +372,10 @@ Esc                  Clear search filter
 
 **Example Queries:**
 
-- `prod` - Find all production resources
-- `192.168.1` - Find resources with this IP
-- `ubuntu` - Find all Ubuntu-related resources
-- `error` - Find resources in error state
+- `prod` -- Find all production resources
+- `192.168.1` -- Find resources with this IP
+- `ubuntu` -- Find all Ubuntu-related resources
+- `error` -- Find resources in error state
 
 ## Troubleshooting Workflows
 

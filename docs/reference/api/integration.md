@@ -1,6 +1,6 @@
 # Integration Guide
 
-CrossPlatformTimer utilities and integration examples for building complete applications with OSClient and SwiftNCurses.
+This guide covers CrossPlatformTimer utilities and integration patterns for building complete applications with OSClient and SwiftNCurses. If you're just learning the individual APIs, check the API reference first. This is where the pieces come together.
 
 ## CrossPlatformTimer API
 
@@ -653,5 +653,5 @@ let servers = await view.servers  // Correct
 **See Also**:
 
 - [OSClient API](osclient.md) - OpenStack client library reference
-- [SwiftNCurses API](SwiftNCurses.md) - Terminal UI framework reference
+- [SwiftNCurses API](swiftncurses.md) - Terminal UI framework reference
 - [API Reference Index](index.md) - Quick reference and navigation

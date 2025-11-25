@@ -4,6 +4,8 @@
 
 **StatusListView** is a reusable component for rendering primary resource lists with StatusIcon indicators and multi-column text display. It handles filtering, scrolling, and pagination automatically, providing a consistent interface for all primary resource views (servers, images, volumes, networks, etc.).
 
+Writing list rendering code manually means 150+ lines of column formatting, scroll management, and filter logic per view. StatusListView reduces that to 15 lines. Stop writing boilerplate. Use StatusListView.
+
 ## Location
 
 - **Component:** [Sources/Substation/Components/StatusListView.swift](https://github.com/cloudnull/substation/blob/main/Sources/Substation/Components/StatusListView.swift)

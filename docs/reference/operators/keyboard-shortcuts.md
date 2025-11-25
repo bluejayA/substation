@@ -1,6 +1,6 @@
 # Keyboard Shortcuts and Navigation Guide
 
-Complete keyboard shortcut reference and navigation guide for Substation. Master keyboard-driven navigation - your mouse is for the weak.
+Complete keyboard shortcut reference and navigation guide for Substation. This is your quick reference. Print it, bookmark it, tattoo it on your arm. Whatever helps you remember. Master keyboard-driven navigation -- your mouse is for the weak.
 
 ## Navigation Philosophy
 
@@ -25,12 +25,12 @@ Substation uses **command-driven navigation** as the modern, primary interface:
 **IMPORTANT**: Lowercase letter keys (a-z) do NOT navigate between views.
 They will display a helpful message: "Use commands for navigation (type : and press Tab for suggestions)"
 
-**Everyone uses command input** - It's fast, discoverable, and works everywhere.
-Press `:` then Tab to see all available commands. There are no "shortcuts to memorize" - the commands ARE the interface.
+**Everyone uses command input** -- It's fast, discoverable, and works everywhere.
+Press `:` then Tab to see all available commands. There are no "shortcuts to memorize" -- the commands ARE the interface.
 
 ## Command Input (Primary Navigation)
 
-Press `:` to enter command input - the primary way to navigate and execute actions in Substation.
+Press `:` to enter command input -- the primary way to navigate and execute actions in Substation.
 
 ### How Command Input Works
 
@@ -205,7 +205,7 @@ These keys trigger actions in relevant views. Note: Most actions use lowercase k
 
 | Key | Command Equivalent | Action | Notes |
 |-----|-------------------|--------|-------|
-| `?` | `:help` | Show Help | Context-aware - changes based on current view |
+| `?` | `:help` | Show Help | Context-aware -- changes based on current view |
 | `@` | - | About | Version info, credits |
 | `/` | - | Search/Filter | Instant local filtering, no API calls |
 | `:` | - | Command Input | PRIMARY navigation method (see Command Input section) |
@@ -565,7 +565,7 @@ Press `/` in any list:
 **Local vs. Advanced Search:**
 
 - **Local (`/`)**: Fast, searches current view only, instant results
-- **Advanced (`z`)**: Comprehensive, searches all services, < 500ms typical
+- **Advanced (`z`)**: Comprehensive, searches all services, <500ms typical
 
 ### Navigation Shortcuts
 
@@ -600,11 +600,11 @@ Press `/` in any list:
 
 Press `A` (uppercase) to cycle auto-refresh intervals:
 
-- **5 seconds** - Real-time monitoring (resource intensive)
-- **10 seconds** - Active monitoring (balanced)
-- **30 seconds** - Passive monitoring (light)
-- **60 seconds** - Background monitoring (very light)
-- **Off** - Manual refresh only (press `r` when needed)
+- **5 seconds** -- Real-time monitoring (resource intensive)
+- **10 seconds** -- Active monitoring (balanced)
+- **30 seconds** -- Passive monitoring (light)
+- **60 seconds** -- Background monitoring (very light)
+- **Off** -- Manual refresh only (press `r` when needed)
 
 **Recommendation**: Use 10-30 seconds for most workflows. Use 5 seconds only when actively monitoring a deployment.
 
@@ -674,15 +674,15 @@ Every operation can be performed without a mouse:
 ### Most Used Shortcuts
 
 ```
-Navigation:  :servers :networks :volumes :images  (Command mode - type : then command name)
+Navigation:  :servers :networks :volumes :images  (Command mode -- type : then command name)
 Actions:     C Del Space ? q                      (Create, Delete, Details, Help, Quit)
 Search:      / :search                            (Local, Advanced search)
-Commands:    : (then cmd name)                    (Command input - :ctx, :servers, :create, etc.)
+Commands:    : (then cmd name)                    (Command input -- :ctx, :servers, :create, etc.)
 Refresh:     :refresh :clear-cache                (Refresh view, Cache purge)
 Movement:    ^v j k Page-Up/Dn                     (List navigation)
 Bulk Ops:    Ctrl-X Space Del                     (Multi-select, Select, Bulk delete)
 Cloud:       :ctx <cloud>                         (Switch between clouds)
-Server Mgmt: S T R                                (Start, Stop, Restart - uppercase context actions)
+Server Mgmt: S T R                                (Start, Stop, Restart -- uppercase context actions)
 ```
 
 ### Emergency Shortcuts
@@ -696,16 +696,16 @@ q                   - Quit (from main view)
 
 ### Pro Tips
 
-1. **Use command mode for navigation** - `:servers`, `:networks`, `:volumes` (NOT lowercase letters)
+1. **Use command mode for navigation** -- `:servers`, `:networks`, `:volumes` (NOT lowercase letters)
 2. **Press `Esc` repeatedly** to bubble up to dashboard
 3. **Press `?` when lost** for context-aware help
-4. **Use `:clear-cache` sparingly** - only when data is truly stale
-5. **Use `/` first** before `:search` - local search is instant
-6. **Learn uppercase context actions** - C for Create, S/T/R for server management
-7. **Use `Space` liberally** - Quick detail inspection
-8. **Vim keys work** - `j/k` for navigation, `g/G` for jumps
-9. **Command input Tab completion** - `:` then Tab shows all commands, `:ctx <Tab>` shows all clouds
-10. **Command history** - UP/DOWN arrows in command input recall previous commands
+4. **Use `:clear-cache` sparingly** -- only when data is truly stale
+5. **Use `/` first** before `:search` -- local search is instant
+6. **Learn uppercase context actions** -- C for Create, S/T/R for server management
+7. **Use `Space` liberally** -- Quick detail inspection
+8. **Vim keys work** -- `j/k` for navigation, `g/G` for jumps
+9. **Command input Tab completion** -- `:` then Tab shows all commands, `:ctx <Tab>` shows all clouds
+10. **Command history** -- UP/DOWN arrows in command input recall previous commands
 
 ---
 

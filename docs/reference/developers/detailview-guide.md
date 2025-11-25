@@ -4,6 +4,8 @@
 
 **DetailView** is a reusable component for rendering detailed information screens with section-based layouts and scrollable content. It standardizes how detailed resource information is displayed, providing consistent formatting for field labels, values, and hierarchical organization.
 
+Detail screens shouldn't require 300 lines of manual component assembly. DetailView gives you sections, fields, scrolling, and consistent formatting in a fraction of the code. Build detail views, not boilerplate.
+
 ## Location
 
 - **Component:** [Sources/Substation/Components/DetailView.swift](https://github.com/cloudnull/substation/blob/main/Sources/Substation/Components/DetailView.swift)

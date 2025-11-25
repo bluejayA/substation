@@ -1,6 +1,6 @@
 # SwiftNCurses Framework API Reference
 
-Complete API reference for the SwiftNCurses terminal UI framework and components.
+This is the API reference for SwiftNCurses. If you're building your first terminal UI, start with the integration guide instead. This covers the complete SwiftNCurses terminal UI framework and components.
 
 ## Package Overview
 
@@ -238,7 +238,7 @@ Text("Success").color(.green)
 Text("Warning").color(.yellow)
 
 // Custom colors
-Text("Custom").color(.custom(r: 100, g: 150, g: 200))
+Text("Custom").color(.custom(r: 100, g: 150, b: 200))
 ```
 
 ## Layout System

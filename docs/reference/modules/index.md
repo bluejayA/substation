@@ -2,11 +2,15 @@
 
 ## Introduction
 
-The Substation project uses a modular architecture where each OpenStack service is encapsulated in a dedicated module. These modules provide comprehensive management capabilities through a consistent interface, enabling users to interact with various OpenStack services through a unified terminal UI.
+We built Substation around a fundamental principle: OpenStack is complex, but your interface to it shouldn't be. Each service has its own personality, its own quirks, its own operational patterns. Rather than forcing everything through a generic interface, we embraced the modularity.
+
+The result is a system where each OpenStack service gets its own dedicated module, a self-contained unit that understands the service deeply and presents it naturally. These modules share a common foundation (the `OpenStackModule` protocol) but express themselves differently. The Servers module knows about console access and resize workflows. The Swift module understands hierarchical object storage and ETag-based synchronization. The Security Groups module speaks in firewall rules and protocol specifications.
+
+This architecture gives us flexibility in how we implement and evolve each service integration, but more importantly, it gives you a consistent yet service-appropriate interface. You're not fighting against a lowest-common-denominator abstraction; you're working with tools designed specifically for each service.
 
 Each module implements the `OpenStackModule` protocol and provides:
 
-- Service-specific views and forms
+- Service-specific views and forms tailored to the resource type
 - Data fetching and caching through DataProvider interfaces
 - Batch operations for multi-resource management
 - Input handling for keyboard navigation and actions
@@ -14,7 +18,7 @@ Each module implements the `OpenStackModule` protocol and provides:
 
 ## Module Overview
 
-Substation provides 14 specialized modules for managing OpenStack resources:
+Substation provides 14 specialized modules for managing OpenStack resources. We've organized them by functional category, but the dependency relationships tell the real story: some modules stand alone, others build on foundational services, and a few (like Servers) tie nearly everything together.
 
 ### Module Metadata
 
@@ -36,6 +40,8 @@ Substation provides 14 specialized modules for managing OpenStack resources:
 | **Barbican** | `barbican` | Secrets | Barbican | Security |
 
 ## Module Dependencies
+
+Understanding module dependencies is critical for initialization order and for making sense of how OpenStack services interact. We've structured this as three phases: independent services that stand alone, networking infrastructure that builds on itself, and finally the compute and storage services that need everything else.
 
 ### Dependency Diagram
 
@@ -95,6 +101,8 @@ graph TD
 
 ## Module Capabilities Matrix
 
+Different resources have different operational patterns. Some change frequently and need aggressive refresh intervals. Others are nearly static and benefit from long cache times. Some support rich creation workflows; others are read-only views into existing resources.
+
 | Module | List View | Detail View | Create/Edit | Delete | Batch Ops | Auto-Refresh |
 |--------|-----------|-------------|-------------|--------|-----------|--------------|
 | **Servers** | Yes | Yes | Yes | Yes | Yes | 60s |
@@ -113,6 +121,14 @@ graph TD
 | **Barbican** | Yes | Yes | Yes | Yes | Yes | On-demand |
 
 ## Module Catalog
+
+The following sections detail each module's implementation, capabilities, and operational characteristics. We've organized them functionally, starting with the compute modules that most users interact with first, followed by networking, storage, and security services.
+
+### Compute Modules
+
+These modules manage the virtual machines and their hardware profiles. Servers is the most complex module in Substation, serving as the integration point for nearly every other service.
+
+---
 
 ### Servers Module
 
@@ -148,6 +164,67 @@ Provides comprehensive server (instance) management capabilities, serving as the
 - `.serverNetworkInterfaces` - Network interface configuration
 
 **DataProvider:** `ServersDataProvider` - Handles server data fetching with performance optimization
+
+---
+
+### Flavors Module
+
+**Location:** `/Sources/Substation/Modules/Flavors/`
+**Service:** OpenStack Nova
+**Identifier:** `flavors`
+
+**Purpose:**
+Manages compute flavors defining virtual hardware profiles.
+
+**Key Features:**
+
+- Flavor specification display (vCPUs, RAM, disk)
+- Extra specs inspection
+- Public/private flavor visibility
+- Flavor access management
+- Performance tier categorization
+
+**Views:**
+
+- `.flavors` - Flavor list
+- `.flavorDetail` - Detailed specifications
+- `.flavorSelection` - Flavor picker for server operations
+
+**DataProvider:** `FlavorsDataProvider` - Flavor data management
+
+---
+
+### ServerGroups Module
+
+**Location:** `/Sources/Substation/Modules/ServerGroups/`
+**Service:** OpenStack Nova
+**Identifier:** `servergroups`
+
+**Purpose:**
+Manages server groups for scheduling policies like anti-affinity.
+
+**Key Features:**
+
+- Anti-affinity policy configuration
+- Affinity policy support
+- Soft anti-affinity rules
+- Server membership management
+- Policy metadata configuration
+
+**Views:**
+
+- `.serverGroups` - Server group list
+- `.serverGroupDetail` - Group members and policy
+- `.serverGroupCreate` - Group creation form
+- `.serverGroupManagement` - Member management
+
+**DataProvider:** `ServerGroupsDataProvider` - Server group data
+
+---
+
+### Network Modules
+
+Neutron provides the virtual networking infrastructure that ties everything together. Networks are the foundation, with subnets, routers, ports, and floating IPs building on that base. These modules have tight interdependencies, you can't have a subnet without a network, or a floating IP without a port.
 
 ---
 
@@ -300,34 +377,9 @@ Manages public IP addresses for external connectivity to instances.
 
 ---
 
-### SecurityGroups Module
+### Storage Modules
 
-**Location:** `/Sources/Substation/Modules/SecurityGroups/`
-**Service:** OpenStack Neutron
-**Identifier:** `securitygroups`
-
-**Purpose:**
-Provides firewall rule management through security groups and rules.
-
-**Key Features:**
-
-- Ingress/egress rule management
-- Protocol and port range configuration
-- ICMP type/code support
-- Remote security group references
-- CIDR-based access control
-- Default security group management
-- Rule priority configuration
-
-**Views:**
-
-- `.securityGroups` - Security group list
-- `.securityGroupDetail` - Rule inspection
-- `.securityGroupCreate` - Group creation
-- `.securityGroupServerAttachment` - Server assignment
-- `.securityGroupServerManagement` - Server security management
-
-**DataProvider:** `SecurityGroupsDataProvider` - Security group and rule data
+Storage in OpenStack comes in three flavors: images for boot templates, volumes for persistent block storage, and Swift for object storage. Each has distinct operational characteristics and use cases.
 
 ---
 
@@ -356,88 +408,6 @@ Manages virtual machine images and snapshots.
 - `.imageSelection` - Image picker for server creation
 
 **DataProvider:** `ImagesDataProvider` - Image catalog fetching
-
----
-
-### Flavors Module
-
-**Location:** `/Sources/Substation/Modules/Flavors/`
-**Service:** OpenStack Nova
-**Identifier:** `flavors`
-
-**Purpose:**
-Manages compute flavors defining virtual hardware profiles.
-
-**Key Features:**
-
-- Flavor specification display (vCPUs, RAM, disk)
-- Extra specs inspection
-- Public/private flavor visibility
-- Flavor access management
-- Performance tier categorization
-
-**Views:**
-
-- `.flavors` - Flavor list
-- `.flavorDetail` - Detailed specifications
-- `.flavorSelection` - Flavor picker for server operations
-
-**DataProvider:** `FlavorsDataProvider` - Flavor data management
-
----
-
-### KeyPairs Module
-
-**Location:** `/Sources/Substation/Modules/KeyPairs/`
-**Service:** OpenStack Nova
-**Identifier:** `keypairs`
-
-**Purpose:**
-Manages SSH key pairs for secure instance access.
-
-**Key Features:**
-
-- Key pair generation
-- Public key import
-- Key fingerprint display
-- Key type support (ssh, x509)
-- Private key download (on creation)
-
-**Views:**
-
-- `.keyPairs` - Key pair list
-- `.keyPairDetail` - Key information
-- `.keyPairCreate` - Key generation/import form
-
-**DataProvider:** `KeyPairsDataProvider` - Key pair data fetching
-
----
-
-### ServerGroups Module
-
-**Location:** `/Sources/Substation/Modules/ServerGroups/`
-**Service:** OpenStack Nova
-**Identifier:** `servergroups`
-
-**Purpose:**
-Manages server groups for scheduling policies like anti-affinity.
-
-**Key Features:**
-
-- Anti-affinity policy configuration
-- Affinity policy support
-- Soft anti-affinity rules
-- Server membership management
-- Policy metadata configuration
-
-**Views:**
-
-- `.serverGroups` - Server group list
-- `.serverGroupDetail` - Group members and policy
-- `.serverGroupCreate` - Group creation form
-- `.serverGroupManagement` - Member management
-
-**DataProvider:** `ServerGroupsDataProvider` - Server group data
 
 ---
 
@@ -516,6 +486,70 @@ Comprehensive object storage management with container and object operations.
 - Transfer monitoring integrated within Swift module form handlers
 - Storage utilities integrated within Swift module
 - `SwiftTreeItem` - Hierarchical object representation
+
+---
+
+### Security Modules
+
+Security in OpenStack spans multiple domains: network security through security groups, SSH access through key pairs, and cryptographic secrets through Barbican. These modules handle sensitive operations and credentials.
+
+---
+
+### SecurityGroups Module
+
+**Location:** `/Sources/Substation/Modules/SecurityGroups/`
+**Service:** OpenStack Neutron
+**Identifier:** `securitygroups`
+
+**Purpose:**
+Provides firewall rule management through security groups and rules.
+
+**Key Features:**
+
+- Ingress/egress rule management
+- Protocol and port range configuration
+- ICMP type/code support
+- Remote security group references
+- CIDR-based access control
+- Default security group management
+- Rule priority configuration
+
+**Views:**
+
+- `.securityGroups` - Security group list
+- `.securityGroupDetail` - Rule inspection
+- `.securityGroupCreate` - Group creation
+- `.securityGroupServerAttachment` - Server assignment
+- `.securityGroupServerManagement` - Server security management
+
+**DataProvider:** `SecurityGroupsDataProvider` - Security group and rule data
+
+---
+
+### KeyPairs Module
+
+**Location:** `/Sources/Substation/Modules/KeyPairs/`
+**Service:** OpenStack Nova
+**Identifier:** `keypairs`
+
+**Purpose:**
+Manages SSH key pairs for secure instance access.
+
+**Key Features:**
+
+- Key pair generation
+- Public key import
+- Key fingerprint display
+- Key type support (ssh, x509)
+- Private key download (on creation)
+
+**Views:**
+
+- `.keyPairs` - Key pair list
+- `.keyPairDetail` - Key information
+- `.keyPairCreate` - Key generation/import form
+
+**DataProvider:** `KeyPairsDataProvider` - Key pair data fetching
 
 ---
 

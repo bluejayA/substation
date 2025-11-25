@@ -2,61 +2,35 @@
 
 ## Overview
 
-OpenStack Swift (Object Storage) provides scalable, redundant storage for unstructured data. Substation implements comprehensive Swift integration with intelligent optimization, background operations, and robust error handling.
+Managing Swift object storage through web interfaces is an exercise in patience. Click to upload a file. Wait. Watch a progress bar that may or may not be accurate. Click another file. Repeat two hundred times. Hope nothing times out. We built Substation's object storage interface because we've lived through this pain and decided there had to be a better way.
+
+OpenStack Swift provides scalable, redundant storage for unstructured data, but working with it efficiently requires tools that understand batch operations, intelligent caching, and the reality that network connections fail at the worst possible moments. Substation implements comprehensive Swift integration with ETAG-based optimization that can skip 50-90% of unnecessary transfers, background operations that keep your terminal responsive during massive uploads, and error handling that actually tells you what went wrong instead of "transfer failed."
 
 ## Core Concepts
 
 ### Containers
 
-Containers are the top-level organizational unit in Swift, similar to buckets in other object storage systems.
+Containers are the top-level organizational unit in Swift, similar to buckets in other object storage systems. Think of them as the directories of the object storage world, except they can't be nested and you can make them serve websites if you're feeling adventurous.
 
-**Key Properties:**
+Each container has a unique name within your project and carries metadata about what's inside. The name is its identifier, metadata provides custom key-value pairs for container configuration, and access control lists govern who can read or write. Containers track how many objects they hold and the total bytes consumed, which becomes surprisingly important when you're trying to figure out why your storage quota vanished.
 
-- **Name**: Unique identifier within a project
-- **Metadata**: Custom key-value pairs for container configuration
-- **ACLs**: Access control lists for read/write permissions
-- **Object Count**: Number of objects stored in the container
-- **Total Bytes**: Combined size of all objects
-
-**Container Operations in Substation:**
-
-- Create/delete containers
-- List objects with prefix filtering
-- Set container metadata
-- Configure web access (static website hosting)
-- Download entire container contents
+In Substation, we give you full control over container operations. Create and delete containers with confirmation dialogs that prevent accidents. List objects with prefix filtering so you can find things in containers with thousands of files. Set container metadata to tag your storage with whatever organizational scheme makes sense this week. Configure web access for static website hosting when you need to turn a container into a CDN. Download entire container contents in the background while you work on something else.
 
 ### Objects
 
-Objects are the actual files stored in containers. Each object has a name (key) and data (value).
+Objects are the actual files stored in containers. Each object has a name, which we call the key, and data, which is the value. Unlike traditional filesystems, there's no real directory structure here. Everything is flat. The appearance of directories is just object names with forward slashes in them, and Swift pretends along with you.
 
-**Key Properties:**
+Object properties include the name, which must be unique within its container and can include path separators to simulate folder structure. The Content-Type tells Swift and browsers what kind of file this is. Content-Length tracks the size in bytes. The ETAG field holds an MD5 hash of the object content, which becomes critical for our optimization strategies. Last-Modified timestamps tell you when something changed, and custom metadata lets you attach arbitrary key-value pairs to objects.
 
-- **Name**: Unique identifier within a container (can include path separators)
-- **Content-Type**: MIME type of the stored data
-- **Content-Length**: Size in bytes
-- **ETAG**: MD5 hash of the object content
-- **Last-Modified**: Timestamp of last modification
-- **Metadata**: Custom key-value pairs attached to the object
-
-**Object Naming:**
-
-- Can include forward slashes to simulate directory structure
-- Maximum length: 1024 bytes (UTF-8 encoded)
-- Special characters are percent-encoded for safety
-- Path traversal sequences (../) are rejected for security
+When naming objects, you can include forward slashes to create the illusion of directory structure. Your object name can be up to 1024 bytes in UTF-8 encoding, though we enforce ASCII-only in this project. Special characters get percent-encoded for safety because URLs are involved. We explicitly reject path traversal sequences like "../" because we're not interested in security vulnerabilities, thanks.
 
 ### Metadata
 
-Both containers and objects support custom metadata for storing additional information.
+Both containers and objects support custom metadata for storing additional information that doesn't fit anywhere else. Maybe you want to tag who uploaded something, or mark which environment a container belongs to, or note which automated process created a backup.
 
-**Metadata Format:**
+Metadata follows a specific format. Container metadata uses keys like "X-Container-Meta-Project" and object metadata uses "X-Object-Meta-Uploaded-By". Each value is a string limited to 256 bytes. Common use cases include tags, categories, and application-specific data that you need to track but don't want to encode in the object name.
 
-- Key: `X-Container-Meta-{name}` or `X-Object-Meta-{name}`
-- Value: String (max 256 bytes per value)
-- Use cases: Tags, categories, application-specific data
-
-**Example Metadata:**
+Example metadata might look like this:
 
 ```
 X-Container-Meta-Project: web-assets
@@ -69,40 +43,19 @@ X-Object-Meta-Source: automated-backup
 
 ### What is ETAG?
 
-ETAG (Entity Tag) is an MD5 hash of the object's content used for:
-
-- **Content verification**: Ensure uploaded data matches original
-- **Change detection**: Determine if object has been modified
-- **Optimization**: Skip redundant uploads/downloads
+ETAG stands for Entity Tag, and in Swift's case, it's an MD5 hash of the object's content. This seemingly simple field enables some of our most powerful optimizations. We use ETAGs for content verification to ensure uploaded data matches the original. We use them for change detection to determine if an object has been modified since we last saw it. Most importantly, we use them to skip redundant uploads and downloads, saving massive amounts of bandwidth.
 
 ### ETAG-Based Skip Optimization
 
-One of Substation's most powerful features is ETAG-based skip optimization, which dramatically reduces bandwidth usage.
+Here's where Substation gets interesting. One of our most powerful features is ETAG-based skip optimization, which can reduce bandwidth usage by 50-90% in common scenarios. If you've ever watched a backup system re-upload gigabytes of unchanged files, you'll appreciate this.
 
-**How It Works:**
+For uploads, we calculate the MD5 hash of your local file first. Then we make a HEAD request to Swift to check if an object with that name exists. If it does, we compare the local MD5 with the remote ETAG. If the hashes match, the file hasn't changed, and we skip the upload entirely. If the hashes differ or the object doesn't exist, we proceed with the upload. Your status bar shows the file as "skipped" and you just saved the time and bandwidth of uploading a file that's already there.
 
-1. **Upload Scenario:**
-   - Calculate MD5 hash of local file
-   - Check if object exists in Swift with HEAD request
-   - Compare local MD5 with remote ETAG
-   - Skip upload if hashes match (file unchanged)
-   - Upload only if hashes differ or object doesn't exist
+For downloads, the process reverses. We check if a local file exists at the destination path. If it does, we calculate its MD5 hash. We retrieve the object's ETAG from Swift. If the hashes match, your local copy is current, and we skip the download. If they differ or the file doesn't exist locally, we proceed with the download.
 
-2. **Download Scenario:**
-   - Check if local file exists
-   - Calculate MD5 hash of local file
-   - Retrieve object ETAG from Swift
-   - Skip download if hashes match (file already current)
-   - Download only if hashes differ or file doesn't exist
+The benefits are substantial. In typical scenarios where you're syncing directories or re-running backups, we've seen bandwidth reduction of 50-90%. Batch operations complete faster because we only transfer changed files. Server load decreases. Your egress costs drop. Everyone wins except your cloud provider's bandwidth billing department.
 
-**Benefits:**
-
-- 50-90% bandwidth reduction for repeated operations
-- Faster batch operations (only transfer changed files)
-- Reduced server load
-- Lower egress costs
-
-**Implementation Details:**
+The implementation looks like this:
 
 ```swift
 // Check if upload needed
@@ -121,7 +74,7 @@ if localHash == remoteEtag {
 
 ### Streaming MD5 Computation
 
-For memory efficiency, Substation computes MD5 hashes incrementally:
+Computing MD5 hashes could be a memory disaster if we loaded entire files into RAM. A 10GB backup file would consume 10GB of memory just to hash it, which is obviously unacceptable. We use streaming MD5 computation instead, processing files in 1MB chunks.
 
 ```swift
 func computeMD5(for url: URL) throws -> String {
@@ -148,55 +101,35 @@ func computeMD5(for url: URL) throws -> String {
 }
 ```
 
-**Benefits:**
+This approach maintains constant memory usage regardless of file size. We can process multi-gigabyte files without issues, and we can report progress during computation, so you're not staring at a frozen interface wondering if the application crashed.
 
-- Constant memory usage regardless of file size
-- Can process multi-GB files without issues
-- Progress can be reported during computation
+## Why Terminal-Based Object Storage Works Better
+
+Web interfaces for object storage suffer from fundamental limitations. Browser upload APIs aren't designed for batch operations. Resuming failed transfers requires JavaScript gymnastics. Checking whether files need uploading at all requires making API calls that web interfaces rarely bother with. Progress tracking is approximate at best.
+
+Terminal-based object storage in Substation solves these problems because we control the entire transfer pipeline. We can compute MD5 hashes before making any network requests. We can parallelize operations intelligently without browser concurrency limits. We can run transfers in the background while you work on other tasks. Error handling can be sophisticated because we're not limited by what a web form can display.
+
+Most importantly, terminal-based object storage enables workflows that web interfaces make painful. Need to upload a directory tree with 500 files? One command. Want to download everything in a container? One command. Need to check if your local backups match what's in Swift without downloading anything? We hash both sides and compare. These operations that would take hours of clicking in a web interface become single commands that run in the background.
 
 ## Error Handling and Retry Strategies
 
 ### Error Categories
 
-Substation categorizes transfer errors for intelligent handling:
+File transfers fail in various ways, and treating all errors the same leads to poor user experience. We categorize transfer errors so we can provide intelligent handling and useful recommendations.
 
-**Network Errors (Retryable):**
+Network errors are retryable and include connection timeouts, DNS resolution failures, and temporary network unavailability. When these occur, we recommend checking your network connection and retrying. The error might be transient.
 
-- Connection timeouts
-- DNS resolution failures
-- Temporary network unavailability
-- Recommendation: "Check network connection and retry"
+Server errors are also retryable. HTTP status codes in the 500-599 range indicate that Swift is having a bad day. Service temporarily unavailable, internal server errors, and similar problems often resolve themselves. We recommend retrying after a brief wait.
 
-**Server Errors (Retryable):**
+Authentication errors are not retryable through simple retry logic. Invalid credentials, expired tokens, and permission denied errors require intervention. We recommend checking your credentials and permissions because retrying won't help.
 
-- HTTP 500-599 status codes
-- Service temporarily unavailable
-- Internal server errors
-- Recommendation: "Server is experiencing issues, retry after a brief wait"
+File system errors are also not retryable automatically. File not found, permission denied on the local filesystem, and disk full errors require you to fix something before proceeding. We recommend verifying your file path and permissions.
 
-**Authentication Errors (Not Retryable):**
-
-- Invalid credentials
-- Expired tokens
-- Permission denied
-- Recommendation: "Check credentials and permissions"
-
-**File System Errors (Not Retryable):**
-
-- File not found
-- Permission denied on local filesystem
-- Disk full
-- Recommendation: "Verify file path and permissions"
-
-**Not Found Errors (Not Retryable):**
-
-- Object doesn't exist
-- Container doesn't exist
-- Recommendation: "Object does not exist, verify object name"
+Not found errors indicate that the object or container you're looking for doesn't exist. Retrying won't make it appear. We recommend verifying the object name and moving on.
 
 ### Error Aggregation
 
-During batch operations, errors are tracked and summarized:
+During batch operations involving hundreds or thousands of files, showing every individual error would flood your terminal with noise. We track errors and summarize them:
 
 ```swift
 // Error tracking within Swift module handlers
@@ -211,16 +144,18 @@ let report = getDetailedErrorReport()
 // Returns formatted report with all error details
 ```
 
-**Status Messages with Errors:**
+Status messages include error summaries so you can see at a glance what happened:
 
 ```
 Downloaded 95 objects (3 network errors, 2 not found)
 Uploaded 150 objects (1 server error)
 ```
 
+If you need details, the detailed error report shows every file that failed and why. This balance between summary and detail means you get actionable information without drowning in logs.
+
 ### Retry Logic
 
-While automatic retry is not currently implemented, the `TransferError.isRetryable` property enables future retry mechanisms:
+Automatic retry is not currently implemented, but the foundation exists. The TransferError.isRetryable property enables future retry mechanisms:
 
 ```swift
 do {
@@ -238,56 +173,29 @@ do {
 }
 ```
 
+When we implement automatic retry, it will use exponential backoff for retryable errors and fail fast for errors that won't resolve themselves.
+
 ## Background Operations
 
 ### Overview
 
-Large transfer operations (container downloads, bulk uploads) run in the background to keep the UI responsive.
+Large transfer operations must run in the background to keep the UI responsive. Nobody wants to stare at a frozen terminal while 1000 files upload. Background operations in Substation handle container downloads, bulk uploads, and any transfer that might take more than a few seconds.
 
-**Background Operation Properties:**
-
-- **ID**: UUID for tracking
-- **Type**: Upload, download, container download, directory download
-- **Status**: Running, completed, failed, cancelled
-- **Progress**: Completed count, total count, bytes transferred
-- **Errors**: Aggregated error information
-- **Start Time**: When operation began
+Each background operation has a UUID for tracking, a type indicating whether it's an upload or download operation, status showing whether it's running, completed, failed, or cancelled, progress information including completed count and bytes transferred, aggregated error information, and a start time so you can see how long it's been running.
 
 ### Operation Types
 
-**Container Download:**
+Container downloads pull all objects from a container with options to preserve directory structure or flatten everything into a single directory. ETAG-based skip optimization means we only download files that have changed or don't exist locally. Concurrent downloads, limited to 10 simultaneous transfers, speed up the process without overwhelming your network or Swift. Progress tracking shows you exactly which objects have completed.
 
-- Downloads all objects from a container
-- Option to preserve directory structure or flatten
-- ETAG-based skip optimization
-- Concurrent downloads (max 10 simultaneous)
-- Progress tracking per object
+Directory downloads work similarly but filter objects by prefix, simulating a directory download from what is fundamentally a flat namespace. Same features, different scope.
 
-**Directory Download:**
+Object uploads handle single or multiple files with automatic Content-Type detection based on file extension. ETAG optimization prevents uploading files that already exist unchanged in Swift. Progress tracking keeps you informed.
 
-- Downloads objects matching a prefix (simulated directory)
-- Same features as container download
-- Prefix-based filtering
-
-**Object Upload:**
-
-- Uploads single or multiple files
-- Content-Type auto-detection
-- ETAG-based skip optimization
-- Progress tracking
-
-**Bulk Upload:**
-
-- Uploads entire local directories
-- Recursive directory scanning
-- Path preservation in object names
-- Concurrent uploads
+Bulk uploads process entire local directories, recursively scanning for files and preserving the path structure in object names. Concurrent uploads and all the same optimizations apply at scale.
 
 ### Progress Tracking
 
-**Note**: Progress tracking functionality is integrated within the Swift module form handlers rather than existing as a separate `SwiftTransferProgressTracker` class. The conceptual architecture below describes the logical design:
-
-Progress tracking provides thread-safe state management:
+Progress tracking provides thread-safe state management integrated within the Swift module form handlers. The conceptual architecture tracks completed, failed, and skipped counts. Total bytes transferred gives you a sense of scale. Active file names show what's currently processing. Errors are aggregated by category so you can see patterns.
 
 ```swift
 // Conceptual design (integrated within Swift module handlers)
@@ -305,7 +213,7 @@ Progress tracking provides thread-safe state management:
 // - getDetailedErrorReport() -> String
 ```
 
-**TransferProgress Structure:**
+The TransferProgress structure provides a snapshot of the operation state:
 
 ```swift
 struct TransferProgress: Sendable {
@@ -321,7 +229,7 @@ struct TransferProgress: Sendable {
 
 ### Concurrency Control
 
-To prevent overwhelming the server or network:
+Running too many transfers simultaneously overwhelms networks and servers. We limit concurrent operations to prevent saturation:
 
 ```swift
 await withThrowingTaskGroup(of: Void.self) { group in
@@ -340,20 +248,13 @@ await withThrowingTaskGroup(of: Void.self) { group in
 }
 ```
 
-**Concurrency Limits:**
-
-- Maximum 10 concurrent transfers
-- Prevents network saturation
-- Reduces server load
-- Maintains responsiveness
+We maintain a maximum of 10 concurrent transfers, which prevents network saturation, reduces server load, and maintains UI responsiveness even during massive operations.
 
 ## Path Utilities and Safety
 
 ### URL Encoding
 
-Object names may contain special characters that need encoding:
-
-**Note**: Storage helper functionality is integrated within the Swift module rather than existing as a separate `SwiftStorageHelpers` class.
+Object names may contain spaces, special characters, and other elements that need encoding for URLs. Storage helper functionality integrated within the Swift module handles this:
 
 ```swift
 // Encode object name preserving path structure (integrated in Swift module)
@@ -364,9 +265,11 @@ let encoded = encodeObjectName("dir/file with spaces.txt")
 // Characters preserved: forward slashes (/)
 ```
 
+This ensures that object names translate correctly into Swift API requests while preserving the simulated directory structure.
+
 ### Path Validation
 
-Before operations, object names are validated for security and correctness:
+Before performing operations, we validate object names for security and correctness. The validation integrated in Swift module handlers checks multiple criteria:
 
 ```swift
 // Validation integrated in Swift module handlers
@@ -377,25 +280,13 @@ if !valid {
 }
 ```
 
-**Validation Checks:**
+Validation ensures that object names are not empty, contain no path traversal sequences like "../", don't start with forward slashes, contain no null bytes or control characters, and stay within the 1024-byte length limit.
 
-1. Not empty
-2. No path traversal sequences (../)
-3. Does not start with /
-4. No null bytes
-5. No control characters
-6. Length <= 1024 bytes
-
-**Security Benefits:**
-
-- Prevents path traversal attacks
-- Ensures filesystem compatibility
-- Validates input before API calls
-- Protects against malicious object names
+These security checks prevent path traversal attacks where malicious object names try to write files outside intended directories. They ensure filesystem compatibility by rejecting characters that would cause problems. Input is validated before making API calls, catching problems early. The system is protected against malicious object names that might exploit edge cases.
 
 ### Directory Structure Handling
 
-Object names can simulate directories using forward slashes:
+Object names simulate directories using forward slashes, and we provide options for how to handle this when downloading:
 
 ```swift
 // Preserve directory structure
@@ -415,42 +306,25 @@ let destPath = buildDestinationPath(
 // Result: "/downloads/app.log"
 ```
 
+Preserving structure maintains organization. Flattening puts everything in one directory, which works when you just want all the files and don't care about the original layout.
+
 ## Content Type Detection
 
-Substation automatically detects content types based on file extensions:
+Substation automatically detects content types based on file extensions, setting appropriate MIME types for uploaded objects:
 
 ```swift
 let contentType = detectContentType(for: fileURL)
 ```
 
-**Supported Categories:**
+We support broad categories covering most common file types. Text files include .txt, .html, .css, .json, .md, .yaml, and .toml. Programming language files cover .swift, .rs, .go, .py, .rb, .java, .c, and .cpp. Image formats include .jpg, .png, .gif, .svg, .webp, .heic, and .heif. Video formats handle .mp4, .mov, .avi, .mkv, and .webm. Audio files support .mp3, .wav, .flac, .aac, and .ogg. Archives include .zip, .tar, .gz, .7z, and .rar. Documents cover .pdf, .doc, .docx, .xls, .xlsx, .ppt, and .pptx.
 
-- **Text**: .txt, .html, .css, .json, .md, .yaml, .toml
-- **Programming Languages**: .swift, .rs, .go, .py, .rb, .java, .c, .cpp
-- **Images**: .jpg, .png, .gif, .svg, .webp, .heic, .heif
-- **Video**: .mp4, .mov, .avi, .mkv, .webm
-- **Audio**: .mp3, .wav, .flac, .aac, .ogg
-- **Archives**: .zip, .tar, .gz, .7z, .rar
-- **Documents**: .pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx
-
-**Fallback:**
-
-- Unknown extensions: `application/octet-stream`
-
-**Content Type Validation:**
-
-```swift
-let isValid = validateContentType("text/plain")
-// Validates format: type/subtype
-// Checks valid type category
-// Validates character set
-```
+For unknown extensions, we fall back to "application/octet-stream", which is the generic binary file type. Content type validation ensures that the detected types follow proper format with type and subtype, valid category, and acceptable character set.
 
 ## File Size and Transfer Rate Formatting
 
 ### File Size Formatting
 
-Human-readable file size display with configurable precision:
+Human-readable file size display makes progress information comprehensible. We format sizes with configurable precision:
 
 ```swift
 let size = formatFileSize(1_536_000, precision: 2)
@@ -460,193 +334,86 @@ let size = formatFileSize(1_536_000, precision: 1)
 // Returns: "1.5 MB"
 ```
 
-**Supported Units:**
-
-- Bytes: < 1 KB
-- KB: 1024 bytes
-- MB: 1024 KB
-- GB: 1024 MB
-- TB: 1024 GB
+Supported units range from bytes for values under 1 KB, through KB (1024 bytes), MB (1024 KB), GB (1024 MB), up to TB (1024 GB). We use binary units because storage systems work in powers of two, not powers of ten.
 
 ### Transfer Rate Formatting
 
-Display transfer speeds during operations:
+Display transfer speeds during operations to provide feedback on network performance:
 
 ```swift
 let rate = formatTransferRate(2_097_152.0, precision: 2)
 // Returns: "2.00 MB/s"
 ```
 
-**Use Cases:**
-
-- Real-time progress updates
-- Performance monitoring
-- Bandwidth optimization feedback
+This enables real-time progress updates, performance monitoring to identify bottlenecks, and feedback on whether bandwidth optimization is working as expected.
 
 ## Best Practices
 
 ### Efficient Uploads
 
-1. **Enable ETAG optimization**: Saves bandwidth on unchanged files
-2. **Use batch operations**: Leverage concurrent uploads
-3. **Set appropriate Content-Type**: Enables proper browser handling
-4. **Add metadata**: Document source, purpose, ownership
+Enable ETAG optimization to save bandwidth on unchanged files. The performance impact is dramatic for recurring uploads. Use batch operations to leverage concurrent uploads, which dramatically outperforms individual file transfers. Set appropriate Content-Type headers so browsers and CDNs handle your files correctly. Add metadata to document source, purpose, and ownership, making future maintenance easier.
 
 ### Efficient Downloads
 
-1. **Enable ETAG optimization**: Skip downloading files you already have
-2. **Preserve directory structure**: When you need it for organization
-3. **Flatten structure**: When all files go to the same directory
-4. **Use concurrent downloads**: For bulk operations
+Enable ETAG optimization to skip downloading files you already have, saving time and bandwidth. Preserve directory structure when you need it for organization, matching the source layout. Flatten structure when all files go to the same directory and you don't care about paths. Use concurrent downloads for bulk operations to maximize throughput.
 
 ### Error Handling
 
-1. **Check error categories**: Distinguish retryable from permanent errors
-2. **Review error summaries**: Identify patterns in failures
-3. **Use detailed error reports**: For debugging and troubleshooting
-4. **Validate inputs**: Before starting operations
+Check error categories to distinguish retryable errors from permanent failures that need intervention. Review error summaries to identify patterns in failures, which might indicate systemic problems. Use detailed error reports for debugging and troubleshooting specific files. Validate inputs before starting operations to catch problems early.
 
 ### Performance Optimization
 
-1. **Leverage ETAG checks**: 50-90% bandwidth savings
-2. **Use background operations**: Keep UI responsive during bulk transfers
-3. **Monitor concurrent operations**: Don't exceed recommended limits
-4. **Batch related operations**: Reduce API call overhead
+Leverage ETAG checks for 50-90% bandwidth savings on typical workloads. Use background operations to keep the UI responsive during bulk transfers. Monitor concurrent operations and don't exceed recommended limits, which could overwhelm your network. Batch related operations to reduce API call overhead.
 
 ## Advanced Object Operations
 
 ### Bulk Delete Operations
 
-Delete multiple objects in a single API request for improved efficiency:
+Deleting objects one at a time is tedious and slow. Swift supports bulk delete operations that remove multiple objects in a single API request, dramatically improving efficiency for cleanup tasks.
 
-**Method Signature:**
 ```swift
 public func bulkDelete(request: BulkDeleteRequest) async throws -> BulkDeleteResponse
 ```
 
-**Features:**
-- Delete up to hundreds of objects in one operation
-- Single API call reduces network overhead
-- Returns detailed status including number deleted and errors
-- Supports both container-scoped and full-path deletion modes
+The bulk delete feature allows deleting up to hundreds of objects in one operation. A single API call replaces what would otherwise be hundreds of individual DELETE requests, reducing network overhead and latency. The response provides detailed status including the number of objects successfully deleted and any errors encountered. The system supports both container-scoped deletion and full-path deletion modes.
 
-**Response Information:**
-- `numberDeleted`: Count of successfully deleted objects
-- `numberNotFound`: Count of objects that did not exist
-- `errors`: Array of errors for failed deletions
-- `responseStatus`: HTTP status of bulk operation
-- `responseBody`: Additional response details
+The response includes numberDeleted showing how many objects were successfully removed, numberNotFound indicating how many objects didn't exist (not necessarily an error), an errors array detailing any failed deletions, responseStatus with the HTTP status of the bulk operation, and responseBody containing additional response details.
 
-**Performance Benefits:**
-- Significantly faster than individual DELETE operations
-- Reduced API call overhead (1 call vs N calls)
-- Lower latency for large-scale cleanup operations
-- Efficient for container emptying before deletion
+Performance benefits are significant. Bulk delete is dramatically faster than individual DELETE operations for large-scale cleanup. Reduced API call overhead means one call instead of N calls for N objects. Lower latency benefits container emptying operations, which must remove all objects before deleting the container itself.
 
-**Usage in Substation:**
-- Select multiple objects in object list view
-- Press Del key to initiate bulk delete
-- Confirmation dialog shows object count
-- Progress tracked in status bar
+In Substation, bulk delete integrates into the object list view. Select multiple objects, press the Del key to initiate bulk delete, confirm in a dialog showing the object count, and watch progress in the status bar. Much better than clicking delete buttons individually.
 
 ### Object Copy Operations
 
-Copy objects within the same container or across containers without downloading:
+Copying objects server-side, without downloading and re-uploading, saves enormous amounts of time and bandwidth. Swift's copy operation handles this elegantly:
 
-**Method Signature:**
 ```swift
 public func copyObject(request: CopySwiftObjectRequest) async throws
 ```
 
-**Features:**
-- Server-side copy (no data transfer to client)
-- Copy within same container or across containers
-- Optional metadata preservation or replacement
-- Rename during copy operation
+Server-side copy means no data transfers to your client. Copy within the same container or across containers with equal ease. Optionally preserve metadata or replace it during the copy. Rename objects during the copy operation, which combined with deleting the source effectively renames objects.
 
-**Request Parameters:**
-- `sourceContainer`: Source container name
-- `sourceObject`: Source object name
-- `destinationContainer`: Destination container name
-- `destinationObject`: Destination object name (can differ from source)
-- `metadata`: New metadata to apply (optional)
-- `freshMetadata`: If true, replace all metadata; if false, preserve existing
+Request parameters include sourceContainer and sourceObject identifying what to copy, destinationContainer and destinationObject specifying where it goes (and the destination name can differ from source), optional metadata to apply, and freshMetadata flag controlling whether to preserve or replace metadata.
 
-**Metadata Handling:**
-- Default: Preserves source object metadata
-- `freshMetadata: false` + new metadata: Adds/updates specific keys
-- `freshMetadata: true`: Replaces all metadata with provided values
+Metadata handling provides flexibility. By default, source object metadata is preserved. Setting freshMetadata to false and providing new metadata adds or updates specific keys. Setting freshMetadata to true replaces all metadata with the provided values, discarding the source metadata.
 
-**Performance Benefits:**
-- No bandwidth usage (server-side operation)
-- Instant copy regardless of object size
-- No temporary storage needed
-- Ideal for object versioning and backup workflows
+Performance benefits are compelling. No bandwidth usage since this is a server-side operation. Instant copy regardless of object size, even for multi-gigabyte files. No temporary storage needed on your local system. This approach is ideal for object versioning and backup workflows.
 
-**Common Use Cases:**
-- Create backups before modification
-- Rename objects (copy + delete source)
-- Duplicate objects across containers
-- Create working copies for testing
+Common use cases include creating backups before modification, renaming objects by copying to a new name and deleting the source, duplicating objects across containers for different access policies, and creating working copies for testing without affecting production objects.
 
 ### Container Web Hosting
 
-Configure containers for static website hosting with public HTTP access:
+Containers can serve as static website hosts, providing public HTTP access to objects without requiring authentication. This turns Swift into a simple CDN or static site host.
 
-**ACL Configuration:**
+Containers support access control through readACL and writeACL headers. For public read access, set "X-Container-Read: .r:*,.rlistings" where ".r:*" allows read access to all users and ".rlistings" enables directory-style listings. For specific referrer access, use "X-Container-Read: .r:.example.com" to restrict access to specific domains. For project-based access, "X-Container-Read: project-id:user-id" grants access to specific OpenStack users or projects.
 
-Containers support access control through `readACL` and `writeACL` headers:
+Web hosting configuration follows a simple pattern. Set the container read ACL for public access. Upload index.html as the default landing page. Upload error.html for 404 handling if your Swift deployment supports it. Upload static assets like CSS, JavaScript, and images. Objects become accessible at URLs following the pattern: swift.example.com/v1/AUTH_project/container/object.
 
-**Public Read Access:**
-```
-X-Container-Read: .r:*,.rlistings
-```
-- `.r:*` - Allow read access to all users
-- `.rlistings` - Enable directory-style listings
+Common web hosting scenarios include static website hosting for documentation or marketing sites, CDN origin storage feeding content delivery networks, public file distribution for downloads, documentation hosting for API references and guides, and asset delivery for applications that need reliable static file serving.
 
-**Specific Referrer Access:**
-```
-X-Container-Read: .r:.example.com
-```
-- Restrict access to specific domains
+Container metadata responses include readACL showing the current read access control list and writeACL showing the current write access control list, so you can verify configuration.
 
-**Project-Based Access:**
-```
-X-Container-Read: project-id:user-id
-```
-- Grant access to specific OpenStack users/projects
-
-**Web Hosting Configuration:**
-
-1. Set container read ACL for public access
-2. Upload index.html as default landing page
-3. Upload error.html for 404 handling (if supported)
-4. Upload static assets (CSS, JS, images)
-
-**Access Pattern:**
-```
-https://swift.example.com/v1/AUTH_project/container/object
-```
-
-**Common Web Hosting Scenarios:**
-- Static website hosting
-- CDN origin storage
-- Public file distribution
-- Documentation hosting
-- Asset delivery for applications
-
-**ACL Metadata in Response:**
-
-Container metadata responses include:
-- `readACL`: Current read access control list
-- `writeACL`: Current write access control list
-
-**Security Considerations:**
-- Public containers expose all objects to internet
-- No authentication required for reads
-- Consider object naming (no sensitive data in names)
-- Use temporary URLs for time-limited access
-- Monitor bandwidth usage for public containers
+Security considerations matter when making containers public. Public containers expose all objects to the internet without authentication required for reads. Consider object naming carefully because the names are visible. Don't put sensitive data in object names. Use temporary URLs for time-limited access instead of full public exposure. Monitor bandwidth usage for public containers, which can be exploited for bandwidth consumption attacks.
 
 ## See Also
 

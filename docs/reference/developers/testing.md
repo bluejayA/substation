@@ -2,6 +2,8 @@
 
 Substation includes a comprehensive test suite covering all major components. This guide explains how to run tests, write new tests, and understand the testing infrastructure.
 
+If you're not testing, you're guessing. This guide shows you how to run the test suite, write new tests, and understand what's already covered. Don't ship untested code.
+
 ## Quick Start
 
 ```bash

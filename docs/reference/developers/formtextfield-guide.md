@@ -4,6 +4,8 @@
 
 **FormTextField** is a unified text input component that provides consistent text editing behavior across all forms in Substation. It includes built-in cursor management, input history, validation display, and keyboard navigation.
 
+Text input is deceptively hard. Cursor movement, history, validation, Home/End keys, character insertion -- there are dozens of edge cases. FormTextField handles all of them so you don't have to reinvent text editing for the 47th time.
+
 ## Location
 
 - **Component:** [Sources/Substation/Components/FormTextField.swift](https://github.com/cloudnull/substation/blob/main/Sources/Substation/Components/FormTextField.swift)

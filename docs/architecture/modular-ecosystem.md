@@ -2,20 +2,19 @@
 
 ## Introduction
 
-The Substation TUI has evolved from a monolithic architecture to a sophisticated modular ecosystem, transforming how OpenStack services are integrated and managed. This architectural shift brings significant benefits:
+When we started building Substation, we made a classic mistake: we built a monolith. Everything lived in one giant TUI class, service-specific logic was scattered everywhere, and adding support for a new OpenStack service meant touching dozens of files. It worked, but it was a maintenance nightmare.
 
-- **Isolated Responsibilities**: Each OpenStack service is encapsulated in its own module with clear boundaries
-- **Dynamic Loading**: Modules can be enabled/disabled at runtime based on cloud capabilities
-- **Dependency Management**: Automatic resolution and validation of inter-module dependencies
-- **Performance Optimization**: Lazy loading and resource pooling reduce memory footprint
-- **Maintainability**: Independent module development and testing cycles
-- **Extensibility**: New OpenStack services can be added without core modifications
+The modular ecosystem we built to replace that mess transforms how OpenStack services integrate into Substation. Each service lives in its own module with clear boundaries, modules can be enabled or disabled at runtime based on what your cloud actually supports, dependencies get resolved automatically, and everything loads lazily to keep memory usage reasonable. The result is a system where adding support for a new OpenStack service takes an afternoon instead of a week, and modules can be developed and tested independently.
+
+This document explains how the modular architecture works, why we made the design choices we did, and how to extend it when you need to add new services.
 
 ## Core Architecture
 
 ### The Module System
 
-At the heart of the modular ecosystem is the `OpenStackModule` protocol, which defines the contract between modules and the TUI system:
+The module system centers on the `OpenStackModule` protocol, which defines the contract between modules and the TUI system. Every module must identify itself with a unique identifier and version, declare its dependencies on other modules, implement lifecycle hooks for configuration and cleanup, register its views and handlers, expose a configuration schema, and optionally provide navigation integration.
+
+Here's the protocol definition. The `@MainActor` isolation ensures all module operations run on the main thread, which simplifies state management and prevents the kind of threading bugs that plague concurrent systems. The required properties and methods cover everything from basic identification to complex lifecycle management.
 
 ```swift
 @MainActor
@@ -48,55 +47,17 @@ protocol OpenStackModule {
 }
 ```
 
-#### Module Lifecycle
+### Module Lifecycle
 
-1. **Discovery**: ModuleCatalog maintains metadata for all available modules
-2. **Registration**: ModuleRegistry validates dependencies and registers modules
-3. **Configuration**: Modules load configuration from ModuleConfigurationManager
-4. **Integration**: Views, handlers, and actions are registered with respective registries
-5. **Operation**: Modules handle their specific ViewModes and data operations
-6. **Health Monitoring**: Periodic health checks ensure module stability
+The module lifecycle follows a predictable path from discovery to operation. First, the ModuleCatalog maintains metadata for all available modules so the system knows what exists. Then ModuleRegistry validates dependencies and registers modules in the correct order. Modules load their configuration from ModuleConfigurationManager, which handles both defaults and user overrides. The integration phase registers views, handlers, and actions with the respective registries so the TUI can route to them. During operation, modules handle their specific ViewModes and data operations. Finally, periodic health checks ensure modules remain stable and responsive.
 
-#### Module Registration Process
-
-The `ModuleRegistry` orchestrates module loading with dependency resolution:
-
-```swift
-func register(_ module: any OpenStackModule) async throws {
-    // Validate dependencies
-    for dep in module.dependencies {
-        guard modules[dep] != nil else {
-            throw ModuleError.missingDependency(...)
-        }
-    }
-
-    // Load configuration
-    let moduleConfig = configManager.configuration(for: module.identifier)
-    module.loadConfiguration(moduleConfig)
-
-    // Configure module
-    try await module.configure()
-
-    // Integrate with TUI
-    await integrateModule(module)
-}
-```
+The registration process itself includes dependency validation (ensuring required modules are loaded first), configuration loading (both schema defaults and user settings), module configuration (calling the async configure method), and TUI integration (registering all the views and handlers). If any step fails, the module doesn't load and the system logs why.
 
 ### Module Structure Pattern
 
-Each module follows a consistent directory structure that promotes organization and discoverability:
+Every module follows a consistent directory structure. This consistency makes it easy to find things and helps new contributors understand the codebase quickly. The main module file implements the OpenStackModule protocol, the data provider handles data fetching logic, form state extensions add module-specific form state to the TUI, models contain service-specific data structures, views implement the UI, and extensions provide TUI extensions and handlers.
 
-```
-Modules/[ServiceName]/
-    [ServiceName]Module.swift        # Main module implementation
-    [ServiceName]DataProvider.swift  # Data fetching logic
-    TUI+[ServiceName]FormState.swift # Form state extensions
-    Models/                          # Service-specific data models
-    Views/                           # UI views for the service
-    Extensions/                      # TUI extensions and handlers
-```
-
-#### Example: Servers Module Structure
+Here's what the structure looks like for the Servers module. The pattern repeats for every service: one main module file, one data provider, form state extensions, and then directories for models, views, and extensions. The consistency means you can jump into any module and immediately know where to find things.
 
 ```
 Modules/Servers/
@@ -119,78 +80,33 @@ Modules/Servers/
 
 ### DataProvider Pattern
 
-The DataProvider protocol enables modules to handle their own data fetching:
+The DataProvider protocol enables modules to handle their own data fetching while integrating with the centralized data management system. Each provider identifies its resource type, tracks when it last refreshed, reports how many items it currently has cached, and implements the standard operations for fetching and refreshing data.
 
-```swift
-@MainActor
-protocol DataProvider {
-    var resourceType: String { get }
-    var lastRefreshTime: Date? { get }
-    var currentItemCount: Int { get }
-
-    func fetchData(priority: DataFetchPriority, forceRefresh: Bool) async -> DataFetchResult
-    func refreshResource(id: String, priority: DataFetchPriority) async -> DataFetchResult
-    func clearCache() async
-    func needsRefresh(threshold: TimeInterval) -> Bool
-}
-```
-
-Each module implements its own DataProvider, registered with the DataProviderRegistry for centralized data management while maintaining module isolation.
+The protocol is straightforward but powerful. Modules register their data providers with the DataProviderRegistry, which coordinates data fetching across the entire application. This gives us centralized cache management while maintaining module isolation. The TUI can request a refresh of all data, or target specific resource types, without knowing the details of how each module fetches its data.
 
 ## Core Packages
 
-The modular ecosystem relies on several foundational packages that provide cross-cutting functionality:
+The modular ecosystem relies on four foundational packages that provide cross-cutting functionality. These packages handle concerns that span multiple modules, like memory management, API communication, UI rendering, and timing.
 
 ### MemoryKit
 
-Advanced memory management system providing:
-
-- Thread-safe caching using Swift actors
-- Intelligent cache eviction policies (LRU, LFU, TTL)
-- Real-time memory monitoring and alerting
-- Cross-platform compatibility (macOS/Linux)
-
-```swift
-public actor MemoryKit {
-    public let memoryManager: MemoryManager
-    public let performanceMonitor: PerformanceMonitor
-}
-```
+MemoryKit provides advanced memory management with thread-safe caching using Swift actors, intelligent cache eviction policies (LRU, LFU, TTL), real-time memory monitoring and alerting, and cross-platform compatibility for macOS and Linux. The public API revolves around a shared actor that coordinates the memory manager and performance monitor.
 
 ### OSClient
 
-OpenStack API client library handling:
-
-- Service catalog discovery
-- Authentication and token management
-- API request/response handling
-- Error handling and retries
-- Response parsing and model mapping
+OSClient is the OpenStack API client library that handles all the messy details of talking to OpenStack. Service catalog discovery finds the endpoints for available services, authentication and token management keeps sessions alive, API request/response handling abstracts away HTTP, error handling and retries make the system resilient, and response parsing maps JSON to Swift models. Every module uses OSClient to talk to its corresponding OpenStack service.
 
 ### SwiftNCurses
 
-Terminal UI framework providing:
-
-- NCurses abstraction layer
-- Window and panel management
-- Input handling and key mapping
-- Color and styling support
-- Component library for consistent UI
+SwiftNCurses provides the terminal UI framework. It abstracts NCurses behind a clean Swift API, manages windows and panels, handles input and key mapping, supports colors and styling, and provides a component library for consistent UI elements. Every view in every module renders through SwiftNCurses.
 
 ### CrossPlatformTimer
 
-Platform-agnostic timer implementation:
-
-- Consistent timer behavior across macOS/Linux
-- High-precision timing for performance monitoring
-- Scheduled task execution
-- Timer lifecycle management
+CrossPlatformTimer solves the problem that macOS and Linux have different timer APIs. It provides consistent timer behavior across platforms, high-precision timing for performance monitoring, scheduled task execution, and proper timer lifecycle management. Modules use it for things like auto-refresh and periodic health checks.
 
 ## Service Modules
 
-The ecosystem includes 14 specialized modules, each handling a specific OpenStack service:
-
-### Module Dependency Graph
+We've built 14 specialized modules, each handling a specific OpenStack service. The dependency graph shows how they relate.
 
 ```mermaid
 graph TD
@@ -207,218 +123,60 @@ graph TD
     Subnets --> Networks
 ```
 
-### Independent Modules (Phase 1)
+The module loading happens in three phases. Phase 1 loads independent modules with no dependencies: Barbican for key management, Swift for object storage, KeyPairs for SSH keys, ServerGroups for anti-affinity policies, Flavors for hardware profiles, Images for boot images, SecurityGroups for firewall rules, and Volumes for block storage. Phase 2 loads network-dependent modules: Networks for virtual network management, Subnets for IP allocation, Routers for routing and NAT, FloatingIPs for public IPs, and Ports for network interfaces. Phase 3 loads multi-dependent modules, which is currently just Servers with its six dependencies on networks, images, flavors, keypairs, volumes, and security groups.
 
-Modules with no dependencies, loaded first:
-
-- **Barbican** (`barbican`): Key management service for secrets and certificates
-- **Swift** (`swift`): Object storage with container and object management
-- **KeyPairs** (`keypairs`): SSH key pair management for instance access
-- **ServerGroups** (`servergroups`): Anti-affinity and affinity policies
-- **Flavors** (`flavors`): Hardware profiles for instances
-- **Images** (`images`): Boot images and snapshots
-- **SecurityGroups** (`securitygroups`): Firewall rules and network security
-- **Volumes** (`volumes`): Block storage management
-
-### Network-Dependent Modules (Phase 2)
-
-Modules requiring network functionality:
-
-- **Networks** (`networks`): Virtual network management
-- **Subnets** (`subnets`): IP allocation pools and DHCP configuration
-- **Routers** (`routers`): Network routing and NAT gateways
-- **FloatingIPs** (`floatingips`): Public IP address management
-- **Ports** (`ports`): Network interface management
-
-### Multi-Dependent Modules (Phase 3)
-
-Complex modules with multiple dependencies:
-
-- **Servers** (`servers`): Compute instance management
-  - Dependencies: networks, images, flavors, keypairs, volumes, securitygroups
-  - Most complex module with comprehensive lifecycle management
+**Why This Matters**: The phased loading ensures dependencies are always satisfied. A module never tries to use functionality that hasn't been loaded yet, which prevents entire classes of initialization bugs.
 
 ## Data Flow Architecture
 
-```mermaid
-flowchart LR
-    subgraph UI
-        TUI[TUI Controller]
-    end
+The data flow through the modular system is clean and predictable. The TUI controller coordinates everything at the top, the ModuleOrchestrator manages module lifecycle and coordination, ViewRegistry routes views to the correct modules, and DataProviderRegistry coordinates data fetching. Below that, the caching layer (CacheManager and the three-tier L1/L2/L3 memory system) sits between the application and OpenStack API.
 
-    subgraph Orchestration
-        MO[ModuleOrchestrator]
-        VR[ViewRegistry]
-        DR[DataProviderRegistry]
-    end
+Requests flow top-down through this stack. The TUI makes a request, ModuleOrchestrator routes it to the appropriate module, the module checks ViewRegistry if it's a view request or DataProviderRegistry if it's data, data requests hit CacheManager first, and only on cache miss does the system actually call the OpenStack API. Responses flow back up the same path, caching at each level.
 
-    subgraph Caching
-        CM[CacheManager]
-        L1[L1 Memory]
-        L2[L2 Memory]
-        L3[L3 Disk]
-    end
+## Inter-Module Communication
 
-    subgraph External
-        API[OpenStack API]
-    end
-
-    TUI --> MO
-    MO --> VR
-    MO --> DR
-    DR --> CM
-    CM --> L1
-    L1 --> L2
-    L2 --> L3
-    L3 --> API
-```
-
-## Module Lifecycle State Diagram
-
-```mermaid
-stateDiagram-v2
-    [*] --> Discovery
-    Discovery --> Registration
-    Registration --> Validation
-    Validation --> Configuration
-    Configuration --> Integration
-    Integration --> Operation
-    Operation --> HealthCheck
-    HealthCheck --> Operation
-    Operation --> Cleanup
-    Cleanup --> [*]
-```
-
-## Inter-module Communication
-
-Modules communicate through well-defined interfaces and shared registries:
+Modules communicate through well-defined interfaces rather than direct dependencies. This keeps modules loosely coupled and makes testing straightforward.
 
 ### Action Registry
 
-Modules register actions that can be triggered from various contexts:
-
-```swift
-struct ModuleActionRegistration {
-    let identifier: String
-    let title: String
-    let keybinding: Character?
-    let viewModes: Set<ViewMode>
-    let handler: @MainActor @Sendable (OpaquePointer?) async -> Void
-}
-```
-
-Actions are categorized (lifecycle, network, storage, security) and can be invoked across module boundaries.
+Modules register actions that can be triggered from various contexts. Each action registration includes an identifier, title, optional keybinding, the view modes where it's available, and the handler function. Actions get categorized (lifecycle, network, storage, security) and can be invoked across module boundaries without tight coupling.
 
 ### DataProvider Registry
 
-Centralized registry for all module DataProviders:
-
-```swift
-@MainActor
-final class DataProviderRegistry {
-    func register(provider: any DataProvider, for resourceType: String)
-    func provider(for resourceType: String) -> (any DataProvider)?
-    func refreshAll(priority: DataFetchPriority) async
-}
-```
-
-This enables coordinated data fetching and cache management across modules.
+The centralized DataProviderRegistry manages all module data providers. Modules register their providers for specific resource types, the registry tracks them, and other parts of the system can request refreshes by resource type without knowing which module owns that type. This enables coordinated data fetching and cache management across modules while maintaining isolation.
 
 ### View Registry
 
-Modules register their views for dynamic navigation:
-
-```swift
-struct ModuleViewRegistration {
-    let viewMode: ViewMode
-    let title: String
-    let renderHandler: @MainActor (OpaquePointer?, Int32, Int32, Int32, Int32) async -> Void
-    let inputHandler: (@MainActor (Int32, OpaquePointer?) async -> Bool)?
-    let category: ViewCategory
-}
-```
-
-The TUI dynamically routes to appropriate module views based on ViewMode.
+Modules register their views for dynamic navigation. Each registration includes the view mode, title, render handler, optional input handler, and category. The TUI dynamically routes to appropriate module views based on ViewMode, which means adding a new view is just a matter of registering it. No need to modify the central routing logic.
 
 ### Event Broadcasting
 
-Modules can broadcast and subscribe to events through the notification system:
+Modules can broadcast and subscribe to events through NotificationCenter. When a module creates a server, it posts a notification. Other interested modules subscribe to that notification and react accordingly. It's a publish-subscribe pattern that keeps modules decoupled while enabling coordination.
 
-```swift
-// Broadcasting module
-NotificationCenter.default.post(
-    name: .serverCreated,
-    object: nil,
-    userInfo: ["serverId": newServer.id]
-)
+The shared state pattern complements event broadcasting. The TUI instance provides shared state accessible to all modules: cacheManager for centralized resource caching, formStateManager for shared form state, navigationStack for navigation history, and the OpenStack client instance. Modules can read and write this shared state without direct dependencies on each other.
 
-// Subscribing module
-NotificationCenter.default.addObserver(
-    self,
-    selector: #selector(handleServerCreated),
-    name: .serverCreated,
-    object: nil
-)
-```
+## Module Lifecycle State Machine
 
-### Shared State
-
-The TUI instance provides shared state accessible to all modules:
-
-- `cacheManager`: Centralized cache for OpenStack resources
-- `formStateManager`: Shared form state across modules
-- `navigationStack`: Navigation history and state
-- `client`: OpenStack API client instance
-
-## Request Flow Sequence
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant TUI
-    participant Module
-    participant DataProvider
-    participant Cache
-    participant API
-
-    User->>TUI: Navigate to view
-    TUI->>Module: Request render
-    Module->>DataProvider: Fetch data
-    DataProvider->>Cache: Check cache
-
-    alt Cache hit
-        Cache-->>DataProvider: Return cached
-    else Cache miss
-        Cache->>API: Fetch from API
-        API-->>Cache: Return data
-        Cache-->>DataProvider: Return data
-    end
-
-    DataProvider-->>Module: Return data
-    Module-->>TUI: Render view
-    TUI-->>User: Display
-```
+The lifecycle state machine ensures modules progress through their initialization in a predictable order. Discovery finds all available modules, registration adds them to the registry, validation checks dependencies, configuration loads settings, integration registers views and handlers, operation is the steady state where modules handle requests, health checks run periodically, and cleanup happens on shutdown or reload.
 
 ## Development Guide
 
 ### Creating a New Module
 
-To add support for a new OpenStack service:
+Adding support for a new OpenStack service follows a standard process. First, define the module in ModuleCatalog with its identifier, display name, dependencies, and phase. Create the directory structure with the main module file, data provider, form state extension, and subdirectories for models, views, and extensions. Implement the OpenStackModule protocol with all required methods. Finally, register it with ModuleRegistry in the loadCoreModules function.
 
-1. **Define the module in ModuleCatalog**:
+Here's a concrete example for adding Heat (OpenStack orchestration service). You'd define it in the catalog with dependencies on networks and servers, create the directory structure following our standard pattern, implement HeatModule conforming to OpenStackModule, and register it conditionally based on whether it's enabled in configuration.
 
 ```swift
+// 1. ModuleCatalog definition
 ModuleDefinition(
     identifier: "heat",
     displayName: "Orchestration (Heat)",
     dependencies: ["networks", "servers"],
     phase: .multiDependent
 )
-```
 
-2. **Create module structure**:
-
-```
+// 2. Directory structure
 Modules/Heat/
     HeatModule.swift
     HeatDataProvider.swift
@@ -426,11 +184,8 @@ Modules/Heat/
     Models/
     Views/
     Extensions/
-```
 
-3. **Implement OpenStackModule protocol**:
-
-```swift
+// 3. Module implementation
 @MainActor
 final class HeatModule: OpenStackModule {
     let identifier = "heat"
@@ -440,11 +195,8 @@ final class HeatModule: OpenStackModule {
 
     // Implementation...
 }
-```
 
-4. **Register with ModuleRegistry** in `loadCoreModules()`:
-
-```swift
+// 4. Registration in loadCoreModules()
 if enabledModules.contains("heat") {
     let heatModule = HeatModule(tui: tui)
     try await registry.register(heatModule)
@@ -453,107 +205,44 @@ if enabledModules.contains("heat") {
 
 ### Module Best Practices
 
-1. **Dependency Management**: Keep dependencies minimal and explicit
-2. **Error Handling**: Gracefully handle service unavailability
-3. **Performance**: Implement efficient data fetching with caching
-4. **Testing**: Provide unit tests for module logic
-5. **Documentation**: Include SwiftDoc comments for public interfaces
-6. **Configuration**: Define sensible defaults in configuration schema
+When building modules, follow these guidelines. Keep dependencies minimal and explicit so modules remain loosely coupled. Handle service unavailability gracefully because not all OpenStack deployments have all services. Implement efficient data fetching with caching to keep the UI responsive. Provide unit tests for module logic to catch bugs early. Include SwiftDoc comments for public interfaces so the code is self-documenting. And define sensible defaults in your configuration schema so the module works out of the box.
 
 For detailed module development instructions, see the [Module Development Guide](../reference/developers/module-development-guide.md).
 
 ## Performance Considerations
 
-The modular architecture provides several performance benefits:
+The modular architecture provides several performance benefits that weren't possible with the monolithic approach.
 
 ### Lazy Loading
 
-Modules are loaded only when needed, reducing initial startup time:
-
-```swift
-class LazyModuleLoader {
-    func loadModuleIfNeeded(_ identifier: String) async throws
-    func preloadDependencies(for identifier: String) async
-}
-```
+Modules load only when needed, which reduces initial startup time. The LazyModuleLoader tracks which modules are loaded, loads modules on demand when first accessed, and can preload dependencies to avoid loading delays during operation. This means if your cloud doesn't have Barbican, you never load the Barbican module and never pay the memory cost.
 
 ### Resource Pooling
 
-Shared resource pools minimize memory allocation:
-
-```swift
-actor ResourcePool<T> {
-    func acquire() async throws -> T
-    func release(_ resource: T) async
-    func drain() async
-}
-```
+Shared resource pools minimize memory allocation overhead. The ResourcePool actor manages acquisition and release of resources, maintains a pool of reusable objects, and can drain the pool when needed. This is particularly useful for things like network connections and JSON parsers where allocation is expensive.
 
 ### Performance Metrics
 
-Each module tracks its performance:
-
-```swift
-struct ModulePerformanceMetrics {
-    let loadTime: TimeInterval
-    let memoryUsage: Int
-    let apiCallCount: Int
-    let cacheHitRate: Double
-}
-```
+Each module tracks its performance through standardized metrics: load time, memory usage, API call count, and cache hit rate. These metrics help identify performance bottlenecks and validate optimizations. When you're optimizing, you need data, and the metrics system provides it.
 
 ## Configuration Management
 
-Modules support runtime configuration through ModuleConfigurationManager:
+Modules support runtime configuration through ModuleConfigurationManager. Each module defines a configuration schema with entries, where each entry specifies a key, type, default value, description, and optional validation rule.
 
-```swift
-struct ConfigurationSchema {
-    let entries: [ConfigurationEntry]
-}
-
-struct ConfigurationEntry {
-    let key: String
-    let type: ConfigurationType
-    let defaultValue: Any?
-    let description: String
-    let validation: ValidationRule?
-}
-```
-
-Configuration can be loaded from:
-
-- Default values in schema
-- Configuration files (YAML/JSON)
-- Environment variables
-- Runtime updates
+Configuration can come from multiple sources: default values in the schema, configuration files in YAML or JSON, environment variables for containerized deployments, and runtime updates for dynamic reconfiguration. The configuration manager merges these sources with a clear precedence order so you always know where a setting came from.
 
 ## Hot Reload Support
 
-The module system supports hot reloading for development:
-
-```swift
-class HotReloadManager {
-    func watchForChanges(in module: String)
-    func reloadModule(_ identifier: String) async throws
-    func reloadConfiguration() async throws
-}
-```
-
-This enables rapid development without restarting the TUI.
+The module system supports hot reloading for development, which makes iteration much faster. The HotReloadManager watches for file changes in a module, reloads the module without restarting the application, and can reload configuration without affecting running modules. This means you can modify a view, trigger a reload, and see your changes in the running application within seconds.
 
 ## Future Enhancements
 
-The modular ecosystem is designed for extensibility:
-
-1. **Plugin System**: Load third-party modules dynamically
-2. **Remote Modules**: Load modules from package repositories
-3. **Module Marketplace**: Community-contributed modules
-4. **Auto-discovery**: Detect available OpenStack services
-5. **Module Versioning**: Support multiple module versions
-6. **Cross-module Transactions**: Coordinated operations across modules
+The modular ecosystem is designed for extensibility, and we have several enhancements planned. A plugin system would let us load third-party modules dynamically, expanding beyond built-in OpenStack services. Remote modules could load from package repositories, enabling community contributions. A module marketplace could provide discoverability and ratings. Auto-discovery could detect available OpenStack services and load appropriate modules automatically. Module versioning would support multiple module versions simultaneously. And cross-module transactions would coordinate operations that span services, like creating a server with an attached volume in a single transaction.
 
 ## Conclusion
 
 The Substation modular ecosystem provides a robust, scalable foundation for OpenStack management. By isolating service-specific logic into discrete modules with well-defined interfaces, the architecture promotes maintainability, testability, and extensibility while delivering excellent performance and user experience.
 
-The consistent module structure, comprehensive registries, and sophisticated lifecycle management ensure that new OpenStack services can be integrated seamlessly, making Substation a future-proof solution for cloud infrastructure management.
+The consistent module structure means new contributors can jump in quickly. The comprehensive registries and sophisticated lifecycle management ensure modules integrate smoothly. And the performance benefits of lazy loading and resource pooling keep the application responsive even as we add more services.
+
+When you need to integrate a new OpenStack service, the modular architecture makes it straightforward. Define your module, implement the protocol, register it, and you're done. The framework handles the rest, from dependency resolution to view routing to data caching. That's the power of a well-designed modular system.

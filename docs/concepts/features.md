@@ -1,374 +1,251 @@
 # Features
 
-Substation provides a comprehensive set of features designed to simplify and enhance OpenStack cloud management through an intuitive terminal interface.
-
-## Core Features
-
-### Complete Resource Management
-
-Substation provides full CRUD (Create, Read, Update, Delete) operations for all major OpenStack resources:
-
-- **Compute (Nova)**: Servers, flavors, keypairs, server groups
-- **Networking (Neutron)**: Networks, subnets, routers, security groups, floating IPs, ports
-- **Storage (Cinder)**: Volumes, snapshots, volume types, backups
-- **Images (Glance)**: Operating system images, snapshots
-- **Secrets (Barbican)**: Secrets, containers, certificates
-- **Object Storage (Swift)**: Containers, objects, account management, bulk delete, object copy, web hosting ACLs
-
-### High-Performance Architecture
-
-- **Designed for up to 60-80% API call reduction** through intelligent caching
-- **Target: Sub-second response times** for most operations (actual performance depends on OpenStack deployment)
-- **Actor-based concurrency** ensuring thread safety
-- **Memory-efficient design** for handling 10,000+ resources
-- **Predictive prefetching** for common workflows
-- **Request coalescing** to minimize network overhead
-
-#### Batch Operations
-
-- Process 100+ resources simultaneously
-- Intelligent dependency resolution
-- Progress tracking with real-time updates
-- Rollback capabilities for failed operations
-- Configurable parallelism (1-20 threads)
-
-#### Telemetry & Monitoring
-
-- Real-time health scoring (0-100 scale)
-- Performance metrics tracking
-- Anomaly detection and alerting
-- Optimization suggestions
-- Historical trend analysis
-- Custom metric definitions
-
-#### Advanced Search & Discovery
-
-- Cross-service resource search
-- Full-text search across all attributes
-- Smart filtering with type-ahead suggestions
-- Saved searches and quick filters
-- Resource relationship mapping
-- Sub-second search on 10,000+ items
-
-#### Templates & Automation
-
-- Pre-built infrastructure patterns
-- One-click deployment of complex topologies
-- Recipe system for common configurations
-- Template versioning and rollback
-- Dry-run validation before deployment
-- Parameter validation and type checking
-
-## User Interface Features
-
-### Intuitive Terminal UI
-
-- **Keyboard-driven workflow** for maximum efficiency
-- **Context-aware help** available at any time
-- **Responsive layout** adapting to terminal size
-- **Color-coded status** indicators
-- **Progress bars** for long-running operations
-- **Modal dialogs** for confirmations
-
-### Smart Navigation
-
-- **Tab-based view** switching
-- **Breadcrumb navigation** showing current location
-- **Quick jumps** using number keys
-- **Search-as-you-type** filtering
-- **Bookmarks** for frequently accessed resources
-- **History** of recent actions
-
-### Real-Time Updates
-
-- **Auto-refresh** with configurable intervals
-- **Live status** updates for resources
-- **Push notifications** for important events
-- **Background operation** monitoring
-- **Change highlighting** for updated values
-
-## Security Features
-
-> See [Security Documentation](security.md) for comprehensive security architecture details.
-
-### Authentication & Authorization
-
-- **Multiple auth methods**: Password, application credentials, token-based
-- **Project/domain** isolation for multi-tenant environments
-- **Secure token management** with automatic refresh
-- **Token encryption** using AES-256-GCM (cross-platform)
-
-### Data Protection
-
-- **AES-256-GCM encryption** for all credentials (macOS + Linux)
-  - Industry-standard authenticated encryption
-  - Memory-safe `SecureString` and `SecureBuffer` implementations
-  - Automatic memory zeroing on cleanup
-  - No plaintext credentials in memory dumps
-- **Certificate validation** on all platforms
-  - Full SSL/TLS chain validation
-  - No certificate bypass vulnerabilities
-  - System CA bundle integration (Linux)
-  - Security framework validation (macOS)
-- **Input validation** protecting against:
-  - SQL injection (14 attack patterns detected)
-  - Command injection (6 attack patterns detected)
-  - Path traversal attacks (3 attack patterns detected)
-  - Buffer overflow via length validation
-- **Secure storage**:
-  - Encrypted credential storage with `SecureCredentialStorage` actor
-  - Memory-only token storage (never persisted to disk)
-  - Secure password input handling (no echoing)
-  - Thread-safe actor-based credential management
-
-### Compliance & Governance
-
-- **Read-only mode** for safe browsing
-- **Operation whitelisting** for restricted access
-- **Audit trail** with timestamps and user attribution
-- **Policy enforcement** for resource creation
-- **Compliance checks** against organizational standards
-
-## Operational Features
-
-### Multi-Region Support
-
-- **Cross-region resource** management
-- **Region-specific** endpoint configuration
-- **Failover support** for high availability
-- **Region priority** configuration
-
-### Configuration Management
-
-- **Export/Import** entire environments
-- **Configuration versioning** with rollback
-- **Environment profiles** for different setups
-- **Backup and restore** capabilities
-- **Configuration validation** before apply
-
-### Performance Optimization
-
-- **Intelligent caching** with TTL management
-- **Memory pressure** handling
-- **Connection pooling** for efficiency
-- **Request batching** for bulk operations
-- **Compression** for large payloads
-
-## Integration Features
-
-### API Compatibility
-
-- **OpenStack API** version negotiation
-- **Microversion** support
-- **Backwards compatibility** with older releases
-- **Service discovery** through catalog
-- **Custom endpoint** configuration
-
-## Productivity Features
-
-### Quick Actions
-
-- **One-key shortcuts** for common operations
-- **Command palette** for all actions
-- **Macro recording** and playback
-- **Custom shortcuts** definition
-- **Context menus** for resources
-
-### Smart Assistance
-
-- **Suggestion engine** for next actions
-- **Error recovery** suggestions
-- **Performance tips** based on usage
-- **Resource recommendations**
-
-### Intelligent Flavor Recommendations
-
-**Because choosing server specs shouldn't feel like playing roulette with your infrastructure budget.**
-
-When creating a new server, Substation's workload-aware recommendation engine analyzes your cloud's entire flavor catalog and serves up the *perfect* match for your use case. No more scrolling through 47 flavors named things like `m1.xlarge.v2.20231015.amd.special` trying to decode what any of it means.
-
-**How It Works (The Magic Behind the Curtain)**:
-
-1. **Workload-First Selection**: Press TAB to switch from boring manual mode to our recommendation engine. Choose your workload type:
-   - **Balanced**: For when you need a little bit of everything (web apps, dev environments)
-   - **Compute Intensive**: When your CPUs need to go brrrr (batch processing, video encoding, scientific computing)
-   - **Memory Intensive**: RAM > everything else (Redis, in-memory databases, big data analytics)
-   - **Storage Intensive**: Disk space for days (file servers, backup systems, media streaming)
-   - **Network Intensive**: Packets galore (load balancers, API gateways, VPN endpoints)
-   - **GPU Accelerated**: For your ML models and rendering needs (actually checks if GPUs exist!)
-   - **Hardware Accelerated**: PCI passthrough and FPGA wizardry
-
-2. **Deep Spec Analysis**: The engine doesn't just look at vCPUs and RAM like some primitive CLI tool from 2010. Oh no. It dives into the flavor's `extra_specs` like a truffle pig hunting for performance gold:
-   - **IOPS Quotas**: Detects read/write IOPS limits (because 24K read IOPS > your neighbor's spinner drive)
-   - **Network Bandwidth**: Finds actual Mbps limits (750 Mbps peak? *Chef's kiss*)
-   - **CPU Pinning**: Identifies dedicated CPU cores (for when you need consistent performance, not noisy neighbors)
-   - **NVMe Detection**: Spots high-performance NVMe storage (your database will thank you)
-   - **GPU Presence**: Actually validates GPU hardware exists (instead of recommending unicorn flavors)
-   - **Architecture Info**: x86? ARM? We got you covered
-   - **Hardware Optimization**: Multi-queue networking, memory page sizes, the works
-
-3. **Smart Scoring Algorithm**: Each flavor gets rated based on what actually matters for your workload:
-   - Compute workloads? +30% bonus for CPU pinning, +20% for CPU-heavy ratios
-   - Memory workloads? +20% for RAM-heavy configs, +15% for 32GB+ allocations
-   - Storage workloads? +40% for NVMe, +20% for high IOPS limits
-   - Network workloads? +40% for network optimization, +25% for 500+ Mbps bandwidth
-   - GPU workloads? Either you have a GPU or you score 0 (we don't do false hope here)
-
-4. **Human-Readable Explanations**: Instead of cryptic spec sheets, you get actual explanations like:
-   > "This flavor provides 500GB disk storage with NVMe SSD for high IOPS, 24576 read/8192 write IOPS, 100GB ephemeral storage. Backed by 16 vCPUs and 32GB RAM. Ideal for file servers, backup systems, media streaming, and log aggregation."
-
-   Not:
-   > "m1.large.storage.v3.20240815 - 16/32/500"
-
-5. **Top 3 Recommendations Per Category**: We show you the best 3 options for each workload type, scored and sorted. No analysis paralysis from 47 similar-looking flavors.
-
-6. **Price-Aware** (when your cloud provides it): If your flavors have `:price` in their extra_specs, we'll show hourly costs right in the selection screen. Budget optimization? Yeah, we do that.
-
-**The Technical Flex**:
-
-- Analyzes CPU:RAM ratios to find optimal balance (1:8 for general-purpose, 1:16 for memory-heavy)
-- Checks for `aggregate_instance_extra_specs` to match specialized hardware requirements
-- Validates quota limits (`quota:disk_*_iops_sec`, `quota:vif_outbound_*`) for performance guarantees
-- Detects hardware capabilities (`hw:cpu_policy`, `hw:mem_page_size`, `hw:vif_multiqueue_enabled`)
-- Zero scores for impossible matches (GPU workload without GPU hardware = nope)
-
-**Why This Matters**:
-
-Remember the last time you picked a flavor, deployed a server, then realized you needed more RAM but picked a CPU-optimized instance? Or paid for a GPU flavor that didn't actually have a GPU? Or wondered why your storage-heavy workload was crawling on a compute-optimized instance?
-
-Yeah, those days are over.
-
-**Usage**:
-
-1. Start creating a server
-2. Get to flavor selection
-3. Press TAB to enter recommendation mode
-4. Pick your workload category
-5. Press SPACE to drill into the top 3 recommendations
-6. Marvel at the detailed explanations
-7. Select your perfect flavor
-8. Actually deploy something that makes sense
-
-*Because life's too short to pick the wrong server flavor. Again.*
-
-### Workflow Optimization
-
-- **Task queuing** for sequential operations
-- **Parallel execution** where possible
-- **Dependency detection** and resolution
-- **Operation scheduling** with cron-like syntax
-- **Batch scripting** support
-
-## Monitoring & Alerting
-
-### Health Monitoring
-
-- **Service availability** checking
-- **Resource utilization** tracking
-- **Quota usage** monitoring
-- **Performance baseline** establishment
-- **Trend analysis** and forecasting
-
-### Alert Management
-
-- **Configurable thresholds** for metrics
-- **Multiple notification** channels
-- **Alert suppression** and deduplication
-- **Escalation policies** for critical issues
-- **Alert history** and acknowledgment
-
-### Reporting
-
-- **Customizable dashboards** for metrics
-- **Scheduled reports** generation
-- **Export to CSV/PDF** formats
-- **Trend visualization** with graphs
-- **Comparative analysis** across periods
-
-## Form Building System
-
-### Declarative Form Components
-
-Substation includes a comprehensive form building system designed specifically for OpenStack resource management:
-
-- **FormBuilder**: Unified component for creating forms with validation, navigation, and state management
-- **FormTextField**: Text input with cursor control, history, and inline validation
-- **FormSelector**: Advanced multi-column selection with search and scrolling for large datasets
-- **FormSelectorRenderer**: Type-safe rendering helper that preserves OpenStack resource types
-- **FormBuilderState**: Centralized state management for complex forms
-
-**Key Features:**
-
-- Single API for all form field types (text, number, toggle, select, selector, multi-select, info, custom)
-- Built-in keyboard navigation (TAB/Shift-TAB between fields, SPACE to activate)
-- Automatic validation display with field-level error messages
-- Search-as-you-type filtering in selector fields
-- Support for 10+ OpenStack resource types out of the box
-- Conditional field visibility based on form state
-- Consistent styling and behavior across all forms
-
-**Developer Benefits:**
-
-- Eliminate cursor tracking, history management, and validation boilerplate
-- Type-safe resource selection that preserves OSClient types
-- Easy extension for new resource types
-
-See [Developer Documentation](../reference/developers/index.md) for implementation guides.
-
-## Developer Features
-
-### Debugging Tools
-
-- **Debug mode** with verbose logging
-- **API call tracing** with timing
-- **Performance profiling** capabilities
-- **Memory usage** analysis
-- **Network traffic** inspection
-
-### Testing Support
-
-- **Dry-run mode** for safe testing
-- **Mock data** generation
-- **Load testing** utilities
-- **Validation tools** for configurations
-- **Regression testing** framework
-
-### Documentation
-
-- **Built-in help** system
-- **Command documentation** with examples
-- **API reference** generation
-- **Configuration schemas** with validation
-- **Tutorial mode** for learning
-
-## Unique Differentiators
-
-### What Sets Substation Apart
-
-1. **Terminal-First Design**: Built specifically for terminal environments, not a CLI afterthought
-2. **Real-Time Performance**: Instant feedback with intelligent caching
-3. **Features**: Batch operations, telemetry, and automation built-in
-4. **Minimal Dependencies**: Single binary with everything included is what we're going for; however, if you need something, let's talk about it.
-5. **Swift-Powered**: Modern, safe, and performant implementation
-6. **Actor-Based**: True concurrent safety without locks
-7. **Operator-Focused**: Designed by operators, for operators
-
-### Comparison with Alternatives
+Substation is not "another OpenStack tool." Every feature exists because an
+operator somewhere lost sleep over a problem that shouldn't have been that hard.
+
+Performance that respects your time? We cache everything aggressively because
+waiting 2 seconds for a server list today is unacceptable. Keyboard-driven
+navigation? Because reaching for a mouse during an incident is cognitive
+overhead you don't need. Intelligent flavor recommendations? Because picking
+from 47 flavors named "m1.xlarge.v2.20231015.amd.special" shouldn't require
+a decoder ring.
+
+Let's talk about what you actually get.
+
+## What Makes Substation Different
+
+Most OpenStack tools fall into two camps: web UIs that force you to click
+through 17 pages to create a server, or CLIs that make you memorize incantations
+like a wizard. Substation rejects both approaches.
+
+We built a terminal interface that's fast, keyboard-driven, and designed for
+muscle memory. It provides complete CRUD operations for all major OpenStack
+resources - Compute (Nova), Networking (Neutron), Storage (Cinder), Images
+(Glance), Secrets (Barbican), and Object Storage (Swift). Everything you need
+to manage servers, networks, volumes, security groups, and the rest of your
+infrastructure lives in one place.
+
+The interface uses Swift 6.1 and actor-based concurrency for true thread safety
+without locks. We're targeting sub-second response times for most operations
+through intelligent caching that reduces API calls by 60-80%. When you manage
+10,000+ resources, these numbers matter.
+
+## The Performance Story
+
+We spent months getting caching right because nobody should wait for data that
+hasn't changed. Substation's caching architecture uses predictive prefetching
+for common workflows and request coalescing to minimize network overhead. When
+you open the server list, we're already loading flavor details in the background
+because we know what you'll click next.
+
+Memory pressure handling ensures the cache doesn't eat your system alive. TTL
+management keeps data fresh without hammering your API endpoints. Connection
+pooling and request batching mean bulk operations don't turn into connection
+storms. The result? Actor-based concurrency that handles massive resource counts
+without breaking a sweat.
+
+Batch operations process 100+ resources simultaneously with intelligent dependency
+resolution and rollback capabilities for failed operations. You can configure
+parallelism from 1-20 threads depending on your deployment's tolerance. Progress
+tracking provides real-time updates so you're never wondering if something froze.
+
+## The Interface Philosophy
+
+Keyboard-driven doesn't mean "we have hotkeys." It means every interaction is
+optimized for hands staying on the home row. Tab-based view switching, breadcrumb
+navigation showing your current location, and quick jumps using number keys make
+navigation feel instant. Search-as-you-type filtering means you're never scrolling
+through pages of resources to find the one you need.
+
+Context-aware help appears when you need it. The responsive layout adapts to
+any terminal size. Color-coded status indicators communicate state at a glance.
+Progress bars for long-running operations mean you can see deployment progress
+without refresh spam. Modal dialogs confirm destructive operations because "are
+you sure?" matters at 3 AM.
+
+Auto-refresh with configurable intervals keeps data current. Live status updates
+show resource state changes in real-time. Background operation monitoring means
+long-running tasks don't block your workflow. Change highlighting shows exactly
+what updated since your last view.
+
+The interface includes bookmarks for frequently accessed resources and history
+tracking of recent actions. A command palette provides access to all operations
+without memorizing every hotkey. We support macro recording and playback for
+repetitive workflows, plus custom shortcut definitions for team-specific operations.
+
+## Security Without Compromise
+
+Security isn't a checkbox - it's a foundation. Substation implements AES-256-GCM
+encryption for all credentials with memory-safe SecureString and SecureBuffer
+implementations. Automatic memory zeroing on cleanup ensures no plaintext
+credentials appear in memory dumps. Full SSL/TLS chain validation with system
+CA bundle integration means certificate validation works correctly across platforms.
+
+Input validation protects against 14 SQL injection patterns, 6 command injection
+patterns, and 3 path traversal attack vectors. The SecureCredentialStorage actor
+provides thread-safe credential management. Tokens live in memory only and never
+persist to disk. Password input handling prevents echoing to the terminal.
+
+Read-only mode supports safe browsing without modification risk. Operation
+whitelisting enables restricted access for compliance scenarios. The audit trail
+captures timestamps and user attribution for all actions. Policy enforcement
+validates resource creation against organizational standards.
+
+See [Security Documentation](security.md) for comprehensive security architecture
+details.
+
+## The Flavor Recommendations System
+
+Because choosing server specs shouldn't feel like playing roulette with your
+infrastructure budget.
+
+When creating a new server, Substation's workload-aware recommendation engine
+analyzes your cloud's entire flavor catalog and serves up the perfect match for
+your use case. No more scrolling through 47 flavors named things like
+"m1.xlarge.v2.20231015.amd.special" trying to decode what any of it means.
+
+### How It Works (The Magic Behind the Curtain)
+
+Press TAB to switch from manual mode to the recommendation engine. Choose your
+workload type: Balanced for general-purpose workloads like web apps and dev
+environments. Compute Intensive when your CPUs need to go brrrr for batch
+processing or scientific computing. Memory Intensive for RAM-heavy workloads
+like Redis or in-memory databases. Storage Intensive for file servers and backup
+systems.
+
+Network Intensive for load balancers and API gateways. GPU Accelerated
+for ML models (we actually check if GPUs exist). Hardware Accelerated for PCI
+passthrough and FPGA wizardry.
+
+The engine doesn't just look at vCPUs and RAM like some primitive CLI tool from
+2010. It dives into the flavor's extra_specs like a truffle pig hunting for
+performance gold. IOPS quotas? We detect read/write IOPS limits because 24K
+read IOPS matters. Network bandwidth? We find actual Mbps limits (750 Mbps peak
+gets a chef's kiss). CPU pinning? We identify dedicated CPU cores for consistent
+performance without noisy neighbors. NVMe detection spots high-performance storage
+that makes databases happy. GPU presence gets validated (no recommending unicorn
+flavors). Architecture info covers x86 and ARM. Hardware optimization includes
+multi-queue networking and memory page sizes.
+
+### Smart Scoring Algorithm
+
+Each flavor gets rated based on what actually matters for your workload. Compute
+workloads earn +30% bonus for CPU pinning and +20% for CPU-heavy ratios. Memory
+workloads get +20% for RAM-heavy configs and +15% for 32GB+ allocations. Storage
+workloads receive +40% for NVMe and +20% for high IOPS limits. Network workloads
+gain +40% for network optimization and +25% for 500+ Mbps bandwidth. GPU workloads?
+Either you have a GPU or you score 0 - we don't do false hope here.
+
+We analyze CPU:RAM ratios to find optimal balance (1:8 for general-purpose, 1:16
+for memory-heavy). The system checks aggregate_instance_extra_specs to match
+specialized hardware requirements. It validates quota limits (quota:disk_\*_iops_sec,
+quota:vif_outbound_\*) for performance guarantees. Hardware capabilities
+(hw:cpu_policy, hw:mem_page_size, hw:vif_multiqueue_enabled) get detected and
+scored. Impossible matches get zero scores - GPU workload without GPU hardware
+equals nope.
+
+### Human-Readable Explanations
+
+Instead of cryptic spec sheets, you get actual explanations like "This flavor
+provides 500GB disk storage with NVMe SSD for high IOPS, 24576 read/8192 write
+IOPS, 100GB ephemeral storage. Backed by 16 vCPUs and 32GB RAM. Ideal for file
+servers, backup systems, media streaming, and log aggregation."
+
+Not "m1.large.storage.v3.20240815 - 16/32/500."
+
+We show the top 3 recommendations per category, scored and sorted. No analysis
+paralysis from 47 similar-looking flavors. If your flavors include :price in
+their extra_specs, we display hourly costs right in the selection screen for
+budget optimization.
+
+### Why This Matters
+
+Remember the last time you picked a flavor, deployed a server, then realized you
+needed more RAM but picked a CPU-optimized instance? Or paid for a GPU flavor
+that didn't actually have a GPU? Or wondered why your storage-heavy workload
+was crawling on a compute-optimized instance? Those days are over. Start creating
+a server, get to flavor selection, press TAB, pick your workload category, press
+SPACE to drill into recommendations, marvel at the detailed explanations, select
+your perfect flavor, and actually deploy something that makes sense.
+
+Because life's too short to pick the wrong server flavor. Again.
+
+## Developer Experience
+
+The form building system eliminates the tedium of resource creation. FormBuilder
+provides a unified component with validation, navigation, and state management.
+FormTextField handles text input with cursor control and history. FormSelector
+manages advanced multi-column selection with search and scrolling for large
+datasets. FormSelectorRenderer preserves OpenStack resource types through
+type-safe rendering.
+
+Single API for all field types: text, number, toggle, select, selector,
+multi-select, info, and custom. Built-in keyboard navigation uses TAB and
+Shift-TAB between fields with SPACE to activate. Automatic validation displays
+field-level error messages. Search-as-you-type filtering works in selector
+fields. Support for 10+ OpenStack resource types comes out of the box.
+Conditional field visibility based on form state keeps interfaces clean.
+
+Developers get to eliminate cursor tracking, history management, and validation
+boilerplate. Type-safe resource selection preserves OSClient types. Extension
+for new resource types follows straightforward patterns. See
+[Developer Documentation](../reference/developers/index.md) for implementation
+guides.
+
+Testing happens through dry-run mode for safe validation. Mock data generation
+enables isolated testing. Load testing utilities validate performance
+characteristics. Configuration validation tools catch errors before deployment.
+The regression testing framework ensures changes don't break existing workflows.
+
+Debug mode provides verbose logging. API call tracing includes timing information.
+Performance profiling capabilities identify bottlenecks. Memory usage analysis
+catches leaks before production. Network traffic inspection debugs connectivity
+issues.
+
+## Advanced Capabilities
+
+Cross-service resource search finds related resources across Nova, Neutron, and
+Cinder. Full-text search works across all attributes. Smart filtering includes
+type-ahead suggestions. Saved searches and quick filters speed up common queries.
+Resource relationship mapping shows dependencies. Sub-second search on 10,000+
+items makes large deployments manageable.
+
+Templates and automation provide pre-built infrastructure patterns. One-click
+deployment handles complex topologies. The recipe system captures common
+configurations. Template versioning enables rollback. Dry-run validation catches
+errors before deployment. Parameter validation and type checking prevent runtime
+failures.
+
+Telemetry includes real-time health scoring on a 0-100 scale. Performance metrics
+tracking identifies degradation. Anomaly detection and alerting catches problems
+early. Optimization suggestions improve efficiency. Historical trend analysis
+shows patterns. Custom metric definitions support organization-specific needs.
+
+Multi-region support manages cross-region resources. Region-specific endpoint
+configuration adapts to deployment topology. Failover support provides high
+availability. Region priority configuration optimizes latency.
+
+Configuration management supports export/import of entire environments.
+Configuration versioning enables rollback. Environment profiles handle different
+setups. Backup and restore capabilities prevent data loss. Configuration
+validation runs before apply operations.
+
+## How We Compare
+
+Substation occupies a unique position: terminal-first design built specifically
+for terminal environments, not a CLI afterthought. Real-time performance provides
+instant feedback through intelligent caching. Batch operations, telemetry, and
+automation come built-in. Single binary deployment with minimal dependencies
+simplifies installation. Swift-powered implementation ensures modern, safe, and
+performant code. Actor-based concurrency provides true thread safety without
+locks. Operator-focused design comes from operators building for operators.
 
 | Feature | Substation | Horizon | OpenStack CLI |
 |---------|------------|---------|---------------|
 | Interface | Terminal UI | Web UI | CLI |
-| Real-time Updates | [x] | [x] | [ ] |
-| Batch Operations | [x] | Limited | [ ] |
+| Real-time Updates | Yes | Yes | No |
+| Batch Operations | Yes | Limited | No |
 | Performance | Excellent | Good | Fair |
 | Learning Curve | Low | Low | Medium |
-| Automation | [x] | [ ] | [x] |
-| Cache-Based Offline | [x] | [ ] | [ ] |
-
-## Upcoming Features
-
-### Roadmap
-
-- **Machine Learning**: Predictive analytics and anomaly detection
-- **Multi-Cloud**: Support for multiple cloud providers
-- **Enhanced Orchestration**: Heat/Octavia service support
+| Automation | Yes | No | Yes |
+| Cache-Based Offline | Yes | No | No |
