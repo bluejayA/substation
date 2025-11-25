@@ -71,13 +71,40 @@ extension FlavorsModule: ModuleNavigationProvider {
 
     /// Open detail view for the currently selected flavor
     ///
-    /// Flavors do not have a detail view, so this always returns false.
+    /// Handles navigation to the flavor detail view for the currently selected
+    /// flavor in the flavors list. This filters flavors based on any active
+    /// search query and validates the selection index before transitioning.
     ///
     /// - Parameters:
     ///   - tui: The TUI instance for accessing view state and cache
-    /// - Returns: false as flavors do not have detail views
+    /// - Returns: true if the detail view was opened, false otherwise
     func openDetailView(tui: TUI) -> Bool {
-        // Flavors do not have a detail view
-        return false
+        // Only handle flavors view
+        guard tui.viewCoordinator.currentView == .flavors else {
+            return false
+        }
+
+        // Filter flavors using the same logic as itemCount
+        let flavors = tui.cacheManager.cachedFlavors
+        let filteredFlavors: [Flavor]
+
+        if let query = tui.searchQuery, !query.isEmpty {
+            filteredFlavors = FilterUtils.filterFlavors(flavors, query: query)
+        } else {
+            filteredFlavors = flavors
+        }
+
+        // Validate selection
+        guard !filteredFlavors.isEmpty &&
+              tui.viewCoordinator.selectedIndex < filteredFlavors.count else {
+            return false
+        }
+
+        // Set selected resource and navigate to detail view
+        tui.viewCoordinator.selectedResource = filteredFlavors[tui.viewCoordinator.selectedIndex]
+        tui.changeView(to: .flavorDetail, resetSelection: false)
+        tui.viewCoordinator.detailScrollOffset = 0
+
+        return true
     }
 }
