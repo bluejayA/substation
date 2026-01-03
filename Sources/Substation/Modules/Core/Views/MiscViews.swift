@@ -118,6 +118,10 @@ struct MiscViews {
             return "Help - Download Object"
         case .swiftDirectoryDownload:
             return "Help - Download Directory"
+        case .swiftBackgroundOperations:
+            return "Help - Background Operations"
+        case .swiftBackgroundOperationDetail:
+            return "Help - Operation Details"
         default:
             return "Help - Keyboard Shortcuts"
         }
@@ -759,6 +763,72 @@ struct MiscViews {
                     "This operation updates MANY objects at once",
                     "Cannot be undone",
                     "Review directory path carefully before applying",
+                ]),
+                generalActions
+            ]
+
+        case .swiftBackgroundOperations:
+            return [
+                generalNavigation,
+                ("Background Operations", [
+                    "SPACE: View operation details",
+                    "M: Show performance metrics",
+                    "DELETE: Cancel active operation or remove completed",
+                    "ESC: Return to previous view",
+                    "Operations run in the background while you work",
+                ]),
+                ("Operation Types", [
+                    "Upload: File or directory upload to object storage",
+                    "Download: Object or container download to local",
+                    "Delete: Single object deletion",
+                    "Bulk Delete: Multiple resource deletion",
+                    "Bulk Create: Multiple resource creation",
+                ]),
+                ("Operation Status", [
+                    "Queued: Waiting to start",
+                    "Running: Currently in progress",
+                    "Completed: Successfully finished",
+                    "Failed: Encountered an error",
+                    "Cancelled: Stopped by user",
+                ]),
+                ("Progress Information", [
+                    "Progress shows percentage completed",
+                    "Size shows bytes transferred / total",
+                    "Rate shows current transfer speed (MB/s)",
+                    "Time shows elapsed duration",
+                    "Failed count shown for bulk operations",
+                ]),
+                generalActions
+            ]
+
+        case .swiftBackgroundOperationDetail:
+            return [
+                generalNavigation,
+                ("Operation Detail View", [
+                    "DELETE: Cancel active operation or remove from history",
+                    "ESC: Return to operations list",
+                    "View detailed operation information",
+                    "Monitor progress and transfer rates",
+                ]),
+                ("Information Displayed", [
+                    "Operation ID: Unique identifier",
+                    "Type: Upload, Download, Delete, Bulk operations",
+                    "Status: Current operation state",
+                    "Container: Target storage container",
+                    "Object: Target object name (if applicable)",
+                    "Local Path: Source or destination path",
+                ]),
+                ("Progress Details", [
+                    "Bytes Transferred: Amount of data moved",
+                    "Total Size: Expected total data size",
+                    "Transfer Rate: Current speed (for active)",
+                    "Files Processed: Count for multi-file operations",
+                    "Files Skipped: Count of skipped files",
+                ]),
+                ("Timing Information", [
+                    "Started At: Operation start timestamp",
+                    "Elapsed Time: Duration since start",
+                    "Duration: Total time (for completed)",
                 ]),
                 generalActions
             ]
