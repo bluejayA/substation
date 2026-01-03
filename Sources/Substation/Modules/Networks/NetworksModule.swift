@@ -43,8 +43,7 @@ final class NetworksModule: OpenStackModule {
 
     /// View modes handled by this module
     var handledViewModes: Set<ViewMode> {
-        return [.networks, .networkDetail, .networkCreate, .networkServerAttachment,
-                .networkServerManagement]
+        return [.networks, .networkDetail, .networkCreate, .networkServerAttachment]
     }
 
     // MARK: - Internal Properties
@@ -162,19 +161,7 @@ final class NetworksModule: OpenStackModule {
                     selectedItems: tui.selectionManager.multiSelectedResourceIDs
                 )
             },
-            inputHandler: { [weak self, weak tui] ch, screen in
-                guard let self = self, let tui = tui else { return false }
-
-                switch ch {
-                case Int32(77):  // M - Manage network interface attachment to servers
-                    Logger.shared.logUserAction("manage_network_to_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
-                    await self.manageNetworkToServers(screen: screen)
-                    return true
-
-                default:
-                    return false
-                }
-            },
+            inputHandler: nil,
             category: .network
         ))
 

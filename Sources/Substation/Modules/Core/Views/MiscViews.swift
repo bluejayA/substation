@@ -64,6 +64,10 @@ struct MiscViews {
             return "Help - Port Management"
         case .routers:
             return "Help - Router Management"
+        case .routerEdit:
+            return "Help - Edit Router"
+        case .routerSubnetManagement:
+            return "Help - Router Subnet Interface Management"
         case .floatingIPs:
             return "Help - Floating IP Management"
         case .securityGroups:
@@ -228,7 +232,6 @@ struct MiscViews {
                 generalNavigation,
                 ("Network Management", [
                     "SHIFT-C: Create new network",
-                    "SHIFT-M: Manage network interfaces attachments",
                     "DELETE: Delete selected network",
                     "Network States: ACTIVE, DOWN, BUILD, ERROR",
                 ]),
@@ -363,9 +366,47 @@ struct MiscViews {
                 generalNavigation,
                 ("Router Management", [
                     "SHIFT-C: Create new router",
+                    "SHIFT-E: Edit selected router",
+                    "SHIFT-S: Manage subnet interfaces",
                     "DELETE: Delete selected router",
                     "Routers connect networks and provide internet access",
                     "Configure external gateways and routes",
+                ]),
+                generalActions
+            ]
+
+        case .routerEdit:
+            return [
+                generalNavigation,
+                ("Edit Router", [
+                    "TAB/UP/DOWN: Navigate between fields",
+                    "SPACE: Toggle values or activate field",
+                    "ENTER: Save changes",
+                    "ESC: Cancel and return to list",
+                ]),
+                ("Editable Properties", [
+                    "Router Name: Display name for the router",
+                    "Description: Optional router description",
+                    "Admin State: Enable or disable the router",
+                    "External Gateway: Connect to external network",
+                ]),
+                generalActions
+            ]
+
+        case .routerSubnetManagement:
+            return [
+                generalNavigation,
+                ("Subnet Interface Management", [
+                    "TAB: Toggle between ATTACH and DETACH mode",
+                    "SPACE: Select a subnet for the operation",
+                    "ENTER: Apply the attachment/detachment",
+                    "ESC: Return to router list",
+                ]),
+                ("About Router Interfaces", [
+                    "Attach subnets to connect them to the router",
+                    "Detach subnets to remove the connection",
+                    "ATTACH mode shows unattached subnets",
+                    "DETACH mode shows currently attached subnets",
                 ]),
                 generalActions
             ]

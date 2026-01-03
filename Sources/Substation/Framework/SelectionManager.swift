@@ -51,6 +51,14 @@ final class SelectionManager {
     /// Router IDs that are already attached to the subnet
     var attachedRouterIds: Set<String> = []
 
+    // MARK: - Router Subnet Management
+
+    /// Currently selected subnet ID for router interface attachment
+    var selectedSubnetId: String?
+
+    /// Subnet IDs that are already attached to the router
+    var attachedSubnetIds: Set<String> = []
+
     // MARK: - Convenience Methods
 
     /// Toggle multi-select mode on or off
@@ -112,8 +120,15 @@ final class SelectionManager {
         attachedRouterIds.removeAll()
     }
 
+    /// Clear subnet selection state
+    /// Resets selectedSubnetId and attachedSubnetIds
+    func clearSubnetSelection() {
+        selectedSubnetId = nil
+        attachedSubnetIds.removeAll()
+    }
+
     /// Reset all selection state to initial values
-    /// Clears all multi-select, server, port, and router selections
+    /// Clears all multi-select, server, port, router, and subnet selections
     func resetAll() {
         multiSelectMode = false
         multiSelectedResourceIDs.removeAll()
@@ -123,5 +138,6 @@ final class SelectionManager {
         clearServerSelection()
         clearPortSelection()
         clearRouterSelection()
+        clearSubnetSelection()
     }
 }

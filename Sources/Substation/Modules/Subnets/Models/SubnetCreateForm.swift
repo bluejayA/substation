@@ -54,7 +54,7 @@ struct SubnetCreateForm: FormViewModel {
     var networkSelectionMode: Bool = false
 
     var ipVersion: IPVersion = .ipv4
-    var cidr: String = ""
+    var cidr: String = "192.168.1.0/24"
     var gatewayEnabled: Bool = true
     var dhcpEnabled: Bool = true
     var allocationPools: String = ""
@@ -84,9 +84,13 @@ struct SubnetCreateForm: FormViewModel {
 
     mutating func toggleIPVersion() {
         ipVersion = ipVersion == .ipv4 ? .ipv6 : .ipv4
-        // Update CIDR placeholder when IP version changes
-        if cidr.isEmpty {
-            cidr = ipVersion == .ipv4 ? "192.168.1.0/24" : "2001:db8::/64"
+
+        // Update CIDR default when IP version changes if using default values
+        let ipv4Default = "192.168.1.0/24"
+        let ipv6Default = "2001:db8::/64"
+
+        if cidr.isEmpty || cidr == ipv4Default || cidr == ipv6Default {
+            cidr = ipVersion == .ipv4 ? ipv4Default : ipv6Default
         }
     }
 

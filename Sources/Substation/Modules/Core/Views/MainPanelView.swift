@@ -11,13 +11,13 @@ enum ViewMode: CaseIterable {
         barbicanSecretDetail,
         swiftContainerDetail, swiftObjectDetail, swiftBackgroundOperationDetail, serverCreate,
         serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement,
-        subnetCreate, volumeCreate, portCreate, routerCreate, floatingIPCreate, keyPairs,
+        subnetCreate, volumeCreate, portCreate, routerCreate, routerEdit, floatingIPCreate, keyPairs,
         keyPairDetail, keyPairCreate, help, about, welcome, tutorial, shortcuts, examples, serverSecurityGroups, serverNetworkInterfaces,
         serverGroupManagement, volumeManagement, floatingIPServerSelect, serverSnapshotManagement,
         serverResize, volumeSnapshotManagement, volumeBackupManagement, networkServerAttachment,
         securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement,
         volumeServerManagement, floatingIPServerManagement, floatingIPPortManagement,
-        portServerManagement, portAllowedAddressPairManagement, subnetRouterManagement,
+        portServerManagement, portAllowedAddressPairManagement, subnetRouterManagement, routerSubnetManagement,
         flavorSelection, barbicanSecretCreate,
         swiftContainerCreate, swiftObjectUpload, swiftContainerDownload, swiftObjectDownload,
         swiftDirectoryDownload, swiftContainerMetadata, swiftObjectMetadata, swiftDirectoryMetadata,
@@ -42,6 +42,7 @@ enum ViewMode: CaseIterable {
         case .routers: return "Routers"
         case .routerDetail: return "Router Details"
         case .routerCreate: return "Create Router"
+        case .routerEdit: return "Edit Router"
         case .networks: return "Networks"
         case .networkDetail: return "Network Details"
         case .networkCreate: return "Create Network"
@@ -109,6 +110,7 @@ enum ViewMode: CaseIterable {
         case .portServerManagement: return "Manage Port Server Attachment"
         case .portAllowedAddressPairManagement: return "Manage Allowed Address Pairs"
         case .subnetRouterManagement: return "Manage Subnet Router Attachment"
+        case .routerSubnetManagement: return "Manage Router Subnet Interfaces"
         case .flavorSelection: return "Select Server Flavor"
         case .swiftBackgroundOperations: return "Operations"
         case .swiftBackgroundOperationDetail: return "Operation Details"
@@ -123,14 +125,14 @@ enum ViewMode: CaseIterable {
             .subnetDetail, .portDetail, .routerDetail, .floatingIPDetail,
             .healthDashboardServiceDetail, .serverCreate, .serverGroupCreate, .networkCreate,
             .securityGroupCreate, .securityGroupRuleManagement, .subnetCreate, .volumeCreate,
-            .portCreate, .routerCreate, .floatingIPCreate, .keyPairDetail, .keyPairCreate,
+            .portCreate, .routerCreate, .routerEdit, .floatingIPCreate, .keyPairDetail, .keyPairCreate,
             .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement,
             .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement, .serverResize,
             .volumeSnapshotManagement, .volumeBackupManagement, .networkServerAttachment,
             .securityGroupServerAttachment, .securityGroupServerManagement,
             .networkServerManagement, .volumeServerManagement, .floatingIPServerManagement,
             .floatingIPPortManagement, .portServerManagement, .portAllowedAddressPairManagement,
-            .subnetRouterManagement, .barbicanSecretDetail,
+            .subnetRouterManagement, .routerSubnetManagement, .barbicanSecretDetail,
             .swiftObjectDetail, .swiftBackgroundOperationDetail, .barbicanSecretCreate,
             .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload,
             .swiftObjectDownload, .swiftDirectoryDownload, .swiftContainerMetadata,
@@ -181,6 +183,7 @@ enum ViewMode: CaseIterable {
         case .volumeCreate: return .volumes
         case .portCreate: return .ports
         case .routerCreate: return .routers
+        case .routerEdit: return .routers
         case .floatingIPCreate: return .floatingIPs
         case .floatingIPServerSelect: return .floatingIPs
         case .keyPairDetail: return .keyPairs
@@ -219,6 +222,7 @@ enum ViewMode: CaseIterable {
         case .portServerManagement: return .ports
         case .portAllowedAddressPairManagement: return .ports
         case .subnetRouterManagement: return .subnets
+        case .routerSubnetManagement: return .routers
         case .flavorSelection: return .serverCreate
         case .performanceMetrics: return .swiftBackgroundOperations
         default: return self

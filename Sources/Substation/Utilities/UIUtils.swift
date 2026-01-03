@@ -63,7 +63,11 @@ struct UIUtils {
         case .floatingIPs:
             return "\(baseCommands) SPACE:details :create :manage :delete /:search ESC:back"
         case .routers:
-            return "\(baseCommands) SPACE:details :create :delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details :create E:edit S:subnets :delete /:search ESC:back"
+        case .routerEdit:
+            return "TAB/UP/DOWN:navigate SPACE:toggle/edit ENTER:save ESC:cancel ?:help"
+        case .routerSubnetManagement:
+            return "UP/DOWN:navigate TAB:attach/detach SPACE:select ENTER:apply ESC:cancel ?:help"
         case .healthDashboard:
             return "^c:quit UP/DOWN:navigate SPACE:service-details ESC:back ?:help"
         case .serverDetail:

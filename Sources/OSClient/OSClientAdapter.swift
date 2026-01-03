@@ -353,6 +353,21 @@ extension OpenStackClient {
         }
     }
 
+    /// Add an interface to a router
+    ///
+    /// - Parameters:
+    ///   - routerId: The router ID
+    ///   - subnetId: The subnet ID to attach (optional if portId is provided)
+    ///   - portId: The port ID to attach (optional if subnetId is provided)
+    /// - Returns: The created router interface
+    @discardableResult
+    public func addRouterInterface(routerId: String, subnetId: String? = nil, portId: String? = nil) async throws -> RouterInterface {
+        return try await executeWithTokenRefresh {
+            let neutron = await self.neutron
+            return try await neutron.addRouterInterface(routerId: routerId, subnetId: subnetId, portId: portId)
+        }
+    }
+
     /// Remove an interface from a router
     public func removeRouterInterface(routerId: String, subnetId: String? = nil, portId: String? = nil) async throws {
         try await executeWithTokenRefresh {

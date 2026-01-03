@@ -13,6 +13,14 @@ struct RoutersFormState {
 
     /// State for router create form
     var createFormState: FormBuilderState = FormBuilderState(fields: [])
+
+    // MARK: - Router Editing
+
+    /// Form for editing existing routers
+    var editForm = RouterEditForm()
+
+    /// State for router edit form
+    var editFormState: FormBuilderState = FormBuilderState(fields: [])
 }
 
 // MARK: - TUI Extension for Routers Form State Accessors
@@ -40,5 +48,19 @@ extension TUI {
     internal var routerCreateFormState: FormBuilderState {
         get { return routersModule?.formState.createFormState ?? FormBuilderState(fields: []) }
         set { routersModule?.formState.createFormState = newValue }
+    }
+
+    // MARK: - Router Edit Accessors
+
+    /// Form for editing existing routers
+    internal var routerEditForm: RouterEditForm {
+        get { return routersModule?.formState.editForm ?? RouterEditForm() }
+        set { routersModule?.formState.editForm = newValue }
+    }
+
+    /// State for router edit form
+    internal var routerEditFormState: FormBuilderState {
+        get { return routersModule?.formState.editFormState ?? FormBuilderState(fields: []) }
+        set { routersModule?.formState.editFormState = newValue }
     }
 }

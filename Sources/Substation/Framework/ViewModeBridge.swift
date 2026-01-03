@@ -60,6 +60,8 @@ extension ViewMode {
         case .routers: return "routers.list"
         case .routerDetail: return "routers.detail"
         case .routerCreate: return "routers.create"
+        case .routerEdit: return "routers.edit"
+        case .routerSubnetManagement: return "routers.subnetManagement"
 
         // Ports module
         case .ports: return "ports.list"

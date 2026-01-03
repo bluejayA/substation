@@ -4,33 +4,31 @@ import Darwin
 #else
 import Glibc
 #endif
-import struct OSClient.Port
 import OSClient
 import SwiftNCurses
 import MemoryKit
 
-// MARK: - Router Create Input Handler (Universal Pattern)
+// MARK: - Router Edit Input Handler (Universal Pattern)
 
 @MainActor
 extension TUI {
 
-    /// Handle input for Router create form using the universal handler
-    internal func handleRouterCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
+    /// Handle input for Router edit form using the universal handler
+    internal func handleRouterEditInput(_ ch: Int32, screen: OpaquePointer?) async {
         // Get local references to avoid actor-isolated inout issues
-        var localFormState = routerCreateFormState
-        var localForm = routerCreateForm
+        var localFormState = routerEditFormState
+        var localForm = routerEditForm
 
         // Get cached data for form rebuilding
-        let availabilityZones = cacheManager.cachedAvailabilityZones
         let externalNetworks = cacheManager.cachedNetworks.filter { $0.external == true }
 
         // Custom key handler for toggle and ENTER (validation needs real data)
-        let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout RouterCreateForm, OpaquePointer?) async -> Bool = { [availabilityZones, externalNetworks] ch, formState, form, screen in
-            // Handle SPACE on toggle field - need to rebuild form to show/hide external network selector
+        let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout RouterEditForm, OpaquePointer?) async -> Bool = { [externalNetworks] ch, formState, form, screen in
+            // Handle SPACE on toggle fields - need to rebuild form for external gateway toggle
             if ch == Int32(32) && !formState.isCurrentFieldActive() {
                 if let field = formState.getCurrentField() {
                     if case .toggle(let toggle) = field,
-                       toggle.id == RouterCreateFieldId.externalGateway.rawValue {
+                       toggle.id == RouterEditFieldId.externalGateway.rawValue {
                         // Toggle the value
                         formState.toggleCurrentField()
                         form.updateFromFormState(formState)
@@ -41,7 +39,6 @@ extension TUI {
                                 selectedFieldId: formState.getCurrentFieldId(),
                                 activeFieldId: formState.getActiveFieldId(),
                                 formState: formState,
-                                availabilityZones: availabilityZones,
                                 externalNetworks: externalNetworks
                             ),
                             preservingStateFrom: formState
@@ -59,17 +56,17 @@ extension TUI {
                 form.updateFromFormState(formState)
 
                 // Validate with actual cached data
-                let errors = form.validateForm(availabilityZones: availabilityZones, externalNetworks: externalNetworks)
+                let errors = form.validateForm(externalNetworks: externalNetworks)
                 if errors.isEmpty {
                     // Update TUI state and submit
-                    self.routerCreateFormState = formState
-                    self.routerCreateForm = form
+                    self.routerEditFormState = formState
+                    self.routerEditForm = form
                     guard let module = ModuleRegistry.shared.module(for: "routers") as? RoutersModule else {
                         Logger.shared.logError("Failed to get RoutersModule from registry", context: [:])
                         self.statusMessage = "Error: Routers module not available"
                         return true
                     }
-                    await module.submitRouterCreation(screen: screen)
+                    await module.submitRouterEdit(screen: screen)
                 } else {
                     // Show validation errors
                     self.statusMessage = "Validation errors: \(errors.joined(separator: ", "))"
@@ -87,15 +84,9 @@ extension TUI {
             formState: &localFormState,
             form: &localForm,
             onSubmit: { formState, form in
-                // Receive formState and form as parameters to avoid exclusivity violation
-                self.routerCreateFormState = formState
-                self.routerCreateForm = form
-                guard let module = ModuleRegistry.shared.module(for: "routers") as? RoutersModule else {
-                    Logger.shared.logError("Failed to get RoutersModule from registry", context: [:])
-                    self.statusMessage = "Error: Routers module not available"
-                    return
-                }
-                await module.submitRouterCreation(screen: screen)
+                // This won't be called since we handle ENTER in customHandler
+                self.routerEditFormState = formState
+                self.routerEditForm = form
             },
             onCancel: {
                 self.changeView(to: .routers, resetSelection: false)
@@ -109,38 +100,35 @@ extension TUI {
                 selectedFieldId: localFormState.getCurrentFieldId(),
                 activeFieldId: localFormState.getActiveFieldId(),
                 formState: localFormState,
-                availabilityZones: availabilityZones,
                 externalNetworks: externalNetworks
             ),
             preservingStateFrom: localFormState
         )
 
         // Update actor-isolated properties with modified local copies
-        routerCreateFormState = localFormState
-        routerCreateForm = localForm
+        routerEditFormState = localFormState
+        routerEditForm = localForm
     }
 }
 
-// MARK: - RouterCreateForm Protocol Conformance Adapters
+// MARK: - RouterEditForm Protocol Conformance Adapters
 
-extension RouterCreateForm {
+extension RouterEditForm {
     /// Adapter for FormStateRebuildable - ignores context parameters
     func buildFields(selectedFieldId: String?, activeFieldId: String?, formState: FormBuilderState) -> [FormField] {
-        // Call the original method with empty arrays - the form state already contains selections
         return buildFields(
             selectedFieldId: selectedFieldId,
             activeFieldId: activeFieldId,
             formState: formState,
-            availabilityZones: [],
             externalNetworks: []
         )
     }
 
     /// Adapter for FormValidatable - provides empty context
     func validateForm() -> [String] {
-        return validateForm(availabilityZones: [], externalNetworks: [])
+        return validateForm(externalNetworks: [])
     }
 }
 
 // Declare protocol conformance after adapters
-extension RouterCreateForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}
+extension RouterEditForm: FormStateUpdatable, FormStateRebuildable, FormValidatable {}

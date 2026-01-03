@@ -952,18 +952,23 @@ public struct UpdateRouterRequest: Codable, Sendable {
     public let externalGatewayInfo: ExternalGatewayInfo?
     public let routes: [Route]?
 
+    /// Flag to explicitly clear the external gateway (send null to API)
+    public let clearExternalGateway: Bool
+
     public init(
         name: String? = nil,
         description: String? = nil,
         adminStateUp: Bool? = nil,
         externalGatewayInfo: ExternalGatewayInfo? = nil,
-        routes: [Route]? = nil
+        routes: [Route]? = nil,
+        clearExternalGateway: Bool = false
     ) {
         self.name = name
         self.description = description
         self.adminStateUp = adminStateUp
         self.externalGatewayInfo = externalGatewayInfo
         self.routes = routes
+        self.clearExternalGateway = clearExternalGateway
     }
 
     enum CodingKeys: String, CodingKey {
@@ -972,6 +977,35 @@ public struct UpdateRouterRequest: Codable, Sendable {
         case adminStateUp = "admin_state_up"
         case externalGatewayInfo = "external_gateway_info"
         case routes
+    }
+
+    /// Custom decoder - clearExternalGateway is a local flag, defaults to false
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decodeIfPresent(String.self, forKey: .name)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.adminStateUp = try container.decodeIfPresent(Bool.self, forKey: .adminStateUp)
+        self.externalGatewayInfo = try container.decodeIfPresent(ExternalGatewayInfo.self, forKey: .externalGatewayInfo)
+        self.routes = try container.decodeIfPresent([Route].self, forKey: .routes)
+        self.clearExternalGateway = false
+    }
+
+    /// Custom encoder - handles sending null to API when clearing external gateway
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        // Encode optional fields only if they have values
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(adminStateUp, forKey: .adminStateUp)
+        try container.encodeIfPresent(routes, forKey: .routes)
+
+        // Handle external gateway specially - encode null if clearing
+        if clearExternalGateway {
+            try container.encodeNil(forKey: .externalGatewayInfo)
+        } else {
+            try container.encodeIfPresent(externalGatewayInfo, forKey: .externalGatewayInfo)
+        }
     }
 }
 

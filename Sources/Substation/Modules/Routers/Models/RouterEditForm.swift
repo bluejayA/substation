@@ -1,10 +1,11 @@
 import Foundation
 import OSClient
 
-enum RouterCreateFieldId: String, CaseIterable {
+/// Field identifiers for the router edit form
+enum RouterEditFieldId: String, CaseIterable {
     case name = "name"
     case description = "description"
-    case availabilityZone = "availabilityZone"
+    case adminStateUp = "adminStateUp"
     case externalGateway = "externalGateway"
     case externalNetwork = "externalNetwork"
 
@@ -14,8 +15,8 @@ enum RouterCreateFieldId: String, CaseIterable {
             return "Router Name"
         case .description:
             return "Description"
-        case .availabilityZone:
-            return "Availability Zone"
+        case .adminStateUp:
+            return "Admin State"
         case .externalGateway:
             return "External Gateway"
         case .externalNetwork:
@@ -24,43 +25,92 @@ enum RouterCreateFieldId: String, CaseIterable {
     }
 }
 
-struct AvailabilityZoneItem: FormSelectableItem, FormSelectorItem {
-    let name: String
+/// Form model for editing an existing router
+///
+/// This form allows users to modify router properties including:
+/// - Router name and description
+/// - Admin state (up/down)
+/// - External gateway configuration
+struct RouterEditForm {
+    // MARK: - Constants
 
-    var id: String { name }
-    var sortKey: String { name }
-
-    func matchesSearch(_ query: String) -> Bool {
-        name.lowercased().contains(query.lowercased())
-    }
-}
-
-struct RouterCreateForm {
     private static let routerNamePlaceholder = "Enter router name"
     private static let routerDescriptionPlaceholder = "Enter description"
     private static let routerNameRequiredError = "Router name is required"
     private static let routerNameInvalidCharsError = "Router name can only contain letters, numbers, spaces, and @._- characters"
     private static let externalNetworkRequiredError = "External network is required when external gateway is enabled"
     private static let noExternalNetworksError = "No external networks available for gateway"
+    private static let adminStateUpLabel = "Up"
+    private static let adminStateDownLabel = "Down"
     private static let externalGatewayEnabledLabel = "Enabled"
     private static let externalGatewayDisabledLabel = "Disabled"
 
+    // MARK: - Properties
+
+    /// The ID of the router being edited
+    var routerId: String = ""
+
+    /// Router name
     var routerName: String = ""
+
+    /// Router description
     var routerDescription: String = ""
-    var selectedAvailabilityZoneId: String?
+
+    /// Admin state (true = up, false = down)
+    var adminStateUp: Bool = true
+
+    /// External gateway enabled
     var externalGatewayEnabled: Bool = false
+
+    /// Selected external network ID
     var selectedExternalNetworkId: String?
 
+    /// Error message if any
     var errorMessage: String? = nil
+
+    /// Loading state
     var isLoading: Bool = false
 
-    func buildFields(selectedFieldId: String?, activeFieldId: String? = nil, formState: FormBuilderState? = nil, availabilityZones: [String], externalNetworks: [Network]) -> [FormField] {
+    // MARK: - Initialization
+
+    /// Initialize an empty edit form
+    init() {}
+
+    /// Initialize the edit form with an existing router's values
+    ///
+    /// - Parameter router: The router to edit
+    init(router: Router) {
+        self.routerId = router.id
+        self.routerName = router.name ?? ""
+        self.routerDescription = router.description ?? ""
+        self.adminStateUp = router.adminStateUp ?? true
+        self.externalGatewayEnabled = router.externalGatewayInfo != nil
+        self.selectedExternalNetworkId = router.externalGatewayInfo?.networkId
+    }
+
+    // MARK: - Field Building
+
+    /// Build form fields for rendering
+    ///
+    /// - Parameters:
+    ///   - selectedFieldId: Currently selected field ID
+    ///   - activeFieldId: Currently active (editing) field ID
+    ///   - formState: Form builder state for cursor positions and selector states
+    ///   - externalNetworks: Available external networks
+    /// - Returns: Array of form fields
+    func buildFields(
+        selectedFieldId: String?,
+        activeFieldId: String? = nil,
+        formState: FormBuilderState? = nil,
+        externalNetworks: [Network]
+    ) -> [FormField] {
         var fields: [FormField] = []
 
-        let nameId = RouterCreateFieldId.name.rawValue
+        // Router Name
+        let nameId = RouterEditFieldId.name.rawValue
         fields.append(.text(FormFieldText(
             id: nameId,
-            label: RouterCreateFieldId.name.title,
+            label: RouterEditFieldId.name.title,
             value: routerName,
             placeholder: Self.routerNamePlaceholder,
             isRequired: true,
@@ -71,10 +121,11 @@ struct RouterCreateForm {
             validationError: getNameValidationError()
         )))
 
-        let descriptionId = RouterCreateFieldId.description.rawValue
+        // Description
+        let descriptionId = RouterEditFieldId.description.rawValue
         fields.append(.text(FormFieldText(
             id: descriptionId,
-            label: RouterCreateFieldId.description.title,
+            label: RouterEditFieldId.description.title,
             value: routerDescription,
             placeholder: Self.routerDescriptionPlaceholder,
             isRequired: false,
@@ -84,35 +135,23 @@ struct RouterCreateForm {
             cursorPosition: formState?.getTextFieldCursorPosition(descriptionId)
         )))
 
-        // Only show availability zone selector if zones are available
-        if !availabilityZones.isEmpty {
-            let availabilityZoneId = RouterCreateFieldId.availabilityZone.rawValue
-            let azItems = availabilityZones.map { AvailabilityZoneItem(name: $0) }
-            fields.append(.selector(FormFieldSelector(
-                id: availabilityZoneId,
-                label: RouterCreateFieldId.availabilityZone.title,
-                items: azItems,
-                selectedItemId: selectedAvailabilityZoneId,
-                isRequired: false,
-                isVisible: true,
-                isSelected: selectedFieldId == availabilityZoneId,
-                isActive: activeFieldId == availabilityZoneId,
-                validationError: nil,
-                columns: [
-                    FormSelectorItemColumn(header: "AVAILABILITY ZONE", width: 40) { item in
-                        (item as? AvailabilityZoneItem)?.name ?? ""
-                    }
-                ],
-                searchQuery: formState?.selectorStates[availabilityZoneId]?.searchQuery,
-                highlightedIndex: formState?.selectorStates[availabilityZoneId]?.highlightedIndex ?? 0,
-                scrollOffset: formState?.selectorStates[availabilityZoneId]?.scrollOffset ?? 0
-            )))
-        }
+        // Admin State
+        let adminStateId = RouterEditFieldId.adminStateUp.rawValue
+        fields.append(.toggle(FormFieldToggle(
+            id: adminStateId,
+            label: RouterEditFieldId.adminStateUp.title,
+            value: adminStateUp,
+            isVisible: true,
+            isSelected: selectedFieldId == adminStateId,
+            enabledLabel: Self.adminStateUpLabel,
+            disabledLabel: Self.adminStateDownLabel
+        )))
 
-        let externalGatewayId = RouterCreateFieldId.externalGateway.rawValue
+        // External Gateway Toggle
+        let externalGatewayId = RouterEditFieldId.externalGateway.rawValue
         fields.append(.toggle(FormFieldToggle(
             id: externalGatewayId,
-            label: RouterCreateFieldId.externalGateway.title,
+            label: RouterEditFieldId.externalGateway.title,
             value: externalGatewayEnabled,
             isVisible: true,
             isSelected: selectedFieldId == externalGatewayId,
@@ -120,12 +159,13 @@ struct RouterCreateForm {
             disabledLabel: Self.externalGatewayDisabledLabel
         )))
 
+        // External Network Selector (only shown when gateway is enabled)
         if externalGatewayEnabled {
-            let externalNetworkId = RouterCreateFieldId.externalNetwork.rawValue
+            let externalNetworkId = RouterEditFieldId.externalNetwork.rawValue
             let networkItems = externalNetworks.filter { $0.external == true }
             fields.append(.selector(FormFieldSelector(
                 id: externalNetworkId,
-                label: RouterCreateFieldId.externalNetwork.title,
+                label: RouterEditFieldId.externalNetwork.title,
                 items: networkItems,
                 selectedItemId: selectedExternalNetworkId,
                 isRequired: true,
@@ -150,6 +190,8 @@ struct RouterCreateForm {
         return fields
     }
 
+    // MARK: - Validation
+
     private func getNameValidationError() -> String? {
         let trimmedName = routerName.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -164,7 +206,6 @@ struct RouterCreateForm {
 
         return nil
     }
-
 
     private func getExternalNetworkValidationError(externalNetworks: [Network]) -> String? {
         guard externalGatewayEnabled else { return nil }
@@ -181,7 +222,11 @@ struct RouterCreateForm {
         return nil
     }
 
-    func validateForm(availabilityZones: [String], externalNetworks: [Network]) -> [String] {
+    /// Validate the form and return any errors
+    ///
+    /// - Parameter externalNetworks: Available external networks for validation
+    /// - Returns: Array of validation error messages
+    func validateForm(externalNetworks: [Network]) -> [String] {
         var errors: [String] = []
 
         if let nameError = getNameValidationError() {
@@ -195,32 +240,41 @@ struct RouterCreateForm {
         return errors
     }
 
+    // MARK: - State Updates
+
+    /// Update form values from form builder state
+    ///
+    /// - Parameter formState: The form builder state to read values from
     mutating func updateFromFormState(_ formState: FormBuilderState) {
-        if let name = formState.getTextValue(RouterCreateFieldId.name.rawValue) {
+        if let name = formState.getTextValue(RouterEditFieldId.name.rawValue) {
             routerName = name
         }
 
-        if let description = formState.getTextValue(RouterCreateFieldId.description.rawValue) {
+        if let description = formState.getTextValue(RouterEditFieldId.description.rawValue) {
             routerDescription = description
         }
 
-        if let azId = formState.selectorStates[RouterCreateFieldId.availabilityZone.rawValue]?.selectedItemId {
-            selectedAvailabilityZoneId = azId
+        if let adminState = formState.getToggleValue(RouterEditFieldId.adminStateUp.rawValue) {
+            adminStateUp = adminState
         }
 
-        if let gatewayEnabled = formState.getToggleValue(RouterCreateFieldId.externalGateway.rawValue) {
+        if let gatewayEnabled = formState.getToggleValue(RouterEditFieldId.externalGateway.rawValue) {
             externalGatewayEnabled = gatewayEnabled
         }
 
-        if let networkId = formState.selectorStates[RouterCreateFieldId.externalNetwork.rawValue]?.selectedItemId {
+        if let networkId = formState.selectorStates[RouterEditFieldId.externalNetwork.rawValue]?.selectedItemId {
             selectedExternalNetworkId = networkId
         }
     }
 
+    // MARK: - Helpers
+
+    /// Get trimmed router name
     func getTrimmedName() -> String {
         return routerName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Get trimmed description
     func getTrimmedDescription() -> String {
         return routerDescription.trimmingCharacters(in: .whitespacesAndNewlines)
     }

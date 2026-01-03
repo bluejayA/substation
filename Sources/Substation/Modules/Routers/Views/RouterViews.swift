@@ -516,6 +516,75 @@ struct RouterViews {
     }
 
 
+    // MARK: - Router Edit View
+
+    private static let routerEditFormTitle = "Edit Router"
+    private static let routerEditScreenTooSmallText = "Screen too small"
+
+    @MainActor
+    static func drawRouterEditForm(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
+                                   width: Int32, height: Int32, routerEditForm: RouterEditForm,
+                                   routerEditFormState: FormBuilderState,
+                                   externalNetworks: [Network]) async {
+
+        let surface = SwiftNCurses.surface(from: screen)
+
+        guard width > Self.routerCreateMinScreenWidth && height > Self.routerCreateMinScreenHeight else {
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(Self.routerCreateBoundsMinWidth, width), height: max(Self.routerCreateBoundsMinHeight, height))
+            await SwiftNCurses.render(Text(Self.routerEditScreenTooSmallText).error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let fields = routerEditForm.buildFields(
+            selectedFieldId: routerEditFormState.getCurrentFieldId(),
+            activeFieldId: routerEditFormState.getActiveFieldId(),
+            formState: routerEditFormState,
+            externalNetworks: externalNetworks
+        )
+
+        let validationErrors = routerEditForm.validateForm(
+            externalNetworks: externalNetworks
+        )
+
+        let formBuilder = FormBuilder(
+            title: Self.routerEditFormTitle,
+            fields: fields,
+            selectedFieldId: routerEditFormState.getCurrentFieldId(),
+            validationErrors: validationErrors,
+            showValidationErrors: !validationErrors.isEmpty
+        )
+
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
+
+        if let currentField = routerEditFormState.getCurrentField() {
+            switch currentField {
+            case .selector(let selectorField) where selectorField.isActive:
+                if let selectorState = routerEditFormState.getSelectorState(selectorField.id) {
+                    if let selectorComponent = FormSelectorRenderer.renderSelector(
+                        label: selectorField.label,
+                        items: selectorField.items,
+                        selectedItemId: selectorState.selectedItemId,
+                        highlightedIndex: selectorState.highlightedIndex,
+                        scrollOffset: selectorState.scrollOffset,
+                        searchQuery: selectorState.searchQuery.isEmpty ? nil : selectorState.searchQuery,
+                        columns: selectorField.columns,
+                        maxHeight: Int(height)
+                    ) {
+                        let overlayBounds = Rect(x: startCol, y: startRow, width: width, height: height)
+                        surface.clear(rect: overlayBounds)
+                        await SwiftNCurses.render(selectorComponent, on: surface, in: overlayBounds)
+                    }
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    // MARK: - Router Delete Confirmation
+
     @MainActor
     static func drawRouterDeleteConfirmation(screen: OpaquePointer?, startRow: Int32, startCol: Int32,
                                            width: Int32, height: Int32, router: Router) async {
