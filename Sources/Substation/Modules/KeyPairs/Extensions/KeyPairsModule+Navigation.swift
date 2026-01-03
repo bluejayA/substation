@@ -71,13 +71,40 @@ extension KeyPairsModule: ModuleNavigationProvider {
 
     /// Open detail view for the currently selected key pair
     ///
-    /// Key pairs do not have a detail view, so this always returns false.
+    /// Handles navigation to the key pair detail view for the currently selected
+    /// key pair in the key pairs list. This filters key pairs based on any active
+    /// search query and validates the selection index before transitioning.
     ///
     /// - Parameters:
     ///   - tui: The TUI instance for accessing view state and cache
-    /// - Returns: false as key pairs do not have detail views
+    /// - Returns: true if the detail view was opened, false otherwise
     func openDetailView(tui: TUI) -> Bool {
-        // Key pairs do not have a detail view
-        return false
+        // Only handle key pairs view
+        guard tui.viewCoordinator.currentView == .keyPairs else {
+            return false
+        }
+
+        // Filter key pairs using the same logic as itemCount
+        let keyPairs = tui.cacheManager.cachedKeyPairs
+        let filteredKeyPairs: [KeyPair]
+
+        if let query = tui.searchQuery, !query.isEmpty {
+            filteredKeyPairs = FilterUtils.filterKeyPairs(keyPairs, query: query)
+        } else {
+            filteredKeyPairs = keyPairs
+        }
+
+        // Validate selection
+        guard !filteredKeyPairs.isEmpty &&
+              tui.viewCoordinator.selectedIndex < filteredKeyPairs.count else {
+            return false
+        }
+
+        // Set selected resource and navigate to detail view
+        tui.viewCoordinator.selectedResource = filteredKeyPairs[tui.viewCoordinator.selectedIndex]
+        tui.changeView(to: .keyPairDetail, resetSelection: false)
+        tui.viewCoordinator.detailScrollOffset = 0
+
+        return true
     }
 }
