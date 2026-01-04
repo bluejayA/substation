@@ -29,7 +29,7 @@ extension TUI {
                 // Receive formState and form as parameters to avoid exclusivity violation
                 self.serverGroupCreateFormState = formState
                 self.serverGroupCreateForm = form
-                if let module = ModuleRegistry.shared.module(for: "serverGroups") as? ServerGroupsModule {
+                if let module = ModuleRegistry.shared.module(for: "servergroups") as? ServerGroupsModule {
                     await module.submitServerGroupCreation(screen: screen)
                 }
             },
@@ -50,24 +50,19 @@ extension ServerGroupCreateForm {
     /// Update form from FormBuilderState
     mutating func updateFromFormState(_ formState: FormBuilderState) {
         // Update form data from FormBuilderState
-        let fields = formState.fields
+        // IMPORTANT: Get values from textFieldStates/selectorStates, not from fields array
+        // The fields array contains the original values, not the user's input
 
-        for field in fields {
-            switch field {
-            case .text(let textField):
-                if textField.id == ServerGroupCreateFieldId.name.rawValue {
-                    self.serverGroupName = textField.value
-                }
-            case .selector(let selectorField):
-                if selectorField.id == ServerGroupCreateFieldId.policy.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let policy = ServerGroupPolicy(rawValue: selectedId) {
-                        self.selectedPolicy = policy
-                    }
-                }
-            default:
-                break
-            }
+        // Update server group name from text field state
+        if let textState = formState.textFieldStates[ServerGroupCreateFieldId.name.rawValue] {
+            self.serverGroupName = textState.value
+        }
+
+        // Update policy from selector state
+        if let selectorState = formState.selectorStates[ServerGroupCreateFieldId.policy.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let policy = ServerGroupPolicy(rawValue: selectedId) {
+            self.selectedPolicy = policy
         }
 
         // Update navigation state
