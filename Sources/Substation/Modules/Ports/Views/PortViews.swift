@@ -181,9 +181,9 @@ struct PortViews {
             var addressPairItems: [DetailItem] = []
 
             for pair in allowedAddressPairs {
-                addressPairItems.append(.field(label: "IP Address", value: pair.ipAddress, style: .secondary))
+                addressPairItems.append(.field(label: "IP Address", value: pair.ipAddress, style: .accent))
                 if let macAddress = pair.macAddress {
-                    addressPairItems.append(.field(label: "  MAC Address", value: macAddress, style: .muted))
+                    addressPairItems.append(.field(label: "  MAC Address", value: macAddress, style: .secondary))
                 }
                 addressPairItems.append(.spacer)
             }
@@ -193,7 +193,13 @@ struct PortViews {
                 addressPairItems.removeLast()
             }
 
-            sections.append(DetailSection(title: "Allowed Address Pairs", items: addressPairItems))
+            sections.append(DetailSection(title: "Allowed Address Pairs (\(allowedAddressPairs.count))", items: addressPairItems))
+        } else {
+            // Show section indicating no allowed address pairs configured
+            sections.append(DetailSection(
+                title: "Allowed Address Pairs",
+                items: [.field(label: "Status", value: "No allowed address pairs configured", style: .muted)]
+            ))
         }
 
         // QoS Section

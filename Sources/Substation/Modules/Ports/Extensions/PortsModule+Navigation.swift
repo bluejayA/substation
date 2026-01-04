@@ -91,8 +91,8 @@ extension PortsModule: ModuleNavigationProvider {
     /// Open detail view for the currently selected port
     ///
     /// Handles navigation to the port detail view for the currently selected
-    /// port in the ports list. This filters ports based on any active
-    /// search query and validates the selection index before transitioning.
+    /// port in the ports list. Uses FilterUtils.filterPorts to ensure consistent
+    /// sorting with the displayed list, whether or not a search query is active.
     ///
     /// - Parameters:
     ///   - tui: The TUI instance for accessing view state and cache
@@ -103,15 +103,8 @@ extension PortsModule: ModuleNavigationProvider {
             return false
         }
 
-        // Filter ports using the same logic as itemCount
-        let ports = tui.cacheManager.cachedPorts
-        let filteredPorts: [Port]
-
-        if let query = tui.searchQuery, !query.isEmpty {
-            filteredPorts = FilterUtils.filterPorts(ports, query: query)
-        } else {
-            filteredPorts = ports
-        }
+        // Always use FilterUtils.filterPorts to ensure consistent sorting with displayed list
+        let filteredPorts = FilterUtils.filterPorts(tui.cacheManager.cachedPorts, query: tui.searchQuery)
 
         // Validate selection
         guard !filteredPorts.isEmpty &&
