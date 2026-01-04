@@ -1,7 +1,7 @@
 import Foundation
 
 enum BarbicanSecretCreateField: CaseIterable {
-    case name, payload, payloadFilePath, payloadContentType, payloadContentEncoding, secretType, algorithm, bitLength, mode, expirationDate
+    case name, payload, payloadFilePath, payloadContentType, payloadContentEncoding, secretType, algorithm, bitLength, mode
 
     var title: String {
         switch self {
@@ -14,7 +14,6 @@ enum BarbicanSecretCreateField: CaseIterable {
         case .algorithm: return "Algorithm"
         case .bitLength: return "Bit Length"
         case .mode: return "Mode"
-        case .expirationDate: return "Expiration Date"
         }
     }
 }
@@ -85,19 +84,9 @@ struct BarbicanSecretCreateForm: FormViewModel {
     var bitLength: Int = 256
     var mode: SecretMode = .cbc
 
-    // Structured expiration date fields
-    var expirationMonth: Int = 1
-    var expirationDay: Int = 1
-    var expirationYear: Int = 2025
-    var expirationHour: Int = 0
-    var expirationMinute: Int = 0
-    var hasExpiration: Bool = false
-
     var currentField: BarbicanSecretCreateField = .name
     var fieldEditMode: Bool = false
     var payloadEditMode: Bool = false // Special mode for multi-line payload editing
-    var dateSelectionMode: Bool = false // Special mode for date selection
-    var dateSelectionIndex: Int = 0 // Current date field index (0=month, 1=day, 2=year, 3=hour, 4=minute)
 
     // Payload input buffering for performance
     var payloadBuffer: String = ""
@@ -200,18 +189,10 @@ struct BarbicanSecretCreateForm: FormViewModel {
         }
     }
 
-    mutating func activateDateSelectionMode() {
-        dateSelectionMode = true
-        hasExpiration = true
-        fieldEditMode = false
-        payloadEditMode = false
-    }
-
     /// Exits any active edit mode in the form
     mutating func exitEditMode() {
         fieldEditMode = false
         payloadEditMode = false
-        dateSelectionMode = false
     }
 
 
@@ -234,31 +215,7 @@ struct BarbicanSecretCreateForm: FormViewModel {
             errors.append("Bit length must be one of: \(validBitLengths.map(String.init).joined(separator: ", "))")
         }
 
-        // Validate expiration date if provided
-        if hasExpiration {
-            if expirationMonth < 1 || expirationMonth > 12 {
-                errors.append("Month must be between 1 and 12")
-            }
-            if expirationDay < 1 || expirationDay > 31 {
-                errors.append("Day must be between 1 and 31")
-            }
-            if expirationYear < 2025 || expirationYear > 9999 {
-                errors.append("Year must be between 2025 and 9999")
-            }
-            if expirationHour < 0 || expirationHour > 23 {
-                errors.append("Hour must be between 0 and 23")
-            }
-            if expirationMinute < 0 || expirationMinute > 59 {
-                errors.append("Minute must be between 0 and 59")
-            }
-
-            // Validate actual date exists
-            let calendar = Calendar.current
-            let dateComponents = DateComponents(year: expirationYear, month: expirationMonth, day: expirationDay, hour: expirationHour, minute: expirationMinute)
-            if calendar.date(from: dateComponents) == nil {
-                errors.append("Invalid date combination")
-            }
-        }
+        // No expiration validation needed - ExpirationOption enum ensures valid values
 
         return errors
     }
@@ -314,76 +271,14 @@ struct BarbicanSecretCreateForm: FormViewModel {
         // Read file
         do {
             let contents = try String(contentsOfFile: expanded, encoding: .utf8)
+            // Clear any direct payload input (mutual exclusivity)
+            payloadBuffer = ""
             payload = contents
             invalidatePayloadCache()
             return nil
         } catch {
             return "Error reading file: \(error.localizedDescription)"
         }
-    }
-
-    func getExpirationDate() -> Date? {
-        guard hasExpiration else {
-            return nil
-        }
-
-        let calendar = Calendar.current
-        let dateComponents = DateComponents(year: expirationYear, month: expirationMonth, day: expirationDay, hour: expirationHour, minute: expirationMinute)
-        return calendar.date(from: dateComponents)
-    }
-
-    // MARK: - Date Selection Navigation Methods
-
-    /// Navigates to the next date field in the date picker
-    mutating func nextDateField() {
-        dateSelectionIndex = min(dateSelectionIndex + 1, 4) // 0=month, 1=day, 2=year, 3=hour, 4=minute
-    }
-
-    /// Navigates to the previous date field in the date picker
-    mutating func previousDateField() {
-        dateSelectionIndex = max(dateSelectionIndex - 1, 0)
-    }
-
-    /// Increases the value of the currently selected date field
-    mutating func increaseDateFieldValue() {
-        switch dateSelectionIndex {
-        case 0: // Month
-            expirationMonth = min(expirationMonth + 1, 12)
-        case 1: // Day
-            expirationDay = min(expirationDay + 1, 31)
-        case 2: // Year
-            expirationYear = min(expirationYear + 1, 9999)
-        case 3: // Hour
-            expirationHour = min(expirationHour + 1, 23)
-        case 4: // Minute
-            expirationMinute = min(expirationMinute + 1, 59)
-        default:
-            break
-        }
-    }
-
-    /// Decreases the value of the currently selected date field
-    mutating func decreaseDateFieldValue() {
-        switch dateSelectionIndex {
-        case 0: // Month
-            expirationMonth = max(expirationMonth - 1, 1)
-        case 1: // Day
-            expirationDay = max(expirationDay - 1, 1)
-        case 2: // Year
-            expirationYear = max(expirationYear - 1, 2025)
-        case 3: // Hour
-            expirationHour = max(expirationHour - 1, 0)
-        case 4: // Minute
-            expirationMinute = max(expirationMinute - 1, 0)
-        default:
-            break
-        }
-    }
-
-    /// Exits date selection mode and resets the date selection index
-    mutating func exitDateSelectionMode() {
-        dateSelectionMode = false
-        dateSelectionIndex = 0
     }
 
     // Payload buffer management for performance
@@ -409,6 +304,8 @@ struct BarbicanSecretCreateForm: FormViewModel {
             payload += payloadBuffer
             payloadBuffer = ""
             invalidatePayloadCache() // Invalidate cache when content changes
+            // Clear file path when payload is directly edited (mutual exclusivity)
+            payloadFilePath = ""
         }
         isBuffering = false
 
@@ -510,7 +407,7 @@ struct BarbicanSecretCreateForm: FormViewModel {
 
     /// Determines if the form is currently in a special input mode
     func isInSpecialMode() -> Bool {
-        return fieldEditMode || payloadEditMode || dateSelectionMode
+        return fieldEditMode || payloadEditMode
     }
 
     private func getFieldConfiguration(for field: BarbicanSecretCreateField) -> FormFieldConfiguration {
@@ -611,16 +508,6 @@ struct BarbicanSecretCreateForm: FormViewModel {
                 isSelected: isSelected,
                 isActive: false,
                 value: mode.title,
-                fieldType: .enumeration
-            )
-
-        case .expirationDate:
-            return FormFieldConfiguration(
-                title: field.title,
-                isRequired: false,
-                isSelected: isSelected,
-                isActive: dateSelectionMode,
-                value: hasExpiration ? "Set Custom Date" : "No Expiration",
                 fieldType: .enumeration
             )
         }
@@ -824,29 +711,6 @@ struct BarbicanSecretCreateForm: FormViewModel {
             scrollOffset: formState.selectorStates[modeFieldId]?.scrollOffset ?? 0
         )))
 
-        // Expiration Date (Selector)
-        let expirationFieldId = BarbicanSecretCreateFieldId.expirationDate.rawValue
-        let expirationItems = ExpirationOption.allCases.map { $0 as any FormSelectorItem }
-        fields.append(.selector(FormFieldSelector(
-            id: expirationFieldId,
-            label: BarbicanSecretCreateField.expirationDate.title,
-            items: expirationItems,
-            selectedItemId: hasExpiration ? ExpirationOption.setCustomDate.rawValue : ExpirationOption.noExpiration.rawValue,
-            isRequired: false,
-            isVisible: true,
-            isSelected: selectedFieldId == expirationFieldId,
-            isActive: activeFieldId == expirationFieldId,
-            validationError: nil,
-            columns: [
-                FormSelectorItemColumn(header: "OPTION", width: 25) { item in
-                    (item as? ExpirationOption)?.title ?? ""
-                }
-            ],
-            searchQuery: formState.selectorStates[expirationFieldId]?.searchQuery,
-            highlightedIndex: formState.selectorStates[expirationFieldId]?.highlightedIndex ?? 0,
-            scrollOffset: formState.selectorStates[expirationFieldId]?.scrollOffset ?? 0
-        )))
-
         return fields
     }
 }
@@ -863,7 +727,6 @@ enum BarbicanSecretCreateFieldId: String {
     case algorithm = "algorithm"
     case bitLength = "bit-length"
     case mode = "mode"
-    case expirationDate = "expiration-date"
 }
 
 // MARK: - BarbicanSecretCreateForm FormState Integration
@@ -915,16 +778,6 @@ extension BarbicanSecretCreateForm {
             self.mode = m
         }
 
-        // Handle expiration date from selectorStates
-        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.expirationDate.rawValue],
-           let selectedId = selectorState.selectedItemId {
-            if selectedId == ExpirationOption.setCustomDate.rawValue {
-                self.hasExpiration = true
-            } else {
-                self.hasExpiration = false
-            }
-        }
-
         // Update navigation state
         if let currentFieldId = formState.getCurrentFieldId() {
             // Map field ID back to BarbicanSecretCreateField enum
@@ -933,6 +786,8 @@ extension BarbicanSecretCreateForm {
                 self.currentField = .name
             case BarbicanSecretCreateFieldId.payload.rawValue:
                 self.currentField = .payload
+            case BarbicanSecretCreateFieldId.payloadFilePath.rawValue:
+                self.currentField = .payloadFilePath
             case BarbicanSecretCreateFieldId.payloadContentType.rawValue:
                 self.currentField = .payloadContentType
             case BarbicanSecretCreateFieldId.payloadContentEncoding.rawValue:
@@ -945,8 +800,6 @@ extension BarbicanSecretCreateForm {
                 self.currentField = .bitLength
             case BarbicanSecretCreateFieldId.mode.rawValue:
                 self.currentField = .mode
-            case BarbicanSecretCreateFieldId.expirationDate.rawValue:
-                self.currentField = .expirationDate
             default:
                 break
             }

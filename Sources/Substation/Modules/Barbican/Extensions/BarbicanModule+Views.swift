@@ -125,7 +125,11 @@ extension BarbicanModule {
                         formState: tui.barbicanSecretCreateFormState
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return false }
+                    await tui.handleBarbicanSecretCreateInput(ch, screen: screen)
+                    return true
+                }
             )
         ]
     }

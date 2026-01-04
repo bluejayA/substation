@@ -144,7 +144,10 @@ extension BarbicanModule {
         tui.renderCoordinator.needsRedraw = true
 
         do {
-            let expiration = tui.barbicanSecretCreateForm.getExpirationDate()
+            // Only include payload_content_encoding for non-text content types
+            // For text/plain, Barbican expects payload_content_encoding to be nil
+            let contentType = tui.barbicanSecretCreateForm.payloadContentType
+            let contentEncoding: String? = contentType == .textPlain ? nil : tui.barbicanSecretCreateForm.payloadContentEncoding.rawValue
 
             let request = CreateSecretRequest(
                 name: secretName,
@@ -153,9 +156,9 @@ extension BarbicanModule {
                 bitLength: tui.barbicanSecretCreateForm.bitLength,
                 mode: tui.barbicanSecretCreateForm.mode.rawValue,
                 payload: payload,
-                payloadContentType: tui.barbicanSecretCreateForm.payloadContentType.rawValue,
-                payloadContentEncoding: tui.barbicanSecretCreateForm.payloadContentEncoding.rawValue,
-                expiration: expiration
+                payloadContentType: contentType.rawValue,
+                payloadContentEncoding: contentEncoding,
+                expiration: nil
             )
 
             _ = try await tui.client.barbican.createSecret(request: request)

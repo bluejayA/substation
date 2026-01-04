@@ -23,12 +23,6 @@ extension TUI {
             return
         }
 
-        // Special handling for date selection mode
-        if barbicanSecretCreateForm.dateSelectionMode {
-            await handleDateSelectionInput(ch, screen: screen)
-            return
-        }
-
         // Normal form handling with universal handler
         var localFormState = barbicanSecretCreateFormState
         var localFormAdapter = BarbicanSecretCreateFormAdapter(form: barbicanSecretCreateForm)
@@ -47,34 +41,9 @@ extension TUI {
                 }
             }
 
-            // ENTER on expiration selector with "Set Custom Date" enters date selection mode
+            // ENTER on file path field loads the file
             if (ch == Int32(10) || ch == Int32(13)) && formState.isCurrentFieldActive() {
                 if let field = formState.getCurrentField() {
-                    // Handle expiration date selector confirmation
-                    if case .selector(let selectorField) = field,
-                       selectorField.id == BarbicanSecretCreateFieldId.expirationDate.rawValue {
-                        // Check if "Set Custom Date" is selected
-                        if let selectorState = formState.selectorStates[selectorField.id] {
-                            let highlightedIndex = selectorState.highlightedIndex
-                            let items = ExpirationOption.allCases
-                            if highlightedIndex < items.count {
-                                let selectedOption = items[highlightedIndex]
-                                if selectedOption == .setCustomDate {
-                                    // Update form state to reflect selection
-                                    formAdapter.form.hasExpiration = true
-                                    // Enter date selection mode
-                                    formAdapter.form.dateSelectionMode = true
-                                    formAdapter.form.dateSelectionIndex = 0
-                                    await self.draw(screen: screen)
-                                    return true
-                                } else {
-                                    // No expiration selected
-                                    formAdapter.form.hasExpiration = false
-                                }
-                            }
-                        }
-                    }
-                    // Handle file path field - loads file
                     if case .text(let textField) = field,
                        textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
                         if let error = formAdapter.form.loadPayloadFromFile() {
@@ -96,7 +65,7 @@ extension TUI {
             formState: &localFormState,
             form: &localFormAdapter,
             onSubmit: { formState, formAdapter in
-                // Receive formState and formAdapter as parameters to avoid exclusivity violation
+                // Sync state before submission
                 self.barbicanSecretCreateFormState = formState
                 self.barbicanSecretCreateForm = formAdapter.form
                 if let module = ModuleRegistry.shared.module(for: "barbican") as? BarbicanModule {
@@ -109,16 +78,12 @@ extension TUI {
             customKeyHandler: customHandler
         )
 
-        // Rebuild after universal handler to ensure field visibility is correct
-        localFormState = FormBuilderState(fields: localFormAdapter.form.buildFields(
-            selectedFieldId: localFormState.getCurrentFieldId(),
-            activeFieldId: nil,
-            formState: localFormState
-        ))
-
-        // Update actor-isolated properties
+        // Update actor-isolated properties with modified local copies
         barbicanSecretCreateFormState = localFormState
         barbicanSecretCreateForm = localFormAdapter.form
+
+        // Redraw with updated state to show selector overlays
+        await self.draw(screen: screen)
     }
 
     // MARK: - Payload Editor Input Handler
@@ -145,39 +110,6 @@ extension TUI {
         }
     }
 
-    // MARK: - Legacy Date Selection Input Handler
-
-    private func handleDateSelectionInput(_ ch: Int32, screen: OpaquePointer?) async {
-        switch ch {
-        case Int32(9), Int32(258): // TAB or DOWN - Next date field
-            self.barbicanSecretCreateForm.nextDateField()
-            await self.draw(screen: screen)
-
-        case 353, Int32(259): // SHIFT+TAB or UP - Previous date field
-            self.barbicanSecretCreateForm.previousDateField()
-            await self.draw(screen: screen)
-
-        case Int32(261), Int32(43): // RIGHT or + - Increase value
-            self.barbicanSecretCreateForm.increaseDateFieldValue()
-            await self.draw(screen: screen)
-
-        case Int32(260), Int32(45): // LEFT or - - Decrease value
-            self.barbicanSecretCreateForm.decreaseDateFieldValue()
-            await self.draw(screen: screen)
-
-        case Int32(10), Int32(13): // ENTER - Confirm date
-            self.barbicanSecretCreateForm.exitDateSelectionMode()
-            await self.draw(screen: screen)
-
-        case Int32(27): // ESC - Cancel date selection
-            self.barbicanSecretCreateForm.hasExpiration = false
-            self.barbicanSecretCreateForm.exitDateSelectionMode()
-            await self.draw(screen: screen)
-
-        default:
-            break
-        }
-    }
 }
 
 // MARK: - BarbicanSecretCreateForm Adapter

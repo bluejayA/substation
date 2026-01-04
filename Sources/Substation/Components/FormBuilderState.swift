@@ -606,11 +606,27 @@ struct FormBuilderState {
     }
 
     func getActiveFieldId() -> String? {
+        // First check the fields array for active state
         for field in fields {
             if field.isActive {
                 return field.id
             }
         }
+
+        // Also check text field states for active editing
+        for (fieldId, state) in textFieldStates {
+            if state.isEditing {
+                return fieldId
+            }
+        }
+
+        // Also check selector states for active selectors
+        for (fieldId, state) in selectorStates {
+            if state.isActive {
+                return fieldId
+            }
+        }
+
         return nil
     }
 

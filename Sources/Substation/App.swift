@@ -698,7 +698,7 @@ struct Substation {
           -c, --cloud <name>     Specify cloud name from clouds.yaml
           --config <path>        Path to clouds.yaml file (default: ~/.config/openstack/clouds.yaml)
           --list-clouds          List available clouds in configuration
-          --wiretap               Enable debug mode and log to ~/substation.log
+          --wiretap              Enable debug mode and log to ~/substation.log
           -h, --help             Show this help message
 
         Environment Variables:

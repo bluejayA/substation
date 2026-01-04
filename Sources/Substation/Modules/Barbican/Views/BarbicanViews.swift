@@ -284,13 +284,6 @@ struct BarbicanViews {
             return
         }
 
-        // Handle date selection mode
-        if form.dateSelectionMode {
-            await drawDateSelectionWindow(screen: screen, startRow: startRow, startCol: startCol,
-                                        width: width, height: height, form: form)
-            return
-        }
-
         let surface = SwiftNCurses.surface(from: screen)
 
         // Build form fields
@@ -314,7 +307,8 @@ struct BarbicanViews {
         surface.clear(rect: bounds)
         await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
 
-        // If a selector field is active, render overlay using FormSelectorRenderer
+        // If a selector field is active, render specialized view as overlay
+        // This pattern matches ServerCreateView exactly
         if let currentField = formState.getCurrentField() {
             switch currentField {
             case .selector(let selectorField) where selectorField.isActive:
@@ -325,7 +319,7 @@ struct BarbicanViews {
                     width: width,
                     height: height,
                     field: selectorField,
-                    selectorState: formState.selectorStates[selectorField.id] ?? FormSelectorFieldState(items: selectorField.items)
+                    selectorState: formState.getSelectorState(selectorField.id) ?? FormSelectorFieldState(items: selectorField.items)
                 )
             default:
                 break
@@ -480,63 +474,5 @@ struct BarbicanViews {
 
         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
         await SwiftNCurses.render(editorComponent, on: surface, in: bounds)
-    }
-
-    @MainActor
-    private static func drawDateSelectionWindow(
-        screen: OpaquePointer?,
-        startRow: Int32,
-        startCol: Int32,
-        width: Int32,
-        height: Int32,
-        form: BarbicanSecretCreateForm
-    ) async {
-        let surface = SwiftNCurses.surface(from: screen)
-        var components: [any Component] = []
-
-        // Title
-        components.append(Text("Set Custom Expiration Date").accent().bold()
-                         .padding(EdgeInsets(top: 0, leading: 0, bottom: 2, trailing: 0)))
-
-        // Instructions
-        components.append(Text("UP/DOWN: Navigate fields | LEFT/RIGHT or +/-: Adjust values | ENTER: Confirm | ESC: Cancel").secondary())
-        components.append(Text(""))
-
-        // Date components
-        let dateFields = [
-            ("Month (1-12)", form.expirationMonth, 1, 12),
-            ("Day (1-31)", form.expirationDay, 1, 31),
-            ("Year (2025-9999)", form.expirationYear, 2025, 9999),
-            ("Hour (0-23)", form.expirationHour, 0, 23),
-            ("Minute (0-59)", form.expirationMinute, 0, 59)
-        ]
-
-        for (index, field) in dateFields.enumerated() {
-            let (label, value, _, _) = field
-            let isSelected = index == form.dateSelectionIndex
-            let prefix = isSelected ? ">> " : "   "
-            let style: TextStyle = isSelected ? .accent : .secondary
-            let valueDisplay = isSelected ? "[\(value)]" : "\(value)" // Highlight selected value
-
-            components.append(Text("\(prefix)\(label): \(valueDisplay)").styled(style))
-        }
-
-        // Footer
-        components.append(Text(""))
-        components.append(Text("Use LEFT/RIGHT arrows or +/- keys to adjust selected value").info())
-
-        let currentDate = form.getExpirationDate()
-        if let date = currentDate {
-            components.append(Text("Preview: \(date.mediumFormatted())").success())
-        } else {
-            components.append(Text("Invalid date combination").error())
-        }
-
-        // Render the date selection window
-        let dateComponent = VStack(spacing: 0, children: components)
-            .padding(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
-
-        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-        await SwiftNCurses.render(dateComponent, on: surface, in: bounds)
     }
 }
