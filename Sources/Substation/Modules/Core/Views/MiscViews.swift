@@ -195,6 +195,7 @@ struct MiscViews {
                     "SHIFT-C: Create new volume",
                     "SHIFT-M: Manage volume attachments",
                     "SHIFT-P: Create volume snapshot",
+                    "SHIFT-B: Create volume backup",
                     "DELETE: Delete selected volume",
                     "Volume States: Available, In-use, Creating, Deleting",
                 ]),
