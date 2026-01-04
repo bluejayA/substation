@@ -1073,4 +1073,49 @@ struct ImageViews {
             return totalLines
         }
     }
+
+    // MARK: - Image Create Form View
+
+    /// Draw the image create form
+    @MainActor
+    static func drawImageCreateForm(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        form: ImageCreateForm,
+        formState: FormBuilderState
+    ) async {
+        // Defensive bounds checking
+        guard width > 20 && height > 10 else {
+            let surface = SwiftNCurses.surface(from: screen)
+            let errorBounds = Rect(x: max(0, startCol), y: max(0, startRow), width: max(1, width), height: max(1, height))
+            await SwiftNCurses.render(Text("Screen too small").error(), on: surface, in: errorBounds)
+            return
+        }
+
+        let surface = SwiftNCurses.surface(from: screen)
+
+        // Build form fields
+        let fields = form.buildFields(
+            selectedFieldId: formState.getCurrentFieldId(),
+            activeFieldId: formState.getActiveFieldId(),
+            formState: formState
+        )
+
+        // Create FormBuilder
+        let formBuilder = FormBuilder(
+            title: "Create New Image",
+            fields: fields,
+            selectedFieldId: formState.getCurrentFieldId(),
+            validationErrors: form.validateForm(),
+            showValidationErrors: formState.showValidationErrors
+        )
+
+        // Render the form
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        surface.clear(rect: bounds)
+        await SwiftNCurses.render(formBuilder.render(), on: surface, in: bounds)
+    }
 }

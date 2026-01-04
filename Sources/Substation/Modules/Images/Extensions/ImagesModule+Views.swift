@@ -23,9 +23,16 @@ extension ImagesModule {
             viewType: .detail
         )
 
+        /// Image create view
+        static let create = DynamicViewIdentifier(
+            id: "images.create",
+            moduleId: "images",
+            viewType: .create
+        )
+
         /// All view identifiers
         static var all: [DynamicViewIdentifier] {
-            return [list, detail]
+            return [list, detail, create]
         }
     }
 
@@ -85,6 +92,33 @@ extension ImagesModule {
                     )
                 },
                 inputHandler: nil
+            ),
+
+            // Image Create View
+            ViewMetadata(
+                identifier: Views.create,
+                title: "Create Image",
+                parentViewId: Views.list.id,
+                isDetailView: false,
+                supportsMultiSelect: false,
+                category: .compute,
+                renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                    guard let tui = tui else { return }
+                    await ImageViews.drawImageCreateForm(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        form: tui.imageCreateForm,
+                        formState: tui.imageCreateFormState
+                    )
+                },
+                inputHandler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return true }
+                    await tui.handleImageCreateInput(ch, screen: screen)
+                    return true
+                }
             )
         ]
     }

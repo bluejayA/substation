@@ -33,13 +33,16 @@ final class ImagesModule: OpenStackModule {
 
     /// View modes handled by this module
     var handledViewModes: Set<ViewMode> {
-        return [.images, .imageDetail]
+        return [.images, .imageDetail, .imageCreate]
     }
 
     // MARK: - Internal Properties
 
     /// Weak reference to TUI to prevent retain cycles
     internal weak var tui: TUI?
+
+    /// Form state container for Images module
+    internal var formState = ImagesFormState()
 
     /// Module health tracking
     private var lastHealthCheck: Date?
@@ -151,6 +154,31 @@ final class ImagesModule: OpenStackModule {
             category: .compute
         ))
 
+        // Register image create view
+        registrations.append(ModuleViewRegistration(
+            viewMode: .imageCreate,
+            title: "Create Image",
+            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                guard let tui = tui else { return }
+
+                await ImageViews.drawImageCreateForm(
+                    screen: screen,
+                    startRow: startRow,
+                    startCol: startCol,
+                    width: width,
+                    height: height,
+                    form: tui.imageCreateForm,
+                    formState: tui.imageCreateFormState
+                )
+            },
+            inputHandler: { [weak tui] ch, screen in
+                guard let tui = tui else { return true }
+                await tui.handleImageCreateInput(ch, screen: screen)
+                return true
+            },
+            category: .compute
+        ))
+
         return registrations
     }
 
@@ -158,13 +186,23 @@ final class ImagesModule: OpenStackModule {
 
     /// Register form handlers for Images forms
     ///
-    /// Images module is read-only and provides no forms.
-    /// Image creation and modification must be done through external tools.
-    ///
-    /// - Returns: Empty array (no form handlers)
+    /// - Returns: Array of form handler registrations
     func registerFormHandlers() -> [ModuleFormHandlerRegistration] {
-        // Images is a read-only module with no forms
-        return []
+        guard let tui = tui else { return [] }
+
+        return [
+            ModuleFormHandlerRegistration(
+                viewMode: .imageCreate,
+                handler: { [weak tui] ch, screen in
+                    guard let tui = tui else { return }
+                    await tui.handleImageCreateInput(ch, screen: screen)
+                },
+                formValidation: { [weak tui] in
+                    guard let tui = tui else { return false }
+                    return tui.imageCreateForm.isValid()
+                }
+            )
+        ]
     }
 
     // MARK: - Data Refresh Registration
@@ -271,16 +309,16 @@ final class ImagesModule: OpenStackModule {
 extension ImagesModule: ActionProvider {
     /// Actions available in the list view for images
     ///
-    /// Images module is read-only so no create action. Includes delete, refresh, and cache management.
+    /// Includes create, delete, refresh, and cache management.
     var listViewActions: [ActionType] {
-        [.delete, .refresh, .clearCache]
+        [.create, .delete, .refresh, .clearCache]
     }
 
     /// The view mode for creating a new image
     ///
-    /// Returns nil as Images module is read-only.
+    /// Returns .imageCreate for navigating to the image creation form.
     var createViewMode: ViewMode? {
-        nil
+        .imageCreate
     }
 
     /// Execute an action for the selected image
@@ -292,6 +330,16 @@ extension ImagesModule: ActionProvider {
     /// - Returns: Boolean indicating if the action was handled
     func executeAction(_ action: ActionType, screen: OpaquePointer?, tui: TUI) async -> Bool {
         switch action {
+        case .create:
+            // Open image create form
+            tui.imageCreateForm = ImageCreateForm()
+            tui.imageCreateFormState = FormBuilderState(fields: tui.imageCreateForm.buildFields(
+                selectedFieldId: ImageCreateFieldId.name.rawValue,
+                activeFieldId: nil,
+                formState: FormBuilderState(fields: [])
+            ))
+            tui.changeView(to: .imageCreate, resetSelection: true)
+            return true
         case .delete:
             await deleteImage(screen: screen)
             return true
