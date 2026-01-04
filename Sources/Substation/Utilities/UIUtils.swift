@@ -51,7 +51,9 @@ struct UIUtils {
             let delete = formatHelp(command: "delete", description: "delete")
             return "\(baseCommands) SPACE:details \(delete) /:search ESC:back"
         case .images:
-            return "\(baseCommands) SPACE:details :delete /:search ESC:back"
+            return "\(baseCommands) SPACE:details C:create :delete /:search ESC:back"
+        case .imageCreate:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:create ESC:cancel"
         case .flavors:
             return "\(baseCommands) SPACE:details /:search ESC:back"
         case .keyPairs:

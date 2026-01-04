@@ -12,7 +12,7 @@ enum ViewMode: CaseIterable {
         swiftContainerDetail, swiftObjectDetail, swiftBackgroundOperationDetail, serverCreate,
         serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement,
         subnetCreate, volumeCreate, portCreate, routerCreate, routerEdit, floatingIPCreate, keyPairs,
-        keyPairDetail, keyPairCreate, help, about, welcome, tutorial, shortcuts, examples, serverSecurityGroups, serverNetworkInterfaces,
+        keyPairDetail, keyPairCreate, imageCreate, help, about, welcome, tutorial, shortcuts, examples, serverSecurityGroups, serverNetworkInterfaces,
         serverGroupManagement, volumeManagement, floatingIPServerSelect, serverSnapshotManagement,
         serverResize, volumeSnapshotManagement, volumeBackupManagement, networkServerAttachment,
         securityGroupServerAttachment, securityGroupServerManagement, networkServerManagement,
@@ -70,6 +70,7 @@ enum ViewMode: CaseIterable {
         case .volumeBackupManagement: return "Create Volume Backup"
         case .images: return "Images"
         case .imageDetail: return "Image Details"
+        case .imageCreate: return "Create Image"
         case .flavors: return "Flavors"
         case .flavorDetail: return "Flavor Details"
         case .keyPairs: return "Key Pairs"
@@ -126,7 +127,7 @@ enum ViewMode: CaseIterable {
             .healthDashboardServiceDetail, .serverCreate, .serverGroupCreate, .networkCreate,
             .securityGroupCreate, .securityGroupRuleManagement, .subnetCreate, .volumeCreate,
             .portCreate, .routerCreate, .routerEdit, .floatingIPCreate, .keyPairDetail, .keyPairCreate,
-            .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement,
+            .imageCreate, .serverSecurityGroups, .serverNetworkInterfaces, .serverGroupManagement,
             .volumeManagement, .floatingIPServerSelect, .serverSnapshotManagement, .serverResize,
             .volumeSnapshotManagement, .volumeBackupManagement, .networkServerAttachment,
             .securityGroupServerAttachment, .securityGroupServerManagement,
@@ -170,6 +171,7 @@ enum ViewMode: CaseIterable {
         case .volumeDetail: return .volumes
         case .volumeArchiveDetail: return .volumeArchives
         case .imageDetail: return .images
+        case .imageCreate: return .images
         case .flavorDetail: return .flavors
         case .subnetDetail: return .subnets
         case .portDetail: return .ports

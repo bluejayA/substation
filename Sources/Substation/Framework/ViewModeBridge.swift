@@ -100,6 +100,7 @@ extension ViewMode {
         // Images module
         case .images: return "images.list"
         case .imageDetail: return "images.detail"
+        case .imageCreate: return "images.create"
 
         // Flavors module
         case .flavors: return "flavors.list"
