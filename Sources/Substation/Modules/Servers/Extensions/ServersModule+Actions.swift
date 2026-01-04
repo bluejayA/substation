@@ -1505,6 +1505,13 @@ extension ServersModule {
         tui.snapshotManagementForm.selectedServer = selectedServer
         tui.snapshotManagementForm.generateDefaultSnapshotName()
 
+        // Initialize form state with fields
+        tui.snapshotManagementFormState = FormBuilderState(fields: tui.snapshotManagementForm.buildFields(
+            selectedFieldId: nil,
+            activeFieldId: nil,
+            formState: nil
+        ))
+
         // Switch to the snapshot management view
         tui.changeView(to: .serverSnapshotManagement, resetSelection: false)
     }

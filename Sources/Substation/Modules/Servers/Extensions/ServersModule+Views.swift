@@ -125,7 +125,34 @@ extension ServersModule {
                         selectedItems: tui.selectionManager.multiSelectedResourceIDs
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak self, weak tui] ch, screen in
+                    guard let self = self, let tui = tui else { return false }
+
+                    switch ch {
+                    case Int32(76):  // L - View server logs (SHIFT-L)
+                        Logger.shared.logUserAction("view_server_logs", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.viewServerLogs(screen: screen)
+                        return true
+
+                    case Int32(79):  // O - View server console (SHIFT-O)
+                        Logger.shared.logUserAction("view_server_console", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.viewServerConsole(screen: screen)
+                        return true
+
+                    case Int32(80):  // P - Create snapshot (SHIFT-P)
+                        Logger.shared.logUserAction("create_snapshot", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.createServerSnapshot(screen: screen)
+                        return true
+
+                    case Int32(90):  // Z - Resize server (SHIFT-Z)
+                        Logger.shared.logUserAction("resize_server", details: ["selectedIndex": tui.viewCoordinator.selectedIndex])
+                        await self.resizeServer(screen: screen)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
 
             // Server Detail View
@@ -197,17 +224,37 @@ extension ServersModule {
                 category: .compute,
                 renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                     guard let tui = tui else { return }
-                    guard tui.viewCoordinator.selectedResource is Server else {
+                    guard let console = tui.viewCoordinator.selectedResource as? RemoteConsole else {
                         let surface = SwiftNCurses.surface(from: screen)
                         let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-                        await SwiftNCurses.render(Text("No server selected").error(), on: surface, in: bounds)
+                        await SwiftNCurses.render(Text("No console data available").error(), on: surface, in: bounds)
                         return
                     }
-                    let surface = SwiftNCurses.surface(from: screen)
-                    let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-                    await SwiftNCurses.render(Text("Console data not available").error(), on: surface, in: bounds)
+
+                    let serverName = tui.viewCoordinator.previousSelectedResourceName ?? "Unknown Server"
+                    await ServerViews.drawServerConsole(
+                        screen: screen,
+                        startRow: startRow,
+                        startCol: startCol,
+                        width: width,
+                        height: height,
+                        console: console,
+                        serverName: serverName
+                    )
                 },
-                inputHandler: nil
+                inputHandler: { [weak self] ch, _ in
+                    guard let self = self else { return false }
+
+                    switch ch {
+                    case Int32(79):  // O - Open console in browser
+                        Logger.shared.logUserAction("open_console_in_browser")
+                        await self.openConsoleInBrowser()
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
 
             // Server Resize View

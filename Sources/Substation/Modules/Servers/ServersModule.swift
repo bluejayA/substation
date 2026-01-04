@@ -274,16 +274,23 @@ final class ServersModule: OpenStackModule {
             title: "Server Console",
             renderHandler: { [weak tui] screen, startRow, startCol, width, height in
                 guard let tui = tui else { return }
-                guard tui.viewCoordinator.selectedResource is Server else {
+                guard let console = tui.viewCoordinator.selectedResource as? RemoteConsole else {
                     let surface = SwiftNCurses.surface(from: screen)
                     let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-                    await SwiftNCurses.render(Text("No server selected").error(), on: surface, in: bounds)
+                    await SwiftNCurses.render(Text("No console data available").error(), on: surface, in: bounds)
                     return
                 }
 
-                let surface = SwiftNCurses.surface(from: screen)
-                let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-                await SwiftNCurses.render(Text("Console data not available").error(), on: surface, in: bounds)
+                let serverName = tui.viewCoordinator.previousSelectedResourceName ?? "Unknown Server"
+                await ServerViews.drawServerConsole(
+                    screen: screen,
+                    startRow: startRow,
+                    startCol: startCol,
+                    width: width,
+                    height: height,
+                    console: console,
+                    serverName: serverName
+                )
             },
             inputHandler: { [weak self] ch, _ in
                 guard let self = self else { return false }
@@ -320,6 +327,31 @@ final class ServersModule: OpenStackModule {
             inputHandler: { [weak tui] ch, screen in
                 guard let tui = tui else { return false }
                 await tui.handleServerResizeInput(ch, screen: screen)
+                return true
+            },
+            category: .compute
+        ))
+
+        // Register server snapshot management view
+        registrations.append(ModuleViewRegistration(
+            viewMode: .serverSnapshotManagement,
+            title: "Create Server Snapshot",
+            renderHandler: { [weak tui] screen, startRow, startCol, width, height in
+                guard let tui = tui else { return }
+
+                await SnapshotManagementView.drawServerSnapshotManagement(
+                    screen: screen,
+                    startRow: startRow,
+                    startCol: startCol,
+                    width: width,
+                    height: height,
+                    form: tui.snapshotManagementForm,
+                    formBuilderState: tui.snapshotManagementFormState
+                )
+            },
+            inputHandler: { [weak tui] ch, screen in
+                guard let tui = tui else { return false }
+                await tui.handleSnapshotManagementInput(ch, screen: screen)
                 return true
             },
             category: .compute

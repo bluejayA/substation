@@ -75,6 +75,15 @@ extension TUI {
 
     /// Handle view-specific input (SPACE and ENTER behavior changes based on mode)
     private func handleServerResizeSpecificInput(_ ch: Int32, screen: OpaquePointer?) async {
+        // Handle ESC key for both modes - return to servers list
+        if ch == Int32(27) { // ESC
+            Logger.shared.logUserAction("server_resize_cancelled", details: ["mode": "\(serverResizeForm.mode)"])
+            serverResizeForm.reset()
+            changeView(to: .servers, resetSelection: false)
+            await self.draw(screen: screen)
+            return
+        }
+
         if serverResizeForm.mode == .confirmOrRevert {
             // Confirm/revert mode
             switch ch {

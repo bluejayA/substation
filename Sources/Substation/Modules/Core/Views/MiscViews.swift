@@ -174,7 +174,7 @@ struct MiscViews {
                     "SHIFT-P: Create snapshot",
                     "SHIFT-L: View server logs",
                     "SHIFT-O: View server console (opens noVNC in browser)",
-                    "SHIFT-Z: Resize server",
+                    "SHIFT-Z: Resize server (resize, confirm, or revert)",
                     "DELETE: Delete selected server",
                     "Server States: ACTIVE, SHUTOFF, ERROR, BUILD",
                 ]),
