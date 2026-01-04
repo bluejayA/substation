@@ -101,6 +101,59 @@ extension VolumesModule: ModuleNavigationProvider {
         return ["servers", "images", "snapshots", "backups"]
     }
 
+    /// Ensure data is loaded when navigating to a view
+    ///
+    /// Loads volume snapshots, backups, and images when navigating to Volume Archives.
+    /// This ensures data is available even on first navigation.
+    ///
+    /// - Parameter tui: The TUI instance for accessing cache and client
+    func ensureDataLoaded(tui: TUI) async {
+        switch tui.viewCoordinator.currentView {
+        case .volumeArchives, .volumeArchiveDetail:
+            // Load snapshots, backups, and images if not already cached
+            let snapshotsEmpty = tui.cacheManager.cachedVolumeSnapshots.isEmpty
+            let backupsEmpty = tui.cacheManager.cachedVolumeBackups.isEmpty
+
+            if snapshotsEmpty || backupsEmpty {
+                Logger.shared.logInfo("Loading volume archives data on view change")
+
+                do {
+                    // Load snapshots
+                    let snapshots = try await tui.client.cinder.listSnapshots()
+                    tui.cacheManager.cachedVolumeSnapshots = snapshots
+
+                    // Load backups
+                    let backups = try await tui.client.cinder.listBackups()
+                    tui.cacheManager.cachedVolumeBackups = backups
+
+                    // Load images for server backups
+                    if tui.cacheManager.cachedImages.isEmpty {
+                        let images = try await tui.client.glance.listImages()
+                        tui.cacheManager.cachedImages = images
+                    }
+
+                    Logger.shared.logInfo("Volume archives data loaded", context: [
+                        "snapshotCount": snapshots.count,
+                        "backupCount": backups.count
+                    ])
+                } catch {
+                    Logger.shared.logError("Failed to load volume archives: \(error.localizedDescription)")
+                    tui.statusMessage = "Failed to load archives: \(error.localizedDescription)"
+                }
+            }
+
+        case .volumes:
+            // Load volumes if not already cached
+            if tui.cacheManager.cachedVolumes.isEmpty {
+                Logger.shared.logInfo("Loading volumes data on view change")
+                let _ = await DataProviderRegistry.shared.fetchData(for: "volumes", priority: .onDemand, forceRefresh: true)
+            }
+
+        default:
+            break
+        }
+    }
+
     /// Navigation provider accessor
     ///
     /// Returns self since VolumesModule conforms to ModuleNavigationProvider.

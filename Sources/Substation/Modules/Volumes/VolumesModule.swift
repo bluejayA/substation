@@ -673,15 +673,47 @@ final class VolumesModule: OpenStackModule {
         width: Int32,
         height: Int32
     ) async {
-        guard let archiveItem = tui.viewCoordinator.selectedResource as? VolumeArchiveItem else {
-            let surface = SwiftNCurses.surface(from: screen)
-            let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-            await SwiftNCurses.render(Text("No archive item selected").error(), on: surface, in: bounds)
+        let selectedResource = tui.viewCoordinator.selectedResource
+
+        // Handle VolumeArchiveItem wrapper (if used)
+        if let archiveItem = selectedResource as? VolumeArchiveItem {
+            switch archiveItem.itemType {
+            case .volumeSnapshot(let snapshot):
+                await VolumeArchiveViews.drawVolumeSnapshotDetail(
+                    screen: screen,
+                    startRow: startRow,
+                    startCol: startCol,
+                    width: width,
+                    height: height,
+                    snapshot: snapshot,
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
+                )
+            case .volumeBackup(let backup):
+                await VolumeArchiveViews.drawVolumeBackupDetail(
+                    screen: screen,
+                    startRow: startRow,
+                    startCol: startCol,
+                    width: width,
+                    height: height,
+                    backup: backup,
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
+                )
+            case .serverBackup(let image):
+                await VolumeArchiveViews.drawServerBackupDetail(
+                    screen: screen,
+                    startRow: startRow,
+                    startCol: startCol,
+                    width: width,
+                    height: height,
+                    image: image,
+                    scrollOffset: tui.viewCoordinator.detailScrollOffset
+                )
+            }
             return
         }
 
-        switch archiveItem.itemType {
-        case .volumeSnapshot(let snapshot):
+        // Handle raw VolumeSnapshot
+        if let snapshot = selectedResource as? VolumeSnapshot {
             await VolumeArchiveViews.drawVolumeSnapshotDetail(
                 screen: screen,
                 startRow: startRow,
@@ -691,7 +723,11 @@ final class VolumesModule: OpenStackModule {
                 snapshot: snapshot,
                 scrollOffset: tui.viewCoordinator.detailScrollOffset
             )
-        case .volumeBackup(let backup):
+            return
+        }
+
+        // Handle raw VolumeBackup
+        if let backup = selectedResource as? VolumeBackup {
             await VolumeArchiveViews.drawVolumeBackupDetail(
                 screen: screen,
                 startRow: startRow,
@@ -701,11 +737,27 @@ final class VolumesModule: OpenStackModule {
                 backup: backup,
                 scrollOffset: tui.viewCoordinator.detailScrollOffset
             )
-        case .serverBackup(_):
-            let surface = SwiftNCurses.surface(from: screen)
-            let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
-            await SwiftNCurses.render(Text("Server backup details not yet implemented").info(), on: surface, in: bounds)
+            return
         }
+
+        // Handle raw Image (server backup)
+        if let image = selectedResource as? Image {
+            await VolumeArchiveViews.drawServerBackupDetail(
+                screen: screen,
+                startRow: startRow,
+                startCol: startCol,
+                width: width,
+                height: height,
+                image: image,
+                scrollOffset: tui.viewCoordinator.detailScrollOffset
+            )
+            return
+        }
+
+        // No valid archive item selected
+        let surface = SwiftNCurses.surface(from: screen)
+        let bounds = Rect(x: startCol, y: startRow, width: width, height: height)
+        await SwiftNCurses.render(Text("No archive item selected").error(), on: surface, in: bounds)
     }
 
     // MARK: - Helper Functions

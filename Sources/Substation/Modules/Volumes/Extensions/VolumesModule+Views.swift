@@ -208,7 +208,18 @@ extension VolumesModule {
                         height: height
                     )
                 },
-                inputHandler: nil
+                inputHandler: { [weak self] ch, screen in
+                    guard let self = self else { return false }
+
+                    switch ch {
+                    case Int32(127), Int32(330):  // DELETE/BACKSPACE - Delete archive
+                        await self.deleteVolumeArchive(screen: screen)
+                        return true
+
+                    default:
+                        return false
+                    }
+                }
             ),
 
             // Volume Archive Detail View

@@ -781,4 +781,133 @@ struct VolumeArchiveViews {
             height: height
         )
     }
+
+    @MainActor
+    static func drawServerBackupDetail(
+        screen: OpaquePointer?,
+        startRow: Int32,
+        startCol: Int32,
+        width: Int32,
+        height: Int32,
+        image: Image,
+        scrollOffset: Int = 0
+    ) async {
+        var sections: [DetailSection] = []
+
+        // Basic Information Section
+        let status = image.status ?? "Unknown"
+        let statusStyle: TextStyle = status.lowercased() == "active" ? .success :
+                                   status.lowercased() == "saving" ? .warning :
+                                   (status.lowercased().contains("error") ? .error : .info)
+
+        let basicItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "ID", value: image.id),
+            DetailView.buildFieldItem(label: "Name", value: image.name),
+            .field(label: "Status", value: status, style: statusStyle),
+            image.size.map { .field(label: "Size", value: formatImageSize($0), style: .accent) }
+        ]
+
+        if let basicSection = DetailView.buildSection(title: "Basic Information", items: basicItems) {
+            sections.append(basicSection)
+        }
+
+        // Server Backup Information Section
+        var backupItems: [DetailItem] = []
+        backupItems.append(.field(label: "Type", value: "Server Backup (Snapshot)", style: .info))
+
+        if let properties = image.properties {
+            if let instanceUUID = properties["instance_uuid"] {
+                backupItems.append(.field(label: "Source Server ID", value: instanceUUID, style: .secondary))
+            }
+            if let baseImageRef = properties["base_image_ref"] {
+                backupItems.append(.field(label: "Base Image ID", value: baseImageRef, style: .secondary))
+            }
+            if let imageType = properties["image_type"] {
+                backupItems.append(.field(label: "Image Type", value: imageType, style: .info))
+            }
+        }
+
+        sections.append(DetailSection(title: "Server Backup Information", items: backupItems))
+
+        // Image Properties Section
+        var propItems: [DetailItem?] = []
+
+        if let diskFormat = image.diskFormat {
+            propItems.append(.field(label: "Disk Format", value: diskFormat, style: .secondary))
+        }
+
+        if let containerFormat = image.containerFormat {
+            propItems.append(.field(label: "Container Format", value: containerFormat, style: .secondary))
+        }
+
+        if let minDisk = image.minDisk {
+            propItems.append(.field(label: "Min Disk", value: "\(minDisk) GB", style: .secondary))
+        }
+
+        if let minRam = image.minRam {
+            propItems.append(.field(label: "Min RAM", value: "\(minRam) MB", style: .secondary))
+        }
+
+        if let propSection = DetailView.buildSection(title: "Image Properties", items: propItems) {
+            sections.append(propSection)
+        }
+
+        // Visibility Section
+        var visibilityItems: [DetailItem?] = []
+
+        if let visibility = image.visibility {
+            visibilityItems.append(.field(label: "Visibility", value: visibility, style: .info))
+        }
+
+        if let visSection = DetailView.buildSection(title: "Visibility", items: visibilityItems) {
+            sections.append(visSection)
+        }
+
+        // Ownership Section
+        var ownershipItems: [DetailItem?] = []
+
+        if let owner = image.owner {
+            ownershipItems.append(.field(label: "Owner", value: owner, style: .secondary))
+        }
+
+        if let ownerSection = DetailView.buildSection(title: "Ownership", items: ownershipItems) {
+            sections.append(ownerSection)
+        }
+
+        // Timestamps Section
+        let timestampItems: [DetailItem?] = [
+            DetailView.buildFieldItem(label: "Created", value: image.createdAt?.formatted(date: .abbreviated, time: .shortened)),
+            DetailView.buildFieldItem(label: "Updated", value: image.updatedAt?.formatted(date: .abbreviated, time: .shortened))
+        ]
+
+        if let timestampSection = DetailView.buildSection(title: "Timestamps", items: timestampItems) {
+            sections.append(timestampSection)
+        }
+
+        // Create and render DetailView
+        let detailView = DetailView(
+            title: "Server Backup Details: \(image.name ?? "Unnamed Backup")",
+            sections: sections,
+            helpText: "Press ESC to return to archive list",
+            scrollOffset: scrollOffset
+        )
+
+        await detailView.draw(
+            screen: screen,
+            startRow: startRow,
+            startCol: startCol,
+            width: width,
+            height: height
+        )
+    }
+
+    /// Format image size from bytes to human-readable format
+    private static func formatImageSize(_ bytes: Int) -> String {
+        let gb = Double(bytes) / (1024.0 * 1024.0 * 1024.0)
+        if gb >= 1.0 {
+            return String(format: "%.2f GB", gb)
+        }
+        let mb = Double(bytes) / (1024.0 * 1024.0)
+        return String(format: "%.2f MB", mb)
+    }
 }
