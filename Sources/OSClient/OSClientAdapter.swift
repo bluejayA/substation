@@ -538,7 +538,7 @@ extension OpenStackClient {
     public func createServerGroup(name: String, policy: String) async throws -> ServerGroup {
         return try await executeWithTokenRefresh {
             let nova = await self.nova
-            return try await nova.createServerGroup(name: name, policies: [policy])
+            return try await nova.createServerGroup(name: name, policy: policy)
         }
     }
 

@@ -407,59 +407,76 @@ struct PortCreateForm {
     }
 
     mutating func updateFromFormState(_ formState: FormBuilderState, networks: [Network], securityGroups: [SecurityGroup], qosPolicies: [QoSPolicy]) {
-        let fields = formState.fields
+        // IMPORTANT: Get values from textFieldStates/selectorStates, not from fields array
+        // The fields array contains the original values, not the user's input
 
+        // Update text fields from textFieldStates
+        if let textState = formState.textFieldStates[PortCreateFieldId.name.rawValue] {
+            self.portName = textState.value
+        }
+        if let textState = formState.textFieldStates[PortCreateFieldId.description.rawValue] {
+            self.portDescription = textState.value
+        }
+        if let textState = formState.textFieldStates[PortCreateFieldId.macAddress.rawValue] {
+            self.macAddress = textState.value
+        }
+
+        // Update selector fields from selectorStates
+        if let selectorState = formState.selectorStates[PortCreateFieldId.portType.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let portType = PortType(rawValue: selectedId),
+           let index = PortType.allCases.firstIndex(of: portType) {
+            self.selectedPortTypeIndex = index
+        }
+        if let selectorState = formState.selectorStates[PortCreateFieldId.qosPolicySelect.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let index = qosPolicies.firstIndex(where: { $0.id == selectedId }) {
+            self.selectedQosPolicyIndex = index
+        }
+
+        // Update multiSelect fields from selectorStates (multiSelect uses same state type)
+        if let selectorState = formState.selectorStates[PortCreateFieldId.network.rawValue] {
+            self.selectedNetworkID = selectorState.selectedItemId
+            if let selectedId = selectorState.selectedItemId,
+               let index = networks.firstIndex(where: { $0.id == selectedId }) {
+                self.selectedNetworkIndex = index
+            }
+        }
+        if let selectorState = formState.selectorStates[PortCreateFieldId.securityGroups.rawValue] {
+            self.selectedSecurityGroupIDs = selectorState.selectedItemIds
+            self.selectedSecurityGroupIndices = Set(
+                securityGroups.enumerated().compactMap { index, sg in
+                    selectorState.selectedItemIds.contains(sg.id) ? index : nil
+                }
+            )
+        }
+
+        // Also check for multiSelect in fields array for checkbox state updates
+        let fields = formState.fields
         for field in fields {
             switch field {
-            case .text(let textField):
-                switch textField.id {
-                case PortCreateFieldId.name.rawValue:
-                    self.portName = textField.value
-                case PortCreateFieldId.description.rawValue:
-                    self.portDescription = textField.value
-                case PortCreateFieldId.macAddress.rawValue:
-                    self.macAddress = textField.value
-                default:
-                    break
-                }
-
-            case .selector(let selectorField):
-                switch selectorField.id {
-                case PortCreateFieldId.portType.rawValue:
-                    if let selectedId = selectorField.selectedItemId,
-                       let portType = PortType(rawValue: selectedId),
-                       let index = PortType.allCases.firstIndex(of: portType) {
-                        self.selectedPortTypeIndex = index
-                    }
-
-                case PortCreateFieldId.qosPolicySelect.rawValue:
-                    if let selectedId = selectorField.selectedItemId,
-                       let index = qosPolicies.firstIndex(where: { $0.id == selectedId }) {
-                        self.selectedQosPolicyIndex = index
-                    }
-
-                default:
-                    break
-                }
-
             case .multiSelect(let multiSelectField):
                 switch multiSelectField.id {
                 case PortCreateFieldId.network.rawValue:
-                    // Extract single network ID from Set (maxSelections: 1)
-                    self.selectedNetworkID = multiSelectField.selectedItemIds.first
-                    if let selectedId = multiSelectField.selectedItemIds.first,
-                       let index = networks.firstIndex(where: { $0.id == selectedId }) {
-                        self.selectedNetworkIndex = index
+                    // Fallback: Extract single network ID from Set (maxSelections: 1)
+                    if self.selectedNetworkID == nil {
+                        self.selectedNetworkID = multiSelectField.selectedItemIds.first
+                        if let selectedId = multiSelectField.selectedItemIds.first,
+                           let index = networks.firstIndex(where: { $0.id == selectedId }) {
+                            self.selectedNetworkIndex = index
+                        }
                     }
 
                 case PortCreateFieldId.securityGroups.rawValue:
-                    self.selectedSecurityGroupIDs = multiSelectField.selectedItemIds
-                    // Update indices based on IDs
-                    self.selectedSecurityGroupIndices = Set(
-                        securityGroups.enumerated().compactMap { index, sg in
-                            multiSelectField.selectedItemIds.contains(sg.id) ? index : nil
-                        }
-                    )
+                    // Fallback
+                    if self.selectedSecurityGroupIDs.isEmpty {
+                        self.selectedSecurityGroupIDs = multiSelectField.selectedItemIds
+                        self.selectedSecurityGroupIndices = Set(
+                            securityGroups.enumerated().compactMap { index, sg in
+                                multiSelectField.selectedItemIds.contains(sg.id) ? index : nil
+                            }
+                        )
+                    }
 
                 default:
                     break

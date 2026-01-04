@@ -870,62 +870,58 @@ enum BarbicanSecretCreateFieldId: String {
 
 extension BarbicanSecretCreateForm {
     mutating func updateFromFormState(_ formState: FormBuilderState) {
-        // Update form data from FormBuilderState
-        let fields = formState.fields
+        // IMPORTANT: Get values from textFieldStates/selectorStates, not from fields array
+        // The fields array contains the original values, not the user's input
 
-        for field in fields {
-            switch field {
-            case .text(let textField):
-                if textField.id == BarbicanSecretCreateFieldId.name.rawValue {
-                    self.secretName = textField.value
-                } else if textField.id == BarbicanSecretCreateFieldId.payload.rawValue {
-                    // Payload has special handling - don't overwrite from form state
-                    // It's managed separately through payloadEditMode
-                } else if textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
-                    self.payloadFilePath = textField.value
-                }
-            case .selector(let selectorField):
-                if selectorField.id == BarbicanSecretCreateFieldId.payloadContentType.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let contentType = SecretPayloadContentType(rawValue: selectedId) {
-                        self.payloadContentType = contentType
-                    }
-                } else if selectorField.id == BarbicanSecretCreateFieldId.payloadContentEncoding.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let encoding = SecretPayloadContentEncoding(rawValue: selectedId) {
-                        self.payloadContentEncoding = encoding
-                    }
-                } else if selectorField.id == BarbicanSecretCreateFieldId.secretType.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let type = SecretType(rawValue: selectedId) {
-                        self.secretType = type
-                    }
-                } else if selectorField.id == BarbicanSecretCreateFieldId.algorithm.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let alg = SecretAlgorithm(rawValue: selectedId) {
-                        self.algorithm = alg
-                    }
-                } else if selectorField.id == BarbicanSecretCreateFieldId.bitLength.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let length = Int(selectedId) {
-                        self.bitLength = length
-                    }
-                } else if selectorField.id == BarbicanSecretCreateFieldId.mode.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let m = SecretMode(rawValue: selectedId) {
-                        self.mode = m
-                    }
-                } else if selectorField.id == BarbicanSecretCreateFieldId.expirationDate.rawValue {
-                    if let selectedId = selectorField.selectedItemId {
-                        if selectedId == ExpirationOption.setCustomDate.rawValue {
-                            self.hasExpiration = true
-                        } else {
-                            self.hasExpiration = false
-                        }
-                    }
-                }
-            default:
-                break
+        // Update text fields from textFieldStates
+        if let textState = formState.textFieldStates[BarbicanSecretCreateFieldId.name.rawValue] {
+            self.secretName = textState.value
+        }
+        // Payload has special handling - don't overwrite from form state
+        // It's managed separately through payloadEditMode
+        if let textState = formState.textFieldStates[BarbicanSecretCreateFieldId.payloadFilePath.rawValue] {
+            self.payloadFilePath = textState.value
+        }
+
+        // Update selector fields from selectorStates
+        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.payloadContentType.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let contentType = SecretPayloadContentType(rawValue: selectedId) {
+            self.payloadContentType = contentType
+        }
+        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.payloadContentEncoding.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let encoding = SecretPayloadContentEncoding(rawValue: selectedId) {
+            self.payloadContentEncoding = encoding
+        }
+        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.secretType.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let type = SecretType(rawValue: selectedId) {
+            self.secretType = type
+        }
+        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.algorithm.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let alg = SecretAlgorithm(rawValue: selectedId) {
+            self.algorithm = alg
+        }
+        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.bitLength.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let length = Int(selectedId) {
+            self.bitLength = length
+        }
+        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.mode.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let m = SecretMode(rawValue: selectedId) {
+            self.mode = m
+        }
+
+        // Handle expiration date from selectorStates
+        if let selectorState = formState.selectorStates[BarbicanSecretCreateFieldId.expirationDate.rawValue],
+           let selectedId = selectorState.selectedItemId {
+            if selectedId == ExpirationOption.setCustomDate.rawValue {
+                self.hasExpiration = true
+            } else {
+                self.hasExpiration = false
             }
         }
 

@@ -610,8 +610,8 @@ public actor NovaService: OpenStackService {
     }
 
     /// Create a server group
-    public func createServerGroup(name: String, policies: [String]) async throws -> ServerGroup {
-        let request = CreateServerGroupRequest(name: name, policies: policies)
+    public func createServerGroup(name: String, policy: String) async throws -> ServerGroup {
+        let request = CreateServerGroupRequest(name: name, policy: policy)
         let requestData = try SharedResources.jsonEncoder.encode(["server_group": request])
         let response: ServerGroupDetailResponse = try await core.request(
             service: serviceName,
@@ -1048,11 +1048,11 @@ public struct NetworkRequest: Codable, Sendable {
 
 public struct CreateServerGroupRequest: Codable, Sendable {
     public let name: String
-    public let policies: [String]
+    public let policy: String
 
-    public init(name: String, policies: [String]) {
+    public init(name: String, policy: String) {
         self.name = name
-        self.policies = policies
+        self.policy = policy
     }
 }
 

@@ -496,6 +496,9 @@ public enum KeyType: String, CaseIterable, Sendable {
 public struct ServerGroup: Codable, Sendable, ResourceIdentifiable {
     public let id: String
     public let name: String?
+    /// Single policy (newer API microversion 2.64+)
+    public let policy: String?
+    /// Multiple policies (older API, deprecated)
     public let policies: [String]?
     public let members: [String]
     public let metadata: [String: String]?
@@ -505,6 +508,7 @@ public struct ServerGroup: Codable, Sendable, ResourceIdentifiable {
     public init(
         id: String,
         name: String? = nil,
+        policy: String? = nil,
         policies: [String]? = nil,
         members: [String] = [],
         metadata: [String: String]? = nil,
@@ -513,6 +517,7 @@ public struct ServerGroup: Codable, Sendable, ResourceIdentifiable {
     ) {
         self.id = id
         self.name = name
+        self.policy = policy
         self.policies = policies
         self.members = members
         self.metadata = metadata
@@ -530,12 +535,23 @@ public struct ServerGroup: Codable, Sendable, ResourceIdentifiable {
         return members.count
     }
 
+    /// Returns the primary policy, checking both new (policy) and old (policies) API formats
     public var primaryPolicy: ServerGroupPolicy? {
+        // First try the new singular policy field
+        if let policy = policy {
+            return ServerGroupPolicy(rawValue: policy)
+        }
+        // Fall back to the old policies array
         guard let policies = policies, let firstPolicy = policies.first else { return nil }
         return ServerGroupPolicy(rawValue: firstPolicy)
     }
 
     public var allPolicies: [ServerGroupPolicy] {
+        // If using new API with singular policy
+        if let policy = policy, let parsed = ServerGroupPolicy(rawValue: policy) {
+            return [parsed]
+        }
+        // Fall back to old policies array
         return policies?.compactMap { ServerGroupPolicy(rawValue: $0) } ?? []
     }
 }

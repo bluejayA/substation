@@ -534,7 +534,7 @@ struct MiscViews {
             return [
                 generalNavigation,
                 ("Security Group Rule Management", [
-                    "A or C: Create new rule",
+                    "SHIFT-C: Create new rule",
                     "SPACE: Edit selected rule",
                     "DELETE: Delete selected rule",
                     "ESC: Return to security groups list",

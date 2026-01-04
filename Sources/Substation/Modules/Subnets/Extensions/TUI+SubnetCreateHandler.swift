@@ -71,46 +71,42 @@ extension SubnetCreateForm {
     /// Implementation of FormStateUpdatable protocol
     /// Updates form fields from FormBuilderState
     mutating func updateFromFormState(_ formState: FormBuilderState) {
-        let fields = formState.fields
+        // IMPORTANT: Get values from textFieldStates/selectorStates, not from fields array
+        // The fields array contains the original values, not the user's input
 
-        for field in fields {
-            switch field {
-            case .text(let textField):
-                switch textField.id {
-                case SubnetCreateFieldId.name.rawValue:
-                    self.subnetName = textField.value
-                case SubnetCreateFieldId.cidr.rawValue:
-                    self.cidr = textField.value
-                case SubnetCreateFieldId.allocationPools.rawValue:
-                    self.allocationPools = textField.value
-                case SubnetCreateFieldId.dns.rawValue:
-                    self.dns = textField.value
-                case SubnetCreateFieldId.hostRoutes.rawValue:
-                    self.hostRoutes = textField.value
-                default:
-                    break
-                }
-            case .checkbox(let checkboxField):
-                switch checkboxField.id {
-                case SubnetCreateFieldId.gatewayEnabled.rawValue:
-                    self.gatewayEnabled = checkboxField.isChecked
-                case SubnetCreateFieldId.dhcpEnabled.rawValue:
-                    self.dhcpEnabled = checkboxField.isChecked
-                default:
-                    break
-                }
-            case .selector(let selectorField):
-                if selectorField.id == SubnetCreateFieldId.network.rawValue {
-                    self.selectedNetworkID = selectorField.selectedItemId
-                } else if selectorField.id == SubnetCreateFieldId.ipVersion.rawValue {
-                    if let selectedId = selectorField.selectedItemId,
-                       let version = IPVersion(rawValue: selectedId) {
-                        self.ipVersion = version
-                    }
-                }
-            default:
-                break
-            }
+        // Update text fields from textFieldStates
+        if let textState = formState.textFieldStates[SubnetCreateFieldId.name.rawValue] {
+            self.subnetName = textState.value
+        }
+        if let textState = formState.textFieldStates[SubnetCreateFieldId.cidr.rawValue] {
+            self.cidr = textState.value
+        }
+        if let textState = formState.textFieldStates[SubnetCreateFieldId.allocationPools.rawValue] {
+            self.allocationPools = textState.value
+        }
+        if let textState = formState.textFieldStates[SubnetCreateFieldId.dns.rawValue] {
+            self.dns = textState.value
+        }
+        if let textState = formState.textFieldStates[SubnetCreateFieldId.hostRoutes.rawValue] {
+            self.hostRoutes = textState.value
+        }
+
+        // Update checkbox fields from checkboxStates
+        if let checkboxState = formState.checkboxStates[SubnetCreateFieldId.gatewayEnabled.rawValue] {
+            self.gatewayEnabled = checkboxState.isChecked
+        }
+        if let checkboxState = formState.checkboxStates[SubnetCreateFieldId.dhcpEnabled.rawValue] {
+            self.dhcpEnabled = checkboxState.isChecked
+        }
+
+        // Update selector fields from selectorStates
+        if let selectorState = formState.selectorStates[SubnetCreateFieldId.network.rawValue] {
+            self.selectedNetworkID = selectorState.selectedItemId
+        }
+        if let selectorState = formState.selectorStates[SubnetCreateFieldId.ipVersion.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let version = IPVersion(rawValue: selectedId) {
+            self.ipVersion = version
         }
 
         // Update navigation state
