@@ -61,8 +61,9 @@ extension TUI {
             var localFormState = form.ruleCreateFormState
             var localFormAdapter = SecurityGroupRuleCreateFormAdapter(form: form.ruleCreateForm)
 
-            // Track if cancel was triggered to properly update state
+            // Track if cancel or submit was triggered to properly update state
             var wasCancelled = false
+            var wasSubmitted = false
 
             await universalFormInputHandler.handleInput(
                 ch,
@@ -83,6 +84,7 @@ extension TUI {
                             await module.updateSecurityGroupRule(screen: screen)
                         }
                     }
+                    wasSubmitted = true
                 },
                 onCancel: {
                     wasCancelled = true
@@ -94,6 +96,11 @@ extension TUI {
                 form.returnToListMode()
                 securityGroupRuleManagementForm = form
                 await self.draw(screen: screen)
+                return true
+            }
+
+            // If submitted, the action already updated the form state - don't overwrite it
+            if wasSubmitted {
                 return true
             }
 
@@ -135,7 +142,7 @@ extension TUI {
     /// - Returns: Bool indicating if the input was handled
     private func handleSecurityGroupRuleListInput(_ ch: Int32, screen: OpaquePointer?, form: inout SecurityGroupRuleManagementForm) async -> Bool {
         switch ch {
-        case Int32(65), Int32(67): // A or C - Add/Create new rule
+        case Int32(67): // C - Create new rule
             form.enterCreateMode()
             await self.draw(screen: screen)
             return true

@@ -967,91 +967,80 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
     }
 
     mutating func updateFromFormState(_ formState: FormBuilderState) {
-        let fields = formState.fields
+        // IMPORTANT: Get values from textFieldStates/selectorStates, not from fields array
+        // The fields array contains the original values, not the user's input
 
-        for field in fields {
-            switch field {
-            case .text(let textField):
-                switch textField.id {
-                case SecurityGroupRuleCreateFieldId.portRangeMin.rawValue:
-                    self.portRangeMin = textField.value
-                case SecurityGroupRuleCreateFieldId.portRangeMax.rawValue:
-                    self.portRangeMax = textField.value
-                case SecurityGroupRuleCreateFieldId.remoteValue.rawValue:
-                    self.remoteValue = textField.value
-                default:
-                    break
+        // Update text fields from textFieldStates
+        if let textState = formState.textFieldStates[SecurityGroupRuleCreateFieldId.portRangeMin.rawValue] {
+            self.portRangeMin = textState.value
+        }
+        if let textState = formState.textFieldStates[SecurityGroupRuleCreateFieldId.portRangeMax.rawValue] {
+            self.portRangeMax = textState.value
+        }
+        if let textState = formState.textFieldStates[SecurityGroupRuleCreateFieldId.remoteValue.rawValue] {
+            self.remoteValue = textState.value
+        }
+
+        // Update selector fields from selectorStates
+        if let selectorState = formState.selectorStates[SecurityGroupRuleCreateFieldId.direction.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let newDirection = SecurityGroupDirection(rawValue: selectedId) {
+            self.direction = newDirection
+        }
+
+        if let selectorState = formState.selectorStates[SecurityGroupRuleCreateFieldId.protocol.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let newProtocol = SecurityGroupProtocol(rawValue: selectedId) {
+            self.ruleProtocol = newProtocol
+
+            // Reset port configuration when protocol changes
+            if newProtocol == .icmp || newProtocol == .any {
+                self.portType = .all
+                self.portRangeMin = ""
+                self.portRangeMax = ""
+            }
+        }
+
+        if let selectorState = formState.selectorStates[SecurityGroupRuleCreateFieldId.portType.rawValue],
+           let selectedId = selectorState.selectedItemId {
+            if selectedId == "all" {
+                self.portType = .all
+                self.portRangeMin = ""
+                self.portRangeMax = ""
+            } else if selectedId == "custom" {
+                self.portType = .custom
+            }
+        }
+
+        if let selectorState = formState.selectorStates[SecurityGroupRuleCreateFieldId.ethertype.rawValue],
+           let selectedId = selectorState.selectedItemId,
+           let newEthertype = SecurityGroupEtherType(rawValue: selectedId) {
+            self.ethertype = newEthertype
+
+            // Update default CIDR when ethertype changes
+            if remoteType == .cidr && remoteValue.isEmpty {
+                remoteValue = newEthertype == .ipv4 ? "0.0.0.0/0" : "::/0"
+            }
+        }
+
+        if let selectorState = formState.selectorStates[SecurityGroupRuleCreateFieldId.remoteType.rawValue],
+           let selectedId = selectorState.selectedItemId {
+            if selectedId == "cidr" {
+                self.remoteType = .cidr
+                if remoteValue.isEmpty {
+                    remoteValue = ethertype == .ipv4 ? "0.0.0.0/0" : "::/0"
                 }
+            } else if selectedId == "security-group" {
+                self.remoteType = .securityGroup
+            }
+        }
 
-            case .selector(let selectorField):
-                switch selectorField.id {
-                case SecurityGroupRuleCreateFieldId.direction.rawValue:
-                    if let selectedId = selectorField.selectedItemId,
-                       let newDirection = SecurityGroupDirection(rawValue: selectedId) {
-                        self.direction = newDirection
-                    }
-
-                case SecurityGroupRuleCreateFieldId.protocol.rawValue:
-                    if let selectedId = selectorField.selectedItemId,
-                       let newProtocol = SecurityGroupProtocol(rawValue: selectedId) {
-                        self.ruleProtocol = newProtocol
-
-                        // Reset port configuration when protocol changes
-                        if newProtocol == .icmp || newProtocol == .any {
-                            self.portType = .all
-                            self.portRangeMin = ""
-                            self.portRangeMax = ""
-                        }
-                    }
-
-                case SecurityGroupRuleCreateFieldId.portType.rawValue:
-                    if let selectedId = selectorField.selectedItemId {
-                        if selectedId == "all" {
-                            self.portType = .all
-                            self.portRangeMin = ""
-                            self.portRangeMax = ""
-                        } else if selectedId == "custom" {
-                            self.portType = .custom
-                        }
-                    }
-
-                case SecurityGroupRuleCreateFieldId.ethertype.rawValue:
-                    if let selectedId = selectorField.selectedItemId,
-                       let newEthertype = SecurityGroupEtherType(rawValue: selectedId) {
-                        self.ethertype = newEthertype
-
-                        // Update default CIDR when ethertype changes
-                        if remoteType == .cidr && remoteValue.isEmpty {
-                            remoteValue = newEthertype == .ipv4 ? "0.0.0.0/0" : "::/0"
-                        }
-                    }
-
-                case SecurityGroupRuleCreateFieldId.remoteType.rawValue:
-                    if let selectedId = selectorField.selectedItemId {
-                        if selectedId == "cidr" {
-                            self.remoteType = .cidr
-                            if remoteValue.isEmpty {
-                                remoteValue = ethertype == .ipv4 ? "0.0.0.0/0" : "::/0"
-                            }
-                        } else if selectedId == "security-group" {
-                            self.remoteType = .securityGroup
-                        }
-                    }
-
-                case SecurityGroupRuleCreateFieldId.remoteValue.rawValue:
-                    // When remoteType is security group, update the selected index
-                    if remoteType == .securityGroup, let selectedId = selectorField.selectedItemId {
-                        if let index = remoteSecurityGroups.firstIndex(where: { $0.id == selectedId }) {
-                            self.selectedRemoteSecurityGroupIndex = index
-                        }
-                    }
-
-                default:
-                    break
-                }
-
-            default:
-                break
+        // When remoteType is security group, update the selected index from selector state
+        if remoteType == .securityGroup,
+           let selectorState = formState.selectorStates[SecurityGroupRuleCreateFieldId.remoteValue.rawValue],
+           let selectedId = selectorState.selectedItemId {
+            if let index = remoteSecurityGroups.firstIndex(where: { $0.id == selectedId }) {
+                self.selectedRemoteSecurityGroupIndex = index
             }
         }
 

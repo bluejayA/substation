@@ -569,6 +569,7 @@ extension SecurityGroupsModule {
 
             let updatedSecurityGroup = try await tui.client.getSecurityGroup(id: form.securityGroup.id)
             form.updateSecurityGroup(updatedSecurityGroup)
+            form.returnToListMode()
             tui.securityGroupRuleManagementForm = form
 
             if let index = tui.cacheManager.cachedSecurityGroups.firstIndex(where: { $0.id == form.securityGroup.id }) {
@@ -577,6 +578,7 @@ extension SecurityGroupsModule {
 
             // Trigger accelerated refresh to show state transitions
             tui.refreshAfterOperation()
+            await tui.draw(screen: screen)
 
         } catch let error as OpenStackError {
             let baseMsg = "Failed to create security group rule"
