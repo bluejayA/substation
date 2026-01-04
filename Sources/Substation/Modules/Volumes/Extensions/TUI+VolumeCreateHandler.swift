@@ -20,6 +20,82 @@ extension TUI {
         var localFormState = volumeCreateFormState
         var localForm = volumeCreateForm
 
+        // Custom key handler for source type selector and source field selection
+        let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout VolumeCreateForm, OpaquePointer?) async -> Bool = { ch, formState, form, screen in
+            // Handle SPACE on selector fields
+            if ch == Int32(32) && formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField() {
+                    if case .selector(let selector) = field {
+                        // Check if this is the source type selector
+                        if selector.id == VolumeCreateFieldId.sourceType.rawValue {
+                            // Toggle the selection
+                            formState.toggleCurrentField()
+                            form.updateFromFormState(formState)
+
+                            // Rebuild form state to show/hide source selector based on new source type
+                            formState = FormBuilderState(
+                                fields: form.buildFields(
+                                    selectedFieldId: formState.getCurrentFieldId(),
+                                    activeFieldId: formState.getActiveFieldId(),
+                                    formState: formState
+                                ),
+                                preservingStateFrom: formState
+                            )
+
+                            await self.draw(screen: screen)
+                            return true // Handled
+                        }
+
+                        // Check if this is the source selector (image or snapshot)
+                        if selector.id == VolumeCreateFieldId.source.rawValue {
+                            // Toggle the selection
+                            formState.toggleCurrentField()
+                            form.updateFromFormState(formState)
+                            await self.draw(screen: screen)
+                            return true // Handled
+                        }
+                    }
+                }
+            }
+
+            // Handle ENTER to confirm source type or source selection
+            if (ch == Int32(10) || ch == Int32(13)) && formState.isCurrentFieldActive() {
+                if let field = formState.getCurrentField() {
+                    if case .selector(let selector) = field {
+                        // Check if this is the source type selector
+                        if selector.id == VolumeCreateFieldId.sourceType.rawValue {
+                            // Deactivate and rebuild form to show appropriate source selector
+                            formState.deactivateCurrentField()
+                            form.updateFromFormState(formState)
+
+                            // Rebuild form state to show/hide source selector
+                            formState = FormBuilderState(
+                                fields: form.buildFields(
+                                    selectedFieldId: formState.getCurrentFieldId(),
+                                    activeFieldId: formState.getActiveFieldId(),
+                                    formState: formState
+                                ),
+                                preservingStateFrom: formState
+                            )
+
+                            await self.draw(screen: screen)
+                            return true // Handled
+                        }
+
+                        // Check if this is the source selector (confirming image/snapshot selection)
+                        if selector.id == VolumeCreateFieldId.source.rawValue {
+                            formState.deactivateCurrentField()
+                            form.updateFromFormState(formState)
+                            await self.draw(screen: screen)
+                            return true // Handled
+                        }
+                    }
+                }
+            }
+
+            return false // Let universal handler process
+        }
+
         await universalFormInputHandler.handleInput(
             ch,
             screen: screen,
@@ -35,7 +111,18 @@ extension TUI {
             },
             onCancel: {
                 self.changeView(to: .volumes, resetSelection: false)
-            }
+            },
+            customKeyHandler: customHandler
+        )
+
+        // Always rebuild after universal handler to ensure form reflects current state
+        localFormState = FormBuilderState(
+            fields: localForm.buildFields(
+                selectedFieldId: localFormState.getCurrentFieldId(),
+                activeFieldId: localFormState.getActiveFieldId(),
+                formState: localFormState
+            ),
+            preservingStateFrom: localFormState
         )
 
         // Update actor-isolated properties with modified local copies

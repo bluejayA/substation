@@ -856,10 +856,11 @@ extension VolumesModule: ActionProvider {
             let volumeTypes = await loadVolumeTypes()
 
             // Initialize form with loaded data
+            // Sort images and snapshots by name for consistent display and selection
             tui.volumeCreateForm = VolumeCreateForm()
-            tui.volumeCreateForm.images = tui.cacheManager.cachedImages
-            tui.volumeCreateForm.snapshots = snapshots
-            tui.volumeCreateForm.volumeTypes = volumeTypes
+            tui.volumeCreateForm.images = tui.cacheManager.cachedImages.sorted { ($0.name ?? "") < ($1.name ?? "") }
+            tui.volumeCreateForm.snapshots = snapshots.sorted { ($0.name ?? "") < ($1.name ?? "") }
+            tui.volumeCreateForm.volumeTypes = volumeTypes.sorted { ($0.name ?? "") < ($1.name ?? "") }
 
             // Initialize form state
             tui.volumeCreateFormState = FormBuilderState(fields: tui.volumeCreateForm.buildFields(
