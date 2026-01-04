@@ -15,29 +15,53 @@ import MemoryKit
 extension TUI {
 
     /// Handle input for Barbican Secret create form using universal handler
-    /// This form has 3 special input modes: payload editor, date selection, legacy selection
     internal func handleBarbicanSecretCreateInput(_ ch: Int32, screen: OpaquePointer?) async {
-        // Special handling for payload edit mode (full-screen editor)
-        if barbicanSecretCreateForm.payloadEditMode {
-            await handlePayloadEditorInput(ch, screen: screen)
-            return
-        }
-
         // Normal form handling with universal handler
         var localFormState = barbicanSecretCreateFormState
         var localFormAdapter = BarbicanSecretCreateFormAdapter(form: barbicanSecretCreateForm)
 
         // Custom key handler for special field behaviors
         let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout BarbicanSecretCreateFormAdapter, OpaquePointer?) async -> Bool = { ch, formState, formAdapter, screen in
-            // SPACE on payload field enters payload edit mode
-            if ch == Int32(32) && !formState.isCurrentFieldActive() {
-                if let field = formState.getCurrentField() {
-                    if case .text(let textField) = field,
-                       textField.id == BarbicanSecretCreateFieldId.payload.rawValue {
-                        formAdapter.form.payloadEditMode = true
-                        await self.draw(screen: screen)
-                        return true
+            // TAB completion for payloadFilePath field
+            if ch == Int32(9) { // TAB
+                if formState.isCurrentFieldActive(),
+                   let field = formState.getCurrentField(),
+                   case .text(let textField) = field,
+                   textField.id == BarbicanSecretCreateFieldId.payloadFilePath.rawValue {
+                    // Perform tab completion
+                    let currentPath = formAdapter.form.payloadFilePath
+                    let (completedPath, hasMultiple) = FilePathCompleter.tabComplete(currentPath)
+
+                    if completedPath != currentPath {
+                        // Update the form with the completed path
+                        formAdapter.form.payloadFilePath = completedPath
+
+                        // Update the text field state with new value and cursor position
+                        if var textState = formState.textFieldStates[BarbicanSecretCreateFieldId.payloadFilePath.rawValue] {
+                            textState.value = completedPath
+                            textState.cursorPosition = completedPath.count
+                            formState.textFieldStates[BarbicanSecretCreateFieldId.payloadFilePath.rawValue] = textState
+                        }
+
+                        if hasMultiple {
+                            // Show hint that there are multiple matches
+                            let completions = FilePathCompleter.getCompletions(for: completedPath)
+                            let displayCount = min(completions.count, 5)
+                            let names = completions.prefix(displayCount).map { URL(fileURLWithPath: $0).lastPathComponent }
+                            let moreText = completions.count > displayCount ? " ..." : ""
+                            self.statusMessage = "Matches: \(names.joined(separator: ", "))\(moreText)"
+                        } else {
+                            self.statusMessage = ""
+                        }
+                    } else if hasMultiple {
+                        // No progress but multiple matches - show them
+                        let completions = FilePathCompleter.getCompletions(for: currentPath)
+                        let displayCount = min(completions.count, 5)
+                        let names = completions.prefix(displayCount).map { URL(fileURLWithPath: $0).lastPathComponent }
+                        let moreText = completions.count > displayCount ? " ..." : ""
+                        self.statusMessage = "Matches: \(names.joined(separator: ", "))\(moreText)"
                     }
+                    return true // TAB handled, don't pass to universal handler
                 }
             }
 
@@ -84,30 +108,6 @@ extension TUI {
 
         // Redraw with updated state to show selector overlays
         await self.draw(screen: screen)
-    }
-
-    // MARK: - Payload Editor Input Handler
-
-    private func handlePayloadEditorInput(_ ch: Int32, screen: OpaquePointer?) async {
-        switch ch {
-        case Int32(27): // ESC - Exit payload edit mode
-            self.barbicanSecretCreateForm.payloadEditMode = false
-            self.barbicanSecretCreateForm.flushPayloadBuffer()
-            await self.draw(screen: screen)
-
-        case Int32(127), Int32(330): // DELETE
-            self.barbicanSecretCreateForm.removeFromPayloadBuffer()
-            await self.draw(screen: screen)
-
-        default:
-            if let character = UnicodeScalar(UInt32(ch))?.description.first {
-                self.barbicanSecretCreateForm.addToPayloadBuffer(character)
-                // Only redraw if not in paste mode to prevent character-by-character slowdown
-                if !self.barbicanSecretCreateForm.isPasteMode {
-                    await self.draw(screen: screen)
-                }
-            }
-        }
     }
 
 }

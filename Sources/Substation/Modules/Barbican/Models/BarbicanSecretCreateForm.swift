@@ -1,13 +1,12 @@
 import Foundation
 
 enum BarbicanSecretCreateField: CaseIterable {
-    case name, payload, payloadFilePath, payloadContentType, payloadContentEncoding, secretType, algorithm, bitLength, mode
+    case name, payloadFilePath, payloadContentType, payloadContentEncoding, secretType, algorithm, bitLength, mode
 
     var title: String {
         switch self {
         case .name: return "Secret Name"
-        case .payload: return "Secret Payload"
-        case .payloadFilePath: return "Or Load from File"
+        case .payloadFilePath: return "Load from File (TAB to complete)"
         case .payloadContentType: return "Payload Content Type"
         case .payloadContentEncoding: return "Payload Content Encoding"
         case .secretType: return "Secret Type"
@@ -75,8 +74,8 @@ enum SecretMode: String, CaseIterable {
 
 struct BarbicanSecretCreateForm: FormViewModel {
     var secretName: String = ""
-    var payload: String = ""
     var payloadFilePath: String = ""
+    var payload: String = "" // Loaded from file
     var payloadContentType: SecretPayloadContentType = .textPlain
     var payloadContentEncoding: SecretPayloadContentEncoding = .base64
     var secretType: SecretType = .opaque
@@ -86,20 +85,6 @@ struct BarbicanSecretCreateForm: FormViewModel {
 
     var currentField: BarbicanSecretCreateField = .name
     var fieldEditMode: Bool = false
-    var payloadEditMode: Bool = false // Special mode for multi-line payload editing
-
-    // Payload input buffering for performance
-    var payloadBuffer: String = ""
-    var isBuffering: Bool = false // Flag to indicate when we're in rapid input mode
-    var isPasteMode: Bool = false // Flag for extremely rapid input (paste operations)
-    var lastBufferFlushTime: Date = Date() // Track when buffer was last flushed
-    var renderOptimizationThreshold: Int = 1000 // Characters above which to use optimized rendering
-    var lastRenderTime: Date = Date() // Track render timing for optimization
-
-    // Cached payload line data for performance
-    private var cachedPayloadLines: [String] = []
-    private var cachedPayloadVersion: String = "" // Track when cache is valid
-    private var isLargeContent: Bool = false // Flag for content > 4096 chars
 
     // Form state management
     var errorMessage: String? = nil
@@ -113,7 +98,6 @@ struct BarbicanSecretCreateForm: FormViewModel {
             currentField = fields[nextIndex]
         }
         fieldEditMode = false
-        payloadEditMode = false
     }
 
     /// Navigates to the previous field in the form
@@ -124,7 +108,6 @@ struct BarbicanSecretCreateForm: FormViewModel {
             currentField = fields[prevIndex]
         }
         fieldEditMode = false
-        payloadEditMode = false
     }
 
     mutating func togglePayloadContentType() {
@@ -192,9 +175,7 @@ struct BarbicanSecretCreateForm: FormViewModel {
     /// Exits any active edit mode in the form
     mutating func exitEditMode() {
         fieldEditMode = false
-        payloadEditMode = false
     }
-
 
     func validate() -> [String] {
         var errors: [String] = []
@@ -204,9 +185,15 @@ struct BarbicanSecretCreateForm: FormViewModel {
             errors.append("Secret name is required")
         }
 
+        // Validate file path is provided
+        if let filePathError = validateFilePath() {
+            errors.append(filePathError)
+        }
+
+        // Validate payload was loaded
         let trimmedPayload = payload.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedPayload.isEmpty {
-            errors.append("Secret payload is required")
+            errors.append("Secret payload is required (load from file)")
         }
 
         // Validate bit length
@@ -215,35 +202,12 @@ struct BarbicanSecretCreateForm: FormViewModel {
             errors.append("Bit length must be one of: \(validBitLengths.map(String.init).joined(separator: ", "))")
         }
 
-        // No expiration validation needed - ExpirationOption enum ensures valid values
-
         return errors
     }
 
-    // Validate file path
+    // Validate file path - required field
     func validateFilePath() -> String? {
-        let trimmed = payloadFilePath.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Empty path is valid (file loading is optional)
-        if trimmed.isEmpty {
-            return nil
-        }
-
-        // Expand tilde
-        let expanded: String
-        if trimmed.hasPrefix("~") {
-            let home = FileManager.default.homeDirectoryForCurrentUser.path
-            expanded = trimmed.replacingOccurrences(of: "~", with: home, options: .anchored)
-        } else {
-            expanded = trimmed
-        }
-
-        // Check file exists
-        guard FileManager.default.fileExists(atPath: expanded) else {
-            return "File not found: \(expanded)"
-        }
-
-        return nil
+        return FilePathCompleter.validatePublicKeyPath(payloadFilePath)
     }
 
     // Load payload from file
@@ -251,131 +215,42 @@ struct BarbicanSecretCreateForm: FormViewModel {
         let trimmed = payloadFilePath.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmed.isEmpty else {
-            return "File path is empty"
+            return "File path is required"
         }
 
-        // Expand tilde
-        let expanded: String
-        if trimmed.hasPrefix("~") {
-            let home = FileManager.default.homeDirectoryForCurrentUser.path
-            expanded = trimmed.replacingOccurrences(of: "~", with: home, options: .anchored)
-        } else {
-            expanded = trimmed
-        }
+        let expanded = FilePathCompleter.expandPath(trimmed)
 
         // Check file exists
         guard FileManager.default.fileExists(atPath: expanded) else {
-            return "File not found: \(expanded)"
+            return "File not found: \(trimmed)"
+        }
+
+        // Check it's not a directory
+        if FilePathCompleter.isDirectory(at: expanded) {
+            return "Path is a directory, not a file"
         }
 
         // Read file
         do {
             let contents = try String(contentsOfFile: expanded, encoding: .utf8)
-            // Clear any direct payload input (mutual exclusivity)
-            payloadBuffer = ""
             payload = contents
-            invalidatePayloadCache()
             return nil
         } catch {
             return "Error reading file: \(error.localizedDescription)"
         }
     }
 
-    // Payload buffer management for performance
-    mutating func addToPayloadBuffer(_ char: Character) {
-        payloadBuffer.append(char)
-        isBuffering = true
-
-        // Detect rapid input patterns (paste operations)
-        let now = Date()
-        if now.timeIntervalSince(lastBufferFlushTime) < 0.05 { // Less than 50ms since last input
-            isPasteMode = true
-        }
-        lastBufferFlushTime = now
-
-        // For paste operations, allow much larger buffers to minimize flushes
-        if payloadBuffer.count > 5000 {
-            flushPayloadBuffer()
-        }
-    }
-
-    mutating func flushPayloadBuffer() {
-        if !payloadBuffer.isEmpty {
-            payload += payloadBuffer
-            payloadBuffer = ""
-            invalidatePayloadCache() // Invalidate cache when content changes
-            // Clear file path when payload is directly edited (mutual exclusivity)
-            payloadFilePath = ""
-        }
-        isBuffering = false
-
-        // Immediately exit paste mode for instant rendering (no delay)
-        isPasteMode = false
-
-        // Check if we now have large content
-        let totalLength = getCompletePayload().count
-        isLargeContent = totalLength > renderOptimizationThreshold
-    }
-
-    mutating func removeFromPayloadBuffer() {
-        if !payloadBuffer.isEmpty {
-            payloadBuffer.removeLast()
-        } else if !payload.isEmpty {
-            payload.removeLast()
-        }
-    }
-
-    func getCompletePayload() -> String {
-        return payload + payloadBuffer
-    }
-
-    // Invalidate cached payload data when content changes
-    private mutating func invalidatePayloadCache() {
-        cachedPayloadLines = []
-        cachedPayloadVersion = ""
-    }
-
-    // Get optimized payload lines for rendering
-    mutating func getPayloadLines() -> [String] {
-        let completePayload = getCompletePayload()
-
-        // Return cached lines if payload hasn't changed
-        if cachedPayloadVersion == completePayload && !cachedPayloadLines.isEmpty {
-            return cachedPayloadLines
-        }
-
-        // Update cache
-        cachedPayloadLines = completePayload.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        cachedPayloadVersion = completePayload
-
-        return cachedPayloadLines
-    }
-
-    // Get optimized payload preview for form display
+    // Get payload preview for form display
     func getPayloadPreview() -> String {
-        let completePayload = getCompletePayload()
-
-        if completePayload.isEmpty {
-            return "Press SPACE to edit payload..."
+        if payload.isEmpty {
+            return "No file loaded"
         }
 
-        // For large content, show optimized preview
-        if completePayload.count > renderOptimizationThreshold {
-            return "Large content (\(completePayload.count) chars) - \(completePayload.prefix(20))..."
-        }
-
-        // For normal content, show up to 50 characters
-        return completePayload.count > 50 ? "\(String(completePayload.prefix(47)))..." : completePayload
-    }
-
-    // Check if content should use optimized rendering
-    func shouldUseOptimizedRendering() -> Bool {
-        return getCompletePayload().count > renderOptimizationThreshold || isPasteMode
-    }
-
-    // Clear paste mode (called from UI when appropriate)
-    mutating func clearPasteMode() {
-        isPasteMode = false
+        // Show preview of loaded content
+        let charCount = payload.count
+        let lineCount = payload.components(separatedBy: "\n").count
+        let preview = payload.prefix(30).replacingOccurrences(of: "\n", with: " ")
+        return "\(charCount) chars, \(lineCount) lines: \(preview)..."
     }
 
     // MARK: - FormViewModel Implementation
@@ -396,10 +271,11 @@ struct BarbicanSecretCreateForm: FormViewModel {
     }
 
     func getNavigationHelp() -> String {
-        if fieldEditMode && currentField == .name {
-            return "ESC: Exit editing | Type to enter name"
-        } else if payloadEditMode {
-            return "ESC: Save and return to form | Type to enter payload"
+        if fieldEditMode {
+            if currentField == .payloadFilePath {
+                return "ESC: Exit editing | TAB: Complete path | ENTER: Load file"
+            }
+            return "ESC: Exit editing | Type to enter value"
         } else {
             return "TAB/UP/DOWN: Navigate fields | SPACE: Edit/Select | ENTER: Create | ESC: Cancel"
         }
@@ -407,12 +283,12 @@ struct BarbicanSecretCreateForm: FormViewModel {
 
     /// Determines if the form is currently in a special input mode
     func isInSpecialMode() -> Bool {
-        return fieldEditMode || payloadEditMode
+        return fieldEditMode
     }
 
     private func getFieldConfiguration(for field: BarbicanSecretCreateField) -> FormFieldConfiguration {
         let isSelected = (currentField == field)
-        let isActive = isSelected && (fieldEditMode || payloadEditMode)
+        let isActive = isSelected && fieldEditMode
 
         switch field {
         case .name:
@@ -427,25 +303,13 @@ struct BarbicanSecretCreateForm: FormViewModel {
                 fieldType: .text
             )
 
-        case .payload:
+        case .payloadFilePath:
             return FormFieldConfiguration(
                 title: field.title,
                 isRequired: true,
                 isSelected: isSelected,
-                isActive: payloadEditMode,
-                placeholder: "Press SPACE to edit payload...",
-                value: payload.isEmpty ? nil : getPayloadPreview(),
-                maxWidth: 60,
-                fieldType: .text
-            )
-
-        case .payloadFilePath:
-            return FormFieldConfiguration(
-                title: field.title,
-                isRequired: false,
-                isSelected: isSelected,
                 isActive: isActive,
-                placeholder: "Enter file path (e.g. ~/secret.txt)",
+                placeholder: "~/path/to/secret.txt (TAB to complete)",
                 value: payloadFilePath.isEmpty ? nil : payloadFilePath,
                 maxWidth: 60,
                 fieldType: .text
@@ -539,31 +403,14 @@ struct BarbicanSecretCreateForm: FormViewModel {
             maxLength: 255
         )))
 
-        // Payload Field (Special handling for multi-line editing)
-        let payloadFieldId = BarbicanSecretCreateFieldId.payload.rawValue
-        fields.append(.text(FormFieldText(
-            id: payloadFieldId,
-            label: BarbicanSecretCreateField.payload.title,
-            value: getPayloadPreview(),
-            placeholder: "Press SPACE to edit payload...",
-            isRequired: true,
-            isVisible: true,
-            isSelected: selectedFieldId == payloadFieldId,
-            isActive: activeFieldId == payloadFieldId,
-            cursorPosition: nil,
-            validationError: nil,
-            maxWidth: 60,
-            maxLength: nil
-        )))
-
-        // Payload File Path (Text)
+        // Payload File Path (Text) - Required field with TAB completion
         let filePathFieldId = BarbicanSecretCreateFieldId.payloadFilePath.rawValue
         fields.append(.text(FormFieldText(
             id: filePathFieldId,
             label: BarbicanSecretCreateField.payloadFilePath.title,
             value: payloadFilePath,
-            placeholder: "Enter file path (e.g. ~/secret.txt)",
-            isRequired: false,
+            placeholder: "~/path/to/secret.txt",
+            isRequired: true,
             isVisible: true,
             isSelected: selectedFieldId == filePathFieldId,
             isActive: activeFieldId == filePathFieldId,
@@ -572,6 +419,17 @@ struct BarbicanSecretCreateForm: FormViewModel {
             maxWidth: 60,
             maxLength: nil
         )))
+
+        // Payload Preview (Info field - shows loaded content)
+        if !payload.isEmpty {
+            fields.append(.info(FormFieldInfo(
+                id: "payload-preview",
+                label: "Loaded Content",
+                value: getPayloadPreview(),
+                isVisible: true,
+                style: .info
+            )))
+        }
 
         // Payload Content Type (Selector)
         let contentTypeFieldId = BarbicanSecretCreateFieldId.payloadContentType.rawValue
@@ -719,7 +577,6 @@ struct BarbicanSecretCreateForm: FormViewModel {
 
 enum BarbicanSecretCreateFieldId: String {
     case name = "secret-name"
-    case payload = "secret-payload"
     case payloadFilePath = "payload-file-path"
     case payloadContentType = "payload-content-type"
     case payloadContentEncoding = "payload-content-encoding"
@@ -740,8 +597,6 @@ extension BarbicanSecretCreateForm {
         if let textState = formState.textFieldStates[BarbicanSecretCreateFieldId.name.rawValue] {
             self.secretName = textState.value
         }
-        // Payload has special handling - don't overwrite from form state
-        // It's managed separately through payloadEditMode
         if let textState = formState.textFieldStates[BarbicanSecretCreateFieldId.payloadFilePath.rawValue] {
             self.payloadFilePath = textState.value
         }
@@ -784,8 +639,6 @@ extension BarbicanSecretCreateForm {
             switch currentFieldId {
             case BarbicanSecretCreateFieldId.name.rawValue:
                 self.currentField = .name
-            case BarbicanSecretCreateFieldId.payload.rawValue:
-                self.currentField = .payload
             case BarbicanSecretCreateFieldId.payloadFilePath.rawValue:
                 self.currentField = .payloadFilePath
             case BarbicanSecretCreateFieldId.payloadContentType.rawValue:
