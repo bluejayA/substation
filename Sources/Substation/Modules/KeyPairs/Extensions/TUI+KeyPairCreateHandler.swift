@@ -24,6 +24,49 @@ extension TUI {
 
         // Custom key handler for KeyPair-specific behavior
         let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout KeyPairCreateForm, OpaquePointer?) async -> Bool = { ch, formState, form, screen in
+            // TAB completion for publicKeyFilePath field
+            if ch == Int32(9) { // TAB
+                if formState.isCurrentFieldActive(),
+                   let field = formState.getCurrentField(),
+                   case .text(let textField) = field,
+                   textField.id == "publicKeyFilePath" {
+                    // Perform tab completion
+                    let currentPath = form.publicKeyFilePath
+                    let (completedPath, hasMultiple) = FilePathCompleter.tabComplete(currentPath)
+
+                    if completedPath != currentPath {
+                        // Update the form with the completed path
+                        form.publicKeyFilePath = completedPath
+
+                        // Update the text field state with new value and cursor position
+                        if var textState = formState.textFieldStates["publicKeyFilePath"] {
+                            textState.value = completedPath
+                            textState.cursorPosition = completedPath.count
+                            formState.textFieldStates["publicKeyFilePath"] = textState
+                        }
+
+                        if hasMultiple {
+                            // Show hint that there are multiple matches
+                            let completions = FilePathCompleter.getCompletions(for: completedPath)
+                            let displayCount = min(completions.count, 5)
+                            let names = completions.prefix(displayCount).map { URL(fileURLWithPath: $0).lastPathComponent }
+                            let moreText = completions.count > displayCount ? " ..." : ""
+                            self.statusMessage = "Matches: \(names.joined(separator: ", "))\(moreText)"
+                        } else {
+                            self.statusMessage = ""
+                        }
+                    } else if hasMultiple {
+                        // No progress but multiple matches - show them
+                        let completions = FilePathCompleter.getCompletions(for: currentPath)
+                        let displayCount = min(completions.count, 5)
+                        let names = completions.prefix(displayCount).map { URL(fileURLWithPath: $0).lastPathComponent }
+                        let moreText = completions.count > displayCount ? " ..." : ""
+                        self.statusMessage = "Matches: \(names.joined(separator: ", "))\(moreText)"
+                    }
+                    return true // TAB handled, don't pass to universal handler
+                }
+            }
+
             // Loading file when ENTER is pressed on publicKeyFilePath field
             if ch == Int32(10) || ch == Int32(13) { // ENTER
                 if formState.isCurrentFieldActive(),

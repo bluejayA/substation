@@ -63,7 +63,7 @@ struct KeyPairCreateForm {
         // Public key file path
         fields.append(.text(FormFieldText(
             id: "publicKeyFilePath",
-            label: "Public Key File Path",
+            label: "Public Key File Path (TAB to complete)",
             value: publicKeyFilePath,
             placeholder: "~/.ssh/id_rsa.pub",
             isRequired: true,
@@ -111,11 +111,7 @@ struct KeyPairCreateForm {
 
     // Validate file path
     func validateFilePath() -> String? {
-        let trimmed = publicKeyFilePath.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            return "File path is required"
-        }
-        return nil
+        return FilePathCompleter.validatePublicKeyPath(publicKeyFilePath)
     }
 
     // Validate entire form
