@@ -843,6 +843,100 @@ public actor NeutronService: OpenStackService {
         )
     }
 
+    // MARK: - Address Group Operations
+
+    /// List address groups with caching
+    /// Address groups are part of the security-groups-remote-address-group Neutron extension
+    public func listAddressGroups(options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [AddressGroup] {
+        let cacheKey = "neutron_address_group_list"
+
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [AddressGroup].self,
+                resourceType: .addressGroupList
+            ) {
+                logger.logInfo("Neutron service cache hit - address group list", context: [
+                    "addressGroupCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Neutron service API call - listing address groups", context: [:])
+
+        var path = "/v2.0/address-groups"
+
+        if !options.queryItems.isEmpty {
+            let queryString = options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+            path += "?" + queryString
+        }
+
+        let response: AddressGroupListResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: path,
+            expected: 200
+        )
+
+        await cacheManager.store(
+            response.addressGroups,
+            forKey: cacheKey,
+            resourceType: .addressGroupList,
+            customTTL: 300.0 // 5 minutes for address groups
+        )
+
+        // Cache individual address groups
+        for addressGroup in response.addressGroups {
+            await cacheManager.store(
+                addressGroup,
+                forKey: "neutron_address_group_\(addressGroup.id)",
+                resourceType: .addressGroup,
+                customTTL: 300.0
+            )
+        }
+
+        return response.addressGroups
+    }
+
+    /// Get address group details with caching
+    public func getAddressGroup(id: String, forceRefresh: Bool = false) async throws -> AddressGroup {
+        let cacheKey = "neutron_address_group_\(id)"
+
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: AddressGroup.self,
+                resourceType: .addressGroup
+            ) {
+                logger.logInfo("Neutron service cache hit - address group detail", context: [
+                    "addressGroupId": id
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Neutron service API call - getting address group", context: [
+            "addressGroupId": id
+        ])
+
+        let response: AddressGroupDetailResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: "/v2.0/address-groups/\(id)",
+            expected: 200
+        )
+
+        await cacheManager.store(
+            response.addressGroup,
+            forKey: cacheKey,
+            resourceType: .addressGroup,
+            customTTL: 300.0
+        )
+
+        return response.addressGroup
+    }
+
     // MARK: - Floating IP Operations
 
     /// List floating IPs with shorter caching (they change frequently)
@@ -988,6 +1082,8 @@ public actor NeutronService: OpenStackService {
         await cacheManager.clearResourceType(.floatingIPList)
         await cacheManager.clearResourceType(.securityGroup)
         await cacheManager.clearResourceType(.securityGroupList)
+        await cacheManager.clearResourceType(.addressGroup)
+        await cacheManager.clearResourceType(.addressGroupList)
 
         logger.logInfo("Neutron service - cleared all caches", context: [:])
     }
@@ -1111,6 +1207,22 @@ public struct SecurityGroupRuleDetailResponse: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case securityGroupRule = "security_group_rule"
+    }
+}
+
+public struct AddressGroupListResponse: Codable, Sendable {
+    public let addressGroups: [AddressGroup]
+
+    enum CodingKeys: String, CodingKey {
+        case addressGroups = "address_groups"
+    }
+}
+
+public struct AddressGroupDetailResponse: Codable, Sendable {
+    public let addressGroup: AddressGroup
+
+    enum CodingKeys: String, CodingKey {
+        case addressGroup = "address_group"
     }
 }
 

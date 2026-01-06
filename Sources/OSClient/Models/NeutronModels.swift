@@ -580,6 +580,7 @@ public struct SecurityGroupRule: Codable, Sendable, ResourceIdentifiable {
     public let portRangeMax: Int?
     public let remoteIpPrefix: String?
     public let remoteGroupId: String?
+    public let remoteAddressGroupId: String?
     public let tenantId: String?
     public let projectId: String?
     public let description: String?
@@ -613,11 +614,80 @@ public struct SecurityGroupRule: Codable, Sendable, ResourceIdentifiable {
         case portRangeMax = "port_range_max"
         case remoteIpPrefix = "remote_ip_prefix"
         case remoteGroupId = "remote_group_id"
+        case remoteAddressGroupId = "remote_address_group_id"
         case tenantId = "tenant_id"
         case projectId = "project_id"
         case description
         case revisionNumber = "revision_number"
         case tags
+    }
+}
+
+// MARK: - Address Group Models
+
+/// Represents a remote address group in Neutron (security-groups-remote-address-group extension)
+/// Address groups contain a collection of IP addresses/prefixes that can be referenced by security group rules
+public struct AddressGroup: Codable, Sendable, ResourceIdentifiable, Timestamped, Identifiable {
+    public let id: String
+    public let name: String?
+    public let description: String?
+    public let addresses: [String]?
+    public let tenantId: String?
+    public let projectId: String?
+    public let createdAt: Date?
+    public let updatedAt: Date?
+    public let revisionNumber: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case description
+        case addresses
+        case tenantId = "tenant_id"
+        case projectId = "project_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case revisionNumber = "revision_number"
+    }
+
+    public init(
+        id: String,
+        name: String? = nil,
+        description: String? = nil,
+        addresses: [String]? = nil,
+        tenantId: String? = nil,
+        projectId: String? = nil,
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil,
+        revisionNumber: Int? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.addresses = addresses
+        self.tenantId = tenantId
+        self.projectId = projectId
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.revisionNumber = revisionNumber
+    }
+
+    /// Returns the display name for this address group
+    public var displayName: String {
+        return name ?? id
+    }
+
+    /// Returns a formatted string of all addresses in the group
+    public var formattedAddresses: String {
+        guard let addresses = addresses, !addresses.isEmpty else {
+            return "No addresses"
+        }
+        return addresses.joined(separator: ", ")
+    }
+
+    /// Returns the count of addresses in the group
+    public var addressCount: Int {
+        return addresses?.count ?? 0
     }
 }
 
@@ -1028,6 +1098,7 @@ public struct CreateSecurityGroupRuleRequest: Codable, Sendable {
     public let portRangeMax: Int?
     public let remoteIpPrefix: String?
     public let remoteGroupId: String?
+    public let remoteAddressGroupId: String?
     public let description: String?
 
     enum CodingKeys: String, CodingKey {
@@ -1039,6 +1110,7 @@ public struct CreateSecurityGroupRuleRequest: Codable, Sendable {
         case portRangeMax = "port_range_max"
         case remoteIpPrefix = "remote_ip_prefix"
         case remoteGroupId = "remote_group_id"
+        case remoteAddressGroupId = "remote_address_group_id"
         case description
     }
 
@@ -1051,6 +1123,7 @@ public struct CreateSecurityGroupRuleRequest: Codable, Sendable {
         portRangeMax: Int? = nil,
         remoteIpPrefix: String? = nil,
         remoteGroupId: String? = nil,
+        remoteAddressGroupId: String? = nil,
         description: String? = nil
     ) {
         self.securityGroupId = securityGroupId
@@ -1061,6 +1134,7 @@ public struct CreateSecurityGroupRuleRequest: Codable, Sendable {
         self.portRangeMax = portRangeMax
         self.remoteIpPrefix = remoteIpPrefix
         self.remoteGroupId = remoteGroupId
+        self.remoteAddressGroupId = remoteAddressGroupId
         self.description = description
     }
 }
@@ -1165,11 +1239,13 @@ public enum SecurityGroupPortType: CaseIterable, Sendable {
 public enum SecurityGroupRemoteType: CaseIterable, Sendable {
     case cidr
     case securityGroup
+    case addressGroup
 
     public var displayName: String {
         switch self {
         case .cidr: return "CIDR"
         case .securityGroup: return "Security Group"
+        case .addressGroup: return "Address Group"
         }
     }
 }

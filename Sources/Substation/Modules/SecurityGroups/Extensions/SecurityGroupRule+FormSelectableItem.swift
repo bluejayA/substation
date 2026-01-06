@@ -41,6 +41,11 @@ extension SecurityGroupRule: FormSelectableItem {
             return true
         }
 
+        // Search by remote address group ID
+        if let remoteAddrGroupId = remoteAddressGroupId?.lowercased(), remoteAddrGroupId.contains(lowercaseQuery) {
+            return true
+        }
+
         // Search by port range
         if let portMin = portRangeMin, String(portMin).contains(lowercaseQuery) {
             return true

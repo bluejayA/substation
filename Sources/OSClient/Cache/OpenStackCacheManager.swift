@@ -38,6 +38,8 @@ public actor OpenStackCacheManager {
         case routerList = "router_list"
         case securityGroup = "security_group"
         case securityGroupList = "security_group_list"
+        case addressGroup = "address_group"
+        case addressGroupList = "address_group_list"
         case volume = "volume"
         case volumeList = "volume_list"
         case volumeType = "volume_type"
@@ -65,7 +67,7 @@ public actor OpenStackCacheManager {
                 return 1800.0 // 30 minutes for semi-static data
             case .flavor, .flavorList, .volumeType, .volumeTypeList:
                 return 900.0 // 15 minutes for relatively static resources
-            case .keypair, .keypairList, .serverGroup, .serverGroupList, .image, .imageList, .network, .networkList, .subnet, .subnetList, .router, .routerList, .securityGroup, .securityGroupList:
+            case .keypair, .keypairList, .serverGroup, .serverGroupList, .image, .imageList, .network, .networkList, .subnet, .subnetList, .router, .routerList, .securityGroup, .securityGroupList, .addressGroup, .addressGroupList:
                 return 300.0 // 5 minutes for moderately static resources
             case .volumeSnapshot, .volumeSnapshotList, .objectStorage, .objectStorageList:
                 return 180.0 // 3 minutes for snapshots and object storage
@@ -123,7 +125,7 @@ public actor OpenStackCacheManager {
             return .critical
         case .server, .serverDetail, .floatingIP, .volume:
             return .high
-        case .network, .subnet, .port, .router, .securityGroup, .image, .flavor:
+        case .network, .subnet, .port, .router, .securityGroup, .addressGroup, .image, .flavor:
             return .normal
         case .serverList, .networkList, .volumeList, .quotas, .volumeSnapshot, .objectStorage, .objectStorageList:
             return .low

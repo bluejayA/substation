@@ -130,6 +130,7 @@ extension SecurityGroupRemoteType: FormSelectableItem, FormSelectorItem {
         switch self {
         case .cidr: return "cidr"
         case .securityGroup: return "security-group"
+        case .addressGroup: return "address-group"
         }
     }
 
@@ -137,6 +138,7 @@ extension SecurityGroupRemoteType: FormSelectableItem, FormSelectorItem {
         switch self {
         case .cidr: return "CIDR"
         case .securityGroup: return "Security Group"
+        case .addressGroup: return "Address Group"
         }
     }
 
@@ -144,6 +146,7 @@ extension SecurityGroupRemoteType: FormSelectableItem, FormSelectorItem {
         switch self {
         case .cidr: return "IP address range in CIDR notation"
         case .securityGroup: return "Another security group"
+        case .addressGroup: return "Predefined group of IP addresses"
         }
     }
 
@@ -152,5 +155,45 @@ extension SecurityGroupRemoteType: FormSelectableItem, FormSelectorItem {
         return displayName.lowercased().contains(lowercaseQuery) ||
                description.lowercased().contains(lowercaseQuery) ||
                id.lowercased().contains(lowercaseQuery)
+    }
+}
+
+// MARK: - AddressGroup FormSelectorItem Conformance
+
+extension AddressGroup: FormSelectableItem, FormSelectorItem {
+    public var sortKey: String { displayName }
+
+    public var description: String {
+        if let addresses = addresses, !addresses.isEmpty {
+            let count = addresses.count
+            if count == 1 {
+                return "1 address: \(addresses[0])"
+            } else if count <= 3 {
+                return "\(count) addresses: \(addresses.joined(separator: ", "))"
+            } else {
+                let first3 = addresses.prefix(3).joined(separator: ", ")
+                return "\(count) addresses: \(first3)..."
+            }
+        }
+        return "No addresses configured"
+    }
+
+    public func matchesSearch(_ query: String) -> Bool {
+        let lowercaseQuery = query.lowercased()
+        if displayName.lowercased().contains(lowercaseQuery) {
+            return true
+        }
+        if id.lowercased().contains(lowercaseQuery) {
+            return true
+        }
+        // Also search in addresses
+        if let addresses = addresses {
+            for addr in addresses {
+                if addr.lowercased().contains(lowercaseQuery) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }

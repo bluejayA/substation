@@ -71,6 +71,9 @@ struct SecurityGroupRuleManagementForm {
     /// Available security groups for remote type selection
     var availableSecurityGroups: [SecurityGroup] = []
 
+    /// Available address groups for remote type selection
+    var availableAddressGroups: [AddressGroup] = []
+
     // MARK: - Initialization
 
     /// Initialize the rule management form
@@ -78,10 +81,13 @@ struct SecurityGroupRuleManagementForm {
     /// - Parameters:
     ///   - securityGroup: The security group to manage rules for
     ///   - availableSecurityGroups: Available security groups for remote type selection
-    init(securityGroup: SecurityGroup, availableSecurityGroups: [SecurityGroup] = []) {
+    ///   - availableAddressGroups: Available address groups for remote type selection
+    init(securityGroup: SecurityGroup, availableSecurityGroups: [SecurityGroup] = [], availableAddressGroups: [AddressGroup] = []) {
         self.securityGroup = securityGroup
         self.availableSecurityGroups = availableSecurityGroups
+        self.availableAddressGroups = availableAddressGroups
         self.ruleCreateForm.remoteSecurityGroups = availableSecurityGroups
+        self.ruleCreateForm.remoteAddressGroups = availableAddressGroups
     }
 
     // MARK: - Rule List Management
@@ -150,6 +156,7 @@ struct SecurityGroupRuleManagementForm {
         mode = .create
         ruleCreateForm.reset()
         ruleCreateForm.remoteSecurityGroups = availableSecurityGroups
+        ruleCreateForm.remoteAddressGroups = availableAddressGroups
 
         // Initialize FormBuilderState with form fields
         ruleCreateFormState = FormBuilderState(fields: ruleCreateForm.buildFields(
@@ -234,12 +241,19 @@ struct SecurityGroupRuleManagementForm {
             if let index = availableSecurityGroups.firstIndex(where: { $0.id == remoteGroupId }) {
                 ruleCreateForm.selectedRemoteSecurityGroupIndex = index
             }
+        } else if let remoteAddressGroupId = rule.remoteAddressGroupId, !remoteAddressGroupId.isEmpty {
+            ruleCreateForm.remoteType = .addressGroup
+            // Find the address group by ID
+            if let index = availableAddressGroups.firstIndex(where: { $0.id == remoteAddressGroupId }) {
+                ruleCreateForm.selectedRemoteAddressGroupIndex = index
+            }
         } else {
             ruleCreateForm.remoteType = .cidr
             ruleCreateForm.remoteValue = ruleCreateForm.ethertype == .ipv4 ? "0.0.0.0/0" : "::/0"
         }
 
         ruleCreateForm.remoteSecurityGroups = availableSecurityGroups
+        ruleCreateForm.remoteAddressGroups = availableAddressGroups
     }
 
     // MARK: - Rule Creation/Update Data
@@ -250,12 +264,14 @@ struct SecurityGroupRuleManagementForm {
                                   portMin: Int?,
                                   portMax: Int?,
                                   remoteIPPrefix: String?,
-                                  remoteGroupID: String?) {
+                                  remoteGroupID: String?,
+                                  remoteAddressGroupID: String?) {
 
         var portMin: Int? = nil
         var portMax: Int? = nil
         var remoteIPPrefix: String? = nil
         var remoteGroupID: String? = nil
+        var remoteAddressGroupID: String? = nil
 
         // Handle port information
         if ruleCreateForm.ruleProtocol == .tcp || ruleCreateForm.ruleProtocol == .udp {
@@ -277,6 +293,8 @@ struct SecurityGroupRuleManagementForm {
                 ruleCreateForm.remoteValue
         case .securityGroup:
             remoteGroupID = ruleCreateForm.getSelectedRemoteSecurityGroup()?.id
+        case .addressGroup:
+            remoteAddressGroupID = ruleCreateForm.getSelectedRemoteAddressGroup()?.id
         }
 
         return (
@@ -286,7 +304,8 @@ struct SecurityGroupRuleManagementForm {
             portMin: portMin,
             portMax: portMax,
             remoteIPPrefix: remoteIPPrefix,
-            remoteGroupID: remoteGroupID
+            remoteGroupID: remoteGroupID,
+            remoteAddressGroupID: remoteAddressGroupID
         )
     }
 
@@ -372,6 +391,11 @@ struct SecurityGroupRuleManagementForm {
     mutating func updateAvailableSecurityGroups(_ groups: [SecurityGroup]) {
         self.availableSecurityGroups = groups
         self.ruleCreateForm.remoteSecurityGroups = groups
+    }
+
+    mutating func updateAvailableAddressGroups(_ groups: [AddressGroup]) {
+        self.availableAddressGroups = groups
+        self.ruleCreateForm.remoteAddressGroups = groups
     }
 }
 

@@ -30,6 +30,9 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
     var selectedRemoteSecurityGroupIndex: Int = 0
     var selectedRemoteSecurityGroups: Set<String> = [] // For multi-selection
     var securityGroupSelectionMode: Bool = false
+    var remoteAddressGroups: [AddressGroup] = []
+    var selectedRemoteAddressGroupIndex: Int = 0
+    var addressGroupSelectionMode: Bool = false
     var ethertype: SecurityGroupEtherType = .ipv4
 
     var currentField: SecurityGroupRuleCreateField = .direction
@@ -142,11 +145,14 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
             // Set default values based on remote type
             switch remoteType {
             case .cidr:
-                remoteValue = "0.0.0.0/0"
+                remoteValue = ethertype == .ipv4 ? "0.0.0.0/0" : "::/0"
             case .securityGroup:
                 remoteValue = ""
                 selectedRemoteSecurityGroupIndex = 0
                 selectedRemoteSecurityGroups.removeAll()
+            case .addressGroup:
+                remoteValue = ""
+                selectedRemoteAddressGroupIndex = 0
             }
         }
     }
@@ -160,11 +166,14 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
             // Set default values based on remote type
             switch remoteType {
             case .cidr:
-                remoteValue = "0.0.0.0/0"
+                remoteValue = ethertype == .ipv4 ? "0.0.0.0/0" : "::/0"
             case .securityGroup:
                 remoteValue = ""
                 selectedRemoteSecurityGroupIndex = 0
                 selectedRemoteSecurityGroups.removeAll()
+            case .addressGroup:
+                remoteValue = ""
+                selectedRemoteAddressGroupIndex = 0
             }
         }
     }
@@ -179,6 +188,53 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
         if !remoteSecurityGroups.isEmpty {
             selectedRemoteSecurityGroupIndex = selectedRemoteSecurityGroupIndex == 0 ?
                 remoteSecurityGroups.count - 1 : selectedRemoteSecurityGroupIndex - 1
+        }
+    }
+
+    // MARK: - Address Group Navigation
+
+    mutating func nextRemoteAddressGroup() {
+        if !remoteAddressGroups.isEmpty {
+            selectedRemoteAddressGroupIndex = (selectedRemoteAddressGroupIndex + 1) % remoteAddressGroups.count
+        }
+    }
+
+    mutating func previousRemoteAddressGroup() {
+        if !remoteAddressGroups.isEmpty {
+            selectedRemoteAddressGroupIndex = selectedRemoteAddressGroupIndex == 0 ?
+                remoteAddressGroups.count - 1 : selectedRemoteAddressGroupIndex - 1
+        }
+    }
+
+    /// Enter address group selection mode
+    mutating func enterAddressGroupSelectionMode() {
+        addressGroupSelectionMode = true
+    }
+
+    /// Exit address group selection mode
+    mutating func exitAddressGroupSelectionMode() {
+        addressGroupSelectionMode = false
+    }
+
+    /// Get the selected address group
+    func getSelectedRemoteAddressGroup() -> AddressGroup? {
+        guard remoteType == .addressGroup,
+              !remoteAddressGroups.isEmpty,
+              selectedRemoteAddressGroupIndex < remoteAddressGroups.count else {
+            return nil
+        }
+        return remoteAddressGroups[selectedRemoteAddressGroupIndex]
+    }
+
+    /// Get display value for selected address group
+    private func getSelectedAddressGroupDisplayValue() -> String {
+        if remoteAddressGroups.isEmpty {
+            return "[No address groups available]"
+        } else if let selectedGroup = getSelectedRemoteAddressGroup() {
+            let addressCount = selectedGroup.addressCount
+            return "\(selectedGroup.displayName) (\(addressCount) addresses)"
+        } else {
+            return "[SPACE to select from \(remoteAddressGroups.count) available]"
         }
     }
 
@@ -320,6 +376,12 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
                 errors.append("No security groups available")
             } else if selectedRemoteSecurityGroups.isEmpty {
                 errors.append("At least one security group must be selected")
+            }
+        } else if remoteType == .addressGroup {
+            if remoteAddressGroups.isEmpty {
+                errors.append("No address groups available")
+            } else if getSelectedRemoteAddressGroup() == nil {
+                errors.append("An address group must be selected")
             }
         }
 
@@ -525,6 +587,8 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
         selectedRemoteSecurityGroupIndex = 0
         selectedRemoteSecurityGroups.removeAll()
         securityGroupSelectionMode = false
+        selectedRemoteAddressGroupIndex = 0
+        addressGroupSelectionMode = false
         ethertype = .ipv4
         currentField = .direction
         fieldEditMode = false
@@ -661,7 +725,7 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
                         value: remoteValue,
                         fieldType: .text
                     )
-                } else {
+                } else if remoteType == .securityGroup {
                     return FormFieldConfiguration(
                         title: "Security Groups",
                         isRequired: true,
@@ -672,6 +736,19 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
                         value: getSelectedSecurityGroupsDisplayValue(),
                         fieldType: .multiSelection,
                         selectionMode: securityGroupSelectionMode
+                    )
+                } else {
+                    // Address Group
+                    return FormFieldConfiguration(
+                        title: "Address Group",
+                        isRequired: true,
+                        isSelected: isSelected,
+                        isActive: isActive,
+                        hasError: hasError,
+                        errorMessage: errorMessage,
+                        value: getSelectedAddressGroupDisplayValue(),
+                        fieldType: .multiSelection,
+                        selectionMode: addressGroupSelectionMode
                     )
                 }
 
@@ -719,7 +796,7 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
     }
 
     func isInSpecialMode() -> Bool {
-        return fieldEditMode || securityGroupSelectionMode
+        return fieldEditMode || securityGroupSelectionMode || addressGroupSelectionMode
     }
 
     private func getFieldError(_ field: SecurityGroupRuleCreateField, from errors: [String]) -> String? {
@@ -935,7 +1012,7 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
                 maxWidth: 50,
                 maxLength: 100
             )))
-        } else {
+        } else if remoteType == .securityGroup {
             // Security Group selector
             let sgItems = remoteSecurityGroups.map { $0 as any FormSelectorItem }
             let selectedSGId = getSelectedRemoteSecurityGroup()?.id
@@ -955,6 +1032,38 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
                     },
                     FormSelectorItemColumn(header: "ID", width: 36) { item in
                         (item as? SecurityGroup)?.id ?? ""
+                    }
+                ],
+                searchQuery: formState.selectorStates[remoteValueFieldId]?.searchQuery,
+                highlightedIndex: formState.selectorStates[remoteValueFieldId]?.highlightedIndex ?? 0,
+                scrollOffset: formState.selectorStates[remoteValueFieldId]?.scrollOffset ?? 0
+            )))
+        } else {
+            // Address Group selector
+            let agItems = remoteAddressGroups.map { $0 as any FormSelectorItem }
+            let selectedAGId = getSelectedRemoteAddressGroup()?.id
+            fields.append(.selector(FormFieldSelector(
+                id: remoteValueFieldId,
+                label: "Remote Address Group",
+                items: agItems,
+                selectedItemId: selectedAGId,
+                isRequired: true,
+                isVisible: true,
+                isSelected: selectedFieldId == remoteValueFieldId,
+                isActive: activeFieldId == remoteValueFieldId,
+                validationError: nil,
+                columns: [
+                    FormSelectorItemColumn(header: "NAME", width: 30) { item in
+                        (item as? AddressGroup)?.displayName ?? "Unnamed"
+                    },
+                    FormSelectorItemColumn(header: "ADDRESSES", width: 15) { item in
+                        if let addrGroup = item as? AddressGroup {
+                            return "\(addrGroup.addressCount) IPs"
+                        }
+                        return "0 IPs"
+                    },
+                    FormSelectorItemColumn(header: "ID", width: 20) { item in
+                        String((item as? AddressGroup)?.id.prefix(18) ?? "")
                     }
                 ],
                 searchQuery: formState.selectorStates[remoteValueFieldId]?.searchQuery,
@@ -1032,6 +1141,8 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
                 }
             } else if selectedId == "security-group" {
                 self.remoteType = .securityGroup
+            } else if selectedId == "address-group" {
+                self.remoteType = .addressGroup
             }
         }
 
@@ -1041,6 +1152,15 @@ struct SecurityGroupRuleCreateForm: FormViewModel {
            let selectedId = selectorState.selectedItemId {
             if let index = remoteSecurityGroups.firstIndex(where: { $0.id == selectedId }) {
                 self.selectedRemoteSecurityGroupIndex = index
+            }
+        }
+
+        // When remoteType is address group, update the selected index from selector state
+        if remoteType == .addressGroup,
+           let selectorState = formState.selectorStates[SecurityGroupRuleCreateFieldId.remoteValue.rawValue],
+           let selectedId = selectorState.selectedItemId {
+            if let index = remoteAddressGroups.firstIndex(where: { $0.id == selectedId }) {
+                self.selectedRemoteAddressGroupIndex = index
             }
         }
 

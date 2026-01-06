@@ -11,6 +11,7 @@ struct SecurityGroupViews {
         let uniqueProtocols: Set<String>
         let uniquePorts: Set<String>
         let remoteGroups: Set<String>
+        let remoteAddressGroups: Set<String>
         let remoteIPs: Set<String>
         let ethertypes: Set<String>
     }
@@ -22,6 +23,7 @@ struct SecurityGroupViews {
         var uniqueProtocols = Set<String>()
         var uniquePorts = Set<String>()
         var remoteGroups = Set<String>()
+        var remoteAddressGroups = Set<String>()
         var remoteIPs = Set<String>()
         var ethertypes = Set<String>()
 
@@ -39,12 +41,13 @@ struct SecurityGroupViews {
 
             ethertypes.insert(rule.ethertype ?? "IPv4")
 
-            // Analyze remote description for groups and IPs
-            let remoteDesc = formatRemoteDescription(rule).lowercased()
-            if remoteDesc.contains("group") {
-                remoteGroups.insert(formatRemoteDescription(rule))
-            } else if remoteDesc.contains(".") || remoteDesc.contains(":") {
-                remoteIPs.insert(formatRemoteDescription(rule))
+            // Categorize remote sources by type
+            if let remoteGroupId = rule.remoteGroupId {
+                remoteGroups.insert("sg-\(String(remoteGroupId.prefix(8)))")
+            } else if let remoteAddressGroupId = rule.remoteAddressGroupId {
+                remoteAddressGroups.insert("addrgrp-\(String(remoteAddressGroupId.prefix(8)))")
+            } else if let remoteIp = rule.remoteIpPrefix {
+                remoteIPs.insert(remoteIp)
             }
         }
 
@@ -54,6 +57,7 @@ struct SecurityGroupViews {
             uniqueProtocols: uniqueProtocols,
             uniquePorts: uniquePorts,
             remoteGroups: remoteGroups,
+            remoteAddressGroups: remoteAddressGroups,
             remoteIPs: remoteIPs,
             ethertypes: ethertypes
         )
@@ -78,8 +82,10 @@ struct SecurityGroupViews {
             return remoteIp
         } else if let remoteGroup = rule.remoteGroupId {
             return "sg-\(String(remoteGroup.prefix(8)))"
+        } else if let remoteAddressGroup = rule.remoteAddressGroupId {
+            return "addrgrp-\(String(remoteAddressGroup.prefix(8)))"
         }
-        return "0.0.0.0/0"
+        return rule.ethertype == "IPv6" ? "::/0" : "0.0.0.0/0"
     }
 
     // Layout Constants
@@ -323,8 +329,8 @@ struct SecurityGroupViews {
             sections.append(DetailSection(title: "Network Configuration", items: networkItems))
         }
 
-        // Remote Sources Section - NEW!
-        if !analysis.remoteIPs.isEmpty || !analysis.remoteGroups.isEmpty {
+        // Remote Sources Section
+        if !analysis.remoteIPs.isEmpty || !analysis.remoteGroups.isEmpty || !analysis.remoteAddressGroups.isEmpty {
             var remoteItems: [DetailItem] = []
 
             if !analysis.remoteIPs.isEmpty {
@@ -347,6 +353,19 @@ struct SecurityGroupViews {
                 }
                 if analysis.remoteGroups.count > 5 {
                     remoteItems.append(.field(label: "  Additional", value: "\(analysis.remoteGroups.count - 5) more", style: .muted))
+                }
+            }
+
+            if !analysis.remoteAddressGroups.isEmpty {
+                if !remoteItems.isEmpty {
+                    remoteItems.append(.spacer)
+                }
+                remoteItems.append(.field(label: "Remote Address Groups", value: "\(analysis.remoteAddressGroups.count) referenced", style: .warning))
+                for addrGroupRef in analysis.remoteAddressGroups.sorted().prefix(5) {
+                    remoteItems.append(.field(label: "  Address Group", value: addrGroupRef, style: .secondary))
+                }
+                if analysis.remoteAddressGroups.count > 5 {
+                    remoteItems.append(.field(label: "  Additional", value: "\(analysis.remoteAddressGroups.count - 5) more", style: .muted))
                 }
             }
 
