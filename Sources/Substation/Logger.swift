@@ -62,7 +62,8 @@ public final class Logger: Sendable {
                 // Log to stderr since Logger is not yet configured - include errno for diagnostics
                 let errorCode = errno
                 let errorDescription = String(cString: strerror(errorCode))
-                fputs("ERROR: Failed to create log file at \(logFileURL.path): \(errorDescription) (errno: \(errorCode))\n", stderr)
+                let errorMessage = "ERROR: Failed to create log file at \(logFileURL.path): \(errorDescription) (errno: \(errorCode))\n"
+                FileHandle.standardError.write(Data(errorMessage.utf8))
             }
         }
     }
