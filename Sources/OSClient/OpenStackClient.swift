@@ -47,6 +47,7 @@ public final class OpenStackClient: @unchecked Sendable {
     private var _barbican: BarbicanService?
     private var _glance: GlanceService?
     private var _swift: SwiftService?
+    private var _magnum: MagnumService?
 
     // Data managers - lazy initialization
     private var _serverDataManager: ServerDataManager?
@@ -289,6 +290,18 @@ public final class OpenStackClient: @unchecked Sendable {
             }
             let service = SwiftService(core: core)
             _swift = service
+            return service
+        }
+    }
+
+    /// Access to Magnum (Container Infrastructure) service
+    public var magnum: MagnumService {
+        get async {
+            if let existing = _magnum {
+                return existing
+            }
+            let service = MagnumService(core: core)
+            _magnum = service
             return service
         }
     }
@@ -758,6 +771,7 @@ public final class OpenStackClient: @unchecked Sendable {
         _barbican = nil
         _glance = nil
         _swift = nil
+        _magnum = nil
 
         // Clear data managers
         _serverDataManager = nil

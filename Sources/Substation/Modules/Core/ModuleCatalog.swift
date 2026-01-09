@@ -93,6 +93,12 @@ enum ModuleCatalog {
             dependencies: [],
             phase: .independent
         ),
+        ModuleDefinition(
+            identifier: "magnum",
+            displayName: "Container Infra (Magnum)",
+            dependencies: [],
+            phase: .independent
+        ),
 
         // Phase 2: Network-dependent modules
         ModuleDefinition(

@@ -162,7 +162,7 @@ final class TUI {
         // Initialize Phase 4.3 professional user experience components
         Logger.shared.logDebug("Initializing professional UX components")
         self.progressIndicator = ProgressIndicator()
-        self.enhancedErrorHandler = EnhancedErrorHandler(feedbackSystem: userFeedback, logger: logger)
+        self.enhancedErrorHandler = EnhancedErrorHandler(feedbackSystem: userFeedback)
         self.loadingStateManager = LoadingStateManager()
 
         // Initialize Phase 5.1 batch operations framework
@@ -256,8 +256,7 @@ final class TUI {
 
         // Create enhanced error handler (for future use)
         let _ = EnhancedErrorHandler(
-            feedbackSystem: userFeedback,
-            logger: ConsoleLogger()
+            feedbackSystem: userFeedback
         )
 
         // Listen for performance optimization events

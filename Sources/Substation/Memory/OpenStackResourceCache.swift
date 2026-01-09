@@ -34,6 +34,9 @@ final class OpenStackResourceCache {
     private var syncAvailabilityZones: [String] = []
     private var syncSecrets: [Secret] = []
     private var syncLoadBalancers: [LoadBalancer] = []
+    private var syncClusters: [Cluster] = []
+    private var syncClusterTemplates: [ClusterTemplate] = []
+    private var syncNodegroups: [Nodegroup] = []
     private var syncSwiftContainers: [SwiftContainer] = []
     private var syncSwiftContainersCacheTime: Date = Date.distantPast
     private var syncSwiftObjectsByContainer: [String: [SwiftObject]] = [:]
@@ -77,6 +80,9 @@ final class OpenStackResourceCache {
     var availabilityZones: [String] { syncAvailabilityZones }
     var secrets: [Secret] { syncSecrets }
     var loadBalancers: [LoadBalancer] { syncLoadBalancers }
+    var clusters: [Cluster] { syncClusters }
+    var clusterTemplates: [ClusterTemplate] { syncClusterTemplates }
+    var nodegroups: [Nodegroup] { syncNodegroups }
     var swiftContainers: [SwiftContainer] { syncSwiftContainers }
     var swiftObjectsByContainer: [String: [SwiftObject]] { syncSwiftObjectsByContainer }
     var volumeSnapshots: [VolumeSnapshot] { syncVolumeSnapshots }
@@ -195,6 +201,24 @@ final class OpenStackResourceCache {
         syncLoadBalancers = loadBalancers
 
         Logger.shared.logDebug("OpenStackResourceCache cached \(loadBalancers.count) load balancers")
+    }
+
+    func setClusters(_ clusters: [Cluster]) async {
+        syncClusters = clusters
+
+        Logger.shared.logDebug("OpenStackResourceCache cached \(clusters.count) clusters")
+    }
+
+    func setClusterTemplates(_ templates: [ClusterTemplate]) async {
+        syncClusterTemplates = templates
+
+        Logger.shared.logDebug("OpenStackResourceCache cached \(templates.count) cluster templates")
+    }
+
+    func setNodegroups(_ nodegroups: [Nodegroup]) async {
+        syncNodegroups = nodegroups
+
+        Logger.shared.logDebug("OpenStackResourceCache cached \(nodegroups.count) nodegroups")
     }
 
     func setSwiftContainers(_ containers: [SwiftContainer]) async {
@@ -360,6 +384,9 @@ final class OpenStackResourceCache {
         syncAvailabilityZones.removeAll()
         syncSecrets.removeAll()
         syncLoadBalancers.removeAll()
+        syncClusters.removeAll()
+        syncClusterTemplates.removeAll()
+        syncNodegroups.removeAll()
         syncSwiftContainers.removeAll()
         syncSwiftObjectsByContainer.removeAll()
         syncSwiftObjectsCacheTime.removeAll()

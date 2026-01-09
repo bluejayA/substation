@@ -25,6 +25,8 @@ actor ResourceDependencyResolver {
         case swiftObject
         case barbicanSecret
         case flavor
+        case cluster
+        case clusterTemplate
 
         /// Module identifier for BatchOperationRegistry lookup
         ///
@@ -60,6 +62,8 @@ actor ResourceDependencyResolver {
                 return "barbican"
             case .flavor:
                 return "flavors"
+            case .cluster, .clusterTemplate:
+                return "magnum"
             }
         }
     }
@@ -412,6 +416,12 @@ actor ResourceDependencyResolver {
 
         case .barbicanSecretBulkDelete(let ids):
             return buildDeleteOperations(ids: ids, type: .barbicanSecret, idPrefix: "barbican-secret")
+
+        case .clusterBulkDelete(let ids):
+            return buildDeleteOperations(ids: ids, type: .cluster, idPrefix: "cluster", duration: 30.0)
+
+        case .clusterTemplateBulkDelete(let ids):
+            return buildDeleteOperations(ids: ids, type: .clusterTemplate, idPrefix: "cluster-template")
         }
     }
 

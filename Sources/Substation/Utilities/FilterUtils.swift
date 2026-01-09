@@ -151,4 +151,37 @@ struct FilterUtils {
             return false
         }
     }
+
+    /// Filter clusters by name, status, or UUID
+    ///
+    /// - Parameters:
+    ///   - clusters: Array of clusters to filter
+    ///   - query: Search query string (case-insensitive)
+    /// - Returns: Filtered array of clusters
+    static func filterClusters(_ clusters: [Cluster], query: String?) -> [Cluster] {
+        guard let query = query?.lowercased() else { return clusters }
+        return clusters.filter { cluster in
+            cluster.name?.lowercased().contains(query) == true ||
+            cluster.status?.lowercased().contains(query) == true ||
+            cluster.uuid.lowercased().contains(query) ||
+            cluster.coeVersion?.lowercased().contains(query) == true
+        }
+    }
+
+    /// Filter cluster templates by name, COE type, or UUID
+    ///
+    /// - Parameters:
+    ///   - templates: Array of cluster templates to filter
+    ///   - query: Search query string (case-insensitive)
+    /// - Returns: Filtered array of cluster templates
+    static func filterClusterTemplates(_ templates: [ClusterTemplate], query: String?) -> [ClusterTemplate] {
+        guard let query = query?.lowercased() else { return templates }
+        return templates.filter { template in
+            template.name?.lowercased().contains(query) == true ||
+            template.coe.lowercased().contains(query) ||
+            template.uuid.lowercased().contains(query) ||
+            template.networkDriver?.lowercased().contains(query) == true ||
+            template.serverType?.lowercased().contains(query) == true
+        }
+    }
 }
