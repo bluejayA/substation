@@ -47,7 +47,13 @@ internal enum SharedResources {
                 // ISO8601 with Z
                 createDateFormatter("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 // ISO8601 with microseconds and Z
-                createDateFormatter("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+                createDateFormatter("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'"),
+                // ISO8601 with timezone offset (e.g., +00:00)
+                createDateFormatter("yyyy-MM-dd'T'HH:mm:ssXXXXX"),
+                // ISO8601 with microseconds and timezone offset
+                createDateFormatter("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX"),
+                // ISO8601 with milliseconds and timezone offset
+                createDateFormatter("yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX")
             ]
 
             for formatter in formatters {

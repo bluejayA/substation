@@ -169,6 +169,26 @@ final class CacheManager {
         set { Task { await resourceCache.setLoadBalancers(newValue) } }
     }
 
+    // MARK: - Cached Container Infrastructure Resources
+
+    /// Cached clusters from OpenStack container infrastructure service
+    internal var cachedClusters: [Cluster] {
+        get { resourceCache.clusters }
+        set { Task { await resourceCache.setClusters(newValue) } }
+    }
+
+    /// Cached cluster templates from OpenStack container infrastructure service
+    internal var cachedClusterTemplates: [ClusterTemplate] {
+        get { resourceCache.clusterTemplates }
+        set { Task { await resourceCache.setClusterTemplates(newValue) } }
+    }
+
+    /// Cached nodegroups from OpenStack container infrastructure service
+    internal var cachedNodegroups: [Nodegroup] {
+        get { resourceCache.nodegroups }
+        set { Task { await resourceCache.setNodegroups(newValue) } }
+    }
+
     // MARK: - Cached Object Storage Resources
 
     /// Cached Swift containers from OpenStack object storage service

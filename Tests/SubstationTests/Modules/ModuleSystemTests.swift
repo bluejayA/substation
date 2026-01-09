@@ -68,13 +68,13 @@ final class ModuleSystemTests: XCTestCase {
 
     // MARK: - ModuleCatalog Tests
 
-    /// Test that allModuleIdentifiers returns the expected 14 modules
+    /// Test that allModuleIdentifiers returns the expected 15 modules
     @MainActor func testModuleCatalogAllModuleIdentifiersCount() {
         let identifiers = ModuleCatalog.allModuleIdentifiers
         XCTAssertEqual(
             identifiers.count,
-            14,
-            "ModuleCatalog should contain exactly 14 module identifiers"
+            15,
+            "ModuleCatalog should contain exactly 15 module identifiers"
         )
     }
 
@@ -85,7 +85,7 @@ final class ModuleSystemTests: XCTestCase {
         let expectedModules = [
             "barbican", "swift", "keypairs", "servergroups", "flavors",
             "images", "securitygroups", "volumes", "networks", "subnets",
-            "routers", "floatingips", "ports", "servers"
+            "routers", "floatingips", "ports", "servers", "magnum"
         ]
 
         for module in expectedModules {
@@ -102,8 +102,8 @@ final class ModuleSystemTests: XCTestCase {
 
         XCTAssertEqual(
             orderedModules.count,
-            14,
-            "modulesByLoadOrder should return all 14 modules"
+            15,
+            "modulesByLoadOrder should return all 15 modules"
         )
 
         // Verify phase ordering
@@ -180,8 +180,8 @@ final class ModuleSystemTests: XCTestCase {
     @MainActor func testModuleCatalogModuleCount() {
         XCTAssertEqual(
             ModuleCatalog.moduleCount,
-            14,
-            "moduleCount should return 14"
+            15,
+            "moduleCount should return 15"
         )
     }
 

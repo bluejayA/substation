@@ -133,6 +133,15 @@ extension ViewMode {
         case .swiftContainerWebAccess: return "swift.webAccess"
         case .swiftBackgroundOperations: return "swift.backgroundOperations"
         case .swiftBackgroundOperationDetail: return "swift.backgroundOperationDetail"
+
+        // Magnum module
+        case .clusters: return "magnum.clusters"
+        case .clusterDetail: return "magnum.clusterDetail"
+        case .clusterTemplates: return "magnum.clusterTemplates"
+        case .clusterTemplateDetail: return "magnum.clusterTemplateDetail"
+        case .clusterCreate: return "magnum.clusterCreate"
+        case .clusterResize: return "magnum.clusterResize"
+        case .clusterTemplateCreate: return "magnum.clusterTemplateCreate"
         }
     }
 

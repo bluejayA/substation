@@ -181,7 +181,8 @@ extension DataProviderRegistry {
                 return ["servers", "servergroups", "networks", "flavors"]
             case .secondary:
                 return ["volumes", "subnets", "keypairs", "volumetypes",
-                       "availabilityzones", "secrets", "floatingips", "images", "swift"]
+                       "availabilityzones", "secrets", "floatingips", "images", "swift",
+                       "clusters"]
             case .expensive:
                 return ["ports", "routers", "securitygroups", "quotas"]
             }

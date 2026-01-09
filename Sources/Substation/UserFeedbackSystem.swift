@@ -712,26 +712,44 @@ public struct ModalView: Component, @unchecked Sendable {
 // MARK: - Error Handling Integration
 
 /// Enhanced error handler that integrates with user feedback
+///
+/// This handler processes errors and converts them to user-friendly messages.
+/// Error logging is handled separately by the callers using Logger.shared
+/// to ensure logs go to the log file rather than the terminal screen.
 public final class EnhancedErrorHandler {
     private let feedbackSystem: UserFeedbackSystem
-    private let logger: any OSClientLogger
 
-    public init(feedbackSystem: UserFeedbackSystem, logger: any OSClientLogger = ConsoleLogger()) {
+    public init(feedbackSystem: UserFeedbackSystem) {
         self.feedbackSystem = feedbackSystem
-        self.logger = logger
     }
 
     /// Process an OpenStack error and return enhanced error information
+    ///
+    /// Converts an OpenStackError into an EnhancedError with user-friendly messaging.
+    /// Note: Error logging should be handled by the caller using Logger.shared
+    /// to avoid duplicate output to the terminal.
+    ///
+    /// - Parameters:
+    ///   - error: The OpenStack error to process
+    ///   - context: Context about where the error occurred
+    /// - Returns: Enhanced error with user-friendly message and recovery options
     public func processOpenStackError(_ error: OpenStackError, context: ErrorContext) -> EnhancedError {
         let enhancedError = createEnhancedError(from: error, context: context)
-        logger.logError("OpenStack error: \(error.localizedDescription)", context: ["operation": context.operation])
         return enhancedError
     }
 
     /// Process a general error and return enhanced error information
+    ///
+    /// Converts any Error into an EnhancedError with user-friendly messaging.
+    /// Note: Error logging should be handled by the caller using Logger.shared
+    /// to avoid duplicate output to the terminal.
+    ///
+    /// - Parameters:
+    ///   - error: The error to process
+    ///   - context: Context about where the error occurred
+    /// - Returns: Enhanced error with user-friendly message and recovery options
     public func processError(_ error: any Error, context: ErrorContext) -> EnhancedError {
         let enhancedError = createEnhancedError(from: error, context: context)
-        logger.logError("Error: \(error.localizedDescription)", context: ["operation": context.operation])
         return enhancedError
     }
 
@@ -813,10 +831,16 @@ public final class EnhancedErrorHandler {
     }
 
     /// Handle an error with appropriate user feedback
+    ///
+    /// Note: Error logging should be handled by the caller using Logger.shared
+    /// to avoid output to the terminal screen.
+    ///
+    /// - Parameters:
+    ///   - error: The error to handle
+    ///   - context: Context string for error message
+    ///   - showUser: Whether to show the error to the user
     @MainActor
     public func handle(_ error: any Error, context: String = "", showUser: Bool = true) {
-        logger.logError("Error in \(context)", context: ["error": error.localizedDescription])
-
         if showUser {
             let userMessage = getUserFriendlyMessage(for: error, context: context)
             feedbackSystem.showError(userMessage, error: error)

@@ -199,6 +199,21 @@ struct UIUtils {
         // Phase 4 Session 2 - Operations Management
         case .performanceMetrics:
             return "\(baseCommands) UP/DOWN:scroll ESC:back"
+        // Magnum (Container Infrastructure)
+        case .clusters:
+            return "\(baseCommands) SPACE:details C:create R:resize K:kubeconfig :delete T:templates /:search ESC:back"
+        case .clusterDetail:
+            return "\(baseCommands) R:resize K:kubeconfig ESC:back"
+        case .clusterTemplates:
+            return "\(baseCommands) SPACE:details C:create /:search ESC:back"
+        case .clusterTemplateDetail:
+            return "\(baseCommands) ESC:back"
+        case .clusterCreate:
+            return "\(baseCommands) TAB:navigate LEFT/RIGHT:change ENTER:create ESC:cancel"
+        case .clusterResize:
+            return "\(baseCommands) LEFT/RIGHT:adjust ENTER:resize ESC:cancel"
+        case .clusterTemplateCreate:
+            return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:create ESC:cancel"
         }
     }
 

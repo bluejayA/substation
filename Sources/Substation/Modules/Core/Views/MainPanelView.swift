@@ -4,11 +4,11 @@ import SwiftNCurses
 enum ViewMode: CaseIterable {
     case loading, dashboard, advancedSearch, healthDashboard, servers, serverGroups, securityGroups,
         volumes, volumeArchives, images, flavors, subnets, ports, routers, floatingIPs, networks,
-        barbican, barbicanSecrets, swift, swiftBackgroundOperations,
-        performanceMetrics, serverDetail, serverConsole, serverGroupDetail, networkDetail,
+        barbican, barbicanSecrets, swift, swiftBackgroundOperations, clusters, clusterTemplates,
+        clusterCreate, clusterResize, clusterTemplateCreate, performanceMetrics, serverDetail, serverConsole, serverGroupDetail, networkDetail,
         securityGroupDetail, volumeDetail, volumeArchiveDetail, imageDetail, flavorDetail,
         subnetDetail, portDetail, routerDetail, floatingIPDetail, healthDashboardServiceDetail,
-        barbicanSecretDetail,
+        barbicanSecretDetail, clusterDetail, clusterTemplateDetail,
         swiftContainerDetail, swiftObjectDetail, swiftBackgroundOperationDetail, serverCreate,
         serverGroupCreate, networkCreate, securityGroupCreate, securityGroupRuleManagement,
         subnetCreate, volumeCreate, portCreate, routerCreate, routerEdit, floatingIPCreate, keyPairs,
@@ -116,6 +116,13 @@ enum ViewMode: CaseIterable {
         case .swiftBackgroundOperations: return "Operations"
         case .swiftBackgroundOperationDetail: return "Operation Details"
         case .performanceMetrics: return "Performance Metrics"
+        case .clusters: return "Clusters"
+        case .clusterDetail: return "Cluster Details"
+        case .clusterTemplates: return "Cluster Templates"
+        case .clusterTemplateDetail: return "Cluster Template Details"
+        case .clusterCreate: return "Create Cluster"
+        case .clusterResize: return "Resize Cluster"
+        case .clusterTemplateCreate: return "Create Cluster Template"
         }
     }
 
@@ -138,7 +145,9 @@ enum ViewMode: CaseIterable {
             .swiftContainerCreate, .swiftObjectUpload, .swiftContainerDownload,
             .swiftObjectDownload, .swiftDirectoryDownload, .swiftContainerMetadata,
             .swiftObjectMetadata, .swiftDirectoryMetadata, .performanceMetrics,
-            .welcome, .tutorial, .shortcuts, .examples:
+            .welcome, .tutorial, .shortcuts, .examples,
+            .clusterDetail, .clusterTemplateDetail, .clusterCreate, .clusterResize,
+            .clusterTemplateCreate:
             return true
         default:
             return false
@@ -149,7 +158,7 @@ enum ViewMode: CaseIterable {
         switch self {
         // Main resource list views
         case .servers, .volumes, .networks, .subnets, .routers, .ports, .floatingIPs,
-            .securityGroups, .serverGroups, .keyPairs, .images:
+            .securityGroups, .serverGroups, .keyPairs, .images, .clusters:
             return true
         // Service list views (barbicanSecrets and volumeArchives support multi-select)
         case .barbican, .barbicanSecrets, .swift,
@@ -227,6 +236,11 @@ enum ViewMode: CaseIterable {
         case .routerSubnetManagement: return .routers
         case .flavorSelection: return .serverCreate
         case .performanceMetrics: return .swiftBackgroundOperations
+        case .clusterDetail: return .clusters
+        case .clusterTemplateDetail: return .clusterTemplates
+        case .clusterCreate: return .clusters
+        case .clusterResize: return .clusterDetail
+        case .clusterTemplateCreate: return .clusterTemplates
         default: return self
         }
     }

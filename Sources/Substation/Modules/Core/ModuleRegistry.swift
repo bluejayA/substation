@@ -337,6 +337,12 @@ final class ModuleRegistry {
             try await register(module)
         }
 
+        // Container infrastructure (no dependencies)
+        if enabledModules.contains("magnum") {
+            let module = MagnumModule(tui: tui)
+            try await register(module)
+        }
+
         // Phase 2: Load modules that depend on Networks
 
         // Networks module (dependency for Subnets, Routers, FloatingIPs, Ports)

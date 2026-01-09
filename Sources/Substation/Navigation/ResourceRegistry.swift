@@ -37,6 +37,10 @@ final class ResourceRegistry: @unchecked Sendable {
         .swiftBackgroundOperations: ["operations", "ops", "background", "tasks"],
         .performanceMetrics: ["performance", "metrics", "perf", "stats"],
 
+        // Container Infrastructure (Magnum)
+        .clusters: ["clusters", "cluster", "clst", "c", "magnum", "kubernetes", "k8s"],
+        .clusterTemplates: ["cluster templates", "clustertemplates", "clustertemplate", "templates", "tmpl", "ct"],
+
         // Utilities
         .about: ["about"],
         .advancedSearch: ["search", "find", "z"],

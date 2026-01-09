@@ -126,6 +126,20 @@ struct MiscViews {
             return "Help - Background Operations"
         case .swiftBackgroundOperationDetail:
             return "Help - Operation Details"
+        case .clusters:
+            return "Help - Container Cluster Management"
+        case .clusterDetail:
+            return "Help - Cluster Details"
+        case .clusterTemplates:
+            return "Help - Cluster Template Management"
+        case .clusterTemplateDetail:
+            return "Help - Cluster Template Details"
+        case .clusterCreate:
+            return "Help - Create Cluster"
+        case .clusterResize:
+            return "Help - Resize Cluster"
+        case .clusterTemplateCreate:
+            return "Help - Create Cluster Template"
         default:
             return "Help - Keyboard Shortcuts"
         }
@@ -871,6 +885,163 @@ struct MiscViews {
                     "Started At: Operation start timestamp",
                     "Elapsed Time: Duration since start",
                     "Duration: Total time (for completed)",
+                ]),
+                generalActions
+            ]
+
+        case .clusters:
+            return [
+                generalNavigation,
+                ("Container Cluster Management", [
+                    "SHIFT-C: Create new Kubernetes cluster",
+                    "SHIFT-Z: Resize cluster (change worker node count)",
+                    "SPACE: View cluster details",
+                    "DELETE: Delete selected cluster",
+                    "Clusters provide Kubernetes container orchestration",
+                ]),
+                ("Cluster Status", [
+                    "CREATE_IN_PROGRESS: Cluster is being provisioned",
+                    "CREATE_COMPLETE: Cluster is ready for use",
+                    "UPDATE_IN_PROGRESS: Cluster is being modified",
+                    "DELETE_IN_PROGRESS: Cluster is being removed",
+                    "CREATE_FAILED: Cluster provisioning failed",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "DELETE: Bulk delete selected clusters",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
+                generalActions
+            ]
+
+        case .clusterDetail:
+            return [
+                generalNavigation,
+                ("Cluster Details", [
+                    "SHIFT-Z: Resize cluster",
+                    "View cluster configuration and status",
+                    "See master and worker node counts",
+                    "View associated cluster template",
+                    "ESC: Return to cluster list",
+                ]),
+                ("Cluster Information", [
+                    "UUID: Unique cluster identifier",
+                    "Name: Human-readable cluster name",
+                    "Status: Current cluster state",
+                    "Template: Cluster template used for creation",
+                    "Keypair: SSH key for node access",
+                    "API Address: Kubernetes API endpoint",
+                ]),
+                generalActions
+            ]
+
+        case .clusterTemplates:
+            return [
+                generalNavigation,
+                ("Cluster Template Management", [
+                    "SHIFT-C: Create new cluster template",
+                    "SPACE: View template details",
+                    "Templates define cluster configuration",
+                    "Used when creating new clusters",
+                ]),
+                ("Template Properties", [
+                    "COE: Container Orchestration Engine (kubernetes, swarm)",
+                    "Image: Base image for cluster nodes",
+                    "Flavor: Default flavor for master/worker nodes",
+                    "Network Driver: Container networking (flannel, calico)",
+                    "Volume Driver: Persistent storage driver",
+                ]),
+                ("Multi-Select Mode (CTRL-X)", [
+                    "CTRL-X: Toggle multi-select mode",
+                    "SPACE: Select/deselect items (in multi-select mode)",
+                    "ESC: Exit multi-select mode",
+                    "Status icons show [ ] or [X] when in multi-select",
+                ]),
+                generalActions
+            ]
+
+        case .clusterTemplateDetail:
+            return [
+                generalNavigation,
+                ("Template Details", [
+                    "View complete template configuration",
+                    "See default flavors, images, and drivers",
+                    "Review networking and storage settings",
+                    "ESC: Return to template list",
+                ]),
+                ("Configuration Sections", [
+                    "Basic Info: Name, COE type, visibility",
+                    "Compute: Master/worker flavors, image",
+                    "Networking: Network driver, DNS, proxy settings",
+                    "Storage: Volume driver, Docker volume size",
+                    "Features: Floating IPs, load balancer, registry",
+                ]),
+                generalActions
+            ]
+
+        case .clusterCreate:
+            return [
+                ("Cluster Creation Form", [
+                    "TAB: Move to next field",
+                    "SHIFT+TAB: Move to previous field",
+                    "UP/DOWN: Navigate fields",
+                    "SPACE: Edit field or open selector",
+                    "ENTER: Create cluster",
+                    "ESC: Cancel and return",
+                ]),
+                ("Required Fields", [
+                    "Cluster Name: Unique name for the cluster",
+                    "Cluster Template: Template defining configuration",
+                ]),
+                ("Optional Fields", [
+                    "SSH Keypair: Key for accessing cluster nodes",
+                    "Master Nodes: Number of control plane nodes",
+                    "Worker Nodes: Number of workload nodes",
+                    "Create Timeout: Max time for cluster creation",
+                ]),
+                generalActions
+            ]
+
+        case .clusterResize:
+            return [
+                ("Cluster Resize", [
+                    "UP/DOWN: Adjust worker node count",
+                    "ENTER: Apply resize operation",
+                    "ESC: Cancel and return to cluster details",
+                ]),
+                ("Resize Information", [
+                    "Only worker nodes can be resized",
+                    "Master node count is fixed at creation",
+                    "Resize may take several minutes",
+                    "Cluster remains accessible during resize",
+                ]),
+                generalActions
+            ]
+
+        case .clusterTemplateCreate:
+            return [
+                ("Cluster Template Creation Form", [
+                    "TAB: Move to next field",
+                    "SHIFT+TAB: Move to previous field",
+                    "SPACE: Edit field, open selector, or toggle",
+                    "ENTER: Create cluster template",
+                    "ESC: Cancel and return to template list",
+                ]),
+                ("Required Fields", [
+                    "Template Name: Unique name for the template",
+                    "Container Engine: Kubernetes or Docker Swarm",
+                    "Node Image: OS image for cluster nodes",
+                ]),
+                ("Optional Fields", [
+                    "External Network: Network for floating IPs",
+                    "Worker/Master Flavor: Instance sizes for nodes",
+                    "SSH Keypair: Default key for node access",
+                    "Docker Volume Size: Storage for containers (GB)",
+                    "Network Driver: Flannel or Calico",
+                    "Floating IPs: Enable external access",
+                    "Master LB: Load balancer for HA masters",
                 ]),
                 generalActions
             ]

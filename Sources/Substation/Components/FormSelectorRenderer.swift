@@ -261,6 +261,17 @@ struct FormSelectorRenderer {
                 columns: columns,
                 maxHeight: maxHeight
             )
+        } else if let clusterTemplates = items as? [ClusterTemplate] {
+            return renderClusterTemplateSelector(
+                label: label,
+                items: clusterTemplates,
+                selectedItemId: selectedItemId,
+                highlightedIndex: highlightedIndex,
+                scrollOffset: scrollOffset,
+                searchQuery: searchQuery,
+                columns: columns,
+                maxHeight: maxHeight
+            )
         }
 
         // Default: return nil for unsupported types
@@ -1262,6 +1273,63 @@ struct FormSelectorRenderer {
         )
 
         let selector = FormSelector<BitLengthOption>(
+            label: label,
+            tabs: [tab],
+            selectedTabIndex: 0,
+            items: items,
+            selectedItemIds: selectedItemId.map { Set([$0]) } ?? [],
+            highlightedIndex: highlightedIndex,
+            checkboxMode: .basic,
+            scrollOffset: scrollOffset,
+            searchQuery: searchQuery,
+            maxHeight: maxHeight,
+            isActive: true
+        )
+
+        return selector.render()
+    }
+
+    // MARK: - Magnum Type Renderers
+
+    /// Render a selector for ClusterTemplate items
+    ///
+    /// Creates a FormSelector configured for selecting cluster templates
+    /// with columns for name, COE type, and other relevant properties.
+    ///
+    /// - Parameters:
+    ///   - label: The label for the selector
+    ///   - items: Array of ClusterTemplate items to display
+    ///   - selectedItemId: Currently selected item ID
+    ///   - highlightedIndex: Index of highlighted item
+    ///   - scrollOffset: Current scroll offset
+    ///   - searchQuery: Optional search query for filtering
+    ///   - columns: Column definitions for the selector
+    ///   - maxHeight: Maximum height for the selector
+    /// - Returns: A Component representing the selector
+    private static func renderClusterTemplateSelector(
+        label: String,
+        items: [ClusterTemplate],
+        selectedItemId: String?,
+        highlightedIndex: Int,
+        scrollOffset: Int,
+        searchQuery: String?,
+        columns: [FormSelectorItemColumn],
+        maxHeight: Int?
+    ) -> any Component {
+        let selectorColumns = columns.map { column in
+            FormSelectorColumn<ClusterTemplate>(
+                header: column.header,
+                width: column.width,
+                getValue: { column.getValue($0) }
+            )
+        }
+
+        let tab = FormSelectorTab<ClusterTemplate>(
+            title: "Cluster Templates",
+            columns: selectorColumns
+        )
+
+        let selector = FormSelector<ClusterTemplate>(
             label: label,
             tabs: [tab],
             selectedTabIndex: 0,

@@ -50,6 +50,8 @@ public enum BatchOperationType: Sendable, Hashable {
     case swiftObjectBulkDelete(containerName: String, objectNames: [String])
     case volumeBackupBulkDelete(backupIDs: [String])
     case barbicanSecretBulkDelete(secretIDs: [String])
+    case clusterBulkDelete(clusterIDs: [String])
+    case clusterTemplateBulkDelete(templateIDs: [String])
 
     public var description: String {
         switch self {
@@ -85,6 +87,10 @@ public enum BatchOperationType: Sendable, Hashable {
             return "Bulk delete \(backupIDs.count) volume backups"
         case .barbicanSecretBulkDelete(let secretIDs):
             return "Bulk delete \(secretIDs.count) Barbican secrets"
+        case .clusterBulkDelete(let clusterIDs):
+            return "Bulk delete \(clusterIDs.count) Kubernetes clusters"
+        case .clusterTemplateBulkDelete(let templateIDs):
+            return "Bulk delete \(templateIDs.count) cluster templates"
         }
     }
 
@@ -122,6 +128,10 @@ public enum BatchOperationType: Sendable, Hashable {
             return max(1, backupIDs.count / 10) // ~10 deletions per minute
         case .barbicanSecretBulkDelete(let secretIDs):
             return max(1, secretIDs.count / 20) // ~20 deletions per minute
+        case .clusterBulkDelete(let clusterIDs):
+            return max(1, clusterIDs.count / 3) // ~3 deletions per minute (clusters take longer)
+        case .clusterTemplateBulkDelete(let templateIDs):
+            return max(1, templateIDs.count / 15) // ~15 deletions per minute
         }
     }
 
@@ -165,6 +175,10 @@ public enum BatchOperationType: Sendable, Hashable {
             return (ids, "volumes")
         case .barbicanSecretBulkDelete(let ids):
             return (ids, "barbican")
+        case .clusterBulkDelete(let ids):
+            return (ids, "magnum")
+        case .clusterTemplateBulkDelete(let ids):
+            return (ids, "magnum")
         }
     }
 }
