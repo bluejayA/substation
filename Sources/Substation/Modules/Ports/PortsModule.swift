@@ -405,12 +405,14 @@ final class PortsModule: OpenStackModule {
         // Check if ports are loaded
         let portCount = tui.cacheManager.cachedPorts.count
         metrics["portCount"] = portCount
-        cachedPortCount = portCount
 
-        // Check for significant changes in port count
+        // Check for significant changes in port count (compare BEFORE updating cached value)
         if cachedPortCount > 0 && portCount == 0 {
             errors.append("Port count dropped to zero unexpectedly")
         }
+
+        // Update cached count AFTER comparison
+        cachedPortCount = portCount
 
         // Check if ports data is available
         if portCount == 0 {
@@ -531,8 +533,8 @@ final class PortsModule: OpenStackModule {
     ///   - operation: The operation being performed
     ///   - portName: The port name if available
     ///   - context: Additional context for logging
-    private func logOperation(_ operation: String, portName: String? = nil, context: [String: Any] = [:]) {
-        var logContext = context
+    private func logOperation(_ operation: String, portName: String? = nil, context: [String: any Sendable] = [:]) {
+        var logContext: [String: any Sendable] = context
         logContext["operation"] = operation
         logContext["module"] = identifier
 
@@ -540,7 +542,7 @@ final class PortsModule: OpenStackModule {
             logContext["portName"] = name
         }
 
-        Logger.shared.logInfo("Ports operation", context: [:])
+        Logger.shared.logInfo("Ports operation", context: logContext)
     }
 
     /// Get port statistics

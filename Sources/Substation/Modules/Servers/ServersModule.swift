@@ -547,12 +547,14 @@ final class ServersModule: OpenStackModule {
         // Check if servers are loaded
         let serverCount = tui.cacheManager.cachedServers.count
         metrics["serverCount"] = serverCount
-        cachedServerCount = serverCount
 
-        // Check for significant changes in server count
+        // Check for significant changes in server count (compare BEFORE updating cached value)
         if cachedServerCount > 0 && serverCount == 0 {
             errors.append("Server count dropped to zero unexpectedly")
         }
+
+        // Update cached count AFTER comparison
+        cachedServerCount = serverCount
 
         // Check if servers data is available
         if serverCount == 0 {
@@ -655,8 +657,8 @@ final class ServersModule: OpenStackModule {
     ///   - operation: The operation being performed
     ///   - serverName: The server name if available
     ///   - context: Additional context for logging
-    private func logOperation(_ operation: String, serverName: String? = nil, context: [String: Any] = [:]) {
-        var logContext = context
+    private func logOperation(_ operation: String, serverName: String? = nil, context: [String: any Sendable] = [:]) {
+        var logContext: [String: any Sendable] = context
         logContext["operation"] = operation
         logContext["module"] = identifier
 
@@ -664,7 +666,7 @@ final class ServersModule: OpenStackModule {
             logContext["serverName"] = name
         }
 
-        Logger.shared.logInfo("Servers operation", context: [:])
+        Logger.shared.logInfo("Servers operation", context: logContext)
     }
 
     /// Get server statistics

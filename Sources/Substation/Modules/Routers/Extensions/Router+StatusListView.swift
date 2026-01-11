@@ -25,13 +25,20 @@ extension RouterViews {
                 StatusListColumn(
                     header: "STATUS",
                     width: 10,
-                    getValue: { _ in
-                        "ACTIVE"
+                    getValue: { router in
+                        router.status ?? "Unknown"
                     },
-                    getStyle: { _ in .success }
+                    getStyle: { router in
+                        let status = router.status ?? "Unknown"
+                        switch status.lowercased() {
+                        case "active": return .success
+                        case "error": return .error
+                        default: return .warning
+                        }
+                    }
                 )
             ],
-            getStatusIcon: { _ in "active" },
+            getStatusIcon: { router in router.status?.lowercased() ?? "unknown" },
             filterItems: { routers, query in
                 FilterUtils.filterRouters(routers, query: query)
             },

@@ -459,12 +459,14 @@ final class RoutersModule: OpenStackModule {
         // Check if routers are loaded
         let routerCount = tui.cacheManager.cachedRouters.count
         metrics["routerCount"] = routerCount
-        cachedRouterCount = routerCount
 
-        // Check for significant changes in router count
+        // Check for significant changes in router count (compare BEFORE updating cached value)
         if cachedRouterCount > 0 && routerCount == 0 {
             errors.append("Router count dropped to zero unexpectedly")
         }
+
+        // Update cached count AFTER comparison
+        cachedRouterCount = routerCount
 
         // Check if routers data is available
         if routerCount == 0 {

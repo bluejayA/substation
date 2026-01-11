@@ -573,7 +573,9 @@ final class HotReloadManager {
                 throw HotReloadError.timeout("operation", seconds)
             }
 
-            let result = try await group.next()!
+            guard let result = try await group.next() else {
+                throw HotReloadError.timeout("operation", seconds)
+            }
             group.cancelAll()
             return result
         }

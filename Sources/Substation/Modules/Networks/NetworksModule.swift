@@ -377,12 +377,14 @@ final class NetworksModule: OpenStackModule {
         // Check if networks are loaded
         let networkCount = tui.cacheManager.cachedNetworks.count
         metrics["networkCount"] = networkCount
-        cachedNetworkCount = networkCount
 
-        // Check for significant changes in network count
+        // Check for significant changes in network count (compare BEFORE updating cached value)
         if cachedNetworkCount > 0 && networkCount == 0 {
             errors.append("Network count dropped to zero unexpectedly")
         }
+
+        // Update cached count AFTER comparison
+        cachedNetworkCount = networkCount
 
         // Check if networks data is available
         if networkCount == 0 {
@@ -490,8 +492,8 @@ final class NetworksModule: OpenStackModule {
     ///   - operation: The operation being performed
     ///   - networkName: The network name if available
     ///   - context: Additional context for logging
-    private func logOperation(_ operation: String, networkName: String? = nil, context: [String: Any] = [:]) {
-        var logContext = context
+    private func logOperation(_ operation: String, networkName: String? = nil, context: [String: any Sendable] = [:]) {
+        var logContext: [String: any Sendable] = context
         logContext["operation"] = operation
         logContext["module"] = identifier
 
@@ -499,7 +501,7 @@ final class NetworksModule: OpenStackModule {
             logContext["networkName"] = name
         }
 
-        Logger.shared.logInfo("Networks operation", context: [:])
+        Logger.shared.logInfo("Networks operation", context: logContext)
     }
 
     /// Get network statistics

@@ -581,8 +581,8 @@ final class SubnetsModule: OpenStackModule {
     ///   - operation: The operation being performed
     ///   - subnetName: The subnet name if available
     ///   - context: Additional context for logging
-    private func logOperation(_ operation: String, subnetName: String? = nil, context: [String: Any] = [:]) {
-        var logContext = context
+    private func logOperation(_ operation: String, subnetName: String? = nil, context: [String: any Sendable] = [:]) {
+        var logContext: [String: any Sendable] = context
         logContext["operation"] = operation
         logContext["module"] = identifier
 
@@ -590,7 +590,7 @@ final class SubnetsModule: OpenStackModule {
             logContext["subnetName"] = name
         }
 
-        Logger.shared.logInfo("Subnets operation", context: [:])
+        Logger.shared.logInfo("Subnets operation", context: logContext)
     }
 
     /// Get subnet statistics

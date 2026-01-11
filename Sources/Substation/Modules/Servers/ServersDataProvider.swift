@@ -242,7 +242,9 @@ final class ServersDataProvider: DataProvider {
                 throw TimeoutError()
             }
 
-            let result = try await group.next()!
+            guard let result = try await group.next() else {
+                throw TimeoutError()
+            }
             group.cancelAll()
             return result
         }

@@ -189,7 +189,9 @@ final class ImagesDataProvider: DataProvider {
                 throw TimeoutError()
             }
 
-            let result = try await group.next()!
+            guard let result = try await group.next() else {
+                throw TimeoutError()
+            }
             group.cancelAll()
             return result
         }
