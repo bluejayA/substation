@@ -5,7 +5,8 @@ enum ViewMode: CaseIterable {
     case loading, dashboard, advancedSearch, healthDashboard, servers, serverGroups, securityGroups,
         volumes, volumeArchives, images, flavors, subnets, ports, routers, floatingIPs, networks,
         barbican, barbicanSecrets, swift, swiftBackgroundOperations, clusters, clusterTemplates,
-        clusterCreate, clusterResize, clusterTemplateCreate, performanceMetrics, serverDetail, serverConsole, serverGroupDetail, networkDetail,
+        clusterCreate, clusterResize, clusterTemplateCreate, hypervisors, hypervisorDetail,
+        hypervisorServers, performanceMetrics, serverDetail, serverConsole, serverGroupDetail, networkDetail,
         securityGroupDetail, volumeDetail, volumeArchiveDetail, imageDetail, flavorDetail,
         subnetDetail, portDetail, routerDetail, floatingIPDetail, healthDashboardServiceDetail,
         barbicanSecretDetail, clusterDetail, clusterTemplateDetail,
@@ -123,6 +124,9 @@ enum ViewMode: CaseIterable {
         case .clusterCreate: return "Create Cluster"
         case .clusterResize: return "Resize Cluster"
         case .clusterTemplateCreate: return "Create Cluster Template"
+        case .hypervisors: return "Hypervisors"
+        case .hypervisorDetail: return "Hypervisor Details"
+        case .hypervisorServers: return "Hypervisor Servers"
         }
     }
 
@@ -147,7 +151,7 @@ enum ViewMode: CaseIterable {
             .swiftObjectMetadata, .swiftDirectoryMetadata, .performanceMetrics,
             .welcome, .tutorial, .shortcuts, .examples,
             .clusterDetail, .clusterTemplateDetail, .clusterCreate, .clusterResize,
-            .clusterTemplateCreate:
+            .clusterTemplateCreate, .hypervisorDetail, .hypervisorServers:
             return true
         default:
             return false
@@ -241,6 +245,8 @@ enum ViewMode: CaseIterable {
         case .clusterCreate: return .clusters
         case .clusterResize: return .clusterDetail
         case .clusterTemplateCreate: return .clusterTemplates
+        case .hypervisorDetail: return .hypervisors
+        case .hypervisorServers: return .hypervisorDetail
         default: return self
         }
     }

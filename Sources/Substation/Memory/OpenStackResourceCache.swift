@@ -43,6 +43,8 @@ final class OpenStackResourceCache {
     private var syncSwiftObjectsCacheTime: [String: Date] = [:]
     private var syncVolumeSnapshots: [VolumeSnapshot] = []
     private var syncVolumeBackups: [VolumeBackup] = []
+    private var syncHypervisors: [Hypervisor] = []
+    private var syncComputeServices: [ComputeService] = []
 
     // Quota caches (optional types)
     private var syncComputeQuotas: ComputeQuotaSet?
@@ -87,6 +89,8 @@ final class OpenStackResourceCache {
     var swiftObjectsByContainer: [String: [SwiftObject]] { syncSwiftObjectsByContainer }
     var volumeSnapshots: [VolumeSnapshot] { syncVolumeSnapshots }
     var volumeBackups: [VolumeBackup] { syncVolumeBackups }
+    var hypervisors: [Hypervisor] { syncHypervisors }
+    var computeServices: [ComputeService] { syncComputeServices }
 
     var computeQuotas: ComputeQuotaSet? { syncComputeQuotas }
     var networkQuotas: NetworkQuotaSet? { syncNetworkQuotas }
@@ -334,6 +338,22 @@ final class OpenStackResourceCache {
         Logger.shared.logDebug("OpenStackResourceCache cached \(backups.count) volume backups")
     }
 
+    /// Set cached hypervisors
+    ///
+    /// - Parameter hypervisors: Array of Hypervisor resources to cache
+    func setHypervisors(_ hypervisors: [Hypervisor]) async {
+        syncHypervisors = hypervisors
+        Logger.shared.logDebug("OpenStackResourceCache cached \(hypervisors.count) hypervisors")
+    }
+
+    /// Set cached compute services
+    ///
+    /// - Parameter services: Array of ComputeService resources to cache
+    func setComputeServices(_ services: [ComputeService]) async {
+        syncComputeServices = services
+        Logger.shared.logDebug("OpenStackResourceCache cached \(services.count) compute services")
+    }
+
     // MARK: - Quota Setters
 
     func setComputeQuotas(_ quotas: ComputeQuotaSet?) async {
@@ -392,6 +412,8 @@ final class OpenStackResourceCache {
         syncSwiftObjectsCacheTime.removeAll()
         syncVolumeSnapshots.removeAll()
         syncVolumeBackups.removeAll()
+        syncHypervisors.removeAll()
+        syncComputeServices.removeAll()
         syncComputeQuotas = nil
         syncNetworkQuotas = nil
         syncVolumeQuotas = nil

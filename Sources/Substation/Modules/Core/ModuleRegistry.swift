@@ -320,6 +320,12 @@ final class ModuleRegistry {
             try await register(module)
         }
 
+        // Hypervisors (admin module, no dependencies)
+        if enabledModules.contains("hypervisors") {
+            let module = HypervisorsModule(tui: tui)
+            try await register(module)
+        }
+
         if enabledModules.contains("images") {
             let module = ImagesModule(tui: tui)
             try await register(module)

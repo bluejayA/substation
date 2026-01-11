@@ -142,6 +142,11 @@ extension ViewMode {
         case .clusterCreate: return "magnum.clusterCreate"
         case .clusterResize: return "magnum.clusterResize"
         case .clusterTemplateCreate: return "magnum.clusterTemplateCreate"
+
+        // Hypervisors module
+        case .hypervisors: return "hypervisors.list"
+        case .hypervisorDetail: return "hypervisors.detail"
+        case .hypervisorServers: return "hypervisors.servers"
         }
     }
 

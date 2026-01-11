@@ -140,6 +140,12 @@ struct MiscViews {
             return "Help - Resize Cluster"
         case .clusterTemplateCreate:
             return "Help - Create Cluster Template"
+        case .hypervisors:
+            return "Help - Hypervisor Management"
+        case .hypervisorDetail:
+            return "Help - Hypervisor Details"
+        case .hypervisorServers:
+            return "Help - Hypervisor Servers"
         default:
             return "Help - Keyboard Shortcuts"
         }
@@ -1042,6 +1048,67 @@ struct MiscViews {
                     "Network Driver: Flannel or Calico",
                     "Floating IPs: Enable external access",
                     "Master LB: Load balancer for HA masters",
+                ]),
+                generalActions
+            ]
+
+        case .hypervisors:
+            return [
+                generalNavigation,
+                ("Hypervisor Management (Admin)", [
+                    "SHIFT-S: View servers running on selected hypervisor",
+                    "SHIFT-E: Enable selected hypervisor",
+                    "SHIFT-D: Disable selected hypervisor (prompts for reason)",
+                    "SPACE: View hypervisor details",
+                    "/: Search/filter hypervisors",
+                    "Requires administrative privileges",
+                ]),
+                ("Hypervisor Status", [
+                    "State UP: Hypervisor is running and responsive",
+                    "State DOWN: Hypervisor is not responding",
+                    "Status Enabled: Accepting new instance scheduling",
+                    "Status Disabled: Not accepting new instances",
+                ]),
+                ("Resource Information", [
+                    "VMs: Number of running virtual machines",
+                    "vCPUs: Used/Total virtual CPU cores",
+                    "Memory: Used/Total RAM in GB",
+                    "Disk: Used/Total local storage in GB",
+                ]),
+                generalActions
+            ]
+
+        case .hypervisorDetail:
+            return [
+                generalNavigation,
+                ("Hypervisor Detail Actions", [
+                    "SHIFT-S: View servers running on this hypervisor",
+                    "SHIFT-E: Enable this hypervisor",
+                    "SHIFT-D: Disable this hypervisor (prompts for reason)",
+                    "ESC: Return to hypervisor list",
+                ]),
+                ("Detail Information", [
+                    "Basic Info: ID, hostname, IP address, type, version",
+                    "State/Status: Current operational state",
+                    "Resource Usage: vCPUs, memory, disk with percentages",
+                    "Instance Info: Running VMs and workload metrics",
+                    "Available Resources: Free memory and disk space",
+                ]),
+                generalActions
+            ]
+
+        case .hypervisorServers:
+            return [
+                generalNavigation,
+                ("Hypervisor Servers View", [
+                    "Shows all servers running on the selected hypervisor",
+                    "UP/DOWN: Navigate server list",
+                    "ESC: Return to hypervisor detail",
+                ]),
+                ("Server Information", [
+                    "Name: Server display name",
+                    "Status: Current server state (ACTIVE, SHUTOFF, etc.)",
+                    "ID: Server UUID",
                 ]),
                 generalActions
             ]

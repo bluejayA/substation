@@ -47,8 +47,8 @@ struct UnifiedInputBarView {
         let maxInputWidth = availableWidth - 20 // Reserve space for hints
         let queryDisplay: String
         if state.displayText.isEmpty && !state.isActive {
-            // Show hint when inactive
-            queryDisplay = "/ search | : commands | ? help"
+            // Show view-specific help when inactive
+            queryDisplay = UIUtils.getDynamicHelpText(for: tui.viewCoordinator.currentView)
         } else {
             queryDisplay = createCompactQueryDisplay(
                 query: state.displayText,
@@ -163,6 +163,8 @@ struct UnifiedInputBarView {
             count = FilterUtils.filterFloatingIPs(tui.cacheManager.cachedFloatingIPs, query: query).count
         case .keyPairs:
             count = FilterUtils.filterKeyPairs(tui.cacheManager.cachedKeyPairs, query: query).count
+        case .hypervisors:
+            count = FilterUtils.filterHypervisors(tui.cacheManager.cachedHypervisors, query: query).count
         default:
             return nil
         }

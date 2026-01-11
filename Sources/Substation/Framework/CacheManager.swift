@@ -75,6 +75,18 @@ final class CacheManager {
         set { Task { await resourceCache.setAvailabilityZones(newValue) } }
     }
 
+    /// Cached hypervisors from OpenStack compute service
+    internal var cachedHypervisors: [Hypervisor] {
+        get { resourceCache.hypervisors }
+        set { Task { await resourceCache.setHypervisors(newValue) } }
+    }
+
+    /// Cached compute services from OpenStack compute service
+    internal var cachedComputeServices: [ComputeService] {
+        get { resourceCache.computeServices }
+        set { Task { await resourceCache.setComputeServices(newValue) } }
+    }
+
     // MARK: - Cached Network Resources
 
     /// Cached networks from OpenStack network service

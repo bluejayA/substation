@@ -76,6 +76,12 @@ enum ModuleCatalog {
             phase: .independent
         ),
         ModuleDefinition(
+            identifier: "hypervisors",
+            displayName: "Hypervisors",
+            dependencies: [],
+            phase: .independent
+        ),
+        ModuleDefinition(
             identifier: "images",
             displayName: "Images",
             dependencies: [],

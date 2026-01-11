@@ -899,6 +899,331 @@ public actor NovaService: OpenStackService {
             }
         }
     }
+
+    // MARK: - Hypervisor Operations
+
+    /// Microversion for hypervisor API calls
+    ///
+    /// Using version 2.28 to get full resource statistics (running_vms, vcpus,
+    /// vcpus_used, memory_mb, memory_mb_used, etc.). These fields were removed
+    /// in microversion 2.53+.
+    private static let hypervisorMicroversion = "2.28"
+
+    /// List all hypervisors with detailed information
+    ///
+    /// Returns a list of all compute hypervisors in the OpenStack deployment.
+    /// This operation requires administrative privileges.
+    ///
+    /// - Parameter forceRefresh: If true, bypass cache and fetch fresh data
+    /// - Returns: Array of Hypervisor resources
+    /// - Throws: API errors or permission denied errors for non-admin users
+    public func listHypervisors(forceRefresh: Bool = false) async throws -> [Hypervisor] {
+        let cacheKey = "nova_hypervisor_list"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [Hypervisor].self,
+                resourceType: .serverList  // Reuse server list resource type
+            ) {
+                logger.logInfo("Nova service cache hit - hypervisor list", context: [
+                    "hypervisorCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Nova service API call - listing hypervisors", context: [
+            "forceRefresh": forceRefresh
+        ])
+
+        // Use older microversion to get full resource statistics
+        let hypervisorHeaders = ["X-OpenStack-Nova-API-Version": Self.hypervisorMicroversion]
+
+        let response: HypervisorListResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: "/os-hypervisors/detail",
+            headers: hypervisorHeaders,
+            expected: 200
+        )
+
+        let hypervisors = response.hypervisors
+
+        // Cache the hypervisor list
+        await cacheManager.store(
+            hypervisors,
+            forKey: cacheKey,
+            resourceType: .serverList,
+            customTTL: 60.0  // 1 minute for hypervisors (resource usage changes frequently)
+        )
+
+        // Cache individual hypervisors
+        for hypervisor in hypervisors {
+            await cacheManager.store(
+                hypervisor,
+                forKey: "nova_hypervisor_\(hypervisor.id)",
+                resourceType: .server,
+                customTTL: 60.0
+            )
+        }
+
+        return hypervisors
+    }
+
+    /// Get detailed information about a specific hypervisor
+    ///
+    /// - Parameters:
+    ///   - id: The hypervisor ID
+    ///   - forceRefresh: If true, bypass cache and fetch fresh data
+    /// - Returns: The Hypervisor resource
+    /// - Throws: API errors or not found errors
+    public func getHypervisor(id: String, forceRefresh: Bool = false) async throws -> Hypervisor {
+        let cacheKey = "nova_hypervisor_\(id)"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: Hypervisor.self,
+                resourceType: .server
+            ) {
+                logger.logInfo("Nova service cache hit - hypervisor detail", context: [
+                    "hypervisorId": id
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Nova service API call - getting hypervisor", context: [
+            "hypervisorId": id,
+            "forceRefresh": forceRefresh
+        ])
+
+        // Use older microversion to get full resource statistics
+        let hypervisorHeaders = ["X-OpenStack-Nova-API-Version": Self.hypervisorMicroversion]
+
+        let response: HypervisorDetailResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: "/os-hypervisors/\(id)",
+            headers: hypervisorHeaders,
+            expected: 200
+        )
+
+        let hypervisor = response.hypervisor
+
+        // Cache the hypervisor
+        await cacheManager.store(
+            hypervisor,
+            forKey: cacheKey,
+            resourceType: .server,
+            customTTL: 60.0
+        )
+
+        return hypervisor
+    }
+
+    /// List servers running on a specific hypervisor
+    ///
+    /// Uses the servers list endpoint with host filter instead of the deprecated
+    /// hypervisor servers endpoint. Requires admin privileges.
+    ///
+    /// - Parameter hypervisorHostname: The hypervisor hostname (not ID)
+    /// - Returns: Array of Server objects running on the hypervisor
+    /// - Throws: API errors
+    public func listHypervisorServers(hypervisorHostname: String) async throws -> [Server] {
+        logger.logInfo("Nova service API call - listing servers on hypervisor", context: [
+            "hypervisorHostname": hypervisorHostname
+        ])
+
+        // Use the servers detail endpoint with host filter
+        // The all_tenants parameter allows admin to see all tenants' servers
+        let queryParams = "?host=\(hypervisorHostname)&all_tenants=1"
+
+        let response: ServerListResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: "/servers/detail\(queryParams)",
+            expected: 200
+        )
+
+        let servers = response.servers
+
+        logger.logInfo("Nova service - found servers on hypervisor", context: [
+            "hypervisorHostname": hypervisorHostname,
+            "serverCount": servers.count
+        ])
+
+        return servers
+    }
+
+    /// List servers running on a specific hypervisor by ID
+    ///
+    /// Convenience method that first fetches the hypervisor to get its hostname,
+    /// then lists servers on that host.
+    ///
+    /// - Parameter hypervisorId: The hypervisor ID
+    /// - Returns: Array of Server objects running on the hypervisor
+    /// - Throws: API errors or not found errors
+    public func listHypervisorServersById(hypervisorId: String) async throws -> [Server] {
+        // First get the hypervisor to find its hostname
+        let hypervisor = try await getHypervisor(id: hypervisorId)
+
+        guard let hostname = hypervisor.hypervisorHostname else {
+            logger.logInfo("Nova service - hypervisor has no hostname", context: [
+                "hypervisorId": hypervisorId
+            ])
+            return []
+        }
+
+        return try await listHypervisorServers(hypervisorHostname: hostname)
+    }
+
+    // MARK: - Compute Service Operations
+
+    /// List all compute services
+    ///
+    /// Returns a list of all compute services in the OpenStack deployment.
+    /// This operation requires administrative privileges.
+    ///
+    /// - Parameter forceRefresh: If true, bypass cache and fetch fresh data
+    /// - Returns: Array of ComputeService resources
+    /// - Throws: API errors or permission denied errors for non-admin users
+    public func listComputeServices(forceRefresh: Bool = false) async throws -> [ComputeService] {
+        let cacheKey = "nova_compute_service_list"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [ComputeService].self,
+                resourceType: .serverList
+            ) {
+                logger.logInfo("Nova service cache hit - compute service list", context: [
+                    "serviceCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Nova service API call - listing compute services", context: [
+            "forceRefresh": forceRefresh
+        ])
+
+        let response: ComputeServiceListResponse = try await core.request(
+            service: serviceName,
+            method: "GET",
+            path: "/os-services",
+            expected: 200
+        )
+
+        let services = response.services
+
+        // Cache the service list
+        await cacheManager.store(
+            services,
+            forKey: cacheKey,
+            resourceType: .serverList,
+            customTTL: 60.0
+        )
+
+        return services
+    }
+
+    /// Enable a compute service (hypervisor)
+    ///
+    /// Enables a previously disabled compute service, allowing it to receive
+    /// new instance scheduling requests. Uses microversion 2.53+ API format.
+    ///
+    /// - Parameters:
+    ///   - host: The hostname of the compute service
+    ///   - binary: The service binary name (default: "nova-compute")
+    /// - Throws: API errors or not found errors
+    public func enableComputeService(host: String, binary: String = "nova-compute") async throws {
+        logger.logInfo("Nova service API call - enabling compute service", context: [
+            "host": host,
+            "binary": binary
+        ])
+
+        // Find the service by host to get its ID
+        let services = try await listComputeServices(forceRefresh: true)
+        guard let service = services.first(where: { $0.host == host && $0.binary == binary }) else {
+            throw OpenStackError.httpError(404, "Compute service not found for host: \(host)")
+        }
+
+        // Use PUT /os-services/{service_id} with status
+        let request = ComputeServiceStatusRequest.enable()
+        let requestData = try SharedResources.jsonEncoder.encode(request)
+
+        let _: ComputeServiceUpdateResponse = try await core.request(
+            service: serviceName,
+            method: "PUT",
+            path: "/os-services/\(service.id)",
+            body: requestData,
+            expected: 200
+        )
+
+        // Invalidate cache
+        await cacheManager.removeEntry(forKey: "nova_compute_service_list")
+        await cacheManager.removeEntry(forKey: "nova_hypervisor_list")
+
+        logger.logInfo("Nova service - compute service enabled", context: [
+            "host": host,
+            "serviceId": service.id
+        ])
+    }
+
+    /// Disable a compute service (hypervisor)
+    ///
+    /// Disables a compute service, preventing it from receiving new instance
+    /// scheduling requests. Uses microversion 2.53+ API format.
+    ///
+    /// - Parameters:
+    ///   - host: The hostname of the compute service
+    ///   - binary: The service binary name (default: "nova-compute")
+    ///   - reason: Optional reason for disabling the service
+    /// - Throws: API errors or not found errors
+    public func disableComputeService(
+        host: String,
+        binary: String = "nova-compute",
+        reason: String? = nil
+    ) async throws {
+        logger.logInfo("Nova service API call - disabling compute service", context: [
+            "host": host,
+            "binary": binary,
+            "hasReason": reason != nil
+        ])
+
+        // Find the service by host to get its ID
+        let services = try await listComputeServices(forceRefresh: true)
+        guard let service = services.first(where: { $0.host == host && $0.binary == binary }) else {
+            throw OpenStackError.httpError(404, "Compute service not found for host: \(host)")
+        }
+
+        // Use PUT /os-services/{service_id} with status and optional reason
+        let request = ComputeServiceStatusRequest.disable(reason: reason)
+        let requestData = try SharedResources.jsonEncoder.encode(request)
+
+        let _: ComputeServiceUpdateResponse = try await core.request(
+            service: serviceName,
+            method: "PUT",
+            path: "/os-services/\(service.id)",
+            body: requestData,
+            expected: 200
+        )
+
+        // Invalidate cache
+        await cacheManager.removeEntry(forKey: "nova_compute_service_list")
+        await cacheManager.removeEntry(forKey: "nova_hypervisor_list")
+
+        logger.logInfo("Nova service - compute service disabled", context: [
+            "host": host,
+            "serviceId": service.id,
+            "reason": reason ?? "none"
+        ])
+    }
 }
 
 // MARK: - Enums

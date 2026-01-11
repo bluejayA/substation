@@ -214,6 +214,13 @@ struct UIUtils {
             return "\(baseCommands) LEFT/RIGHT:adjust ENTER:resize ESC:cancel"
         case .clusterTemplateCreate:
             return "\(baseCommands) TAB:navigate SPACE:edit/toggle ENTER:create ESC:cancel"
+        // Hypervisors (admin module)
+        case .hypervisors:
+            return "\(baseCommands) S:servers E:enable D:disable SPACE:details /:search"
+        case .hypervisorDetail:
+            return "\(baseCommands) S:servers E:enable D:disable ESC:back"
+        case .hypervisorServers:
+            return "\(baseCommands) ESC:back"
         }
     }
 

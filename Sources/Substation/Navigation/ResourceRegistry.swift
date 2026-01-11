@@ -14,6 +14,7 @@ final class ResourceRegistry: @unchecked Sendable {
 
         // Compute - Servers
         .flavors: ["flavors", "flavor", "flv", "f", "novaflavors", "novaflavor"],
+        .hypervisors: ["hypervisors", "hypervisor", "hyper", "hv", "novahypervisors", "novahypervisor"],
         .keyPairs: ["keypairs", "keypair", "keys", "key", "kp", "k", "novakeypairs", "novakeypair"],
         .serverGroups: ["server groups", "servergroups", "servergroup", "srvgrp", "sg", "g", "novaservergroups", "novaservergroup"],
         .servers: ["servers", "server", "srv", "s", "nova"],
@@ -375,7 +376,7 @@ final class ResourceRegistry: @unchecked Sendable {
     /// Get commands grouped by category
     func commandsByCategory() -> [CommandCategory: [String]] {
         return [
-            .compute: ["servers", "servergroups", "flavors", "keypairs"],
+            .compute: ["servers", "servergroups", "flavors", "keypairs", "hypervisors"],
             .networking: ["networks", "subnets", "routers", "ports", "floatingips", "securitygroups"],
             .storage: ["volumes", "images", "archives"],
             .services: ["secrets", "loadbalancers", "swift", "operations", "performance"],

@@ -184,4 +184,22 @@ struct FilterUtils {
             template.serverType?.lowercased().contains(query) == true
         }
     }
+
+    /// Filter hypervisors by hostname, status, state, type, or IP
+    ///
+    /// - Parameters:
+    ///   - hypervisors: Array of hypervisors to filter
+    ///   - query: Search query string (case-insensitive)
+    /// - Returns: Filtered array of hypervisors
+    static func filterHypervisors(_ hypervisors: [Hypervisor], query: String?) -> [Hypervisor] {
+        guard let query = query?.lowercased() else { return hypervisors }
+        return hypervisors.filter { hypervisor in
+            hypervisor.hypervisorHostname?.lowercased().contains(query) == true ||
+            hypervisor.hypervisorType?.lowercased().contains(query) == true ||
+            hypervisor.status?.lowercased().contains(query) == true ||
+            hypervisor.state?.lowercased().contains(query) == true ||
+            hypervisor.hostIp?.lowercased().contains(query) == true ||
+            hypervisor.id.lowercased().contains(query)
+        }
+    }
 }
