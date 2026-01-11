@@ -768,7 +768,19 @@ public actor OpenStackClientCore {
             logger.logAPICall("POST", url: request.url?.absoluteString ?? "", statusCode: httpResponse.statusCode, duration: duration)
 
             guard httpResponse.statusCode == 201 else {
-                throw OpenStackError.httpError(httpResponse.statusCode)
+                // Handle authentication-specific HTTP errors with clear messages
+                switch httpResponse.statusCode {
+                case 401:
+                    throw OpenStackError.authenticationFailed
+                case 403:
+                    throw OpenStackError.httpError(403, "Access forbidden - check project permissions")
+                case 400:
+                    // Try to extract error message from response
+                    let errorMsg = String(data: data, encoding: .utf8) ?? "Invalid request"
+                    throw OpenStackError.httpError(400, "Bad request: \(errorMsg)")
+                default:
+                    throw OpenStackError.httpError(httpResponse.statusCode)
+                }
             }
 
             guard let token = httpResponse.value(forHTTPHeaderField: "X-Subject-Token") else {
@@ -795,7 +807,12 @@ public actor OpenStackClientCore {
 
             logger.logInfo("Authentication successful", context: ["region": config.region])
 
+        } catch let osError as OpenStackError {
+            // Re-throw OpenStack errors directly without wrapping
+            logger.logError("Authentication failed", context: ["error": osError.localizedDescription])
+            throw osError
         } catch {
+            // Wrap other errors (network issues, etc.) as network errors
             logger.logError("Authentication failed", context: ["error": error.localizedDescription])
             throw OpenStackError.networkError(error)
         }

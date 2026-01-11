@@ -92,6 +92,14 @@ public final class OpenStackClient: @unchecked Sendable {
     // MARK: - Factory Method
 
     /// Create a new OpenStack client with the provided configuration and credentials
+    ///
+    /// - Parameters:
+    ///   - config: OpenStack configuration containing auth URL and settings
+    ///   - credentials: Authentication credentials (password or application credential)
+    ///   - logger: Logger instance for API call logging
+    ///   - enablePerformanceEnhancements: Whether to enable performance monitoring
+    /// - Returns: Connected and authenticated OpenStack client
+    /// - Throws: `OpenStackError.authenticationFailed` if credentials are invalid
     public static func connect(
         config: OpenStackConfig,
         credentials: OpenStackCredentials,
@@ -108,6 +116,19 @@ public final class OpenStackClient: @unchecked Sendable {
 
         // Perform connection and authentication
         await client.connect()
+
+        // Check if authentication succeeded - throw if it failed
+        if !client.isAuthenticated {
+            if let authError = client.authenticationError {
+                // Check if it's already an OpenStackError
+                if let osError = authError as? OpenStackError {
+                    throw osError
+                }
+                // Wrap network/other errors appropriately
+                throw OpenStackError.authenticationFailed
+            }
+            throw OpenStackError.authenticationFailed
+        }
 
         return client
     }
