@@ -89,6 +89,14 @@ final class ServerGroupsModule: OpenStackModule {
         ViewRegistry.shared.register(metadataList: viewMetadata)
     }
 
+    /// Load configuration for this module
+    ///
+    /// - Parameter config: Module-specific configuration (currently unused)
+    func loadConfiguration(_ config: ModuleConfig?) {
+        // Configuration acknowledged - no module-specific settings required
+        Logger.shared.logDebug("[\(identifier)] Configuration loaded", context: [:])
+    }
+
     // MARK: - View Registration
 
     /// Register all server group views with TUI system

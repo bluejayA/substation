@@ -12,7 +12,12 @@ struct FeatureFlags {
         }
         return true  // Module system enabled by default
         #else
-        return UserDefaults.standard.bool(forKey: "useModuleSystem")
+        // Check if key exists - bool(forKey:) returns false for missing keys
+        // but we want to default to true when not explicitly set
+        if UserDefaults.standard.object(forKey: "useModuleSystem") != nil {
+            return UserDefaults.standard.bool(forKey: "useModuleSystem")
+        }
+        return true  // Module system enabled by default
         #endif
     }
 

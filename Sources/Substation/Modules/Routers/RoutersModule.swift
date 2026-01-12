@@ -113,6 +113,14 @@ final class RoutersModule: OpenStackModule {
         lastHealthCheck = Date()
     }
 
+    /// Load configuration for this module
+    ///
+    /// - Parameter config: Module-specific configuration (currently unused)
+    func loadConfiguration(_ config: ModuleConfig?) {
+        // Configuration acknowledged - no module-specific settings required
+        Logger.shared.logDebug("[\(identifier)] Configuration loaded", context: [:])
+    }
+
     // MARK: - View Registration
 
     /// Register all router-related views with the TUI system

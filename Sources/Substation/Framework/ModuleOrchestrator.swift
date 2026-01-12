@@ -26,8 +26,17 @@ final class ModuleOrchestrator {
     /// - Parameter tui: The TUI instance to initialize with
     /// - Throws: ModuleError if initialization fails
     func initialize(with tui: TUI) async throws {
+        // Always register core system views first - they are essential
+        // and must be available regardless of module system status
+        Logger.shared.logDebug("Registering core system views...")
+        let coreViewMetadata = CoreViews.registerViewsEnhanced(tui: tui)
+        ViewRegistry.shared.register(metadataList: coreViewMetadata)
+        Logger.shared.logDebug("Registered \(coreViewMetadata.count) core view metadata entries")
+
         guard FeatureFlags.useModuleSystem else {
             Logger.shared.logDebug("Module system disabled via FeatureFlags")
+            // Log registration diagnostics even when module system is disabled
+            ViewRegistry.shared.logRegistrationStatus()
             return
         }
 
@@ -40,11 +49,6 @@ final class ModuleOrchestrator {
             let allModules = ModuleRegistry.shared.allModules()
             Logger.shared.logInfo("Module system initialized: \(allModules.count) modules loaded")
 
-            // Register core system views with metadata
-            let coreViewMetadata = CoreViews.registerViewsEnhanced(tui: tui)
-            ViewRegistry.shared.register(metadataList: coreViewMetadata)
-            Logger.shared.logDebug("Registered \(coreViewMetadata.count) core view metadata entries")
-
             // Log registration diagnostics
             ViewRegistry.shared.logRegistrationStatus()
         } catch {
@@ -52,6 +56,7 @@ final class ModuleOrchestrator {
                 "error": String(describing: error)
             ])
             // Module system is optional, continue without it
+            // Core views are already registered above
             moduleRegistry = nil
             throw error
         }
