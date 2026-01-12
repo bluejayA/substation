@@ -27,11 +27,18 @@ class RenderOptimizer {
     private var needsRender: Bool = false
 
     // Force a full screen redraw
+    // Preserves viewTransition if already set (to ensure screen clear happens)
     func markFullScreenDirty() {
+        let hadViewTransition = dirtyRegions.contains(.viewTransition)
         dirtyRegions.removeAll()
-        dirtyRegions.insert(.fullScreen)
+        if hadViewTransition {
+            // Preserve view transition to ensure screen clear happens
+            dirtyRegions.insert(.viewTransition)
+        } else {
+            dirtyRegions.insert(.fullScreen)
+        }
         needsRender = true
-        Logger.shared.logDebug("RenderOptimizer - Marked full screen dirty")
+        Logger.shared.logDebug("RenderOptimizer - Marked full screen dirty (viewTransition preserved: \(hadViewTransition))")
     }
 
     // Force immediate full screen redraw with clear for view transitions

@@ -11,7 +11,16 @@ final class ViewCoordinator {
     // MARK: - View State
 
     /// Current view being displayed
-    var currentView: ViewMode = .loading
+    /// Automatically triggers view transition marking when changed
+    var currentView: ViewMode = .loading {
+        didSet {
+            if oldValue != currentView {
+                // Trigger full screen redraw with clear for view transitions
+                markViewTransition?()
+                Logger.shared.logDebug("View transition: \(oldValue) -> \(currentView)")
+            }
+        }
+    }
 
     /// Previous view (for back navigation)
     var previousView: ViewMode = .loading
@@ -185,10 +194,7 @@ final class ViewCoordinator {
             HealthDashboardView.resetNavigationState(healthDashboardNavState)
         }
 
-        // Force full screen redraw for view transitions
-        markViewTransition?()
-
-        Logger.shared.logDebug("View changed to: \(newView)")
+        // Note: markViewTransition is automatically called by currentView's didSet
     }
 
     // MARK: - Selection Index Calculation

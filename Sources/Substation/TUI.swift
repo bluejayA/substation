@@ -991,7 +991,16 @@ final class TUI {
 
         // Clear screen only if full redraw is needed
         if renderPlan.shouldClearScreen {
+            Logger.shared.logDebug("CLEARING SCREEN for view transition", context: [
+                "view": "\(viewCoordinator.currentView)",
+                "renderPlan": renderPlan.description
+            ])
             SwiftNCurses.clear(WindowHandle(screen))
+        } else {
+            Logger.shared.logDebug("NOT clearing screen", context: [
+                "view": "\(viewCoordinator.currentView)",
+                "renderPlan": renderPlan.description
+            ])
         }
 
         // Draw layout components based on render plan

@@ -1212,7 +1212,7 @@ struct MiscViews {
     }
 
     // Cache build information - computed once at first access
-    private static let cachedBuildInfo: (version: String, buildDate: String, gitCommit: String, configuration: String) = {
+    private static let cachedBuildInfo: (version: String, buildDate: String, gitCommit: String, configuration: String, swiftVersion: String) = {
         return getBuildInformation()
     }()
 
@@ -1233,7 +1233,7 @@ struct MiscViews {
                 "Name: Substation",
                 "Description: OpenStack Terminal User Interface Client",
                 "Platform: \(platform)",
-                "Swift Version: 6.1",
+                "Swift Version: \(buildInfo.swiftVersion)",
             ]),
             ("Version Information", [
                 "Version: \(buildInfo.version)",
@@ -1286,12 +1286,13 @@ struct MiscViews {
     /// in distributed binaries without access to the git repository.
     ///
     /// - Returns: A tuple containing version, build date, git commit hash, and configuration
-    private static func getBuildInformation() -> (version: String, buildDate: String, gitCommit: String, configuration: String) {
+    private static func getBuildInformation() -> (version: String, buildDate: String, gitCommit: String, configuration: String, swiftVersion: String) {
         return (
             version: BuildInfo.version,
             buildDate: BuildInfo.buildDate,
             gitCommit: BuildInfo.gitCommitHash,
-            configuration: BuildInfo.configuration
+            configuration: BuildInfo.configuration,
+            swiftVersion: BuildInfo.swiftVersion
         )
     }
 

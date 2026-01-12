@@ -122,13 +122,13 @@ class InputHandler {
                     tui.changeView(to: viewMode)
                     tui.statusMessage = "Navigated to \(viewMode.title)"
                     tui.unifiedInputState.clear()
-                    tui.forceRedraw()
+                    // Note: forceRedraw() removed - changeView() triggers markViewTransition() via didSet
                     return
 
                 case .showHelp:
                     tui.changeView(to: .help)
                     tui.unifiedInputState.clear()
-                    tui.forceRedraw()
+                    // Note: forceRedraw() removed - changeView() triggers markViewTransition() via didSet
                     return
 
                 case .showCommands:
@@ -194,28 +194,28 @@ class InputHandler {
                     // Show interactive tutorial view
                     tui.changeView(to: .tutorial, resetSelection: true)
                     tui.unifiedInputState.clear()
-                    tui.forceRedraw()
+                    // Note: forceRedraw() removed - changeView() triggers markViewTransition() via didSet
                     return
 
                 case .showShortcuts:
                     // Show shortcuts reference view
                     tui.changeView(to: .shortcuts, resetSelection: true)
                     tui.unifiedInputState.clear()
-                    tui.forceRedraw()
+                    // Note: forceRedraw() removed - changeView() triggers markViewTransition() via didSet
                     return
 
                 case .showExamples:
                     // Show command examples view
                     tui.changeView(to: .examples, resetSelection: true)
                     tui.unifiedInputState.clear()
-                    tui.forceRedraw()
+                    // Note: forceRedraw() removed - changeView() triggers markViewTransition() via didSet
                     return
 
                 case .showWelcome:
                     // Show welcome view
                     tui.changeView(to: .welcome, resetSelection: true)
                     tui.unifiedInputState.clear()
-                    tui.forceRedraw()
+                    // Note: forceRedraw() removed - changeView() triggers markViewTransition() via didSet
                     return
 
                 case .reloadModule(let moduleName):
