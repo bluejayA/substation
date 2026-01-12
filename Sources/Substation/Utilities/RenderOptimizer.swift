@@ -6,6 +6,7 @@ class RenderOptimizer {
     // Track different types of content changes
     enum DirtyRegion {
         case fullScreen
+        case viewTransition  // Only this triggers screen clear
         case header
         case sidebar
         case mainPanel
@@ -33,39 +34,45 @@ class RenderOptimizer {
         Logger.shared.logDebug("RenderOptimizer - Marked full screen dirty")
     }
 
-    // Force immediate full screen redraw for view transitions
+    // Force immediate full screen redraw with clear for view transitions
+    // This is the ONLY case that should clear the screen to prevent flashing
     func markViewTransitionDirty() {
         dirtyRegions.removeAll()
-        dirtyRegions.insert(.fullScreen)
+        dirtyRegions.insert(.viewTransition)
         needsRender = true
         lastRenderTime = Date(timeIntervalSince1970: 0) // Force immediate render
-        Logger.shared.logDebug("RenderOptimizer - Marked view transition dirty (immediate)")
+        Logger.shared.logDebug("RenderOptimizer - Marked view transition dirty (immediate with clear)")
+    }
+
+    // Check if full redraw is already queued
+    private var hasFullRedraw: Bool {
+        dirtyRegions.contains(.fullScreen) || dirtyRegions.contains(.viewTransition)
     }
 
     // Mark specific regions for update
     func markHeaderDirty() {
-        if !dirtyRegions.contains(.fullScreen) {
+        if !hasFullRedraw {
             dirtyRegions.insert(.header)
             needsRender = true
         }
     }
 
     func markSidebarDirty() {
-        if !dirtyRegions.contains(.fullScreen) {
+        if !hasFullRedraw {
             dirtyRegions.insert(.sidebar)
             needsRender = true
         }
     }
 
     func markMainPanelDirty() {
-        if !dirtyRegions.contains(.fullScreen) {
+        if !hasFullRedraw {
             dirtyRegions.insert(.mainPanel)
             needsRender = true
         }
     }
 
     func markStatusBarDirty() {
-        if !dirtyRegions.contains(.fullScreen) {
+        if !hasFullRedraw {
             dirtyRegions.insert(.statusBar)
             needsRender = true
         }
@@ -73,7 +80,7 @@ class RenderOptimizer {
 
     // Mark specific content rows for scrolling optimization
     func markScrollContentDirty(startRow: Int32, endRow: Int32) {
-        if !dirtyRegions.contains(.fullScreen) {
+        if !hasFullRedraw {
             dirtyRegions.insert(.scrollContent(startRow: startRow, endRow: endRow))
             needsRender = true
         }
@@ -100,9 +107,23 @@ class RenderOptimizer {
 
     // Get optimized render plan
     func getRenderPlan(screenRows: Int32, screenCols: Int32) -> RenderPlan {
-        if dirtyRegions.contains(.fullScreen) {
+        // View transitions require screen clear to prevent artifacts from different layouts
+        if dirtyRegions.contains(.viewTransition) {
             return RenderPlan(
                 shouldClearScreen: true,
+                renderHeader: true,
+                renderSidebar: true,
+                renderMainPanel: true,
+                renderStatusBar: true,
+                scrollOptimization: nil
+            )
+        }
+
+        // Full screen redraw WITHOUT clear - components overwrite their areas
+        // This prevents flashing while still redrawing everything
+        if dirtyRegions.contains(.fullScreen) {
+            return RenderPlan(
+                shouldClearScreen: false,
                 renderHeader: true,
                 renderSidebar: true,
                 renderMainPanel: true,
@@ -229,6 +250,8 @@ extension RenderOptimizer.DirtyRegion: Hashable {
         switch self {
         case .fullScreen:
             hasher.combine("fullScreen")
+        case .viewTransition:
+            hasher.combine("viewTransition")
         case .header:
             hasher.combine("header")
         case .sidebar:
@@ -247,6 +270,7 @@ extension RenderOptimizer.DirtyRegion: Hashable {
     static func == (lhs: RenderOptimizer.DirtyRegion, rhs: RenderOptimizer.DirtyRegion) -> Bool {
         switch (lhs, rhs) {
         case (.fullScreen, .fullScreen),
+             (.viewTransition, .viewTransition),
              (.header, .header),
              (.sidebar, .sidebar),
              (.mainPanel, .mainPanel),
