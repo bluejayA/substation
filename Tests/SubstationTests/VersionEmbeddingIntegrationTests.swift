@@ -210,11 +210,11 @@ final class VersionEmbeddingIntegrationTests: XCTestCase {
         let buildDate: String = BuildInfo.buildDate
         let configuration: String = BuildInfo.configuration
 
-        // Type checking ensures the API hasn't changed
-        XCTAssertTrue(version is String)
-        XCTAssertTrue(commitHash is String)
-        XCTAssertTrue(buildDate is String)
-        XCTAssertTrue(configuration is String)
+        // Verify the API provides non-empty values
+        XCTAssertFalse(version.isEmpty)
+        XCTAssertFalse(commitHash.isEmpty)
+        XCTAssertFalse(buildDate.isEmpty)
+        XCTAssertFalse(configuration.isEmpty)
     }
 
     // MARK: - Edge Case Tests

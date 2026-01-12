@@ -105,14 +105,14 @@ enum ModuleCatalog {
             dependencies: [],
             phase: .independent
         ),
-
-        // Phase 2: Network-dependent modules
         ModuleDefinition(
             identifier: "networks",
             displayName: "Networks",
             dependencies: [],
-            phase: .networkDependent
+            phase: .independent
         ),
+
+        // Phase 2: Network-dependent modules
         ModuleDefinition(
             identifier: "subnets",
             displayName: "Subnets",
