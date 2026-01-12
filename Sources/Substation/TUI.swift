@@ -613,14 +613,9 @@ final class TUI {
             } else if refreshManager.autoRefresh && isUserActive && timeSinceRefresh > refreshManager.refreshInterval {
                 Logger.shared.logDebug("Auto-refresh deferred - user active (\(String(format: "%.1f", timeSinceActivity))s ago)")
 
-                // Update sidebar to show new last refresh time
+                // Update sidebar to show deferred refresh status
+                // Note: No forceRedraw() here - refresh is deferred, no data changed
                 markSidebarDirty()
-
-                // Force redraw after data refresh
-                forceRedraw()
-
-                // Reset adaptive polling to be responsive after refresh
-                renderCoordinator.markInputReceived()
             }
 
             // Periodic performance logging with adaptive polling metrics
