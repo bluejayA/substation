@@ -61,20 +61,19 @@ The servers list view provides a comprehensive overview of all instances with re
 **Available Actions:**
 
 - `Enter` - View detailed server information
-- `s` - Start server
-- `S` - Stop server (uppercase = destructive)
-- `r` - Soft reboot server
-- `R` - Resize server (uppercase = significant change)
-- `c` - Open console
+- `s` - Start server (requires confirmation)
+- `S` - Stop server (uppercase = destructive, requires confirmation)
+- `r` - Soft reboot server (requires confirmation)
+- `R` - Resize server (opens resize view)
+- `c` - Open remote console (noVNC)
 - `l` - View console logs
-- `n` - Create snapshot
-- `Ctrl-X` - Toggle multi-select mode
+- `n` - Create snapshot (opens snapshot form)
 - `Space` - Toggle selection (in multi-select mode)
 - `/` - Search servers
 - `Del` - Delete selected server
-- `q` - Back to main menu
+- `Esc` or `q` - Back to main menu
 
-**Note**: Use `:create` command to create new servers (no keyboard shortcut).
+**Note**: Use `:create` command to create new servers.
 
 ### Detail View
 
@@ -83,14 +82,22 @@ The server detail view provides comprehensive information about a single server 
 **Displayed Information:**
 
 - **Basic Info**: Name, ID, status, power state, task state
-- **Hardware**: Flavor details (vCPUs, RAM, disk), current usage
-- **Operating System**: Image name, kernel ID, ramdisk ID
-- **Network Configuration**: All network interfaces with IP addresses, MAC addresses, and security groups
-- **Storage**: Attached volumes with mount points and device names
-- **Metadata**: User metadata, system metadata, and tags
+- **Server Age**: Uptime calculation from launch/creation time
+- **Hardware Information**: Flavor details (vCPUs, RAM, disk), current usage
+- **Flavor Metadata**: Description, network factor, visibility, status
+- **Flavor Extra Specifications**: All key-value extra specs from flavor
+- **Flavor Sizing Analysis**: Performance profile classification and sizing notes
+- **Performance Insights**: CPU type analysis, ephemeral storage warnings, expected use cases
+- **Network Configuration**: All network interfaces with IP addresses (IPv4/IPv6)
+- **Storage Information**: Attached volumes with names, sizes, and status
+- **Security Groups**: List of applied security groups
+- **Security Posture Analysis**: SSH key status, volume encryption status, security group coverage
+- **Access IPs**: Direct IPv4 and IPv6 access addresses
+- **Project and User**: Tenant ID and user ID
+- **Hypervisor Information**: Hypervisor hostname, instance name, host status
+- **Metadata**: User-defined metadata key-value pairs
 - **Timestamps**: Created, updated, launched times
 - **Fault Information**: Error messages and fault details if applicable
-- **Host Information**: Hypervisor hostname, availability zone
 
 ### Create/Edit Operations
 
@@ -101,18 +108,25 @@ The server creation form is a comprehensive multi-step wizard that guides users 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | Server Name | Text | Yes | Unique name for the server instance |
-| Boot Source | Select | Yes | Choose between Image or Volume boot |
-| Image/Volume | Select | Yes | Select boot image or bootable volume |
-| Flavor | Select | Yes | Hardware profile defining vCPUs, RAM, disk |
-| Networks | Multi-Select | No | Networks to attach (auto-allocate if empty) |
+| Boot Source | Selector | Yes | Choose between Image or Volume boot (TAB to toggle) |
+| Flavor | Selector | Yes | Hardware profile with manual or workload-based selection (TAB to toggle mode) |
+| Networks | Multi-Select | Yes | Networks to attach (at least one required) |
 | Security Groups | Multi-Select | No | Security groups to apply |
-| Key Pair | Select | No | SSH key pair for authentication |
-| Availability Zone | Select | No | Placement zone for the server |
-| Server Group | Select | No | Scheduling group for affinity rules |
-| User Data | Text | No | Cloud-init script or configuration |
-| Max Servers | Number | Yes | Number of servers to create (1-100) |
-| Configuration Drive | Toggle | No | Attach metadata drive |
-| Description | Text | No | Human-readable description |
+| Server Group | Selector | No | Scheduling group for affinity rules |
+| SSH Key Pair | Selector | No | SSH key pair for authentication |
+| Max Servers | Number | Yes | Number of servers to create (default: 1) |
+
+**Boot Source Selection:**
+
+- Press `TAB` while in the source selector to toggle between Image and Volume modes
+- Images are sorted alphabetically for easy selection
+- Only bootable volumes are displayed in Volume mode
+
+**Flavor Selection Modes:**
+
+- **Manual Mode**: Browse and select from all available flavors sorted alphabetically
+- **Workload-Based Mode**: Flavors categorized by workload type with recommendations
+- Press `TAB` while in the flavor selector to toggle between modes
 
 ### Batch Operations
 
@@ -120,11 +134,12 @@ The Servers module supports efficient batch operations for managing multiple ins
 
 **Supported Batch Actions:**
 
-- **Bulk Delete**: Delete multiple servers with single confirmation
+- **Bulk Delete**: Delete multiple servers with single confirmation (idempotent - handles 404 as success)
 - **Bulk Start**: Start multiple stopped servers
 - **Bulk Stop**: Stop multiple running servers
 - **Bulk Reboot**: Reboot multiple servers
-- **Bulk Snapshot**: Create snapshots of multiple servers
+
+**Deletion Priority:** 1 (Highest) - Servers are deleted first to release dependent resources.
 
 ## API Endpoints
 
@@ -550,5 +565,5 @@ extension ServersModule {
 
 ---
 
-*Last Updated: November 2024*
-*Documentation Version: 1.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1*

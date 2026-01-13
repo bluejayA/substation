@@ -448,5 +448,5 @@ extension SubnetsModule {
 
 ---
 
-*Last Updated: November 2024*
-*Documentation Version: 1.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1*

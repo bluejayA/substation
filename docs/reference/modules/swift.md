@@ -51,16 +51,16 @@ The Swift browser provides a file-system-like interface for navigating object st
 
 **Available Actions:**
 
-- `Enter` - Navigate into container/directory or view object details
-- `Backspace` - Navigate up one directory level
+- `Space` - Navigate into container/directory or view object details
+- `Enter` - Show container metadata (from container list)
+- `Esc` - Navigate up one directory level or back to container list
 - `c` - Create new container
-- `u` - Upload file(s) to current location
-- `d` - Download selected object(s)
+- `U` - Upload file(s) to current location
+- `D` - Download selected object(s) or container
 - `Delete` - Delete selected object(s)/container(s)
-- `m` - Edit metadata
-- `w` - Configure web access
+- `M` - Edit metadata
+- `W` - Configure web access
 - `/` - Search in current container
-- `Space` - Toggle multi-select mode
 - `b` - View background operations
 
 ### Detail View
@@ -83,21 +83,18 @@ Multiple forms for different Swift operations with context-aware fields.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| Name | Text | Yes | Container name (DNS-compliant) |
-| Storage Policy | Select | No | Backend storage policy |
-| Public Read | Toggle | No | Enable public read access |
-| Public Write | Toggle | No | Enable public write access |
-| Metadata | Key-Value | No | Custom metadata headers |
+| Container Name | Text | Yes | Container name (cannot contain '/' character) |
 
 **Object Upload Fields:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| File Path | File | Yes | Local file to upload |
-| Object Name | Text | Auto | Override object name |
-| Content Type | Text | Auto | MIME type (auto-detected) |
-| Directory | Text | No | Target pseudo-directory |
-| Metadata | Key-Value | No | Custom object metadata |
+| File/Directory Path | Text | Yes | Local file or directory to upload |
+| Prefix | Text | No | Prefix for object names (directories only) |
+| Object Name | Text | No | Override object name (single files only) |
+| Content-Type | Text | No | MIME type (auto-detected if empty) |
+| Recursive | Toggle | No | Include subdirectories (directories only) |
+| Background Upload | Toggle | No | Run upload in background (default: enabled) |
 
 ### Batch Operations
 
@@ -105,10 +102,10 @@ Efficient bulk operations for managing multiple objects simultaneously.
 
 **Supported Batch Actions:**
 
-- **Bulk Delete**: Delete multiple objects/directories
+- **Bulk Delete**: Delete multiple objects/directories or containers
 - **Bulk Download**: Download multiple objects with directory structure
 - **Bulk Upload**: Upload entire directories recursively
-- **Bulk Metadata**: Apply metadata to multiple objects
+- **Bulk Create**: Create multiple containers
 
 ## API Endpoints
 
@@ -153,9 +150,10 @@ swiftModule.stopBackgroundSyncTask()
 ### Performance Tuning
 
 - **Container Cache**: LRU cache for 10 most recent containers
-- **ETag Differential Sync**: Only fetch changed objects
-- **Tree Prefetch**: Prefetch directory structures for instant navigation
-- **Chunk Size**: 64MB chunks for large file transfers
+- **ETag Differential Sync**: Only fetch changed objects (uses object count as pseudo-ETag)
+- **Tree Prefetch**: Prefetch up to 10 top-level directory structures for instant navigation
+- **Parallel Fetching**: Up to 5 concurrent workers for large container loading
+- **Page Size**: 100 objects for initial page, 1000 for background fetching
 
 ## Views
 
@@ -215,10 +213,18 @@ swiftModule.stopBackgroundSyncTask()
 
 **Key Features:**
 
-- Transfer progress bars
-- Speed and ETA display
-- Pause/resume/cancel controls
-- Error reporting
+- Operation list with type, status, resource, container, progress, size, rate, time columns
+- Status indicators (Queued, Running, Completed, Failed, Canceled)
+- Cancel active operations
+- Remove completed operations from history
+
+**Keyboard Shortcuts:**
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `Space` | Open Detail | View detailed operation information |
+| `M` | Performance Metrics | Navigate to performance metrics view |
+| `Delete/Backspace` | Cancel/Remove | Cancel active operation or remove from history |
 
 **Navigation:**
 
@@ -231,14 +237,23 @@ swiftModule.stopBackgroundSyncTask()
 
 **Key Features:**
 
-- Transfer statistics
-- Error details if failed
-- Retry/cancel options
-- Log output
+- Basic information (ID, type, status)
+- Resource information (container, object, local path)
+- Progress information (percentage, bytes transferred, transfer rate, files processed)
+- Timing information (start time, elapsed time, duration)
+- Error information (if failed)
+- Cancel/remove options
+
+**Keyboard Shortcuts:**
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `Delete/Backspace` | Cancel/Remove | Cancel active operation or remove from history |
+| `Esc` | Go Back | Return to operations list |
 
 **Navigation:**
 
-- **Enter from:** Background operations list
+- **Enter from:** Background operations list via Space key
 - **Exit to:** Background operations list
 
 #### Container Create (`.swiftContainerCreate`)
@@ -408,15 +423,16 @@ swiftModule.stopBackgroundSyncTask()
 
 | Key | Action | View | Description |
 |-----|--------|------|-------------|
-| `Backspace` | Navigate Up | Swift Browser | Go to parent directory |
+| `Space` | Navigate Into | Swift Browser | Enter container |
+| `Enter` | Show Metadata | Swift Browser | Show container details |
+| `Esc` | Navigate Up | Container Detail | Go to parent directory or container list |
 | `c` | Create Container | Swift Browser | Create new container |
-| `u` | Upload | Container View | Upload files/directories |
-| `d` | Download | Container View | Download selected items |
-| `m` | Metadata | Any Swift View | Edit metadata |
-| `w` | Web Access | Container View | Configure web settings |
+| `U` | Upload | Container View | Upload files/directories |
+| `D` | Download | Container View | Download selected items |
+| `M` | Metadata | Any Swift View | Edit metadata |
+| `W` | Web Access | Swift Browser | Configure web settings |
 | `b` | Background Ops | Any Swift View | View active operations |
 | `Delete` | Delete | List Views | Delete selected items |
-| `Space` | Multi-Select | List Views | Toggle selection mode |
 
 ## Data Provider
 
@@ -428,10 +444,11 @@ The module implements intelligent caching with ETag-based differential sync. Con
 
 ### Refresh Patterns
 
-- **ETag Differential**: Only fetch if container ETag changed
-- **Background Sync**: Automatic refresh for active container
-- **LRU Eviction**: Keep only 10 most recent containers
-- **Tree Prefetch**: Prefetch directory structures
+- **ETag Differential**: Only fetch if container object count changed
+- **Background Sync**: Automatic refresh for active container every 60 seconds
+- **LRU Eviction**: Keep only 10 most recent containers cached
+- **Tree Prefetch**: Prefetch up to 10 top-level directory structures
+- **Stale-While-Revalidate**: Show cached data immediately, revalidate in background if stale (30-second freshness threshold)
 
 ### Performance Optimizations
 
@@ -580,5 +597,5 @@ for object in selectedObjects {
 
 ---
 
-*Last Updated: 2024-11-23*
-*Documentation Version: 1.0.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1.0*

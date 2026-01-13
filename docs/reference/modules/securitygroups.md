@@ -370,5 +370,5 @@ Uses central cache manager with security group storage.
 
 ---
 
-*Last Updated: 2024*
-*Documentation Version: 1.0.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1.0*

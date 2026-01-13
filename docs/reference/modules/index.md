@@ -18,13 +18,14 @@ Each module implements the `OpenStackModule` protocol and provides:
 
 ## Module Overview
 
-Substation provides 14 specialized modules for managing OpenStack resources. We've organized them by functional category, but the dependency relationships tell the real story: some modules stand alone, others build on foundational services, and a few (like Servers) tie nearly everything together.
+Substation provides 16 specialized modules for managing OpenStack resources. We've organized them by functional category, but the dependency relationships tell the real story: some modules stand alone, others build on foundational services, and a few (like Servers) tie nearly everything together.
 
 ### Module Metadata
 
 | Module | Identifier | Display Name | Service | Category |
 |--------|------------|--------------|---------|----------|
 | **Servers** | `servers` | Servers | Nova | Compute |
+| **Hypervisors** | `hypervisors` | Hypervisors | Nova | Compute |
 | **Networks** | `networks` | Networks | Neutron | Network |
 | **Subnets** | `subnets` | Subnets | Neutron | Network |
 | **Routers** | `routers` | Routers | Neutron | Network |
@@ -38,6 +39,7 @@ Substation provides 14 specialized modules for managing OpenStack resources. We'
 | **Volumes** | `volumes` | Volumes | Cinder | Storage |
 | **Swift** | `swift` | Object Storage | Swift | Storage |
 | **Barbican** | `barbican` | Secrets | Barbican | Security |
+| **Magnum** | `magnum` | Container Clusters | Magnum | Container |
 
 ## Module Dependencies
 
@@ -55,6 +57,7 @@ graph TD
         ServerGroups[Server Groups]
         Barbican[Barbican]
         Swift[Swift]
+        Hypervisors[Hypervisors]
     end
 
     subgraph "Phase 2 - Network Foundation"
@@ -75,6 +78,7 @@ graph TD
     subgraph "Phase 3 - Multi-Dependency Modules"
         Servers[Servers]
         Volumes[Volumes]
+        Magnum[Magnum]
 
         Servers --> Networks
         Servers --> Images
@@ -84,13 +88,17 @@ graph TD
         Servers --> ServerGroups
         Servers --> Volumes
         Volumes --> Servers
+        Magnum --> Networks
+        Magnum --> Images
+        Magnum --> Flavors
+        Magnum --> KeyPairs
     end
 ```
 
 ### Initialization Order
 
 1. **Phase 1 - Independent Modules**: Can be initialized in any order
-   - Images, Flavors, KeyPairs, SecurityGroups, ServerGroups, Barbican, Swift
+   - Images, Flavors, KeyPairs, SecurityGroups, ServerGroups, Barbican, Swift, Hypervisors
 
 2. **Phase 2 - Network Dependencies**: Must initialize Networks first
    - Networks -> Subnets, Routers, Ports -> FloatingIPs
@@ -98,6 +106,7 @@ graph TD
 3. **Phase 3 - Multi-Dependencies**: Require multiple services
    - Volumes (can attach to Servers)
    - Servers (depends on most other services)
+   - Magnum (depends on Networks, Images, Flavors, KeyPairs)
 
 ## Module Capabilities Matrix
 
@@ -106,6 +115,7 @@ Different resources have different operational patterns. Some change frequently 
 | Module | List View | Detail View | Create/Edit | Delete | Batch Ops | Auto-Refresh |
 |--------|-----------|-------------|-------------|--------|-----------|--------------|
 | **Servers** | Yes | Yes | Yes | Yes | Yes | 60s |
+| **Hypervisors** | Yes | Yes | No | No | No | 60s |
 | **Networks** | Yes | Yes | Yes | Yes | Yes | 60s |
 | **Subnets** | Yes | Yes | Yes | Yes | Yes | On-demand |
 | **Routers** | Yes | Yes | Yes | Yes | Yes | On-demand |
@@ -119,6 +129,7 @@ Different resources have different operational patterns. Some change frequently 
 | **Volumes** | Yes | Yes | Yes | Yes | Yes | 60s |
 | **Swift** | Yes | Yes | Yes | Yes | Yes | ETag sync |
 | **Barbican** | Yes | Yes | Yes | Yes | Yes | On-demand |
+| **Magnum** | Yes | Yes | Yes | Yes | Yes | 60s |
 
 ## Module Catalog
 
@@ -219,6 +230,33 @@ Manages server groups for scheduling policies like anti-affinity.
 - `.serverGroupManagement` - Member management
 
 **DataProvider:** `ServerGroupsDataProvider` - Server group data
+
+---
+
+### Hypervisors Module
+
+**Location:** `/Sources/Substation/Modules/Hypervisors/`
+**Service:** OpenStack Nova
+**Identifier:** `hypervisors`
+
+**Purpose:**
+Provides read-only hypervisor monitoring and management for cloud administrators to oversee compute infrastructure.
+
+**Key Features:**
+
+- Hypervisor resource monitoring (vCPUs, RAM, disk)
+- Server instance discovery per hypervisor
+- Admin state management (enable/disable)
+- Hypervisor type and version display
+- Running VM count tracking
+- Workload distribution analysis
+
+**Views:**
+
+- `.hypervisors` - Hypervisor list with resource utilization
+- `.hypervisorDetail` - Detailed specifications and server list
+
+**DataProvider:** `HypervisorsDataProvider` - Hypervisor data fetching with caching
 
 ---
 
@@ -582,6 +620,45 @@ Cryptographic key and secret management service integration.
 
 ---
 
+### Container Modules
+
+Container orchestration extends OpenStack into the Kubernetes ecosystem. Magnum provides a Container-as-a-Service layer, enabling users to deploy and manage Kubernetes clusters as first-class OpenStack resources.
+
+---
+
+### Magnum Module
+
+**Location:** `/Sources/Substation/Modules/Magnum/`
+**Service:** OpenStack Magnum (Container Orchestration Engine)
+**Identifier:** `magnum`
+
+**Purpose:**
+Provides comprehensive container cluster management for Kubernetes, Docker Swarm, and other container orchestration engines through OpenStack Magnum.
+
+**Key Features:**
+
+- Cluster lifecycle management (create, resize, delete)
+- Cluster template management for reusable configurations
+- Kubeconfig retrieval for kubectl access
+- Node group management and scaling
+- Cluster health monitoring
+- Certificate management
+- Multi-COE support (Kubernetes, Docker Swarm, Mesos)
+
+**Views:**
+
+- `.magnum` - Main Magnum dashboard
+- `.magnumClusters` - Cluster list with status
+- `.magnumClusterDetail` - Detailed cluster information
+- `.magnumClusterCreate` - Cluster creation form
+- `.magnumTemplates` - Cluster template list
+- `.magnumTemplateDetail` - Template specifications
+- `.magnumTemplateCreate` - Template creation form
+
+**DataProvider:** `MagnumDataProvider` - Cluster and template data with parallel fetching
+
+---
+
 ## Quick Reference
 
 ### Common Module Operations
@@ -706,4 +783,4 @@ The Core framework provides shared infrastructure components that all modules de
 - Error handling frameworks
 - Performance monitoring tools
 
-This infrastructure layer enables the consistent behavior and interface across all 14 service modules.
+This infrastructure layer enables the consistent behavior and interface across all 16 service modules.

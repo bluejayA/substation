@@ -390,5 +390,5 @@ await tui.client.createSecret(newSecret)
 
 ---
 
-*Last Updated: 2024-11-23*
-*Documentation Version: 1.0.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1.0*

@@ -340,5 +340,5 @@ Uses central cache manager for floating IP storage with automatic refresh on dat
 
 ---
 
-*Last Updated: 2024*
-*Documentation Version: 1.0.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1.0*

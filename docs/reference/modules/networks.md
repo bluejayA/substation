@@ -53,18 +53,24 @@ None - Networks is a base module with no dependencies
 
 The networks list view provides a comprehensive overview of all networks with real-time status updates, provider information, and quick access to common operations. Virtual scrolling handles large network deployments efficiently.
 
+**List Columns:**
+
+- NAME (29 chars)
+- STATUS (11 chars) - Color-coded: active=green, down=red, build/building=yellow
+- SHARED (7 chars) - Yes/No indicator
+- EXTERNAL (8 chars) - Yes/No indicator
+
 **Available Actions:**
 
 - `Enter` - View detailed network information
 - `c` - Create new network
 - `d` - Delete selected network
-- `A` - Attach network to server
-- `I` - Manage server network interfaces
+- `a` - Manage server attachments for selected network
 - `m` - Toggle multi-select mode
 - `M` - Select all networks
 - `/` - Search networks by name
 - `r` - Refresh network list
-- `q` - Back to main menu
+- `Esc` or `q` - Back to previous view/main menu
 
 ### Detail View
 
@@ -90,18 +96,16 @@ The network creation form provides a comprehensive wizard for configuring new ne
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| Network Name | Text | Yes | Unique name for the network |
+| Network Name | Text | Yes | Unique name for the network (letters, numbers, spaces, @._- allowed) |
 | Description | Text | No | Human-readable description |
-| Admin State | Toggle | Yes | Enable/disable network (default: up) |
-| Shared | Toggle | No | Make network visible to all projects |
-| External | Toggle | No | Mark as external network for floating IPs |
-| Port Security | Toggle | Yes | Enable port security (default: enabled) |
-| MTU | Number | No | Maximum transmission unit (default: 1500) |
-| Provider Type | Select | No | Physical network type (VLAN, VXLAN, etc.) |
-| Physical Network | Text | No | Physical network name for VLAN/Flat |
-| Segmentation ID | Number | No | VLAN ID or VNI for segmented networks |
-| QoS Policy | Select | No | Quality of service policy to apply |
-| Availability Zones | Multi-Select | No | Availability zone hints |
+| MTU | Text | Yes | Maximum transmission unit (68-9000, default: 1500) |
+| Port Security | Toggle | Yes | Enable/disable port security (default: enabled) |
+
+**Validation Rules:**
+
+- Network name is required and cannot be empty
+- Network name can only contain letters, numbers, spaces, and @._- characters
+- MTU is required and must be between 68 and 9000
 
 ### Batch Operations
 
@@ -110,8 +114,14 @@ The Networks module supports efficient batch operations for managing multiple ne
 **Supported Batch Actions:**
 
 - **Bulk Delete**: Delete multiple networks with single confirmation
-- **Bulk Admin State Change**: Enable/disable multiple networks
-- **Bulk Tag Management**: Apply tags to multiple networks
+
+**Deletion Priority:** 7 (late deletion) - Networks must be deleted after their dependent resources:
+- Subnets (priority 6)
+- Ports (priority 5)
+- Routers (priority 4)
+- Floating IPs (priority 3)
+
+**Idempotent Behavior:** HTTP 404 errors are treated as success to allow retry operations.
 
 ## API Endpoints
 
@@ -268,13 +278,11 @@ let networksConfig = NetworksModuleConfig(
 |-----|--------|------|-------------|
 | `c` | Create Network | List | Open network creation form |
 | `d` | Delete Network | List | Delete selected network with confirmation |
-| `A` | Attach to Server | List | Open server attachment interface |
-| `I` | Interface Management | List | Manage network interfaces on servers |
+| `a` | Manage Servers | List | Open server management interface (attach/detach) |
 | `m` | Multi-Select | List | Toggle multi-select mode |
 | `M` | Select All | List | Select all visible networks |
-| `E` | Toggle External | Detail | Toggle external network flag (admin only) |
-| `S` | Toggle Shared | Detail | Toggle shared network flag (admin only) |
-| `P` | Port Security | Detail | Toggle port security enabled |
+| `TAB` | Switch Mode | Server Management | Toggle between ATTACH and DETACH modes |
+| `SPACE` | Toggle Selection | Server Management | Select/deselect server for operation |
 
 ## Data Provider
 
@@ -457,12 +465,12 @@ extension NetworksModule {
 | **Version** | 1.0.0 |
 | **Service** | OpenStack Neutron |
 | **Category** | Networking |
-| **Deletion Priority** | 5 (Low) |
+| **Deletion Priority** | 7 (Late) |
 | **Load Order** | 20 |
 | **Typical Memory Usage** | 5-20 MB |
 | **CPU Impact** | Low |
 
 ---
 
-*Last Updated: November 2024*
-*Documentation Version: 1.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1*

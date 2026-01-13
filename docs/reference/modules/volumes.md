@@ -16,7 +16,7 @@ The Volumes module provides comprehensive block storage management capabilities 
 | **List View** | Yes | Volume listing with status, size, type, and attachment info |
 | **Detail View** | Yes | Comprehensive volume details including metadata and attachments |
 | **Create/Edit** | Yes | Volume creation with advanced options |
-| **Batch Operations** | Yes | Bulk delete, bulk snapshot, bulk backup |
+| **Batch Operations** | Yes | Bulk delete, bulk backup delete |
 | **Multi-Select** | Yes | Select multiple volumes for batch operations |
 | **Search/Filter** | Yes | Search by name, ID, status, or type |
 | **Auto-Refresh** | Yes | 30-second interval for volumes, 60s for snapshots/backups |
@@ -66,13 +66,17 @@ Displays comprehensive information about a selected volume including all technic
 
 **Displayed Information:**
 
-- **Basic Info**: Name, ID, status, size, type, bootable flag
+- **Basic Info**: Name, ID, description, status, size
+- **Volume Configuration**: Volume type, bootable flag, encrypted status, multi-attach capability, shared targets
+- **Source Information**: Source volume ID, snapshot ID, or image ID
 - **Attachments**: Server attachments with device paths and attachment IDs
+- **Status Information**: Replication status, migration status
+- **Location and Placement**: Availability zone, host, cluster name
+- **Group Information**: Consistency group ID, group ID
+- **Provider Information**: Provider ID, service UUID
 - **Metadata**: Custom key-value pairs for organization
+- **Ownership**: Project ID, user ID
 - **Timestamps**: Created, updated dates
-- **Availability**: Zone information
-- **Properties**: Encryption status, multiattach capability
-- **Source Info**: Created from snapshot, image, or blank
 
 ### Create/Edit Operations
 
@@ -82,14 +86,18 @@ Volume creation supports multiple source types and configuration options.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| Name | Text | Yes | Volume display name |
-| Description | Text | No | Volume description |
-| Size (GB) | Integer | Yes | Volume size in gigabytes |
-| Type | Select | No | Volume type (SSD, HDD, etc.) |
-| Availability Zone | Select | No | Target availability zone |
-| Source Type | Select | No | blank, image, snapshot, or volume |
-| Source ID | Select | Conditional | Required if source type specified |
-| Bootable | Toggle | No | Make volume bootable |
+| Volume Name | Text | Yes | Volume display name (alphanumeric, @._- allowed) |
+| Volume Size | Number | Yes | Volume size in gigabytes (minimum 1) |
+| Source Type | Selector | Yes | Blank Volume, From Image, or From Snapshot |
+| Source | Selector | Conditional | Required if source type is image or snapshot |
+| Volume Type | Selector | No | Volume type (SSD, HDD, etc.) |
+| Max Volumes | Number | Yes | Number of volumes to create (default 1) |
+
+**Source Type Options:**
+
+- **Blank Volume**: Create an empty volume
+- **From Image**: Create volume from an existing image
+- **From Snapshot**: Create volume from an existing snapshot
 
 ### Batch Operations
 
@@ -97,10 +105,10 @@ The module supports efficient batch operations for managing multiple volumes sim
 
 **Supported Batch Actions:**
 
-- **Bulk Delete**: Delete multiple volumes at once
-- **Bulk Snapshot**: Create snapshots of multiple volumes
-- **Bulk Backup**: Create backups of multiple volumes
-- **Bulk Detach**: Detach multiple volumes from instances
+- **Bulk Delete**: Delete multiple volumes at once (deletion priority: 2)
+- **Bulk Backup Delete**: Delete multiple volume backups at once
+
+**Idempotent Behavior:** HTTP 404 errors are treated as success to allow retry operations.
 
 ## API Endpoints
 
@@ -463,12 +471,12 @@ for volume in selectedVolumes {
 | **Version** | 1.0.0 |
 | **Service** | OpenStack Cinder |
 | **Category** | Storage |
-| **Deletion Priority** | 30 |
+| **Deletion Priority** | 2 |
 | **Load Order** | 40 |
 | **Memory Usage** | ~15 MB typical |
 | **CPU Impact** | Low |
 
 ---
 
-*Last Updated: 2024-11-23*
-*Documentation Version: 1.0.0*
+*Last Updated: January 2025*
+*Documentation Version: 1.1.0*
