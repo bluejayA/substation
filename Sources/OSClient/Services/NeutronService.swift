@@ -9,12 +9,19 @@ public actor NeutronService: OpenStackService {
     private let invalidationManager: IntelligentCacheInvalidation
     private let logger: any OpenStackClientLogger
 
-    public init(core: OpenStackClientCore, logger: any OpenStackClientLogger) {
+    /// Initialize the Neutron service with the given OpenStack core and logger.
+    ///
+    /// - Parameters:
+    ///   - core: The OpenStack client core for API communication
+    ///   - logger: Logger instance for service operations
+    ///   - cloudName: Optional cloud name for consistent cache filenames across restarts
+    public init(core: OpenStackClientCore, logger: any OpenStackClientLogger, cloudName: String? = nil) {
         self.core = core
         self.logger = logger
         self.cacheManager = OpenStackCacheManager(
             maxCacheSize: 5000, // Increased for network resource density
             maxMemoryUsage: 40 * 1024 * 1024, // 40MB optimized for network service
+            cacheIdentifier: cloudName,
             logger: logger
         )
         self.invalidationManager = IntelligentCacheInvalidation(

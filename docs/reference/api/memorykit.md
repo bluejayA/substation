@@ -551,6 +551,7 @@ public struct Configuration: Sendable {
     public let defaultTTL: TimeInterval // Default TTL
     public let enableCompression: Bool  // Enable compression
     public let enableMetrics: Bool      // Enable metrics
+    public let cacheIdentifier: String? // Cloud name for consistent caching
 
     public init(
         l1MaxSize: Int = 1000,
@@ -561,8 +562,72 @@ public struct Configuration: Sendable {
         l3CacheDirectory: URL? = nil,
         defaultTTL: TimeInterval = 300.0,       // 5 minutes
         enableCompression: Bool = true,
-        enableMetrics: Bool = true
+        enableMetrics: Bool = true,
+        cacheIdentifier: String? = nil          // Optional cloud name
     )
+}
+```
+
+#### Cloud-Specific Caching
+
+The `cacheIdentifier` parameter enables cloud-specific cache isolation. When provided (typically the cloud name from clouds.yaml), the cache manager:
+
+1. **Creates cloud-specific subdirectories**: Cache files are stored in `~/.config/substation/multi-level-cache/<cloudName>/`
+2. **Uses consistent hash-based filenames**: Cache files use deterministic naming (`cache_<hash>.dat`) instead of timestamps
+3. **Enables cache reuse across restarts**: Same data produces same filename, allowing cache hits after application restart
+
+```mermaid
+graph TB
+    subgraph "Cache Directory Structure"
+        Base[~/.config/substation/multi-level-cache/]
+        Cloud1[production/]
+        Cloud2[staging/]
+        Cloud3[development/]
+
+        Base --> Cloud1
+        Base --> Cloud2
+        Base --> Cloud3
+
+        Cloud1 --> F1[cache_a1b2c3d4.dat]
+        Cloud1 --> F2[cache_e5f6g7h8.dat]
+        Cloud2 --> F3[cache_i9j0k1l2.dat]
+    end
+```
+
+**Example:**
+
+```swift
+// Create cache with cloud-specific isolation
+let config = MultiLevelCacheManager<String, Data>.Configuration(
+    l3CacheDirectory: nil, // Uses default ~/.config/substation/multi-level-cache/
+    cacheIdentifier: "production" // Cloud name
+)
+// Cache files stored in: ~/.config/substation/multi-level-cache/production/
+```
+
+#### Stale Cache Cleanup
+
+The `cleanupStaleCacheFiles` static method removes cache files older than a specified age. This should be called at application startup to prevent stale data from being presented to operators.
+
+```swift
+/// Clean up cache files older than 8 hours for a specific cloud
+@discardableResult
+public static func cleanupStaleCacheFiles(
+    maxAge: TimeInterval = 8 * 60 * 60,  // 8 hours default
+    cloudName: String? = nil,             // Optional cloud name
+    cacheDirectory: URL? = nil            // Optional custom directory
+) -> Int  // Returns number of files removed
+```
+
+**Example:**
+
+```swift
+// At application startup, clean up stale cache for the current cloud
+let removedCount = MultiLevelCacheManager<String, Data>.cleanupStaleCacheFiles(
+    cloudName: "production"
+)
+if removedCount > 0 {
+    print("Cleaned up \(removedCount) stale cache files")
 }
 ```
 

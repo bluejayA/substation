@@ -91,9 +91,18 @@ public actor OpenStackCacheManager {
 
     // MARK: - Initialization
 
+    /// Initialize the OpenStack cache manager with configurable parameters.
+    ///
+    /// - Parameters:
+    ///   - maxCacheSize: Maximum number of cache entries (default: 4000)
+    ///   - maxMemoryUsage: Maximum memory usage in bytes (default: 80 MB)
+    ///   - cacheIdentifier: Optional identifier for consistent cache filenames (e.g., cloud name).
+    ///     When provided, cache files use hash-based naming enabling reuse across restarts.
+    ///   - logger: Logger instance for cache operations
     public init(
         maxCacheSize: Int = 4000, // Increased for OpenStack resource density
         maxMemoryUsage: Int = 80 * 1024 * 1024, // 80 MB optimized for OpenStack data
+        cacheIdentifier: String? = nil,
         logger: any OpenStackClientLogger
     ) {
         let config = MultiLevelCacheManager<String, Data>.Configuration(
@@ -104,7 +113,8 @@ public actor OpenStackCacheManager {
             l3MaxSize: maxCacheSize * 5,         // 500% on disk
             defaultTTL: 300.0,
             enableCompression: true,
-            enableMetrics: true
+            enableMetrics: true,
+            cacheIdentifier: cacheIdentifier
         )
 
         let memoryKitLogger = MemoryKitLoggerAdapter(openStackLogger: logger)

@@ -104,6 +104,14 @@ let package = Package(
                 .enableExperimentalFeature("StrictConcurrency"),
                 .enableUpcomingFeature("ExistentialAny")
             ]
+        ),
+        .testTarget(
+            name: "MemoryKitTests",
+            dependencies: ["MemoryKit"],
+            swiftSettings: [
+                .enableExperimentalFeature("StrictConcurrency"),
+                .enableUpcomingFeature("ExistentialAny")
+            ]
         )
     ]
 )

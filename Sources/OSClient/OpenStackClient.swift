@@ -98,15 +98,17 @@ public final class OpenStackClient: @unchecked Sendable {
     ///   - credentials: Authentication credentials (password or application credential)
     ///   - logger: Logger instance for API call logging
     ///   - enablePerformanceEnhancements: Whether to enable performance monitoring
+    ///   - cloudName: Optional cloud name identifier for consistent cache filenames across restarts
     /// - Returns: Connected and authenticated OpenStack client
     /// - Throws: `OpenStackError.authenticationFailed` if credentials are invalid
     public static func connect(
         config: OpenStackConfig,
         credentials: OpenStackCredentials,
         logger: any OpenStackClientLogger = ConsoleLogger(),
-        enablePerformanceEnhancements: Bool = true
+        enablePerformanceEnhancements: Bool = true,
+        cloudName: String? = nil
     ) async throws -> OpenStackClient {
-        let core = OpenStackClientCore(config: config, credentials: credentials, logger: logger)
+        let core = OpenStackClientCore(config: config, credentials: credentials, logger: logger, cloudName: cloudName)
         let client = OpenStackClient(core: core)
 
         // Initialize performance enhancements if enabled
@@ -233,7 +235,11 @@ public final class OpenStackClient: @unchecked Sendable {
             if let existing = _nova {
                 return existing
             }
-            let service = NovaService(core: core, logger: await core.clientLogger)
+            let service = NovaService(
+                core: core,
+                logger: await core.clientLogger,
+                cloudName: await core.cloudName
+            )
             // Performance manager integration temporarily disabled
             // if let perfManager = performanceManager {
             //     await service.setPerformanceManager(perfManager)
@@ -249,7 +255,11 @@ public final class OpenStackClient: @unchecked Sendable {
             if let existing = _neutron {
                 return existing
             }
-            let service = NeutronService(core: core, logger: await core.clientLogger)
+            let service = NeutronService(
+                core: core,
+                logger: await core.clientLogger,
+                cloudName: await core.cloudName
+            )
             _neutron = service
             return service
         }

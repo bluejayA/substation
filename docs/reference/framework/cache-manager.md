@@ -246,6 +246,33 @@ print("Total cached resources: \(stats.totalItems)")
 
 The CacheManager is marked with `@MainActor` to ensure thread-safe access from the TUI. All write operations to the underlying cache are performed asynchronously using `Task` blocks to prevent blocking the main thread.
 
+## L3 Disk Cache and Cloud-Specific Storage
+
+The underlying MemoryKit multi-level cache stores persistent data on disk (L3 tier) in cloud-specific directories:
+
+```
+~/.config/substation/multi-level-cache/<cloudName>/
+```
+
+### Key Features
+
+- **Cloud Isolation**: Each OpenStack cloud has its own cache directory, preventing data mixing between clouds
+- **Consistent Filenames**: Cache files use hash-based naming (`cache_<hash>.dat`) for deterministic caching across restarts
+- **Automatic Cleanup**: Stale cache files (older than 8 hours) are automatically removed at application startup
+
+### Cache File Lifecycle
+
+```mermaid
+graph LR
+    Start[App Start] --> Cleanup[Cleanup stale files > 8h]
+    Cleanup --> Load[Load L3 index]
+    Load --> Use[Cache operations]
+    Use --> Promote[Promote hot data to L1/L2]
+    Use --> Demote[Demote cold data to L3]
+```
+
+For detailed information about the multi-level cache implementation, see [MemoryKit API Reference](../api/memorykit.md#cloud-specific-caching).
+
 ## Dependencies
 
 - **SubstationMemoryContainer**: Provides the MemoryKit integration

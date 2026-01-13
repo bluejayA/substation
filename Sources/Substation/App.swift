@@ -421,6 +421,16 @@ struct Substation {
             exit(1)
         }
 
+        // Clean up stale cache files before starting (older than 8 hours)
+        // This ensures operators are not presented with stale data when launching Substation
+        // Cache files are stored in cloud-specific subdirectories: ~/.config/substation/multi-level-cache/<cloudName>/
+        let staleCacheFilesRemoved = MultiLevelCacheManager<String, Data>.cleanupStaleCacheFiles(
+            cloudName: selectedCloud
+        )
+        if staleCacheFilesRemoved > 0 {
+            Logger.shared.logInfo("Cleaned up \(staleCacheFilesRemoved) stale cache file(s) older than 8 hours for cloud '\(selectedCloud)'")
+        }
+
         do {
             // Create shared logger for all components - Substation is the authoritative source
             // All logs from MemoryKit, SwiftNCurses, and OSClient adapters route through the SubstationLogger bridge
@@ -497,7 +507,12 @@ struct Substation {
             SwiftNCurses.batchedRefresh(screen)
 
             let connectionStart = Date().timeIntervalSinceReferenceDate
-            var client = try await OSClient.connect(config: config, credentials: credentials, logger: LoggerBridge())
+            var client = try await OSClient.connect(
+                config: config,
+                credentials: credentials,
+                logger: LoggerBridge(),
+                cloudName: selectedCloud
+            )
             let connectionDuration = Date().timeIntervalSinceReferenceDate - connectionStart
             Logger.shared.logPerformance("OpenStack client connection", duration: connectionDuration)
             Logger.shared.logInfo("Successfully connected to OpenStack cloud")
@@ -548,7 +563,12 @@ struct Substation {
                             projectDomainName: config.projectDomainName,
                             verifySSL: config.verifySSL
                         )
-                        client = try await OSClient.connect(config: reconnectConfig, credentials: credentials, logger: LoggerBridge())
+                        client = try await OSClient.connect(
+                            config: reconnectConfig,
+                            credentials: credentials,
+                            logger: LoggerBridge(),
+                            cloudName: selectedCloud
+                        )
                         Logger.shared.logInfo("Reconnected with detected region: \(region)")
                     }
                 } catch let error as RegionDetectionError {

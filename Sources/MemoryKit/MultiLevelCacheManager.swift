@@ -19,6 +19,10 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         public let defaultTTL: TimeInterval
         public let enableCompression: Bool
         public let enableMetrics: Bool
+        /// Optional identifier used for generating consistent cache filenames (e.g., cloud name).
+        /// When set, cache files use a hash of this identifier instead of timestamps,
+        /// enabling cache reuse across application restarts.
+        public let cacheIdentifier: String?
 
         public init(
             l1MaxSize: Int = 1000,
@@ -29,7 +33,8 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
             l3CacheDirectory: URL? = nil,
             defaultTTL: TimeInterval = 300.0,     // 5 minutes
             enableCompression: Bool = true,
-            enableMetrics: Bool = true
+            enableMetrics: Bool = true,
+            cacheIdentifier: String? = nil
         ) {
             self.l1MaxSize = l1MaxSize
             self.l1MaxMemory = l1MaxMemory
@@ -40,6 +45,7 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
             self.defaultTTL = defaultTTL
             self.enableCompression = enableCompression
             self.enableMetrics = enableMetrics
+            self.cacheIdentifier = cacheIdentifier
         }
     }
 
@@ -203,12 +209,25 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         self.configuration = configuration
         self.logger = logger
 
-        // Setup L3 cache directory
+        // Setup L3 cache directory with cloud-specific subdirectory
+        let baseDirectory: URL
         if let cacheDir = configuration.l3CacheDirectory {
-            self.l3CacheDirectory = cacheDir
+            baseDirectory = cacheDir
         } else {
             let homeDir = FileManager.default.homeDirectoryForCurrentUser
-            self.l3CacheDirectory = homeDir.appendingPathComponent(".config/substation/multi-level-cache")
+            baseDirectory = homeDir.appendingPathComponent(".config/substation/multi-level-cache")
+        }
+
+        // Append cloud name as subdirectory if provided for cloud-specific caching
+        if let cloudName = configuration.cacheIdentifier {
+            // Sanitize cloud name for use as directory name
+            let sanitizedCloudName = cloudName
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: ":", with: "_")
+                .replacingOccurrences(of: " ", with: "_")
+            self.l3CacheDirectory = baseDirectory.appendingPathComponent(sanitizedCloudName)
+        } else {
+            self.l3CacheDirectory = baseDirectory
         }
 
         // Create cache directory if needed
@@ -227,6 +246,103 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
     /// Start the cache manager (call after initialization)
     public func start() {
         startMaintenanceTasks()
+    }
+
+    // MARK: - Static Cache Cleanup
+
+    /// Default base cache directory path used when no custom directory is specified
+    private static var defaultCacheDirectory: URL {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        return homeDir.appendingPathComponent(".config/substation/multi-level-cache")
+    }
+
+    /// Sanitizes a cloud name for use as a directory name.
+    ///
+    /// - Parameter cloudName: The cloud name to sanitize
+    /// - Returns: A sanitized string safe for use as a directory name
+    private static func sanitizeCloudName(_ cloudName: String) -> String {
+        return cloudName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+    }
+
+    /// Cleans up stale cache files from the cache directory.
+    ///
+    /// This static method should be called at application startup to remove cache files
+    /// that are older than the specified maximum age. This prevents operators from being
+    /// presented with stale data when first loading the application.
+    ///
+    /// When a cloud name is provided, only the cloud-specific subdirectory is cleaned.
+    /// Cache files are stored in `~/.config/substation/multi-level-cache/<cloudName>/`.
+    ///
+    /// - Parameters:
+    ///   - maxAge: Maximum age of cache files to keep in seconds (default: 8 hours = 28800 seconds)
+    ///   - cloudName: Optional cloud name for cloud-specific cache cleanup. When provided,
+    ///     cleans the `<cloudName>/` subdirectory.
+    ///   - cacheDirectory: Optional custom base cache directory. Uses default if not specified.
+    /// - Returns: The number of stale cache files that were removed
+    @discardableResult
+    public static func cleanupStaleCacheFiles(
+        maxAge: TimeInterval = 8 * 60 * 60, // 8 hours in seconds
+        cloudName: String? = nil,
+        cacheDirectory: URL? = nil
+    ) -> Int {
+        let baseDirectory = cacheDirectory ?? defaultCacheDirectory
+
+        // Use cloud-specific subdirectory if cloud name is provided
+        let directory: URL
+        if let cloudName = cloudName {
+            let sanitizedCloudName = sanitizeCloudName(cloudName)
+            directory = baseDirectory.appendingPathComponent(sanitizedCloudName)
+        } else {
+            directory = baseDirectory
+        }
+
+        guard FileManager.default.fileExists(atPath: directory.path) else {
+            return 0
+        }
+
+        var removedCount = 0
+        let now = Date()
+
+        do {
+            let files = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey]
+            )
+
+            for fileURL in files {
+                // Only process .dat cache files
+                guard fileURL.pathExtension == "dat" else { continue }
+
+                do {
+                    let resourceValues = try fileURL.resourceValues(
+                        forKeys: [.contentModificationDateKey, .isRegularFileKey]
+                    )
+
+                    // Skip if not a regular file
+                    guard resourceValues.isRegularFile == true else { continue }
+
+                    // Check file age
+                    if let modificationDate = resourceValues.contentModificationDate {
+                        let age = now.timeIntervalSince(modificationDate)
+                        if age > maxAge {
+                            try FileManager.default.removeItem(at: fileURL)
+                            removedCount += 1
+                        }
+                    }
+                } catch {
+                    // Continue with other files if one fails
+                    continue
+                }
+            }
+        } catch {
+            // Unable to read directory contents
+            return 0
+        }
+
+        return removedCount
     }
 
     deinit {
@@ -707,14 +823,35 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         }
     }
 
+    /// Generates a consistent filename for L3 cache storage using a hash-based approach.
+    ///
+    /// Filenames are always generated using a deterministic hash of the cache key,
+    /// ensuring cache reuse across application restarts. Cloud isolation is handled
+    /// by the directory structure (`~/.config/substation/multi-level-cache/<cloudName>/`),
+    /// so the hash is based solely on the key for consistency within each cloud's cache.
+    ///
+    /// - Parameter key: The cache key to generate a filename for
+    /// - Returns: A deterministic filename for the cache entry
     private func generateL3Filename(for key: String) -> String {
-        // Create safe filename from cache key
-        let sanitized = key.replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: ":", with: "-")
-            .replacingOccurrences(of: " ", with: "_")
+        // Generate consistent hash based on the cache key
+        let hash = Self.simpleHash(key)
+        return "cache_\(hash).dat"
+    }
 
-        let timestamp = Int(Date().timeIntervalSince1970)
-        return "cache_\(sanitized)_\(timestamp).dat"
+    /// Simple hash function for generating consistent cache filenames.
+    ///
+    /// Uses a djb2-style hash algorithm to produce a deterministic integer hash
+    /// from the input string. This ensures the same input always produces the same
+    /// filename across application restarts.
+    ///
+    /// - Parameter input: The string to hash
+    /// - Returns: A hexadecimal string representation of the hash
+    private static func simpleHash(_ input: String) -> String {
+        var hash: UInt64 = 5381
+        for char in input.utf8 {
+            hash = ((hash << 5) &+ hash) &+ UInt64(char)
+        }
+        return String(format: "%016llx", hash)
     }
 
     // MARK: - Maintenance

@@ -589,11 +589,14 @@ public actor OpenStackClientCore {
     private var currentProjectId: String?
     private var currentProjectName: String?
     private let microversionManager: MicroversionManager
+    /// The cloud name identifier used for consistent cache filenames across restarts
+    private let _cloudName: String?
 
-    internal init(config: OpenStackConfig, credentials: OpenStackCredentials, logger: any OpenStackClientLogger) {
+    internal init(config: OpenStackConfig, credentials: OpenStackCredentials, logger: any OpenStackClientLogger, cloudName: String? = nil) {
         self.config = config
         self.credentials = credentials
         self.logger = logger
+        self._cloudName = cloudName
         self.memoryManager = MemoryManager(configuration: MemoryManager.Configuration(
             maxCacheSize: 5000, // Increased for OpenStack API data density
             maxMemoryBudget: 120 * 1024 * 1024, // 120MB optimized for OpenStack Core
@@ -645,6 +648,11 @@ public actor OpenStackClientCore {
     /// Access to the current project name (from token)
     public var projectName: String? {
         currentProjectName
+    }
+
+    /// Access to the cloud name identifier for consistent cache filenames
+    public var cloudName: String? {
+        _cloudName
     }
 
     // MARK: - Authentication
