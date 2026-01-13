@@ -319,8 +319,3 @@ Uses central cache manager with server group storage.
 | **Category** | Compute |
 | **Deletion Priority** | Low (delete members first) |
 | **Load Order** | Phase 1 (independent) |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1.0*

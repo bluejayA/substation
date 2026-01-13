@@ -86,8 +86,11 @@ Press `:` to enter command input -- the primary way to navigate and execute acti
 | `:routers` | `:router`, `:rtr`, `:r`, `:neutronrouters`, `:neutronrouter` | Navigate to routers view |
 | `:floatingips` | `:floatingip`, `:fips`, `:fip`, `:floating`, `:l`, `:neutronfloatingips`, `:neutronfloatingip` | Navigate to floating IPs |
 | `:keypairs` | `:keypair`, `:keys`, `:key`, `:kp`, `:k`, `:novakeypairs`, `:novakeypair` | Navigate to key pairs |
+| `:hypervisors` | `:hypervisor`, `:hyper`, `:hv`, `:novahypervisors`, `:novahypervisor` | Navigate to hypervisors view |
 | `:secrets` | `:secret`, `:barbican`, `:b` | Navigate to secrets (Barbican) |
 | `:object storage` | `:swift`, `:objectstorage`, `:objects`, `:obj`, `:j` | Navigate to object storage (Swift) |
+| `:clusters` | `:cluster`, `:clst`, `:c`, `:magnum`, `:kubernetes`, `:k8s` | Navigate to Magnum clusters |
+| `:cluster templates` | `:clustertemplates`, `:clustertemplate`, `:templates`, `:tmpl`, `:ct` | Navigate to cluster templates |
 | `:operations` | `:ops`, `:background`, `:tasks` | Navigate to Swift background operations |
 | `:performance` | `:metrics`, `:perf`, `:stats` | Navigate to performance metrics |
 | `:health` | `:healthdashboard`, `:h` | Navigate to health dashboard |
@@ -249,6 +252,7 @@ These keys trigger actions in relevant views. Note: Most actions use lowercase k
 
 - Servers, Volumes, Networks, Subnets, Routers, Ports
 - Floating IPs, Security Groups, Server Groups, Key Pairs, Images
+- Clusters (Magnum), Cluster Templates, Hypervisors, Swift Containers/Objects
 
 #### Resource Actions
 
@@ -380,14 +384,47 @@ These keys trigger actions in relevant views. Note: Most actions use lowercase k
 | `Del` | Delete secret | Permanent deletion |
 | `Space` | View secret metadata | Metadata only, not payload |
 
+### Hypervisors View (`:hypervisors`)
+
+| Key | Action | Notes |
+|-----|--------|-------|
+| `Space` | View hypervisor details | CPU, memory, disk stats |
+| `^/v` | Navigate hypervisors | Browse compute hosts |
+| `/` | Search hypervisors | Filter by hostname |
+
+### Magnum Clusters View (`:clusters`)
+
+| Key | Action | Notes |
+|-----|--------|-------|
+| `C` | Create cluster | Create Kubernetes/Swarm cluster |
+| `Del` | Delete cluster | Delete cluster and resources |
+| `Space` | View cluster details | Status, nodes, endpoints |
+| `R` | Resize cluster | Add/remove worker nodes |
+| `U` | Upgrade cluster | Upgrade Kubernetes version |
+
+### Cluster Templates View (`:clustertemplates`)
+
+| Key | Action | Notes |
+|-----|--------|-------|
+| `C` | Create template | Define cluster configuration |
+| `Del` | Delete template | Remove template definition |
+| `Space` | View template details | COE, image, network config |
+
 ### Swift View (`:swift`)
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `:create` | Create container | Object storage container (no keyboard shortcut) |
+| `c` | Create container | Object storage container |
+| `U` | Upload file/directory | Upload to current container |
+| `D` | Download object | Download selected object(s) |
 | `d` | Delete container/object | Must be empty for containers |
+| `M` | Edit metadata | Container or object metadata |
+| `W` | Configure web access | Static website hosting |
+| `b` | Background operations | View transfer progress |
+| `Space` | Navigate into | Enter container or view object |
+| `Esc` | Navigate up | Go to parent directory |
 
-**Note**: Upload, download, web access, and metadata management operations are accessed through detail views and forms, not keyboard shortcuts.
+**Note**: Swift supports background upload/download operations. Press `b` to view active transfers.
 
 ### Health Dashboard (`:health`)
 
@@ -675,6 +712,7 @@ Every operation can be performed without a mouse:
 
 ```
 Navigation:  :servers :networks :volumes :images  (Command mode -- type : then command name)
+             :clusters :hypervisors :swift        (Magnum, Nova Hypervisors, Object Storage)
 Actions:     C Del Space ? q                      (Create, Delete, Details, Help, Quit)
 Search:      / :search                            (Local, Advanced search)
 Commands:    : (then cmd name)                    (Command input -- :ctx, :servers, :create, etc.)
@@ -683,6 +721,7 @@ Movement:    ^v j k Page-Up/Dn                     (List navigation)
 Bulk Ops:    Ctrl-X Space Del                     (Multi-select, Select, Bulk delete)
 Cloud:       :ctx <cloud>                         (Switch between clouds)
 Server Mgmt: S T R                                (Start, Stop, Restart -- uppercase context actions)
+Swift:       U D b                                (Upload, Download, Background operations)
 ```
 
 ### Emergency Shortcuts

@@ -7,9 +7,10 @@ Substation provides comprehensive integration with OpenStack services, supportin
 Substation is tested and supported with:
 
 - **2023.1** (Antelope) - Tested extensively
-- **2023.2** (Bobcat) and later - Should work
-- **2024.1** (Caracal) and later - Tested extensively
-- **2025.1** (Epoxy) - Should work
+- **2023.2** (Bobcat) - Tested
+- **2024.1** (Caracal) - Tested extensively
+- **2024.2** (Dalmatian) - Tested
+- **2025.1** (Epoxy) - Supported
 
 **Microversion Support:** Substation automatically negotiates the highest compatible API microversion with your OpenStack deployment. This ensures you get the latest features available in your cloud.
 
@@ -28,9 +29,10 @@ Substation is tested and supported with:
 | Service | Component | API Version | Status |
 |---------|-----------|-------------|--------|
 | **Cinder** | Block Storage | v3 | Full support |
-| **Glance** | Image | v2 | Partial support |
+| **Glance** | Image | v2 | Full support |
 | **Barbican** | Key Manager | v1 | Full support |
 | **Swift** | Object Storage | v1 | Full support |
+| **Magnum** | Container Infrastructure | v1 | Full support |
 
 ### Service Capabilities Detail
 
@@ -42,6 +44,7 @@ Substation is tested and supported with:
 - Flavors: List, show, create (admin), delete (admin)
 - Keypairs: List, create, delete, import
 - Server Groups: List, create, delete, add members
+- Hypervisors: List, show statistics, monitor utilization
 - Server actions: Pause, unpause, suspend, resume, lock, unlock, backup
 
 **Advanced Features:**
@@ -51,6 +54,7 @@ Substation is tested and supported with:
 - Volume attachment/detachment
 - Interface attachment/detachment
 - Server group policies (affinity, anti-affinity)
+- Hypervisor resource monitoring
 
 #### Neutron (Networking Service)
 
@@ -93,6 +97,7 @@ Substation is tested and supported with:
 - Images: List, create, delete, update metadata
 - Image upload/download
 - Image activation/deactivation
+- Image visibility management
 
 **Advanced Features:**
 
@@ -100,6 +105,7 @@ Substation is tested and supported with:
 - Image members (sharing)
 - Image properties and tags
 - Protected images
+- Image filtering by visibility, status, owner
 
 #### Barbican (Secrets Management)
 
@@ -129,6 +135,22 @@ Substation is tested and supported with:
 - Container ACLs
 - Object versioning
 - Temporary URLs
+
+#### Magnum (Container Infrastructure)
+
+**Full Resource Support:**
+
+- Clusters: List, create, delete, resize, upgrade
+- Cluster Templates: List, create, delete
+- Node Groups: List, create, delete, scale
+
+**Advanced Features:**
+
+- Kubernetes cluster management
+- Docker Swarm support
+- Multi-master configurations
+- Node group autoscaling
+- Certificate management
 
 ## Authentication Architecture
 
@@ -262,11 +284,12 @@ graph TB
     subgraph "Service Types"
         Compute[compute/nova]
         Network[network/neutron]
-        Volume[volume/cinder]
+        Volume[volumev3/cinder]
         Image[image/glance]
         Identity[identity/keystone]
         KeyManager[key-manager/barbican]
         ObjectStorage[object-store/swift]
+        ContainerInfra[container-infra/magnum]
     end
 
     subgraph "Endpoint Types"
@@ -284,8 +307,8 @@ graph TB
     Image --> Internal
     Identity --> Public
     KeyManager --> Admin
-    LoadBalancer --> Public
     ObjectStorage --> Public
+    ContainerInfra --> Public
 ```
 
 ## API Communication Patterns

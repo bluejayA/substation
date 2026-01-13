@@ -8,9 +8,10 @@ This is the complete API reference for Substation's packages: OSClient, SwiftNCu
 
 | Package | Purpose | When to Use |
 |---------|---------|-------------|
+| **CrossPlatformTimer** | Timer utilities | Periodic tasks, animations |
+| **MemoryKit** | Memory management | Caching, resource handling |
 | **OSClient** | OpenStack API client | Interacting with OpenStack services |
 | **SwiftNCurses** | Terminal UI framework | Building terminal UIs |
-| **CrossPlatformTimer** | Timer utilities | Periodic tasks, animations |
 
 ### Quick Start
 
@@ -63,7 +64,7 @@ let timer = createCompatibleTimer(interval: 5.0, repeats: true) {
 - Handle OpenStack errors
 - Monitor API performance
 
-### [SwiftNCurses - Terminal UI Framework](swiftncurses.md)
+### [SwiftNCurses - Terminal UI Framework](SwiftNCurses.md)
 
 **What's in it**:
 
@@ -287,7 +288,7 @@ Intelligent multi-level caching designed for up to 60-80% API call reduction:
 - **L2 Cache**: Session-persistent
 - **L3 Cache**: Disk-backed, survives restarts
 
-See: [Caching Concepts](../../concepts/caching.md)
+See: [MemoryKit API Reference](memorykit.md)
 
 ### Resource-Specific TTLs
 
@@ -428,7 +429,7 @@ defer { timer.invalidate() }
 ## Related Documentation
 
 - **[Performance Documentation](../../performance/index.md)** - Benchmarking, tuning, troubleshooting
-- **[Caching Concepts](../../concepts/caching.md)** - Deep dive into caching architecture
+- **[MemoryKit API Reference](memorykit.md)** - Deep dive into caching architecture
 - **[Architecture Overview](../../architecture/index.md)** - Overall system architecture
 - **[Developer Guides](../../reference/developers/index.md)** - Building forms and components
 

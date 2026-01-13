@@ -359,8 +359,3 @@ extension KeyPairsModule {
 | **Load Order** | 15 |
 | **Memory Usage** | ~1-2 MB |
 | **CPU Impact** | Minimal |
-
----
-
-*Last Updated: 2025-11-23*
-*Documentation Version: 1.0.0*

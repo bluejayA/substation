@@ -92,7 +92,7 @@ When you're ready to go deeper:
 - **[Common Workflows](../reference/operators/workflows.md)** - Everyday operations and patterns
 - **[Keyboard Shortcuts](../reference/operators/keyboard-shortcuts.md)** - Complete navigation reference
 - **[Performance Tuning](../performance/index.md)** - Cache settings and optimization
-- **[Caching Concepts](../concepts/caching.md)** - How the multi-level cache reduces API calls
+- **[MemoryKit API Reference](../reference/api/memorykit.md)** - How the multi-level cache reduces API calls
 - **[OpenStack Integration](../reference/openstack/index.md)** - Supported services and operations
 
 Press ? at any time for context-aware help. Check ~/substation.log if something seems wrong. And remember: command input felt weird for ten minutes. Now you're on the other side of that curve.

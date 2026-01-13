@@ -475,8 +475,3 @@ for volume in selectedVolumes {
 | **Load Order** | 40 |
 | **Memory Usage** | ~15 MB typical |
 | **CPU Impact** | Low |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1.0*

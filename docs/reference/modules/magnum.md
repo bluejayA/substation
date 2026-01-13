@@ -520,8 +520,3 @@ extension MagnumModule {
 | **Load Order** | 10 |
 | **Memory Usage** | ~5-15 MB |
 | **CPU Impact** | Low-Medium |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.0.0*

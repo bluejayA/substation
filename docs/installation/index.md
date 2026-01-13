@@ -316,4 +316,4 @@ Substation enforces a **zero-warning build standard**. All warnings must be fixe
 - **Built-in Help**: Run `substation --help`
 - **Documentation**: Complete guides at [Quick Start](../quick-start.md)
 - **GitHub Issues**: [Report installation problems](https://github.com/cloudnull/substation/issues)
-- **FAQ**: [Common installation questions](../reference/faq.md)
+- **[Troubleshooting](../troubleshooting/index.md)**: Common issues and solutions

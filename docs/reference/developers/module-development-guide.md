@@ -41,10 +41,14 @@ graph TD
     Ext --> E3[YourModule+Navigation.swift<br/>Navigation handling]
     Ext --> E4[YourModule+Views.swift<br/>View registration metadata]
     Ext --> E5[TUI+YourResourceHandlers.swift<br/>Resource operation handlers]
+    Ext --> E6[YourResource+StatusListView.swift<br/>StatusListView configuration]
+    Ext --> E7[YourResource+FormSelectableItem.swift<br/>Form selection support]
 
-    Mod --> M1[YourResource+Extensions.swift<br/>Model UI extensions]
+    Mod --> M1[YourResourceCreateForm.swift<br/>Form model and state]
+    Mod --> M2[YourResourceManagementForm.swift<br/>Management form model]
 
     Views --> V1[YourViews.swift<br/>View rendering functions]
+    Views --> V2[YourResourceSelectionView.swift<br/>Resource selection views]
 
     style Root fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
     style Ext fill:#fff4e1,stroke:#f57c00,stroke-width:2px
@@ -693,7 +697,114 @@ extension YourModule: BatchOperationProvider {
 }
 ```
 
-### Step 7: Register the Module
+### Step 7: Create StatusListView Extension
+
+Use the StatusListView component for consistent list rendering. Create `Extensions/YourResource+StatusListView.swift`:
+
+```swift
+// Sources/Substation/Modules/YourModule/Extensions/YourResource+StatusListView.swift
+import Foundation
+import OSClient
+import SwiftNCurses
+
+extension YourViews {
+    @MainActor
+    static func createResourceStatusListView() -> StatusListView<YourResource> {
+        return StatusListView<YourResource>(
+            title: "Your Resources",
+            columns: [
+                StatusListColumn(
+                    header: "NAME",
+                    width: 30,
+                    getValue: { resource in
+                        resource.name ?? "Unnamed"
+                    }
+                ),
+                StatusListColumn(
+                    header: "STATUS",
+                    width: 12,
+                    getValue: { resource in
+                        resource.status ?? "Unknown"
+                    },
+                    getStyle: { resource in
+                        let status = resource.status ?? "unknown"
+                        switch status.lowercased() {
+                        case "active", "available": return .success
+                        case "error", "failed": return .error
+                        case "building", "creating": return .warning
+                        default: return .info
+                        }
+                    }
+                ),
+                StatusListColumn(
+                    header: "CREATED",
+                    width: 20,
+                    getValue: { resource in
+                        if let created = resource.createdAt {
+                            return DateFormatter.openStackFormatter.string(from: created)
+                        }
+                        return "N/A"
+                    }
+                )
+            ],
+            getStatusIcon: { resource in
+                resource.status ?? "unknown"
+            },
+            filterItems: { resources, query in
+                guard let query = query, !query.isEmpty else { return resources }
+                let lowercased = query.lowercased()
+                return resources.filter { resource in
+                    (resource.name?.lowercased().contains(lowercased) ?? false) ||
+                    resource.id.lowercased().contains(lowercased)
+                }
+            },
+            getItemID: { resource in
+                resource.id
+            }
+        )
+    }
+}
+```
+
+### Step 8: Create FormSelectableItem Extension
+
+Enable resource selection in forms by implementing FormSelectableItem. Create `Extensions/YourResource+FormSelectableItem.swift`:
+
+```swift
+// Sources/Substation/Modules/YourModule/Extensions/YourResource+FormSelectableItem.swift
+import OSClient
+
+extension YourResource: FormSelectableItem {
+    /// Key for sorting resources in selection lists
+    var sortKey: String {
+        return name ?? id
+    }
+
+    /// Search matching for form selectors
+    func matchesSearch(_ query: String) -> Bool {
+        let lowercaseQuery = query.lowercased()
+
+        // Match on name
+        if let name = name, name.lowercased().contains(lowercaseQuery) {
+            return true
+        }
+
+        // Match on ID
+        if id.lowercased().contains(lowercaseQuery) {
+            return true
+        }
+
+        // Match on status
+        if let status = status, status.lowercased().contains(lowercaseQuery) {
+            return true
+        }
+
+        return false
+    }
+}
+```
+
+### Step 9: Register the Module
 
 Add your module to the module registry loading in `ModuleRegistry.swift`:
 
@@ -1021,13 +1132,23 @@ If experiencing performance problems:
 
 Developing a new OpenStack module involves:
 
-1. Creating the module structure
+1. Creating the module directory structure
 2. Implementing the OpenStackModule protocol
 3. Creating a DataProvider for API integration
 4. Building views for UI rendering
 5. Implementing form handlers for user input
-6. Adding optional features (batch operations, actions)
-7. Registering the module with the system
-8. Testing thoroughly
+6. Adding batch operations (optional)
+7. Creating StatusListView extension for list rendering
+8. Creating FormSelectableItem extension for form selection
+9. Registering the module with the system
+10. Testing thoroughly
 
 Follow the patterns established by existing modules, use the provided protocols and base classes, and ensure all code follows the project's Swift 6.1 conventions and ASCII-only requirement.
+
+## Related Documentation
+
+- [StatusListView Guide](statuslistview-guide.md) - Detailed guide for StatusListView component
+- [FormSelector Guide](formselector-guide.md) - Guide for FormSelectableItem and FormSelector
+- [FormBuilder Guide](formbuilder-guide.md) - Form construction guide
+- [Testing Guide](testing.md) - How to test your module
+- [Framework Reference](../framework/) - Framework component documentation

@@ -653,5 +653,5 @@ let servers = await view.servers  // Correct
 **See Also**:
 
 - [OSClient API](osclient.md) - OpenStack client library reference
-- [SwiftNCurses API](swiftncurses.md) - Terminal UI framework reference
+- [SwiftNCurses API](SwiftNCurses.md) - Terminal UI framework reference
 - [API Reference Index](index.md) - Quick reference and navigation

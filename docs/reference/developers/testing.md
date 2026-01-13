@@ -19,11 +19,18 @@ If you're not testing, you're guessing. This guide shows you how to run the test
 
 ## Test Suites
 
-Substation currently has **36+ tests** organized into four test suites:
+Substation has a comprehensive test suite organized into multiple categories:
 
 ### OSClientTests
 
 Tests for the OpenStack API client library.
+
+**Test Files:**
+
+- `OSClientTests.swift` - Core client functionality
+- `MemoryManagementTests.swift` - Memory safety and leak detection
+- `KeystoneServiceTests.swift` - Keystone authentication service
+- `NeutronModelsTests.swift` - Neutron network model tests
 
 **Coverage:**
 
@@ -32,6 +39,9 @@ Tests for the OpenStack API client library.
 - Application credential authentication
 - Mixed authentication methods
 - Credential validation
+- Memory safety and leak detection
+- Concurrent request handling
+- Network failure recovery
 
 **Run only OSClient tests:**
 
@@ -41,7 +51,14 @@ Tests for the OpenStack API client library.
 
 ### SubstationTests
 
-Tests for cloud configuration, YAML parsing, and authentication management.
+Tests for cloud configuration, navigation, modules, and application features.
+
+**Test Files:**
+
+- `EnhancedCloudConfigTests.swift` - YAML parsing and cloud config
+- `DataManagerCatalogTests.swift` - Data manager functionality
+- `BuildInfoTests.swift` - Build information tests
+- `VersionEmbeddingIntegrationTests.swift` - Version embedding
 
 **Coverage:**
 
@@ -53,6 +70,7 @@ Tests for cloud configuration, YAML parsing, and authentication management.
 - Secure credential storage
 - Region auto-detection
 - Error handling and recovery
+- Build information and version embedding
 
 **Run only Substation tests:**
 
@@ -66,30 +84,71 @@ Tests for cloud configuration, YAML parsing, and authentication management.
 ~/.swiftly/bin/swift test --filter EnhancedCloudConfigTests
 ```
 
-### MemoryManagementTests
+### Navigation Tests
 
-Tests for memory safety, leak detection, and proper resource cleanup.
+Tests for the navigation system and input handling.
+
+**Test Files:**
+
+- `Navigation/CommandModeTests.swift` - Command mode input handling
+- `Navigation/ContextSwitcherTests.swift` - View context switching
+- `Navigation/InputPriorityTests.swift` - Input priority management
+- `Navigation/ResourceRegistryTests.swift` - Resource registry functionality
 
 **Coverage:**
 
-- Client cleanup without crashes
-- Concurrent requests with cancellation
-- Multiple client creation and cleanup
-- Network failure recovery
-- Task cancellation handling
-- URLSession delegate retention
-- URLSession invalidation on deinit
-- Weak self in task capture
+- Command mode activation and input processing
+- Context switching between views
+- Input priority ordering
+- Resource registry lookups
 
-**Run only memory tests:**
+**Run only navigation tests:**
 
 ```bash
-~/.swiftly/bin/swift test --filter MemoryManagementTests
+~/.swiftly/bin/swift test --filter CommandModeTests
+~/.swiftly/bin/swift test --filter ContextSwitcherTests
+~/.swiftly/bin/swift test --filter InputPriorityTests
+~/.swiftly/bin/swift test --filter ResourceRegistryTests
+```
+
+### Module Tests
+
+Tests for the module system and individual module functionality.
+
+**Test Files:**
+
+- `Modules/ModuleSystemTests.swift` - Module system lifecycle
+- `Modules/ModuleHealthTests.swift` - Module health checking
+- `Modules/ModuleCatalogExtendedTests.swift` - Extended module catalog
+- `Modules/DataProviderTests.swift` - Data provider functionality
+- `Modules/FormRegistryTests.swift` - Form registry tests
+- `Modules/StatusListViewTests.swift` - StatusListView component
+- `Modules/BugFixTests.swift` - Regression tests for bug fixes
+
+**Coverage:**
+
+- Module initialization and lifecycle
+- Module health checks and status reporting
+- Data provider registration and fetching
+- Form registry and handler registration
+- StatusListView rendering and filtering
+- Bug fix verifications
+
+**Run only module tests:**
+
+```bash
+~/.swiftly/bin/swift test --filter ModuleSystemTests
+~/.swiftly/bin/swift test --filter ModuleHealthTests
+~/.swiftly/bin/swift test --filter DataProviderTests
 ```
 
 ### TUITests
 
 Tests for terminal UI components and utilities.
+
+**Test Files:**
+
+- `TUITests.swift` - Core TUI functionality
 
 **Coverage:**
 
@@ -181,15 +240,33 @@ Tests for terminal UI components and utilities.
 
 ### Test File Structure
 
-Test files are organized by component:
+Test files are organized by component and feature:
 
 ```
 Tests/
 |-- OSClientTests/
 |   |-- OSClientTests.swift
-|   +-- MemoryManagementTests.swift
+|   |-- MemoryManagementTests.swift
+|   |-- KeystoneServiceTests.swift
+|   +-- NeutronModelsTests.swift
 |-- SubstationTests/
-|   +-- EnhancedCloudConfigTests.swift
+|   |-- EnhancedCloudConfigTests.swift
+|   |-- DataManagerCatalogTests.swift
+|   |-- BuildInfoTests.swift
+|   |-- VersionEmbeddingIntegrationTests.swift
+|   |-- Navigation/
+|   |   |-- CommandModeTests.swift
+|   |   |-- ContextSwitcherTests.swift
+|   |   |-- InputPriorityTests.swift
+|   |   +-- ResourceRegistryTests.swift
+|   +-- Modules/
+|       |-- ModuleSystemTests.swift
+|       |-- ModuleHealthTests.swift
+|       |-- ModuleCatalogExtendedTests.swift
+|       |-- DataProviderTests.swift
+|       |-- FormRegistryTests.swift
+|       |-- StatusListViewTests.swift
+|       +-- BugFixTests.swift
 +-- TUITests/
     +-- TUITests.swift
 ```
@@ -477,8 +554,10 @@ top -pid $(pgrep swift-testing)
 
 Current test coverage:
 
-- **OSClient**: Core functionality covered
-- **Substation**: Configuration and authentication covered
+- **OSClient**: Core functionality, authentication, Keystone service, Neutron models
+- **Substation**: Configuration, authentication, data management, version embedding
+- **Navigation**: Command mode, context switching, input priority, resource registry
+- **Modules**: Module system, health checking, data providers, form registry, StatusListView
 - **MemoryKit**: Memory management covered
 - **SwiftNCurses**: Basic components covered
 
@@ -487,6 +566,8 @@ Current test coverage:
 - Minimum 70% line coverage for all modules
 - 100% coverage for critical paths (authentication, caching)
 - All public APIs should have tests
+- Navigation and input handling should have comprehensive tests
+- Module lifecycle should be fully tested
 
 ### Measuring Coverage
 

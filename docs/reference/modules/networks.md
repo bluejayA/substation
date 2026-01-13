@@ -469,8 +469,3 @@ extension NetworksModule {
 | **Load Order** | 20 |
 | **Typical Memory Usage** | 5-20 MB |
 | **CPU Impact** | Low |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1*

@@ -769,4 +769,4 @@ Now that Substation is configured, learn how to use it:
 - **Built-in Help**: Press `?` at any time in Substation
 - **Documentation**: [Complete guides](../index.md)
 - **GitHub Issues**: [Report configuration issues](https://github.com/cloudnull/substation/issues)
-- **FAQ**: [Common configuration questions](../reference/faq.md)
+- **[Troubleshooting](../troubleshooting/index.md)**: Common issues and solutions

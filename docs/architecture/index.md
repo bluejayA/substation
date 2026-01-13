@@ -1,48 +1,20 @@
 # Architecture
 
-Substation is built with a modular, layered architecture that emphasizes performance, reliability, and maintainability. This section provides comprehensive documentation of the system design and architectural decisions.
+Substation is built with a modular, layered architecture that emphasizes performance, reliability, and maintainability. This section provides the architectural philosophy and design decisions behind the system.
 
 **Or**: How we built a terminal app that doesn't suck, using Swift.
 
-## Architecture Documentation
+## Architecture Overview
 
-This section is organized into focused documents covering different aspects of the architecture:
+The [Architecture Overview](./overview.md) covers everything you need to understand Substation's design:
 
-### [Overview](./overview.md)
+- **Design Principles** - Performance first, modular architecture, security first, reliability
+- **Module System** - OpenStackModule protocol, lifecycle, dependencies
+- **Package Architecture** - Substation, SwiftNCurses, OSClient, MemoryKit, CrossPlatformTimer
+- **Concurrency Model** - Actor-based design, Swift 6 strict concurrency
+- **Data Flow** - Request routing, caching, error handling
 
-Design principles and high-level architecture:
-
-- **Performance First** - Caching strategy, concurrency model, memory efficiency
-- **Modular Architecture** - Package structure, dependency management
-- **Security First** - Credential encryption, certificate validation, input validation
-- **Reliability** - Retry logic, health monitoring, error handling
-- **Package-Based Architecture** - Cross-platform design, data flow
-
-**Read this first** to understand the big picture and architectural philosophy.
-
-### [Components](./components.md)
-
-Detailed component architecture and implementation:
-
-- **TUI Layer (SwiftNCurses)** - Rendering pipeline, UI components, event system
-- **OSClient Service Layer** - OpenStack service clients, data managers, caching
-- **Substation Service Layer** - Resource operations, server actions, UI helpers
-- **FormBuilder System** - Declarative forms, field types, type-safe rendering
-- **Caching Architecture (MemoryKit)** - Multi-level cache, hit rates, TTL management
-- **Security Architecture** - Authentication, encryption, validation
-
-**Read this** for implementation details and how components interact.
-
-### [Technology Stack](./technology-stack.md)
-
-Core technologies, dependencies, and development tools:
-
-- **Core Technologies** - Swift 6.1, actors, async/await, SwiftNCurses, URLSession
-- **Package Dependencies** - swift-crypto, Foundation, NCurses
-- **Platform Support** - macOS, Linux, cross-platform abstractions
-- **Development Tools** - Build system, testing, CI/CD, performance monitoring
-
-**Read this** to understand the technology choices and platform-specific details.
+**Read this** to understand the big picture and architectural philosophy.
 
 ## Quick Reference
 
@@ -123,15 +95,34 @@ sequenceDiagram
     VM-->>UI: Update View
 ```
 
+## Detailed Reference Documentation
+
+For implementation details, see the API and framework reference:
+
+### API Reference
+
+- **[SwiftNCurses](../reference/api/SwiftNCurses.md)** - Terminal UI framework API
+- **[OSClient](../reference/api/osclient.md)** - OpenStack client library API
+- **[MemoryKit](../reference/api/memorykit.md)** - Multi-level caching system API
+- **[CrossPlatformTimer](../reference/api/crossplatformtimer.md)** - Timer abstraction API
+
+### Framework Reference
+
+- **[Module System](../reference/framework/module-system.md)** - Module architecture and protocols
+- **[Security](../reference/framework/security.md)** - Security implementation details
+- **[Search System](../reference/framework/search-system.md)** - Navigation and search architecture
+- **[Cache Manager](../reference/framework/cache-manager.md)** - Resource caching interface
+
+### Developer Guides
+
+- **[FormBuilder Guide](../reference/developers/formbuilder-guide.md)** - Building forms with FormBuilder
+- **[Module Development](../reference/developers/module-development-guide.md)** - Creating new modules
+
 ## Related Documentation
 
-For related architectural documentation:
-
 - **[Performance](../performance/index.md)** - Performance architecture and benchmarking
-- **[Security](../concepts/security.md)** - Security implementation details
-- **[Caching](../concepts/caching.md)** - Multi-level caching architecture
 - **[OpenStack Integration](../reference/openstack/index.md)** - API patterns and service integration
-- **[FormBuilder Guide](../reference/developers/formbuilder-guide.md)** - Developer guide for forms
+- **[Installation](../installation/index.md)** - Platform-specific installation instructions
 
 ---
 

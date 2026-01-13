@@ -594,8 +594,3 @@ for object in selectedObjects {
 | **Load Order** | 35 |
 | **Memory Usage** | ~20 MB typical (varies with cache) |
 | **CPU Impact** | Low (higher during transfers) |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1.0*

@@ -557,7 +557,7 @@ Network utilization: <20% or >95%
 
 ## See Also
 
-- [Object Storage Concepts](../concepts/object-storage.md) - Core concepts and features
-- [Object Storage Architecture](../architecture/object-storage.md) - System design
+- [Swift Module](../reference/modules/swift.md) - Swift module documentation
+- [Architecture Overview](../architecture/index.md) - System design principles
 - [Performance Tuning](tuning.md) - General performance optimization
 - [Benchmarks](benchmarks.md) - System-wide performance data

@@ -9,8 +9,114 @@ The OSClient library provides a comprehensive Swift API for interacting with Ope
 - **Type-safe API** using Swift's strong type system
 - **Actor-based concurrency** for thread safety
 - **Intelligent caching** designed for up to 60-80% API call reduction
-- **Comprehensive error handling** with recovery strategies
+- **Comprehensive error handling** with configurable retry policies
 - **Cross-platform compatibility** (macOS and Linux)
+- **SSL verification control** for development environments
+
+### Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "OSClient Library"
+        Client[OpenStackClient]
+
+        subgraph "Service Clients"
+            Nova[NovaService<br/>Compute]
+            Neutron[NeutronService<br/>Networking]
+            Cinder[CinderService<br/>Block Storage]
+            Glance[GlanceService<br/>Images]
+            Keystone[KeystoneService<br/>Identity]
+            Barbican[BarbicanService<br/>Key Manager]
+            Swift[SwiftService<br/>Object Storage]
+            Magnum[MagnumService<br/>Containers]
+        end
+
+        subgraph "Support Layer"
+            Auth[Authentication]
+            Cache[Data Managers]
+            Retry[Retry Policy]
+            Log[Logger]
+        end
+    end
+
+    subgraph "OpenStack APIs"
+        API[REST APIs]
+    end
+
+    Client --> Nova
+    Client --> Neutron
+    Client --> Cinder
+    Client --> Glance
+    Client --> Keystone
+    Client --> Barbican
+    Client --> Swift
+    Client --> Magnum
+
+    Nova --> Auth
+    Neutron --> Auth
+    Cinder --> Auth
+    Glance --> Auth
+
+    Auth --> API
+    Cache --> API
+
+    style Client fill:#4a9eff,stroke:#333,color:#fff
+    style Nova fill:#ff6b6b,stroke:#333,color:#fff
+    style Neutron fill:#51cf66,stroke:#333,color:#fff
+    style Cinder fill:#ffd43b,stroke:#333,color:#000
+    style Glance fill:#be4bdb,stroke:#333,color:#fff
+```
+
+### Class Hierarchy
+
+```mermaid
+classDiagram
+    class OpenStackClient {
+        +nova: NovaService
+        +neutron: NeutronService
+        +cinder: CinderService
+        +glance: GlanceService
+        +keystone: KeystoneService
+        +barbican: BarbicanService
+        +swift: SwiftService
+        +magnum: MagnumService
+        +isAuthenticated: Bool
+        +connect()
+        +disconnect()
+    }
+
+    class OpenStackService {
+        <<protocol>>
+        +endpoint: URL
+        +authToken: String
+    }
+
+    class NovaService {
+        +listServers()
+        +getServer(id)
+        +createServer(request)
+        +deleteServer(id)
+    }
+
+    class NeutronService {
+        +listNetworks()
+        +listSubnets()
+        +listRouters()
+        +listFloatingIPs()
+    }
+
+    class DataManager {
+        <<protocol>>
+        +loadData()
+        +refreshData()
+        +invalidateCache()
+    }
+
+    OpenStackClient --> NovaService
+    OpenStackClient --> NeutronService
+    NovaService ..|> OpenStackService
+    NeutronService ..|> OpenStackService
+```
 
 ## OpenStackClient
 
@@ -25,9 +131,12 @@ public final class OpenStackClient: @unchecked Sendable {
     public static func connect(
         config: OpenStackConfig,
         credentials: OpenStackCredentials,
-        logger: OpenStackClientLogger = ConsoleLogger(),
+        logger: any OpenStackClientLogger = ConsoleLogger(),
         enablePerformanceEnhancements: Bool = true
     ) async throws -> OpenStackClient
+
+    /// Convenience initializer for logger-only initialization
+    public convenience init(logger: any OpenStackClientLogger)
 }
 ```
 
@@ -37,14 +146,17 @@ public final class OpenStackClient: @unchecked Sendable {
 import OSClient
 
 let config = OpenStackConfig(
-    authUrl: "https://keystone.example.com:5000/v3"
+    authURL: URL(string: "https://keystone.example.com:5000/v3")!,
+    region: "RegionOne",
+    verifySSL: true  // Set to false for self-signed certificates
 )
 
-let credentials = OpenStackCredentials(
+let credentials = OpenStackCredentials.password(
     username: "operator",
     password: "secret",
     projectName: "myproject",
-    domainName: "default"
+    userDomainName: "default",
+    projectDomainName: "default"
 )
 
 let client = try await OpenStackClient.connect(
@@ -53,49 +165,454 @@ let client = try await OpenStackClient.connect(
 )
 ```
 
-### Service Access
+### Connection Management
+
+#### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Client as OpenStackClient
+    participant Keystone as Keystone API
+    participant Service as Service API
+
+    App->>Client: connect(config, credentials)
+    Client->>Keystone: POST /v3/auth/tokens
+    Keystone-->>Client: Token + Service Catalog
+
+    Note over Client: Store token and endpoints
+
+    App->>Client: listServers()
+    Client->>Client: Check token validity
+
+    alt Token Valid
+        Client->>Service: GET /servers (with token)
+        Service-->>Client: Server list
+    else Token Expired
+        Client->>Keystone: POST /v3/auth/tokens
+        Keystone-->>Client: New token
+        Client->>Service: GET /servers (with new token)
+        Service-->>Client: Server list
+    end
+
+    Client-->>App: [Server]
+```
 
 ```swift
-// Service client properties
-public var nova: NovaService { get }
-public var neutron: NeutronService { get }
-public var cinder: CinderService { get }
-public var glance: GlanceService { get }
-public var keystone: KeystoneService { get }
-public var barbican: BarbicanService { get }
-public var swift: SwiftService { get }
+extension OpenStackClient {
+    /// Manually trigger connection/authentication
+    public func connect() async
+
+    /// Disconnect and clear authentication state
+    public func disconnect()
+
+    /// Clear authentication cache (forces re-authentication)
+    public func clearAuthCache() async
+}
+```
+
+### UI State Properties
+
+```swift
+extension OpenStackClient {
+    /// Whether the client is currently authenticated
+    public private(set) var isAuthenticated: Bool
+
+    /// Any authentication error that occurred
+    public private(set) var authenticationError: (any Error)?
+
+    /// Whether a connection attempt is in progress
+    public private(set) var isConnecting: Bool
+
+    /// Time until the current token expires
+    public private(set) var timeUntilTokenExpiration: TimeInterval?
+
+    /// Add an observer for state changes
+    public func addObserver(_ observer: @escaping () -> Void)
+}
+```
+
+### Service Access
+
+Service properties are async to support lazy initialization:
+
+```swift
+extension OpenStackClient {
+    /// Access to Nova (Compute) service
+    public var nova: NovaService { get async }
+
+    /// Access to Neutron (Network) service
+    public var neutron: NeutronService { get async }
+
+    /// Access to Cinder (Block Storage) service
+    public var cinder: CinderService { get async }
+
+    /// Access to Glance (Image) service
+    public var glance: GlanceService { get async }
+
+    /// Access to Keystone (Identity) service
+    public var keystone: KeystoneService { get async }
+
+    /// Access to Barbican (Key Management) service
+    public var barbican: BarbicanService { get async }
+
+    /// Access to Swift (Object Storage) service
+    public var swift: SwiftService { get async }
+
+    /// Access to Magnum (Container Infrastructure) service
+    public var magnum: MagnumService { get async }
+}
+```
+
+**Example**:
+
+```swift
+// Access a service (async)
+let nova = await client.nova
+let servers = try await nova.listServers()
+
+// Or use convenience methods directly on client
+let servers = try await client.listServers()
+```
+
+### Data Manager Access
+
+Data managers provide caching and incremental loading for frequently accessed resources:
+
+#### Data Manager Caching Flow
+
+```mermaid
+flowchart TD
+    Request[Data Request] --> CacheCheck{Cache Valid?}
+
+    CacheCheck --> |Yes| CacheHit[Return Cached Data]
+    CacheCheck --> |No| FetchAPI[Fetch from API]
+
+    FetchAPI --> Store[Store in Cache]
+    Store --> Return[Return Fresh Data]
+
+    subgraph "Cache Invalidation"
+        Timer[TTL Timer] --> Invalidate[Invalidate Cache]
+        Modify[Create/Update/Delete] --> Invalidate
+        Force[forceRefresh=true] --> Invalidate
+    end
+
+    Invalidate --> CacheCheck
+
+    style CacheHit fill:#51cf66,stroke:#333,color:#fff
+    style FetchAPI fill:#4a9eff,stroke:#333,color:#fff
+```
+
+```swift
+extension OpenStackClient {
+    /// Access to the data manager factory
+    public var dataManagerFactory: ServiceDataManagerFactory { get async }
+
+    /// Access to server data manager with caching
+    public var serverDataManager: ServerDataManager { get async }
+
+    /// Access to network data manager with caching
+    public var networkDataManager: NetworkDataManager { get async }
+
+    /// Access to volume data manager with caching
+    public var volumeDataManager: VolumeDataManager { get async }
+
+    /// Access to image data manager with caching
+    public var imageDataManager: ImageDataManager { get async }
+}
+```
+
+### Configuration Properties
+
+```swift
+extension OpenStackClient {
+    /// The configured region for this client
+    public var region: String { get async }
+
+    /// The configured project domain name
+    public var projectDomainName: String { get async }
+
+    /// The project name (from credentials or token)
+    public var projectName: String? { get async }
+
+    /// The project ID (if available from token)
+    public var projectID: String? { get async }
+
+    /// The project identifier (name or ID)
+    public var project: String { get async }
+}
 ```
 
 ### Configuration
 
 ```swift
-public struct OpenStackConfig {
-    public let authUrl: String
-    public let interface: String = "public"
-    public let validateCertificates: Bool = true
-    public let timeout: TimeInterval = 30
-    public let retryCount: Int = 3
-}
+/// OpenStack configuration containing connection settings
+public struct OpenStackConfig: Sendable {
+    /// The authentication URL for the OpenStack Identity (Keystone) service
+    public let authURL: URL
 
-public struct OpenStackCredentials {
-    public let username: String?
-    public let password: String?
-    public let projectName: String?
-    public let domainName: String?
-    public let applicationCredentialId: String?
-    public let applicationCredentialSecret: String?
-    public let token: String?
+    /// The region name ("auto-detect" for automatic detection)
+    public let region: String
+
+    /// The interface type ("public", "internal", "admin")
+    public let interface: String
+
+    /// The domain name for user authentication
+    public let userDomainName: String
+
+    /// The domain name for project scope
+    public let projectDomainName: String
+
+    /// The timeout interval for API requests in seconds
+    public let timeout: TimeInterval
+
+    /// The retry policy for failed API requests
+    public let retryPolicy: RetryPolicy
+
+    /// Whether to verify SSL/TLS certificates
+    /// Set to false for self-signed certificates (development only)
+    public let verifySSL: Bool
+
+    public init(
+        authURL: URL,
+        region: String = "auto-detect",
+        userDomainName: String = "default",
+        projectDomainName: String = "default",
+        timeout: TimeInterval = 30.0,
+        retryPolicy: RetryPolicy = RetryPolicy(),
+        verifySSL: Bool = true,
+        interface: String = "public"
+    )
+}
+```
+
+### Credentials
+
+#### Authentication Methods
+
+```mermaid
+graph TB
+    subgraph "Password Authentication"
+        PW[Password Credentials]
+        PW --> User[Username]
+        PW --> Pass[Password]
+        PW --> Project[Project Name/ID]
+        PW --> Domain[Domain Name/ID]
+
+        User --> KeystoneP[Keystone Auth]
+        Pass --> KeystoneP
+        Project --> KeystoneP
+        Domain --> KeystoneP
+    end
+
+    subgraph "Application Credential Authentication"
+        AC[App Credential]
+        AC --> AppID[Credential ID]
+        AC --> Secret[Secret]
+
+        AppID --> KeystoneA[Keystone Auth]
+        Secret --> KeystoneA
+    end
+
+    KeystoneP --> Token[Auth Token]
+    KeystoneA --> Token
+
+    style PW fill:#4a9eff,stroke:#333,color:#fff
+    style AC fill:#51cf66,stroke:#333,color:#fff
+    style Token fill:#ffd43b,stroke:#333,color:#000
+```
+
+```swift
+/// OpenStack authentication credentials
+public enum OpenStackCredentials: Sendable {
+    /// Username/password authentication
+    case password(
+        username: String,
+        password: String,
+        projectName: String?,
+        projectID: String? = nil,
+        userDomainName: String? = nil,
+        userDomainID: String? = nil,
+        projectDomainName: String? = nil,
+        projectDomainID: String? = nil
+    )
+
+    /// Application credential authentication
+    case applicationCredential(
+        id: String,
+        secret: String,
+        projectName: String?,
+        projectID: String? = nil
+    )
+}
+```
+
+**Example**:
+
+```swift
+// Password authentication
+let passwordCreds = OpenStackCredentials.password(
+    username: "admin",
+    password: "secret",
+    projectName: "admin",
+    userDomainName: "default",
+    projectDomainName: "default"
+)
+
+// Application credential authentication
+let appCreds = OpenStackCredentials.applicationCredential(
+    id: "app-cred-id",
+    secret: "app-cred-secret",
+    projectName: nil  // Project is encoded in the app credential
+)
+```
+
+### Retry Policy
+
+#### Retry Flow with Exponential Backoff
+
+```mermaid
+flowchart TD
+    Request[API Request] --> Execute[Execute Request]
+    Execute --> Response{Response Status}
+
+    Response --> |2xx Success| Success[Return Result]
+    Response --> |4xx Client Error| ClientError{Retryable?}
+    Response --> |5xx Server Error| ServerError{Retryable?}
+    Response --> |Network Error| NetworkError{Retryable?}
+
+    ClientError --> |429 Rate Limit| Retry
+    ClientError --> |Other 4xx| Fail[Return Error]
+
+    ServerError --> |500, 502, 503, 504| Retry
+    ServerError --> |Other 5xx| Fail
+
+    NetworkError --> |Timeout| Retry
+    NetworkError --> |Other| Fail
+
+    Retry{Attempts < Max?} --> |Yes| Backoff[Wait: baseDelay * 2^attempt]
+    Retry --> |No| Fail
+
+    Backoff --> Execute
+
+    style Success fill:#51cf66,stroke:#333,color:#fff
+    style Fail fill:#ff6b6b,stroke:#333,color:#fff
+    style Backoff fill:#ffd43b,stroke:#333,color:#000
+```
+
+```swift
+/// Configuration for automatic request retries
+public struct RetryPolicy: Sendable {
+    /// Maximum number of retry attempts
+    public let maxAttempts: Int
+
+    /// Base delay between retries (exponential backoff)
+    public let baseDelay: TimeInterval
+
+    /// Maximum delay cap for retries
+    public let maxDelay: TimeInterval
+
+    /// HTTP status codes that trigger a retry
+    public let retryStatusCodes: Set<Int>
+
+    public init(
+        maxAttempts: Int = 3,
+        baseDelay: TimeInterval = 1.0,
+        maxDelay: TimeInterval = 60.0,
+        retryStatusCodes: Set<Int> = [429, 500, 502, 503, 504]
+    )
 }
 ```
 
 ## Service Clients
 
+### Service Relationships
+
+```mermaid
+graph LR
+    subgraph "Compute"
+        Nova[NovaService]
+        Servers[Servers]
+        Flavors[Flavors]
+        KeyPairs[KeyPairs]
+        ServerGroups[ServerGroups]
+        Hypervisors[Hypervisors]
+    end
+
+    subgraph "Networking"
+        Neutron[NeutronService]
+        Networks[Networks]
+        Subnets[Subnets]
+        Routers[Routers]
+        Ports[Ports]
+        FloatingIPs[FloatingIPs]
+        SecurityGroups[SecurityGroups]
+    end
+
+    subgraph "Storage"
+        Cinder[CinderService]
+        Volumes[Volumes]
+        Snapshots[Snapshots]
+        Backups[Backups]
+
+        SwiftSvc[SwiftService]
+        Containers[Containers]
+        Objects[Objects]
+    end
+
+    subgraph "Other Services"
+        Glance[GlanceService]
+        Images[Images]
+
+        Keystone[KeystoneService]
+        Projects[Projects]
+        Users[Users]
+
+        Barbican[BarbicanService]
+        Secrets[Secrets]
+
+        Magnum[MagnumService]
+        Clusters[Clusters]
+    end
+
+    Nova --> Servers
+    Nova --> Flavors
+    Nova --> KeyPairs
+    Nova --> ServerGroups
+    Nova --> Hypervisors
+
+    Neutron --> Networks
+    Neutron --> Subnets
+    Neutron --> Routers
+    Neutron --> Ports
+    Neutron --> FloatingIPs
+    Neutron --> SecurityGroups
+
+    Cinder --> Volumes
+    Cinder --> Snapshots
+    Cinder --> Backups
+
+    SwiftSvc --> Containers
+    SwiftSvc --> Objects
+
+    Glance --> Images
+    Keystone --> Projects
+    Keystone --> Users
+    Barbican --> Secrets
+    Magnum --> Clusters
+
+    style Nova fill:#ff6b6b,stroke:#333,color:#fff
+    style Neutron fill:#51cf66,stroke:#333,color:#fff
+    style Cinder fill:#ffd43b,stroke:#333,color:#000
+    style Glance fill:#be4bdb,stroke:#333,color:#fff
+```
+
 ### NovaService (Compute)
 
-Compute service for managing servers, flavors, and keypairs.
+Compute service for managing servers, flavors, keypairs, server groups, and hypervisors.
 
 ```swift
-public actor NovaService {
+public actor NovaService: OpenStackService {
     // Server operations
     /// List servers with optional pagination
     public func listServers(
@@ -142,6 +659,13 @@ public actor NovaService {
         type: String = "novnc"
     ) async throws -> RemoteConsole
 
+    /// Create server snapshot
+    public func createServerSnapshot(
+        serverId: String,
+        name: String,
+        metadata: [String: String]? = nil
+    ) async throws -> String
+
     // Flavor operations
     /// List available flavors
     public func listFlavors(
@@ -185,15 +709,32 @@ public actor NovaService {
 
     /// Delete a server group
     public func deleteServerGroup(id: String) async throws
+
+    // Hypervisor operations (admin only)
+    /// List hypervisors
+    public func listHypervisors(
+        forceRefresh: Bool = false
+    ) async throws -> [Hypervisor]
+
+    /// Get hypervisor details
+    public func getHypervisor(
+        id: String,
+        forceRefresh: Bool = false
+    ) async throws -> Hypervisor
+
+    /// List servers on a hypervisor
+    public func listHypervisorServers(
+        hypervisorId: String
+    ) async throws -> [HypervisorServer]
 }
 ```
 
 ### NeutronService (Networking)
 
-Networking service for managing networks, subnets, routers, and security groups.
+Networking service for managing networks, subnets, routers, ports, security groups, and floating IPs.
 
 ```swift
-public actor NeutronService {
+public actor NeutronService: OpenStackService {
     // Network operations
     /// List networks
     public func listNetworks(
@@ -377,10 +918,10 @@ public actor NeutronService {
 
 ### CinderService (Block Storage)
 
-Block storage service for managing volumes and snapshots.
+Block storage service for managing volumes, snapshots, and backups.
 
 ```swift
-public actor CinderService {
+public actor CinderService: OpenStackService {
     // Volume operations
     /// List volumes
     public func listVolumes(
@@ -427,14 +968,6 @@ public actor CinderService {
     /// Get volume type details
     public func getVolumeType(id: String) async throws -> VolumeType
 
-    /// Create volume type
-    public func createVolumeType(
-        request: CreateVolumeTypeRequest
-    ) async throws -> VolumeType
-
-    /// Delete volume type
-    public func deleteVolumeType(id: String) async throws
-
     // Snapshot operations
     /// List volume snapshots
     public func listSnapshots(
@@ -448,12 +981,6 @@ public actor CinderService {
     /// Create snapshot
     public func createSnapshot(
         request: CreateSnapshotRequest
-    ) async throws -> VolumeSnapshot
-
-    /// Update snapshot
-    public func updateSnapshot(
-        id: String,
-        request: UpdateSnapshotRequest
     ) async throws -> VolumeSnapshot
 
     /// Delete snapshot
@@ -490,7 +1017,7 @@ public actor CinderService {
 Image service for managing virtual machine images.
 
 ```swift
-public actor GlanceService {
+public actor GlanceService: OpenStackService {
     // Image operations
     /// List images
     public func listImages(
@@ -500,7 +1027,7 @@ public actor GlanceService {
     /// Get image details
     public func getImage(id: String) async throws -> Image
 
-    /// Create image
+    /// Create image (metadata only)
     public func createImage(
         request: CreateImageRequest
     ) async throws -> Image
@@ -534,27 +1061,15 @@ public actor GlanceService {
         id: String,
         tag: String
     ) async throws
-
-    /// Set image visibility
-    public func setImageVisibility(
-        id: String,
-        visibility: String
-    ) async throws -> Image
-
-    /// Set image protection
-    public func setImageProtection(
-        id: String,
-        protected: Bool
-    ) async throws -> Image
 }
 ```
 
 ### KeystoneService (Identity)
 
-Identity service for managing projects, users, roles, and authentication.
+Identity service for managing projects, users, roles, and domains.
 
 ```swift
-public actor KeystoneService {
+public actor KeystoneService: OpenStackService {
     // Project operations
     /// List projects
     public func listProjects(
@@ -602,25 +1117,11 @@ public actor KeystoneService {
     /// Delete user
     public func deleteUser(id: String) async throws
 
-    /// Change user password
-    public func changeUserPassword(
-        id: String,
-        request: ChangePasswordRequest
-    ) async throws
-
     // Role operations
     /// List roles
     public func listRoles(
         options: PaginationOptions = PaginationOptions()
     ) async throws -> [Role]
-
-    /// Get role details
-    public func getRole(id: String) async throws -> Role
-
-    /// Create role
-    public func createRole(
-        request: CreateRoleRequest
-    ) async throws -> Role
 
     /// Grant role to user on project
     public func grantRoleToUserOnProject(
@@ -644,11 +1145,6 @@ public actor KeystoneService {
 
     /// Get domain details
     public func getDomain(id: String) async throws -> Domain
-
-    /// Create domain
-    public func createDomain(
-        request: CreateDomainRequest
-    ) async throws -> Domain
 }
 ```
 
@@ -657,7 +1153,7 @@ public actor KeystoneService {
 Key management service for secrets, certificates, and encryption keys.
 
 ```swift
-public actor BarbicanService {
+public actor BarbicanService: OpenStackService {
     // Secret operations
     /// List secrets
     public func listSecrets(
@@ -704,27 +1200,6 @@ public actor BarbicanService {
 
     /// Delete container
     public func deleteContainer(id: String) async throws
-
-    // Certificate operations
-    /// List certificate authorities
-    public func listCertificateAuthorities(
-        options: PaginationOptions = PaginationOptions()
-    ) async throws -> [CertificateAuthority]
-
-    /// Get certificate authority details
-    public func getCertificateAuthority(
-        id: String
-    ) async throws -> CertificateAuthority
-
-    /// List certificate orders
-    public func listCertificateOrders(
-        options: PaginationOptions = PaginationOptions()
-    ) async throws -> [CertificateOrder]
-
-    /// Create certificate order
-    public func createCertificateOrder(
-        request: CreateCertificateOrderRequest
-    ) async throws -> CertificateOrderRef
 }
 ```
 
@@ -733,7 +1208,7 @@ public actor BarbicanService {
 Object storage service for managing containers and objects.
 
 ```swift
-public actor SwiftService {
+public actor SwiftService: OpenStackService {
     // Container operations
     /// List containers
     public func listContainers(
@@ -795,13 +1270,6 @@ public actor SwiftService {
         request: CopySwiftObjectRequest
     ) async throws
 
-    /// Update object metadata
-    public func updateObjectMetadata(
-        containerName: String,
-        objectName: String,
-        request: UpdateSwiftObjectMetadataRequest
-    ) async throws
-
     /// Delete object
     public func deleteObject(
         containerName: String,
@@ -814,16 +1282,56 @@ public actor SwiftService {
         request: BulkDeleteRequest
     ) async throws -> BulkDeleteResponse
 
-    /// Bulk upload objects
-    public func bulkUpload(
-        containerName: String,
-        objects: [(name: String, data: Data, contentType: String?)],
-        progressCallback: ((Int, Int) -> Void)? = nil
-    ) async throws -> BulkUploadResult
-
     // Account operations
     /// Get account information
     public func getAccountInfo() async throws -> SwiftAccountInfo
+}
+```
+
+### MagnumService (Container Infrastructure)
+
+Container infrastructure service for managing Kubernetes and other COE clusters.
+
+```swift
+public actor MagnumService: OpenStackService {
+    // Cluster operations
+    /// List all clusters
+    public func listClusters() async throws -> [Cluster]
+
+    /// Get cluster details
+    public func getCluster(id: String) async throws -> Cluster
+
+    /// Create a new cluster
+    public func createCluster(
+        request: ClusterCreateRequest
+    ) async throws -> Cluster
+
+    /// Delete a cluster
+    public func deleteCluster(id: String) async throws
+
+    /// Resize a cluster (change node count)
+    public func resizeCluster(
+        id: String,
+        nodeCount: Int
+    ) async throws
+
+    /// Get kubeconfig for a cluster
+    public func getKubeconfig(id: String) async throws -> String
+
+    // Cluster template operations
+    /// List all cluster templates
+    public func listClusterTemplates() async throws -> [ClusterTemplate]
+
+    /// Get cluster template details
+    public func getClusterTemplate(id: String) async throws -> ClusterTemplate
+
+    /// Create a cluster template
+    public func createClusterTemplate(
+        request: ClusterTemplateCreateRequest
+    ) async throws -> ClusterTemplate
+
+    /// Delete a cluster template
+    public func deleteClusterTemplate(id: String) async throws
 }
 ```
 
@@ -832,170 +1340,201 @@ public actor SwiftService {
 ### Server Model
 
 ```swift
-public struct Server: Codable, Identifiable {
+public struct Server: Codable, Sendable, ResourceIdentifiable, Timestamped {
     public let id: String
-    public let name: String
-    public let status: ServerStatus
-    public let flavor: FlavorRef
-    public let image: ImageRef?
-    public let addresses: [String: [Address]]
-    public let created: Date
-    public let updated: Date
-    public let metadata: [String: String]
-    public let securityGroups: [SecurityGroupRef]
-    public let volumesAttached: [String]
-
-    public enum ServerStatus: String, Codable {
-        case active = "ACTIVE"
-        case building = "BUILD"
-        case deleted = "DELETED"
-        case error = "ERROR"
-        case hardReboot = "HARD_REBOOT"
-        case password = "PASSWORD"
-        case paused = "PAUSED"
-        case reboot = "REBOOT"
-        case rebuild = "REBUILD"
-        case rescue = "RESCUE"
-        case resize = "RESIZE"
-        case revertResize = "REVERT_RESIZE"
-        case shutoff = "SHUTOFF"
-        case softDeleted = "SOFT_DELETED"
-        case stopped = "STOPPED"
-        case suspended = "SUSPENDED"
-        case unknown = "UNKNOWN"
-        case verifyResize = "VERIFY_RESIZE"
-    }
+    public let name: String?
+    public let status: String?
+    public let taskState: String?
+    public let vmState: String?
+    public let powerState: Int?
+    public let flavor: Flavor?
+    public let image: ServerImage?
+    public let addresses: [String: [ServerAddress]]?
+    public let created: Date?
+    public let updated: Date?
+    public let metadata: [String: String]?
+    public let securityGroups: [ServerSecurityGroup]?
+    public let volumesAttached: [ServerVolumeAttachment]?
+    public let keyName: String?
+    public let availabilityZone: String?
+    public let hostId: String?
+    public let tenantId: String?
+    public let userId: String?
 }
 ```
 
 ### Network Model
 
 ```swift
-public struct Network: Codable, Identifiable {
+public struct Network: Codable, Sendable, ResourceIdentifiable, Timestamped {
     public let id: String
-    public let name: String
-    public let status: String
-    public let shared: Bool
-    public let external: Bool
-    public let subnets: [String]
-    public let adminStateUp: Bool
+    public let name: String?
+    public let status: String?
+    public let shared: Bool?
+    public let external: Bool?
+    public let subnets: [String]?
+    public let adminStateUp: Bool?
     public let mtu: Int?
-    public let portSecurityEnabled: Bool
+    public let portSecurityEnabled: Bool?
     public let providerNetworkType: String?
     public let providerSegmentationId: Int?
+    public let createdAt: Date?
+    public let updatedAt: Date?
 }
 ```
 
 ### Volume Model
 
 ```swift
-public struct Volume: Codable, Identifiable {
+public struct Volume: Codable, Sendable, ResourceIdentifiable, Timestamped {
     public let id: String
     public let name: String?
-    public let status: VolumeStatus
-    public let size: Int
-    public let volumeType: String
-    public let bootable: Bool
-    public let encrypted: Bool
-    public let attachments: [VolumeAttachment]
-    public let createdAt: Date
+    public let description: String?
+    public let status: String?
+    public let size: Int?
+    public let volumeType: String?
+    public let bootable: String?
+    public let encrypted: Bool?
+    public let multiattach: Bool?
+    public let attachments: [VolumeAttachment]?
+    public let availabilityZone: String?
+    public let snapshotId: String?
+    public let sourceVolid: String?
+    public let createdAt: Date?
+    public let updatedAt: Date?
+}
+```
+
+### Cluster Model (Magnum)
+
+```swift
+public struct Cluster: Codable, Sendable, ResourceIdentifiable, Timestamped {
+    public let uuid: String
+    public let name: String?
+    public let status: String?
+    public let statusReason: String?
+    public let clusterTemplateId: String
+    public let keypair: String?
+    public let masterCount: Int?
+    public let nodeCount: Int?
+    public let masterAddresses: [String]?
+    public let nodeAddresses: [String]?
+    public let apiAddress: String?
+    public let coeVersion: String?
+    public let floatingIpEnabled: Bool?
+    public let masterLbEnabled: Bool?
+    public let labels: [String: String]?
+    public let createdAt: Date?
     public let updatedAt: Date?
 
-    public enum VolumeStatus: String, Codable {
-        case creating = "creating"
-        case available = "available"
-        case attaching = "attaching"
-        case inUse = "in-use"
-        case deleting = "deleting"
-        case error = "error"
-        case errorDeleting = "error_deleting"
-        case maintenance = "maintenance"
-    }
+    // ResourceIdentifiable conformance
+    public var id: String { uuid }
 }
 ```
 
-## Cache Management
-
-### CacheManager
+### ClusterTemplate Model (Magnum)
 
 ```swift
-public actor CacheManager {
-    /// Configure cache settings
-    public func configure(
-        maxSize: Int,
-        defaultTTL: TimeInterval,
-        resourceTTLs: [ResourceType: TimeInterval] = [:]
-    )
+public struct ClusterTemplate: Codable, Sendable, ResourceIdentifiable {
+    public let uuid: String
+    public let name: String?
+    public let coe: String?
+    public let imageId: String?
+    public let keypairId: String?
+    public let externalNetworkId: String?
+    public let fixedNetwork: String?
+    public let fixedSubnet: String?
+    public let flavorId: String?
+    public let masterFlavorId: String?
+    public let volumeDriver: String?
+    public let dockerVolumeSize: Int?
+    public let networkDriver: String?
+    public let dnsNameserver: String?
+    public let floatingIpEnabled: Bool?
+    public let masterLbEnabled: Bool?
+    public let labels: [String: String]?
 
-    /// Get cache statistics
-    public func statistics() -> CacheStatistics
-
-    /// Clear cache
-    public func clear(type: ResourceType? = nil)
-
-    /// Warm cache with frequently used data
-    public func warm(resources: [ResourceType])
-}
-
-public struct CacheStatistics {
-    public let hitRate: Double
-    public let missRate: Double
-    public let evictionCount: Int
-    public let currentSize: Int
-    public let maxSize: Int
+    // ResourceIdentifiable conformance
+    public var id: String { uuid }
 }
 ```
 
-**Example**:
+### Hypervisor Model
 
 ```swift
-// Configure cache for your environment
-await client.cacheManager.configure(
-    maxSize: 100_000_000,  // 100MB
-    defaultTTL: 300,       // 5 minutes
-    resourceTTLs: [
-        .servers: 60,      // 1 minute for servers
-        .networks: 300,    // 5 minutes for networks
-        .images: 3600      // 1 hour for images
-    ]
-)
-
-// Get cache statistics
-let stats = await client.cacheManager.statistics()
-print("Cache hit rate: \(stats.hitRate * 100)%")
+public struct Hypervisor: Codable, Sendable, ResourceIdentifiable {
+    public let id: String
+    public let hypervisorHostname: String?
+    public let hypervisorType: String?
+    public let hypervisorVersion: Int?
+    public let hostIp: String?
+    public let state: String?
+    public let status: String?
+    public let vcpus: Int?
+    public let vcpusUsed: Int?
+    public let memoryMb: Int?
+    public let memoryMbUsed: Int?
+    public let localGb: Int?
+    public let localGbUsed: Int?
+    public let runningVms: Int?
+    public let currentWorkload: Int?
+    public let freeDiskGb: Int?
+    public let freeRamMb: Int?
+}
 ```
 
 ## Error Handling
 
-### Error Types
+### Error Classification
 
-```swift
-public enum OpenStackError: Error {
-    case authentication(String)
-    case authorization(String)
-    case notFound(resource: String, id: String)
-    case conflict(String)
-    case quotaExceeded(String)
-    case serverError(String)
-    case timeout(operation: String)
-    case networkError(Error)
-    case invalidResponse(String)
-    case rateLimited(retryAfter: TimeInterval?)
-}
+```mermaid
+flowchart TD
+    Error[API Error] --> Type{Error Type}
+
+    Type --> |401| Auth[authenticationFailed]
+    Type --> |403| Unauth[unauthorized]
+    Type --> |404| NotFound[notFound]
+    Type --> |409| Conflict[conflict]
+    Type --> |413| Quota[quotaExceeded]
+    Type --> |5xx| Server[serverError]
+    Type --> |Network| Network[networkError]
+    Type --> |Timeout| Timeout[timeout]
+    Type --> |503| Unavail[serviceUnavailable]
+    Type --> |Parse Error| Invalid[invalidResponse]
+    Type --> |Other| Unknown[unknown]
+
+    subgraph "Recoverable"
+        Auth
+        Quota
+        Timeout
+        Unavail
+    end
+
+    subgraph "Non-Recoverable"
+        NotFound
+        Conflict
+        Invalid
+    end
+
+    style Auth fill:#ffd43b,stroke:#333,color:#000
+    style NotFound fill:#ff6b6b,stroke:#333,color:#fff
+    style Conflict fill:#ff6b6b,stroke:#333,color:#fff
 ```
 
-### Error Recovery
-
 ```swift
-public protocol ErrorRecoveryStrategy {
-    func shouldRetry(error: Error, attempt: Int) -> Bool
-    func delayForRetry(attempt: Int) -> TimeInterval
-}
-
-public struct ExponentialBackoffStrategy: ErrorRecoveryStrategy {
-    public let maxAttempts: Int
-    public let baseDelay: TimeInterval
-    public let maxDelay: TimeInterval
+public enum OpenStackError: Error, Sendable {
+    case authenticationFailed
+    case unauthorized
+    case notFound(String)
+    case conflict(String)
+    case serverError(String)
+    case networkError(String)
+    case configurationError(String)
+    case invalidResponse(String)
+    case quotaExceeded(String)
+    case serviceUnavailable(String)
+    case timeout
+    case unknown(String)
 }
 ```
 
@@ -1003,242 +1542,118 @@ public struct ExponentialBackoffStrategy: ErrorRecoveryStrategy {
 
 ```swift
 do {
-    let server = try await client.nova.servers.create(...)
-} catch OpenStackError.quotaExceeded(let message) {
-    // Handle quota error
-    print("Quota exceeded: \(message)")
-} catch OpenStackError.conflict(let message) {
-    // Handle conflict
-    print("Conflict: \(message)")
+    let server = try await client.getServer(id: "nonexistent")
+} catch OpenStackError.notFound(let message) {
+    print("Server not found: \(message)")
+} catch OpenStackError.authenticationFailed {
+    print("Need to re-authenticate")
 } catch {
-    // Handle other errors
-    print("Error: \(error)")
-}
-```
-
-## Data Managers
-
-### ServerDataManager
-
-High-level server operations with related resource management.
-
-```swift
-public actor ServerDataManager {
-    /// Get detailed server information with related resources
-    public func getDetailed(_ id: String) async throws -> DetailedServer
-
-    /// Batch operations
-    public func batchDelete(_ ids: [String]) async throws -> BatchResult
-    public func batchStop(_ ids: [String]) async throws -> BatchResult
-    public func batchStart(_ ids: [String]) async throws -> BatchResult
-
-    /// Advanced queries
-    public func search(
-        name: String? = nil,
-        status: ServerStatus? = nil,
-        flavor: String? = nil,
-        network: String? = nil
-    ) async throws -> [Server]
-}
-```
-
-### NetworkDataManager
-
-High-level network operations with topology analysis.
-
-```swift
-public actor NetworkDataManager {
-    /// Get network topology
-    public func getTopology() async throws -> NetworkTopology
-
-    /// Find connected resources
-    public func getConnectedServers(_ networkId: String) async throws -> [Server]
-    public func getConnectedRouters(_ networkId: String) async throws -> [Router]
-
-    /// Network path analysis
-    public func findPath(from: String, to: String) async throws -> [NetworkHop]
-}
-```
-
-## Performance Monitoring
-
-### PerformanceMonitor
-
-```swift
-public actor PerformanceMonitor {
-    /// Start monitoring
-    public func start()
-
-    /// Get metrics
-    public func metrics() -> PerformanceMetrics
-
-    /// Export metrics
-    public func export(format: ExportFormat) -> Data
-}
-
-public struct PerformanceMetrics {
-    public let apiCallCount: Int
-    public let averageLatency: TimeInterval
-    public let p95Latency: TimeInterval
-    public let p99Latency: TimeInterval
-    public let cacheHitRate: Double
-    public let errorRate: Double
+    print("Unexpected error: \(error)")
 }
 ```
 
 ## Logging
 
-### Logger Protocol
-
 ```swift
-public protocol OpenStackClientLogger {
-    func logDebug(_ message: String)
-    func logInfo(_ message: String)
-    func logWarning(_ message: String)
-    func logError(_ message: String, error: Error?)
+/// Protocol for custom logging implementations
+public protocol OpenStackClientLogger: Sendable {
+    func logError(_ message: String, context: [String: any Sendable])
+    func logInfo(_ message: String, context: [String: any Sendable])
+    func logDebug(_ message: String, context: [String: any Sendable])
+    func logAPICall(_ method: String, url: String, statusCode: Int?, duration: TimeInterval?)
 }
 
-// Built-in loggers
-public struct ConsoleLogger: OpenStackClientLogger { }
-public struct FileLogger: OpenStackClientLogger { }
-public struct NullLogger: OpenStackClientLogger { }
-```
-
-## Extensions
-
-### Async Sequences
-
-```swift
-extension ServerManager {
-    /// Stream server events
-    public func events(_ serverId: String) -> AsyncStream<ServerEvent>
-
-    /// Watch for state changes
-    public func watchStatus(
-        _ serverId: String,
-        until status: ServerStatus,
-        timeout: TimeInterval = 300
-    ) async throws
+/// Default console logger implementation
+public struct ConsoleLogger: OpenStackClientLogger {
+    public init()
 }
 ```
 
-**Example**:
+**Custom Logger Example**:
 
 ```swift
-// Watch for server to become active
-try await client.nova.servers.watchStatus(
-    serverId,
-    until: .active,
-    timeout: 600  // 10 minutes
-)
-```
+struct MyLogger: OpenStackClientLogger {
+    func logError(_ message: String, context: [String: any Sendable]) {
+        // Log to your logging system
+    }
 
-### Batch Operations
+    func logInfo(_ message: String, context: [String: any Sendable]) {
+        // Log informational messages
+    }
 
-```swift
-public protocol BatchOperation {
-    associatedtype Resource
-    associatedtype Result
+    func logDebug(_ message: String, context: [String: any Sendable]) {
+        // Log debug messages
+    }
 
-    func execute(
-        on resources: [Resource],
-        concurrency: Int
-    ) async throws -> [Result]
+    func logAPICall(_ method: String, url: String, statusCode: Int?, duration: TimeInterval?) {
+        // Log API calls for monitoring
+    }
 }
-```
-
-## Migration Guide
-
-### From Python OpenStack SDK
-
-**Python**:
-
-```python
-from openstack import connection
-conn = connection.Connection(
-    auth_url="https://keystone.example.com:5000/v3",
-    username="user",
-    password="pass",
-    project_name="project"
-)
-servers = conn.compute.servers()
-```
-
-**Swift**:
-
-```swift
-import OSClient
 
 let client = try await OpenStackClient.connect(
-    config: OpenStackConfig(authUrl: "https://keystone.example.com:5000/v3"),
-    credentials: OpenStackCredentials(
-        username: "user",
-        password: "pass",
-        projectName: "project"
-    )
+    config: config,
+    credentials: credentials,
+    logger: MyLogger()
 )
-let response = try await client.nova.listServers()
-let servers = response.servers
 ```
 
 ## Best Practices
 
-### 1. Use Async/Await
+### 1. Use Convenience Methods When Possible
 
 ```swift
-// Good: Using async/await
-let response = try await client.nova.listServers()
+// Convenience method on client
+let servers = try await client.listServers()
 
-// Avoid: Blocking calls
-// Not supported - all operations are async
+// Equivalent service access (more verbose)
+let nova = await client.nova
+let response = try await nova.listServers()
+let servers = response.servers
 ```
 
-### 2. Handle Errors Properly
+### 2. Handle Authentication Expiration
 
 ```swift
-do {
-    let server = try await client.nova.createServer(request: createRequest)
-} catch OpenStackError.quotaExceeded(let message) {
-    // Handle quota error
-} catch OpenStackError.conflict(let message) {
-    // Handle conflict
-} catch {
-    // Handle other errors
+// The client automatically refreshes tokens
+// But you can monitor expiration if needed
+if let expiration = client.timeUntilTokenExpiration, expiration < 60 {
+    // Token expires soon, might want to warn user
 }
 ```
 
-### 3. Leverage Intelligent Caching
+### 3. Use Force Refresh Sparingly
 
 ```swift
-// First call fetches from API
-let servers1 = try await client.nova.listServers()
+// Default: Uses cache when available
+let servers = try await client.listServers()
 
-// Subsequent calls use cache (within TTL)
-let servers2 = try await client.nova.listServers()
-
-// Force refresh when needed
-let servers3 = try await client.nova.listServers(forceRefresh: true)
+// Force API call (ignores cache)
+let freshServers = try await client.listServers(forceRefresh: true)
 ```
 
-### 4. Use Request Objects for Complex Operations
+### 4. Configure SSL for Development
 
 ```swift
-// Create server with detailed configuration
-let createRequest = CreateServerRequest(
-    name: "my-server",
-    imageRef: imageId,
-    flavorRef: flavorId,
-    networks: [NetworkRequest(uuid: networkId)],
-    keyName: "my-keypair"
+// For self-signed certificates in development
+let config = OpenStackConfig(
+    authURL: URL(string: "https://dev-keystone:5000/v3")!,
+    verifySSL: false  // WARNING: Only for development
 )
+```
 
-let server = try await client.nova.createServer(request: createRequest)
+### 5. Use Data Managers for UI Applications
+
+```swift
+// Data managers provide caching and incremental loading
+let serverManager = await client.serverDataManager
+let servers = try await serverManager.loadServers()
 ```
 
 ---
 
 **See Also**:
 
-- [SwiftNCurses Framework API](swiftncurses.md) - Terminal UI framework
-- [Integration Guide](integration.md) - CrossPlatformTimer and integration examples
+- [SwiftNCurses API](SwiftNCurses.md) - Terminal UI framework
+- [MemoryKit API](memorykit.md) - Memory and cache management
+- [Integration Guide](integration.md) - Integration examples
 - [API Reference Index](index.md) - Quick reference and navigation

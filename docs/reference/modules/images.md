@@ -323,8 +323,3 @@ ActionProviderRegistry.shared.registerCustomAction(
 | **Load Order** | 10 |
 | **Memory Usage** | ~5-10 MB |
 | **CPU Impact** | Low |
-
----
-
-*Last Updated: 2025-11-23*
-*Documentation Version: 1.0.0*

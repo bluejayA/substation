@@ -116,7 +116,25 @@ auth:
   application_credential_secret: secret123
 ```
 
+### Authentication Timeouts
+
+If you're seeing "Authentication failed" errors, timeouts during login, or token expiration errors, the cause is usually Keystone service being slow or down, network latency, token TTL being too short, or simply invalid credentials.
+
+Test Keystone directly to isolate the problem:
+
+```bash
+openstack token issue
+curl -I https://keystone.example.com:5000/v3
+tail -f ~/substation.log | grep -i auth
+```
+
+If Keystone itself is the problem, check the service health on the controller node with `systemctl status apache2` (or `httpd` depending on your distribution) and review logs with `journalctl -u apache2 -f`.
+
+Authentication tokens are cached for 1 hour by default. If tokens seem stale, use `:cache-purge<Enter>` (or `:cc<Enter>`) to clear the cache and force re-authentication. Verify the token TTL in your Keystone configuration matches what Substation expects.
+
 ## Performance: When Everything Feels Slow
+
+For background on Substation's performance architecture, see the [Performance Overview](../performance/index.md).
 
 ### The Reality Check
 
@@ -165,6 +183,130 @@ Memory leaks are rare, but if you see memory growing continuously without stabil
 ### First-Time Loads Are Expected to Be Slow
 
 The first time you view any resource type, the cache is empty. A cache miss is expected. The API call is required and will be slow. Subsequent views are fast thanks to cache hits. This is completely normal behavior and not something to fix.
+
+### High Memory Usage: When Things Get Bloated
+
+If Substation is consuming more than 500MB of memory, your system feels sluggish, or you're getting warnings about memory pressure, something needs attention. The usual culprits are cache sizes too large for your environment, too many resources being cached, or in rare cases actual memory leaks.
+
+Check current memory usage with `ps aux | grep substation` or press `h` for the health dashboard to see memory utilization metrics.
+
+For immediate relief, purge the caches using `:cache-purge<Enter>` (or the shortcut `:cc<Enter>`). This clears all cached data immediately and memory usage should drop. The tradeoff is that your next operations will be slower while the cache rebuilds.
+
+If you need a more sustainable fix, consider reducing cache TTLs. Shorter TTLs mean data expires faster and uses less memory. For environments with serious memory constraints, you can adjust the cache eviction threshold to start clearing data at 75% memory usage instead of 85%.
+
+Keep your memory expectations realistic. The target is under 200MB for steady state operation. With 10,000 resources, expect under 300MB. If you're consistently using 500MB or more, something is wrong and worth investigating.
+
+### Low Cache Hit Rates: Hitting the API Too Often
+
+Your cache hit rate shows up on the health dashboard when you press `h`. Target 80% or higher in stable environments. In chaotic production environments with auto-scaling, 60% is acceptable. Below 60% is concerning and worth investigating.
+
+Low hit rates usually mean TTLs are too short (cache expires before you need the data again), resources are changing very frequently, cache eviction is happening too often due to memory pressure, or there's a bug with cache keys (report this if suspected).
+
+If your environment is relatively stable, increase TTLs to reduce API calls and improve hit rates. The tradeoff is staler data and slower visibility of new resources. If memory pressure is causing evictions, use `:cache-purge<Enter>` to clear stale data, consider increasing the eviction threshold, or add more RAM.
+
+Some environments are just chaotic by nature. Production with auto-scaling means high churn, and lower hit rates are expected. Accept 60% in these situations rather than chasing an unrealistic target.
+
+### Poor Search Performance: Finding Things Slowly
+
+When searches consistently take more than 2 seconds, results appear slowly, or some services timeout giving you partial results, the problem is almost always OpenStack API performance, not Substation.
+
+Enable wiretap mode and watch the logs to see which services are slow:
+
+```bash
+substation --cloud mycloud --wiretap
+tail -f ~/substation.log | grep -i search
+```
+
+Test individual services to isolate the problem:
+
+```bash
+openstack server list --limit 1    # Test Nova
+openstack network list --limit 1   # Test Neutron
+openstack token issue              # Test Keystone auth
+```
+
+Improve your search patterns by using more specific queries. Searching for "prod-web-01" is faster than searching for just "prod" because there are fewer matches to process. Filter by specific services if you know which one you need. Accept partial results when timeouts occur.
+
+Substation times out searches at 5 seconds intentionally. If OpenStack cannot respond in 5 seconds, something is wrong on the server side. Better to show partial results than wait forever. When a service times out, check that service's health directly, review the OpenStack logs for that service, and treat it as a canary indicating something is wrong with your OpenStack deployment.
+
+### UI Rendering Issues: Sluggish Interface
+
+If the UI feels sluggish or janky, frame rates drop below 30 FPS, or screen updates are delayed, you're dealing with rendering performance issues. These are distinct from terminal corruption problems covered in the Display Issues section below.
+
+Common causes include terminal emulator performance limitations, SSH connection latency, too many screen updates from auto-refresh, and general rendering overhead.
+
+Press `h` for the health dashboard and check the Rendering FPS metric. Target 60 FPS. 30+ FPS is acceptable. Below 30 FPS is poor and needs attention.
+
+Reduce auto-refresh frequency using `:auto-refresh<Enter>` or `:toggle-refresh<Enter>` to toggle it off entirely. Increase the interval from 5 seconds to 10 or 30 seconds if you still want automatic updates. Use manual refresh with `r` when you specifically need current data.
+
+Try a different terminal emulator if yours is slow. Check SSH connection latency if you're working remotely. Consider tmux or screen for session persistence which can also help with rendering performance.
+
+Reduce the volume of data being displayed by filtering lists to show fewer items, using pagination, and limiting detail view depth.
+
+### Slow API Response Times: The OpenStack Reality
+
+When operations take more than 5 seconds and the UI feels frozen, start by understanding that 90% of the time the OpenStack API itself is slow, 8% of the time network latency between you and OpenStack is the culprit, and only about 2% of the time is it actually a Substation bug.
+
+Enable wiretap mode to see all API calls with `substation --cloud mycloud --wiretap` and check the logs for API call duration (should be under 2 seconds), retry attempts (exponential backoff in action), 500 errors (OpenStack having a bad day), and timeouts (OpenStack having a really bad day).
+
+If it is the OpenStack API (usually the case), check service health:
+
+```bash
+openstack endpoint list
+openstack server list --all-projects --limit 1  # Test response time
+```
+
+On OpenStack controller nodes, check database connections with `mysql -e "SHOW PROCESSLIST;" | wc -l` to see the connection count. Check load on API nodes with `top` for CPU usage and `iostat` for disk I/O. Consider scaling your control plane by adding more API workers, more database read replicas, or optimizing database queries.
+
+If network latency is the problem, measure it with `ping your-openstack-api.com` and check the network path with `traceroute your-openstack-api.com`. Consider running Substation closer to OpenStack in the same datacenter or network segment. Use VPN or direct connect instead of traversing the public internet.
+
+The hard truth is that OpenStack APIs are slow. This is a known issue discussed at years of summits with countless patches, and they're still slow. Database queries are expensive especially with 50K servers. Keystone auth adds overhead to every request. Neutron network queries involve complex joins. Nova compute queries hit multiple tables.
+
+Substation caches aggressively targeting 60-80% API reduction, parallelizes where possible, uses HTTP/2 connection pooling, and implements exponential backoff retry. But if the API takes 5 seconds to respond, we cannot make it 1 second. The bottleneck is OpenStack, not Substation.
+
+### Performance Monitoring Checklist
+
+**Daily Checks**
+
+Press `h` for the health dashboard. Verify cache hit rate exceeds 60%. Confirm memory usage stays under 300MB. Check for API timeouts. Review search performance.
+
+**Weekly Reviews**
+
+Run a full benchmark suite with `substation benchmark`. Compare with baseline metrics. Review performance trends. Check for regressions. Update documentation if configurations changed.
+
+**Monthly Maintenance**
+
+Review TTL configurations to ensure they match your environment's needs. Optimize cache sizes based on actual usage patterns. Clean up old benchmark data. Update performance baselines. Plan optimization work for the next cycle.
+
+For more details on performance tuning, see the [Performance Tuning Guide](../performance/tuning.md). For benchmark methodology and metrics, see [Performance Benchmarks](../performance/benchmarks.md). The [MemoryKit API Reference](../reference/api/memorykit.md) provides a deep dive into the caching subsystem.
+
+### Quick Diagnosis Flowchart
+
+When facing performance issues, work through this decision tree:
+
+```
+Performance Issue
+    |
+    |- Memory High?
+    |   |- Yes -> Press 'c' to purge cache -> Reduce TTLs -> Increase eviction threshold
+    |   +- No -> Continue
+    |
+    |- API Slow?
+    |   |- Yes -> Check OpenStack health -> Check network -> Enable wiretap
+    |   +- No -> Continue
+    |
+    |- Cache Hit Rate Low?
+    |   |- Yes -> Increase TTLs -> Reduce eviction -> Check for high churn
+    |   +- No -> Continue
+    |
+    |- Search Slow?
+    |   |- Yes -> Check service health -> Use specific queries -> Check cache
+    |   +- No -> Continue
+    |
+    +- UI Sluggish?
+        |- Yes -> Reduce auto-refresh -> Check terminal -> Reduce data volume
+        +- No -> Report issue (might be a bug)
+```
 
 ## Display Issues: Terminal Problems
 

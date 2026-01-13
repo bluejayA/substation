@@ -422,8 +422,3 @@ cat ~/.substation/logs/hypervisors.log
 | **CPU Impact** | Low |
 | **Refresh Interval** | 60 seconds |
 | **Admin Required** | Yes |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.0.0*

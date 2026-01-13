@@ -330,6 +330,101 @@ Substation emphasizes **command-based navigation** as the primary method for all
 
 (See "Create Server Snapshot" above)
 
+## Container Infrastructure (Magnum)
+
+### List Kubernetes Clusters
+
+1. Navigate to clusters: `:clusters<Enter>`
+2. View all Magnum clusters
+3. Press `Space` for cluster details
+4. See status, nodes, API endpoint
+
+**Command Aliases:**
+
+- `:clusters` = `:cluster` = `:magnum` = `:k8s`
+
+### Create Kubernetes Cluster
+
+1. Navigate to clusters: `:clusters<Enter>`
+2. Create cluster: `:create<Enter>`
+3. Fill in cluster form:
+   - **Name**: Cluster name
+   - **Template**: Select cluster template
+   - **Node Count**: Number of worker nodes
+   - **Master Count**: Number of master nodes (HA)
+   - **Keypair**: SSH key for nodes
+4. Press `Enter` to create
+5. Monitor status (cluster takes several minutes to build)
+
+### Resize Cluster
+
+1. Navigate to clusters: `:clusters<Enter>`
+2. Select cluster to resize
+3. Use keyboard shortcut or action menu to resize
+4. Enter new node count
+5. Confirm resize operation
+6. Monitor node scaling
+
+### View Cluster Templates
+
+1. Navigate to templates: `:clustertemplates<Enter>`
+2. View available templates
+3. Press `Space` for template details
+4. See COE type, image, network configuration
+
+**Command Aliases:**
+
+- `:clustertemplates` = `:templates` = `:ct`
+
+### Create Cluster Template
+
+1. Navigate to templates: `:clustertemplates<Enter>`
+2. Create template: `:create<Enter>`
+3. Configure template:
+   - **Name**: Template name
+   - **COE**: kubernetes, swarm, mesos
+   - **Image**: Base image for nodes
+   - **Network Driver**: flannel, calico, etc.
+   - **External Network**: External network for load balancers
+   - **Keypair**: Default SSH key
+   - **Flavor**: Default node flavor
+   - **Master Flavor**: Master node flavor
+4. Press `Enter` to create
+
+## Hypervisor Management
+
+### List Hypervisors
+
+1. Navigate to hypervisors: `:hypervisors<Enter>`
+2. View all compute hosts
+3. See CPU, memory, disk utilization
+4. Press `Space` for detailed stats
+
+**Command Aliases:**
+
+- `:hypervisors` = `:hyper` = `:hv`
+
+### Monitor Hypervisor Resources
+
+1. Navigate to hypervisors: `:hypervisors<Enter>`
+2. Select hypervisor
+3. Press `Space` for details:
+   - Total/Used/Free CPUs
+   - Total/Used/Free RAM
+   - Total/Used/Free disk
+   - Running VMs count
+   - Hypervisor type and version
+4. Use `/` to filter by hostname
+
+### Find Server Location
+
+1. Navigate to servers: `:servers<Enter>`
+2. Select server
+3. Press `Space` for server details
+4. Note the `Host` field (hypervisor name)
+5. Navigate to hypervisors: `:hypervisors<Enter>`
+6. Find matching hypervisor for capacity planning
+
 ## Search Operations
 
 ### Local Search (Fast)
@@ -427,7 +522,7 @@ Esc                  Clear search filter
 
 **Stale Data:**
 
-1. Cache purge: `:cache-purge<Enter>` (or `:clear-cache<Enter>`)
+1. Cache purge: `:clear-cache<Enter>` (or `:cc<Enter>`)
 2. Refresh view: `:refresh<Enter>` (or `:reload<Enter>`)
 3. Fresh data loaded from API
 
@@ -455,6 +550,7 @@ Substation supports multi-select for bulk operations:
 
 - Servers, Volumes, Networks, Subnets, Routers, Ports
 - Floating IPs, Security Groups, Server Groups, Key Pairs, Images
+- Clusters (Magnum), Cluster Templates, Hypervisors, Swift Containers/Objects
 
 ### Monitor Build Progress
 
@@ -522,7 +618,7 @@ Substation supports multi-select for bulk operations:
 ### Data Freshness
 
 1. Refresh: `:refresh<Enter>` (uses cache if valid)
-2. Cache purge: `:cache-purge<Enter>` (force fresh data from API)
+2. Cache purge: `:clear-cache<Enter>` (force fresh data from API)
 3. Auto-refresh: Press `a` to toggle intervals (5s, 10s, 30s, 60s, off)
 4. Health check: `:health<Enter>` to see cache hit rate
 

@@ -387,8 +387,3 @@ await tui.client.createSecret(newSecret)
 | **Load Order** | 90 |
 | **Memory Usage** | ~5 MB typical |
 | **CPU Impact** | Minimal |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1.0*

@@ -337,8 +337,3 @@ Uses central cache manager for floating IP storage with automatic refresh on dat
 | **Category** | Network |
 | **Deletion Priority** | Medium |
 | **Load Order** | Phase 2 (network-dependent) |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1.0*

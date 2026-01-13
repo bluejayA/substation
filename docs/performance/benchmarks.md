@@ -431,7 +431,6 @@ let performanceData = await PerformanceMonitor.shared.exportMetrics()
 - Investigate immediately
 - Check for regressions
 - Review recent changes
-- See [Troubleshooting Guide](troubleshooting.md)
 
 ## Benchmark Best Practices
 
@@ -467,8 +466,8 @@ let performanceData = await PerformanceMonitor.shared.exportMetrics()
 
 **See Also**:
 
-- [Performance Overview](overview.md) - Architecture and key components
+- [Performance Overview](index.md) - Architecture and key components
 - [Performance Tuning](tuning.md) - Optimization strategies
-- [Troubleshooting](troubleshooting.md) - Performance issue diagnosis
+- [MemoryKit API Reference](../reference/api/memorykit.md) - Multi-level caching architecture details
 
 **Note**: All benchmark targets represent design goals based on architecture and testing with 10K+ resources. Actual performance will vary based on your specific OpenStack deployment, network conditions, and system resources. Use the built-in performance monitor to measure actual performance in your environment.

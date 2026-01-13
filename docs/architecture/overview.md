@@ -577,12 +577,13 @@ This dependency structure ensures packages remain reusable - OSClient, SwiftNCur
 
 For more detailed information about specific aspects of the architecture:
 
-- **[Module System](../architecture/modular-ecosystem.md)** - Deep dive into the module architecture
-- **[Components](./components.md)** - Detailed component architecture (UI layer, services, FormBuilder)
-- **[Technology Stack](./technology-stack.md)** - Core technologies and dependencies
+- **[Module System](../reference/framework/module-system.md)** - Module architecture and protocols
+- **[SwiftNCurses API](../reference/api/SwiftNCurses.md)** - Terminal UI framework API
+- **[OSClient API](../reference/api/osclient.md)** - OpenStack client library API
+- **[MemoryKit API](../reference/api/memorykit.md)** - Multi-level caching system API
+- **[Security](../reference/framework/security.md)** - Security implementation details
 - **[Performance](../performance/index.md)** - Performance architecture and benchmarking
-- **[Security](../concepts/security.md)** - Security implementation details
-- **[Caching](../concepts/caching.md)** - Multi-level caching architecture with MemoryKit
+- **[FormBuilder Guide](../reference/developers/formbuilder-guide.md)** - Building forms with FormBuilder
 
 ---
 

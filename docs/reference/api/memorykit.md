@@ -12,6 +12,7 @@ MemoryKit is a high-performance, thread-safe memory management and caching frame
 - **Memory Pressure Management**: Automatic cleanup and resource optimization
 - **Type-Safe APIs**: Generic implementations with full type safety
 - **Cross-Platform Support**: Works on macOS and Linux
+- **Flexible Logging**: Configurable logging with console and file output support
 
 ## Installation and Integration
 
@@ -61,27 +62,167 @@ MemoryKit is structured as a modular system with the following components:
 1. **MemoryKit** - Main orchestrator providing unified access
 2. **MemoryManager** - Core memory management with automatic cleanup
 3. **CacheManager** - Generic cache with eviction policies
-4. **MultiLevelCacheManager** - Three-tier cache hierarchy
-5. **PerformanceMonitor** - Real-time monitoring and alerting
-6. **ResourcePool** - Pool for expensive object reuse
+4. **TypedCacheManager** - Type-safe cache manager for specific data types
+5. **MultiLevelCacheManager** - Three-tier cache hierarchy
+6. **PerformanceMonitor** - Real-time monitoring and alerting
+7. **ResourcePool** - Pool for expensive object reuse
+8. **ComprehensiveCacheMetrics** - Cross-cache metrics collection
+
+### Component Architecture
+
+```mermaid
+graph TB
+    subgraph "MemoryKit Framework"
+        MK[MemoryKit<br/>Main Orchestrator]
+
+        subgraph "Cache Managers"
+            MM[MemoryManager]
+            CM[CacheManager]
+            TCM[TypedCacheManager]
+            MLCM[MultiLevelCacheManager]
+        end
+
+        subgraph "Support Components"
+            RP[ResourcePool]
+            PM[PerformanceMonitor]
+            CCM[ComprehensiveCacheMetrics]
+            LOG[MemoryKitLogger]
+        end
+    end
+
+    MK --> MM
+    MK --> PM
+    MK --> CM
+    MK --> TCM
+    MK --> MLCM
+    MK --> RP
+
+    PM --> CCM
+    MM --> LOG
+    CM --> LOG
+    MLCM --> LOG
+
+    style MK fill:#4a9eff,stroke:#333,color:#fff
+    style MM fill:#51cf66,stroke:#333,color:#fff
+    style MLCM fill:#ff6b6b,stroke:#333,color:#fff
+    style PM fill:#ffd43b,stroke:#333,color:#000
+```
+
+### Class Hierarchy
+
+```mermaid
+classDiagram
+    class MemoryKit {
+        +memoryManager: MemoryManager
+        +performanceMonitor: PerformanceMonitor
+        +getHealthReport() SystemHealthReport
+        +forceCleanup()
+        +createTypedCacheManager()
+        +createResourcePool()
+        +createMultiLevelCacheManager()
+    }
+
+    class MemoryManager {
+        +shared: MemoryManager
+        +store(data, forKey)
+        +retrieve(forKey, as) T?
+        +clearKey(key)
+        +clearAll()
+        +getMetrics() MemoryMetrics
+        +getCacheStats() CacheStats
+        +forceCleanup()
+    }
+
+    class CacheManager~Key,Value~ {
+        +set(value, forKey, ttl)
+        +get(key) Value?
+        +remove(key)
+        +removeAll()
+        +getMetrics() CacheMetrics
+    }
+
+    class MultiLevelCacheManager~Key,Value~ {
+        +store(value, forKey, priority, ttl)
+        +retrieve(forKey, as) Value?
+        +remove(forKey)
+        +clearAll()
+        +getStatistics() MultiLevelCacheStatistics
+    }
+
+    class PerformanceMonitor {
+        +collectMetrics() UnifiedMetrics
+        +getActiveAlerts() PerformanceAlert[]
+        +clearAlert(alert)
+        +registerComponents(memoryManager)
+    }
+
+    class ResourcePool~Resource~ {
+        +acquire() Resource
+        +release(resource)
+        +getStats() PoolStats
+        +cleanupIdleResources()
+    }
+
+    MemoryKit --> MemoryManager
+    MemoryKit --> PerformanceMonitor
+    MemoryKit ..> CacheManager : creates
+    MemoryKit ..> MultiLevelCacheManager : creates
+    MemoryKit ..> ResourcePool : creates
+```
 
 ### Cache Hierarchy
 
+```mermaid
+graph TB
+    subgraph "Multi-Level Cache Architecture"
+        direction TB
+
+        L1[L1 Cache - Memory<br/>Fast - Small - Frequently Used<br/>20MB Default]
+        L2[L2 Cache - Compressed<br/>Medium Speed - Compressed Data<br/>50MB Default]
+        L3[L3 Cache - Disk<br/>Slow - Large - Persistent<br/>50K Entries Default]
+
+        L1 <--> |Promote/Demote| L2
+        L2 <--> |Promote/Demote| L3
+    end
+
+    REQ[Cache Request] --> L1
+    L1 --> |Miss| L2
+    L2 --> |Miss| L3
+    L3 --> |Miss| SRC[Data Source]
+
+    style L1 fill:#51cf66,stroke:#333,color:#fff
+    style L2 fill:#ffd43b,stroke:#333,color:#000
+    style L3 fill:#ff6b6b,stroke:#333,color:#fff
 ```
-+-------------------------------------+
-|         L1 Cache (Memory)           |
-|    Fast, Small, Frequently Used     |
-+-------------------------------------+
-                 v^
-+-------------------------------------+
-|      L2 Cache (Compressed)          |
-|    Medium Speed, Compressed Data    |
-+-------------------------------------+
-                 v^
-+-------------------------------------+
-|         L3 Cache (Disk)             |
-|    Slow, Large, Persistent          |
-+-------------------------------------+
+
+### Cache Lookup Flow
+
+```mermaid
+flowchart TD
+    Start[Cache Request] --> L1Check{L1 Hit?}
+    L1Check --> |Yes| L1Hit[Return from L1<br/>Update Access Stats]
+    L1Check --> |No| L2Check{L2 Hit?}
+
+    L2Check --> |Yes| L2Hit[Decompress Data]
+    L2Hit --> Promote1{Access Count >= 3?}
+    Promote1 --> |Yes| PromoteL1[Promote to L1]
+    Promote1 --> |No| ReturnL2[Return Data]
+    PromoteL1 --> ReturnL2
+
+    L2Check --> |No| L3Check{L3 Hit?}
+    L3Check --> |Yes| L3Hit[Load from Disk]
+    L3Hit --> Promote2{Access Count >= 2?}
+    Promote2 --> |Yes| PromoteL2[Promote to L2]
+    Promote2 --> |No| ReturnL3[Return Data]
+    PromoteL2 --> ReturnL3
+
+    L3Check --> |No| Miss[Cache Miss<br/>Fetch from Source]
+
+    L1Hit --> Done[Done]
+    ReturnL2 --> Done
+    ReturnL3 --> Done
+    Miss --> Store[Store in Cache]
+    Store --> Done
 ```
 
 ## API Reference
@@ -112,6 +253,13 @@ public struct Configuration: Sendable {
 }
 ```
 
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `memoryManager` | `MemoryManager` | Advanced memory manager with cache and resource management |
+| `performanceMonitor` | `PerformanceMonitor` | Performance monitor for real-time metrics and alerting |
+
 #### Methods
 
 | Method | Description | Parameters | Returns |
@@ -121,6 +269,31 @@ public struct Configuration: Sendable {
 | `createTypedCacheManager<K,V>()` | Create a specialized cache manager | `keyType`, `valueType`, `configuration` | `CacheManager<K,V>` |
 | `createResourcePool<R>()` | Create a resource pool | `resourceType`, `configuration`, `factory`, `cleanup`, `validator` | `ResourcePool<R>` |
 | `createMultiLevelCacheManager<K,V>()` | Create multi-level cache | `keyType`, `valueType`, `configuration`, `logger` | `MultiLevelCacheManager<K,V>` |
+
+#### System Health Types
+
+```swift
+public struct SystemHealthReport: Sendable {
+    public let timestamp: Date
+    public let memoryStats: CacheStats
+    public let performanceMetrics: PerformanceMonitor.UnifiedMetrics
+    public let activeAlerts: [PerformanceMonitor.PerformanceAlert]
+    public let overallHealth: SystemHealth
+
+    public var summary: String
+}
+
+public enum SystemHealth: String, Sendable {
+    case excellent = "Excellent"
+    case good = "Good"
+    case fair = "Fair"
+    case poor = "Poor"
+    case critical = "Critical"
+
+    public var description: String
+    public var color: String
+}
+```
 
 ### MemoryManager
 
@@ -137,12 +310,22 @@ let manager = MemoryManager.shared
 ```swift
 public struct Configuration: Sendable {
     public let maxCacheSize: Int              // Maximum number of entries
-    public let maxMemoryBudget: Int          // Maximum memory in bytes
+    public let maxMemoryBudget: Int           // Maximum memory in bytes
     public let cleanupInterval: TimeInterval  // Automatic cleanup interval
     public let pressureThreshold: Double      // Memory pressure threshold (0.0-1.0)
-    public let enableMetrics: Bool           // Enable metrics collection
-    public let enableLeakDetection: Bool     // Enable leak detection
-    public let logger: any MemoryKitLogger   // Logger instance
+    public let enableMetrics: Bool            // Enable metrics collection
+    public let enableLeakDetection: Bool      // Enable leak detection
+    public let logger: any MemoryKitLogger    // Logger instance
+
+    public init(
+        maxCacheSize: Int = 1000,
+        maxMemoryBudget: Int = 100 * 1024 * 1024, // 100MB
+        cleanupInterval: TimeInterval = 600.0,    // 10 minutes
+        pressureThreshold: Double = 0.8,
+        enableMetrics: Bool = true,
+        enableLeakDetection: Bool = true,
+        logger: any MemoryKitLogger = MemoryKitLoggerFactory.defaultLogger()
+    )
 }
 ```
 
@@ -160,6 +343,38 @@ public struct Configuration: Sendable {
 | `isUnderMemoryPressure()` | Check memory pressure | None | `Bool` |
 | `start()` | Start background tasks | None | `Void` |
 
+#### Memory Metrics
+
+```swift
+public struct MemoryMetrics: Sendable {
+    public private(set) var cacheHits: Int
+    public private(set) var cacheMisses: Int
+    public private(set) var cacheEvictions: Int
+    public private(set) var bytesWritten: Int
+    public private(set) var bytesRead: Int
+    public private(set) var cleanupOperations: Int
+    public private(set) var aggressiveCleanups: Int
+    public private(set) var lastCleanupTime: Date?
+
+    public var hitRate: Double
+    public var efficiency: Double
+}
+```
+
+#### Cache Statistics
+
+```swift
+public struct CacheStats: Sendable {
+    public let entryCount: Int
+    public let totalSize: Int
+    public let hitRate: Double
+    public let averageAge: TimeInterval
+    public let memoryPressure: Double
+
+    public var description: String
+}
+```
+
 ### CacheManager<Key, Value>
 
 Generic cache manager with intelligent eviction policies.
@@ -169,12 +384,22 @@ Generic cache manager with intelligent eviction policies.
 ```swift
 public struct Configuration: Sendable {
     public let maxSize: Int                    // Maximum entries
-    public let maxMemoryUsage: Int            // Maximum memory bytes
-    public let defaultTTL: TimeInterval       // Default time-to-live
-    public let enableTTL: Bool               // Enable TTL tracking
-    public let evictionPolicy: EvictionPolicy // Eviction strategy
-    public let compressionEnabled: Bool      // Enable compression
-    public let enableMetrics: Bool          // Enable metrics
+    public let maxMemoryUsage: Int             // Maximum memory bytes
+    public let defaultTTL: TimeInterval        // Default time-to-live
+    public let enableTTL: Bool                 // Enable TTL tracking
+    public let evictionPolicy: EvictionPolicy  // Eviction strategy
+    public let compressionEnabled: Bool        // Enable compression
+    public let enableMetrics: Bool             // Enable metrics
+
+    public init(
+        maxSize: Int = 1000,
+        maxMemoryUsage: Int = 50 * 1024 * 1024, // 50MB
+        defaultTTL: TimeInterval = 300,
+        enableTTL: Bool = true,
+        evictionPolicy: EvictionPolicy = .lru,
+        compressionEnabled: Bool = true,
+        enableMetrics: Bool = true
+    )
 }
 ```
 
@@ -191,6 +416,33 @@ public enum EvictionPolicy: Sendable {
 }
 ```
 
+#### Eviction Policy Comparison
+
+```mermaid
+graph LR
+    subgraph "LRU - Least Recently Used"
+        LRU1[Entry A - 5s ago] --> LRU2[Entry B - 10s ago]
+        LRU2 --> LRU3[Entry C - 30s ago]
+        LRU3 -.-> |Evict| LRUOUT[Remove C]
+    end
+
+    subgraph "LFU - Least Frequently Used"
+        LFU1[Entry A - 10 hits] --> LFU2[Entry B - 5 hits]
+        LFU2 --> LFU3[Entry C - 2 hits]
+        LFU3 -.-> |Evict| LFUOUT[Remove C]
+    end
+
+    subgraph "FIFO - First In First Out"
+        FIFO1[Entry C - oldest] --> FIFO2[Entry B]
+        FIFO2 --> FIFO3[Entry A - newest]
+        FIFO1 -.-> |Evict| FIFOOUT[Remove C]
+    end
+
+    style LRUOUT fill:#ff6b6b,stroke:#333,color:#fff
+    style LFUOUT fill:#ff6b6b,stroke:#333,color:#fff
+    style FIFOOUT fill:#ff6b6b,stroke:#333,color:#fff
+```
+
 #### Methods
 
 | Method | Description | Parameters | Returns |
@@ -204,7 +456,83 @@ public enum EvictionPolicy: Sendable {
 | `getMetrics()` | Get cache metrics | None | `CacheMetrics` |
 | `evictToSize(_ targetSize: Int)` | Force eviction | `targetSize` | `Void` |
 | `contains(_ key: Key)` | Check key existence | `key` | `Bool` |
+| `getAllKeys()` | Get all keys | None | `[Key]` |
 | `start()` | Start cleanup tasks | None | `Void` |
+
+#### Cache Metrics
+
+```swift
+public struct CacheMetrics: Sendable {
+    public private(set) var hits: Int
+    public private(set) var misses: Int
+    public private(set) var writes: Int
+    public private(set) var evictions: Int
+    public private(set) var expirations: Int
+    public private(set) var bytesStored: Int
+    public private(set) var bytesEvicted: Int
+
+    public var hitRate: Double
+    public var evictionRate: Double
+}
+```
+
+### TypedCacheManager<Key, Value>
+
+A type-safe cache manager that provides specialized caching for specific types.
+
+#### Configuration
+
+```swift
+public struct Configuration: Sendable {
+    public let maxSize: Int
+    public let ttl: TimeInterval
+    public let evictionPolicy: EvictionPolicy
+    public let enableStatistics: Bool
+
+    public init(
+        maxSize: Int = 1000,
+        ttl: TimeInterval = 300.0,
+        evictionPolicy: EvictionPolicy = .leastRecentlyUsed,
+        enableStatistics: Bool = true
+    )
+}
+
+public enum EvictionPolicy: Sendable {
+    case leastRecentlyUsed
+    case leastFrequentlyUsed
+    case timeToLive
+    case fifo
+}
+```
+
+#### Methods
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `store(_ value: Value, forKey: Key)` | Store a value | `value`, `key` | `Void` |
+| `retrieve(forKey: Key)` | Retrieve a value | `key` | `Value?` |
+| `remove(forKey: Key)` | Remove a specific key | `key` | `Void` |
+| `clear()` | Clear all cached values | None | `Void` |
+| `getStatistics()` | Get cache statistics | None | `CacheStatistics` |
+
+#### Cache Statistics
+
+```swift
+public struct CacheStatistics: Sendable {
+    public var hits: Int
+    public var misses: Int
+    public var writes: Int
+    public var evictions: Int
+    public var expiries: Int
+    public var cleanups: Int
+    public var currentSize: Int
+    public var maxSize: Int
+
+    public var hitRate: Double
+    public var hitCount: Int
+    public var accessCount: Int
+}
+```
 
 ### MultiLevelCacheManager<Key, Value>
 
@@ -223,6 +551,18 @@ public struct Configuration: Sendable {
     public let defaultTTL: TimeInterval // Default TTL
     public let enableCompression: Bool  // Enable compression
     public let enableMetrics: Bool      // Enable metrics
+
+    public init(
+        l1MaxSize: Int = 1000,
+        l1MaxMemory: Int = 20 * 1024 * 1024,   // 20 MB for L1
+        l2MaxSize: Int = 5000,
+        l2MaxMemory: Int = 50 * 1024 * 1024,   // 50 MB for L2
+        l3MaxSize: Int = 50000,                 // 50k entries on disk
+        l3CacheDirectory: URL? = nil,
+        defaultTTL: TimeInterval = 300.0,       // 5 minutes
+        enableCompression: Bool = true,
+        enableMetrics: Bool = true
+    )
 }
 ```
 
@@ -234,6 +574,9 @@ public enum CachePriority: Int, CaseIterable, Sendable {
     case high = 3      // Active servers, current projects
     case normal = 2    // General resources
     case low = 1       // Historical data, rarely accessed
+
+    public var weight: Double
+    public var ttlMultiplier: Double
 }
 ```
 
@@ -248,9 +591,95 @@ public enum CachePriority: Int, CaseIterable, Sendable {
 | `getStatistics()` | Get comprehensive stats | None | `MultiLevelCacheStatistics` |
 | `start()` | Start maintenance tasks | None | `Void` |
 
+#### Multi-Level Cache Statistics
+
+```swift
+public struct MultiLevelCacheStatistics: Sendable {
+    public let l1Stats: CacheTierStatistics
+    public let l2Stats: CacheTierStatistics
+    public let l3Stats: CacheTierStatistics
+    public let overallHitRate: Double
+    public let totalMisses: Int
+    public let compressionStats: CompressionStats
+
+    public var description: String
+}
+
+public struct CacheTierStatistics: Sendable {
+    public let entries: Int
+    public let maxEntries: Int
+    public let memoryUsage: Int
+    public let maxMemory: Int
+    public let hitCount: Int
+    public let hitRate: Double
+}
+
+public struct CompressionStats: Sendable {
+    public var totalCompressions: Int
+    public var totalOriginalBytes: Int
+    public var totalCompressedBytes: Int
+    public var averageCompressionTime: TimeInterval
+    public var averageDecompressionTime: TimeInterval
+
+    public var averageCompressionRatio: Double
+}
+```
+
+#### Error Types
+
+```swift
+public enum MultiLevelCacheError: Error, LocalizedError {
+    case compressionFailed
+    case decompressionFailed
+
+    public var errorDescription: String?
+    public var failureReason: String?
+    public var recoverySuggestion: String?
+}
+```
+
 ### ResourcePool<Resource>
 
 Thread-safe pool for expensive-to-create objects.
+
+#### Resource Pool Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Available: Pre-created
+    Available --> InUse: acquire()
+    InUse --> Available: release() + valid
+    InUse --> Discarded: release() + invalid
+    Available --> Discarded: Idle Timeout
+    Available --> Discarded: Pool Full
+    Discarded --> [*]
+
+    note right of Available: Resources ready for use
+    note right of InUse: Resource checked out
+    note right of Discarded: Resource cleaned up
+```
+
+#### Acquire/Release Flow
+
+```mermaid
+flowchart TD
+    Acquire[acquire called] --> CheckPool{Pool has available?}
+    CheckPool --> |Yes| Validate{Validate resource}
+    Validate --> |Valid| Return[Return resource]
+    Validate --> |Invalid| Discard1[Discard resource]
+    Discard1 --> CheckPool
+
+    CheckPool --> |No| CheckMax{Below max size?}
+    CheckMax --> |Yes| Create[Create new resource]
+    Create --> Return
+    CheckMax --> |No| Wait[Wait or throw]
+
+    Release[release called] --> CheckFull{Pool full?}
+    CheckFull --> |No| ValidateR{Validate resource}
+    ValidateR --> |Valid| ReturnToPool[Return to pool]
+    ValidateR --> |Invalid| Cleanup[Cleanup resource]
+    CheckFull --> |Yes| Cleanup
+```
 
 #### Configuration
 
@@ -260,7 +689,25 @@ public struct Configuration: Sendable {
     public let minPoolSize: Int           // Minimum pool size
     public let idleTimeout: TimeInterval  // Idle resource timeout
     public let enableMetrics: Bool        // Enable metrics
+
+    public init(
+        maxPoolSize: Int = 10,
+        minPoolSize: Int = 2,
+        idleTimeout: TimeInterval = 300,
+        enableMetrics: Bool = true
+    )
 }
+```
+
+#### Initialization
+
+```swift
+public init(
+    configuration: Configuration = Configuration(),
+    factory: @escaping @Sendable () async throws -> Resource,
+    cleanup: @escaping @Sendable (Resource) async -> Void = { _ in },
+    validator: @escaping @Sendable (Resource) async -> Bool = { _ in true }
+)
 ```
 
 #### Methods
@@ -273,9 +720,102 @@ public struct Configuration: Sendable {
 | `cleanupIdleResources()` | Cleanup idle resources | None | `Void` |
 | `start()` | Start cleanup tasks | None | `Void` |
 
+#### Pool Statistics
+
+```swift
+public struct PoolMetrics: Sendable {
+    public private(set) var acquisitionsFromPool: Int
+    public private(set) var acquisitionsCreated: Int
+    public private(set) var releasesToPool: Int
+    public private(set) var releasesDiscarded: Int
+    public private(set) var validationFailures: Int
+    public private(set) var idleCleanups: Int
+    public private(set) var preCreations: Int
+
+    public var poolHitRate: Double
+}
+
+public struct PoolStats: Sendable {
+    public let availableCount: Int
+    public let inUseCount: Int
+    public let maxPoolSize: Int
+    public let metrics: PoolMetrics
+
+    public var utilization: Double
+    public var description: String
+}
+```
+
 ### PerformanceMonitor
 
 Real-time performance monitoring and alerting.
+
+#### Monitoring Architecture
+
+```mermaid
+graph LR
+    subgraph "Data Sources"
+        MM[MemoryManager]
+        CM[CacheManager]
+        MLCM[MultiLevelCacheManager]
+        RP[ResourcePool]
+    end
+
+    subgraph "PerformanceMonitor"
+        Collect[Metrics Collector]
+        Analyze[Threshold Analyzer]
+        Alerts[Alert Manager]
+    end
+
+    subgraph "Outputs"
+        Metrics[UnifiedMetrics]
+        AlertList[Active Alerts]
+        Profile[PerformanceProfile]
+    end
+
+    MM --> Collect
+    CM --> Collect
+    MLCM --> Collect
+    RP --> Collect
+
+    Collect --> Analyze
+    Analyze --> Alerts
+    Analyze --> Profile
+
+    Collect --> Metrics
+    Alerts --> AlertList
+
+    style Collect fill:#4a9eff,stroke:#333,color:#fff
+    style Analyze fill:#ffd43b,stroke:#333,color:#000
+    style Alerts fill:#ff6b6b,stroke:#333,color:#fff
+```
+
+#### Alert Flow
+
+```mermaid
+flowchart TD
+    Metrics[Collect Metrics] --> CheckMem{Memory Usage > 80%?}
+    CheckMem --> |Yes| MemAlert[High Memory Alert]
+    CheckMem --> |No| CheckHit{Hit Rate < 70%?}
+
+    CheckHit --> |Yes| HitAlert[Low Hit Rate Alert]
+    CheckHit --> |No| CheckResp{Response Time > 2s?}
+
+    CheckResp --> |Yes| RespAlert[Slow Response Alert]
+    CheckResp --> |No| NoAlert[No Alerts]
+
+    MemAlert --> Severity{Usage > 95%?}
+    Severity --> |Yes| Critical[CRITICAL]
+    Severity --> |No| Warning[WARNING]
+
+    HitAlert --> Severity2{Hit Rate < 50%?}
+    Severity2 --> |Yes| Critical
+    Severity2 --> |No| Warning
+
+    RespAlert --> Severity3{Response > 5s?}
+    Severity3 --> |Yes| Critical
+    Severity3 --> |No| Warning
+```
 
 #### Configuration
 
@@ -284,6 +824,24 @@ public struct Configuration: Sendable {
     public let enableMonitoring: Bool
     public let metricsCollectionInterval: TimeInterval
     public let alertThresholds: AlertThresholds
+
+    public init(
+        enableMonitoring: Bool = true,
+        metricsCollectionInterval: TimeInterval = 300.0,
+        alertThresholds: AlertThresholds = AlertThresholds()
+    )
+}
+
+public struct AlertThresholds: Sendable {
+    public let memoryUsageThreshold: Double
+    public let cacheHitRateThreshold: Double
+    public let responseTimeThreshold: TimeInterval
+
+    public init(
+        memoryUsageThreshold: Double = 0.8,
+        cacheHitRateThreshold: Double = 0.7,
+        responseTimeThreshold: TimeInterval = 2.0
+    )
 }
 ```
 
@@ -294,6 +852,53 @@ public enum PerformanceAlert: Sendable {
     case highMemoryUsage(current: Double, threshold: Double)
     case lowCacheHitRate(current: Double, threshold: Double)
     case slowResponseTime(current: TimeInterval, threshold: TimeInterval)
+
+    public var severity: AlertSeverity
+    public var description: String
+}
+
+public enum AlertSeverity: String, Sendable {
+    case info = "INFO"
+    case warning = "WARNING"
+    case critical = "CRITICAL"
+}
+```
+
+#### Unified Metrics
+
+```swift
+public struct UnifiedMetrics: Sendable {
+    public let timestamp: Date
+    public let memoryMetrics: MemoryMetrics
+    public let cacheMetrics: CacheMetrics
+    public let systemMetrics: SystemMetrics
+    public let performanceProfile: PerformanceProfile
+
+    public var summary: String
+}
+
+public struct SystemMetrics: Sendable {
+    public let memoryUsage: Double
+    public let cpuUsage: Double
+    public let timestamp: Date
+}
+
+public struct PerformanceProfile: Sendable {
+    public let averageResponseTime: TimeInterval
+    public let cacheEfficiency: Double
+    public let systemLoad: Double
+
+    public var grade: PerformanceGrade
+}
+
+public enum PerformanceGrade: String, Sendable {
+    case excellent = "A+"
+    case good = "A"
+    case fair = "B"
+    case poor = "C"
+    case critical = "F"
+
+    public var description: String
 }
 ```
 
@@ -303,7 +908,147 @@ public enum PerformanceAlert: Sendable {
 |--------|-------------|------------|---------|
 | `collectMetrics()` | Collect current metrics | None | `UnifiedMetrics` |
 | `getActiveAlerts()` | Get active alerts | None | `[PerformanceAlert]` |
+| `clearAlert(_ alert:)` | Clear a specific alert | `alert` | `Void` |
 | `registerComponents(memoryManager:)` | Register components | `memoryManager` | `Void` |
+
+### ComprehensiveCacheMetrics
+
+Collects metrics across multiple cache managers.
+
+#### Initialization
+
+```swift
+public init(logger: any MemoryKitLogger, enablePeriodicReporting: Bool = false)
+```
+
+#### Methods
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `collectMetrics(cacheManagers:typedCacheManagers:)` | Collect metrics from all managers | `cacheManagers`, `typedCacheManagers` | `ComprehensiveMetrics` |
+
+#### Metrics Types
+
+```swift
+public struct ComprehensiveMetrics: Sendable {
+    public let timestamp: Date
+    public let cacheManagers: [String: CacheMetrics]
+    public let typedCacheManagers: [String: CacheStatistics]
+
+    public var overallStats: OverallCacheStats
+}
+
+public struct OverallCacheStats: Sendable {
+    public let totalEntries: Int
+    public let totalSize: Int
+    public let hitRate: Double
+
+    public var description: String
+}
+```
+
+#### Protocols
+
+```swift
+public protocol CacheManagerProtocol: Actor {
+    func getMetrics() async -> CacheMetrics
+}
+
+public protocol TypedCacheManagerProtocol: Actor {
+    func getStatistics() async -> CacheStatistics
+}
+```
+
+### Logging System
+
+MemoryKit provides a flexible logging system for debugging and monitoring.
+
+#### Logging Architecture
+
+```mermaid
+graph TB
+    subgraph "MemoryKit Components"
+        MM[MemoryManager]
+        CM[CacheManager]
+        MLCM[MultiLevelCacheManager]
+        RP[ResourcePool]
+    end
+
+    subgraph "Logger Protocol"
+        Protocol[MemoryKitLogger]
+    end
+
+    subgraph "Logger Implementations"
+        Default[DefaultMemoryKitLogger]
+        Silent[SilentMemoryKitLogger]
+    end
+
+    subgraph "Outputs"
+        Console[Console Output]
+        File[File Output]
+        None[No Output]
+    end
+
+    MM --> Protocol
+    CM --> Protocol
+    MLCM --> Protocol
+    RP --> Protocol
+
+    Protocol --> Default
+    Protocol --> Silent
+
+    Default --> Console
+    Default --> File
+    Silent --> None
+
+    style Protocol fill:#4a9eff,stroke:#333,color:#fff
+    style Default fill:#51cf66,stroke:#333,color:#fff
+    style Silent fill:#868e96,stroke:#333,color:#fff
+```
+
+#### MemoryKitLogger Protocol
+
+```swift
+public protocol MemoryKitLogger: Sendable {
+    func logDebug(_ message: String, context: [String: Any])
+    func logInfo(_ message: String, context: [String: Any])
+    func logWarning(_ message: String, context: [String: Any])
+    func logError(_ message: String, context: [String: Any])
+}
+```
+
+#### Logger Implementations
+
+**DefaultMemoryKitLogger** - Console and file logging:
+
+```swift
+public struct DefaultMemoryKitLogger: MemoryKitLogger {
+    public init(prefix: String = "[MemoryKit]")
+    public init(prefix: String = "[MemoryKit]", logToFile: Bool)
+    public init(prefix: String = "[MemoryKit]", logFileURL: URL)
+    public init(prefix: String = "[MemoryKit]", logFilePath: String)
+}
+```
+
+**SilentMemoryKitLogger** - No-op logger for testing or disabled logging:
+
+```swift
+public struct SilentMemoryKitLogger: MemoryKitLogger {
+    public init()
+}
+```
+
+#### MemoryKitLoggerFactory
+
+```swift
+public enum MemoryKitLoggerFactory {
+    public static func fileLogger(logFilePath: String, prefix: String = "[MemoryKit]") -> any MemoryKitLogger
+    public static func fileLogger(logFileURL: URL, prefix: String = "[MemoryKit]") -> any MemoryKitLogger
+    public static func consoleLogger(prefix: String = "[MemoryKit]") -> any MemoryKitLogger
+    public static func silentLogger() -> any MemoryKitLogger
+    public static func defaultLogger() -> any MemoryKitLogger  // Returns SilentMemoryKitLogger
+}
+```
 
 ## Usage Examples
 
@@ -332,23 +1077,52 @@ print("Cache hit rate: \(stats.hitRate * 100)%")
 
 ```swift
 // Create a typed cache for specific data types
-let userCache = CacheManager<String, User>(
-    configuration: CacheManager<String, User>.Configuration(
+let userCache = TypedCacheManager<String, User>(
+    configuration: TypedCacheManager<String, User>.Configuration(
         maxSize: 1000,
-        defaultTTL: 300,
-        evictionPolicy: .lru
+        ttl: 300,
+        evictionPolicy: .leastRecentlyUsed
     )
 )
-await userCache.start()
 
 // Store user data
 let user = User(id: "123", name: "John Doe")
-await userCache.set(user, forKey: "user_123", ttl: 600)
+await userCache.store(user, forKey: "user_123")
 
 // Retrieve user data
-if let cachedUser = await userCache.get("user_123") {
+if let cachedUser = await userCache.retrieve(forKey: "user_123") {
     print("Found user: \(cachedUser.name)")
 }
+
+// Get statistics
+let stats = await userCache.getStatistics()
+print("Hit rate: \(stats.hitRate * 100)%")
+```
+
+### Generic Cache Manager
+
+```swift
+// Create a cache with custom eviction policy
+let cache = CacheManager<String, Server>(
+    configuration: CacheManager<String, Server>.Configuration(
+        maxSize: 500,
+        defaultTTL: 600,
+        evictionPolicy: .adaptive
+    )
+)
+await cache.start()
+
+// Store with custom TTL
+await cache.set(server, forKey: "server_123", ttl: 1800)
+
+// Retrieve
+if let cached = await cache.get("server_123") {
+    print("Server: \(cached.name)")
+}
+
+// Check metrics
+let metrics = await cache.getMetrics()
+print("Eviction rate: \(metrics.evictionRate * 100)%")
 ```
 
 ### Multi-Level Cache
@@ -422,6 +1196,27 @@ defer {
 // Use connection...
 ```
 
+### Custom Logging
+
+```swift
+// Create a file logger for debugging
+let fileLogger = MemoryKitLoggerFactory.fileLogger(
+    logFilePath: "/var/log/memorykit.log",
+    prefix: "[MyApp]"
+)
+
+let memoryManager = MemoryManager(configuration: MemoryManager.Configuration(
+    maxCacheSize: 5000,
+    logger: fileLogger
+))
+
+// Or use console logging
+let consoleLogger = MemoryKitLoggerFactory.consoleLogger(prefix: "[Debug]")
+
+// For production, use silent logger (default)
+let silentLogger = MemoryKitLoggerFactory.silentLogger()
+```
+
 ## Configuration Guide
 
 ### Memory Manager Configuration
@@ -480,6 +1275,38 @@ MemoryKit automatically manages memory pressure through:
 - Adaptive scoring for cache entries
 - Automatic tier demotion
 
+#### Memory Pressure Response Flow
+
+```mermaid
+flowchart TD
+    Monitor[Monitor Memory Usage] --> Check{Pressure > Threshold?}
+    Check --> |No| Continue[Continue Normal Operation]
+    Continue --> Monitor
+
+    Check --> |Yes| Level{Pressure Level}
+    Level --> |80-90%| Moderate[Moderate Cleanup]
+    Level --> |90-95%| Aggressive[Aggressive Cleanup]
+    Level --> |>95%| Emergency[Emergency Cleanup]
+
+    Moderate --> CleanExpired[Clean Expired Entries]
+    CleanExpired --> EvictLow[Evict Low Priority]
+
+    Aggressive --> CleanExpired
+    EvictLow --> EvictNormal[Evict Normal Priority]
+
+    Emergency --> CleanExpired
+    EvictNormal --> DemoteL1[Demote L1 to L2]
+    DemoteL1 --> DemoteL2[Demote L2 to L3]
+
+    EvictLow --> Monitor
+    EvictNormal --> Monitor
+    DemoteL2 --> Monitor
+
+    style Emergency fill:#ff6b6b,stroke:#333,color:#fff
+    style Aggressive fill:#ffd43b,stroke:#333,color:#000
+    style Moderate fill:#51cf66,stroke:#333,color:#fff
+```
+
 ### Eviction Strategies
 
 | Policy | CPU Cost | Memory Efficiency | Best Use Case |
@@ -495,6 +1322,7 @@ MemoryKit automatically manages memory pressure through:
 - **L2 Compression**: Reduces memory by 50-80% for JSON data
 - **L3 Compression**: Reduces disk I/O but increases CPU usage
 - **Compression overhead**: ~0.5ms for 10KB JSON data
+- **Platform Support**: Uses LZFSE on macOS, no compression on Linux
 
 ## Best Practices
 
@@ -604,8 +1432,10 @@ cache["user_123"] = user
 
 **After:**
 ```swift
-let cache = CacheManager<String, User>()
-await cache.set(user, forKey: "user_123")
+let cache = TypedCacheManager<String, User>(
+    configuration: TypedCacheManager.Configuration()
+)
+await cache.store(user, forKey: "user_123")
 ```
 
 ### Adding MemoryKit to Existing Project
@@ -650,14 +1480,26 @@ print("Eviction rate: \(metrics.evictionRate)")
 
 ```swift
 // Enable detailed logging
-let logger = DefaultMemoryKitLogger(
-    prefix: "[Debug]",
-    logToFile: true
+let logger = MemoryKitLoggerFactory.fileLogger(
+    logFilePath: "/tmp/memorykit-debug.log",
+    prefix: "[Debug]"
 )
-let cache = CacheManager(
+let cache = CacheManager<String, MyType>(
     configuration: CacheManager.Configuration(),
     logger: logger
 )
+```
+
+### Compression Issues
+
+```swift
+// Handle compression errors gracefully
+do {
+    let value = await multiLevelCache.retrieve(forKey: "key", as: MyType.self)
+} catch MultiLevelCacheError.decompressionFailed {
+    // Entry was corrupted, it will be removed automatically
+    // Fetch fresh data
+}
 ```
 
 ## Thread Safety
@@ -715,11 +1557,3 @@ MemoryKit is maintained as part of the Substation project. For issues or contrib
 3. Ensure all code is ASCII-only (no Unicode)
 4. Add SwiftDoc comments for public APIs
 5. Test with both macOS and Linux targets
-
-## Version History
-
-- **1.0.0** - Initial implementation with core caching
-- **1.1.0** - Added multi-level cache support
-- **1.2.0** - Performance monitoring integration
-- **1.3.0** - Resource pool and typed cache managers
-- **Current** - Optimized for Substation TUI performance

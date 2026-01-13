@@ -436,8 +436,3 @@ extension RoutersModule {
 | **Load Order** | 22 |
 | **Typical Memory Usage** | 5-15 MB |
 | **CPU Impact** | Low |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1*

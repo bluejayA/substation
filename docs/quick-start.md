@@ -177,6 +177,5 @@ If something looks stale, use `:cc<Enter>` to purge the cache, then `:refresh<En
 - **[Navigation Guide](reference/operators/keyboard-shortcuts.md)** - Master all keyboard shortcuts
 - **[Common Workflows](reference/operators/workflows.md)** - Everyday operations and patterns
 - **[Troubleshooting](troubleshooting/index.md)** - When things go wrong
-- **[FAQ](reference/faq.md)** - Common questions answered
 
 Press `?` at any time for context-aware help, or report issues on **[GitHub](https://github.com/cloudnull/substation/issues)**.

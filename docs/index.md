@@ -33,7 +33,7 @@ Substation is a complete terminal interface for OpenStack. You get resource mana
 
 **For Developers**: [Developer Guide](reference/developers/index.md) for contributing. [FormBuilder Guide](reference/developers/formbuilder-guide.md) for building forms. [API Reference](reference/api/index.md) for using Substation packages.
 
-**Deep Dives**: [Architecture](architecture/index.md) for system design. [Performance](performance/index.md) for optimization details. [Security](concepts/security.md) for protection and best practices. [Object Storage](concepts/object-storage.md) for Swift integration and ETAG optimization.
+**Deep Dives**: [Architecture](architecture/index.md) for system design. [Performance](performance/index.md) for optimization details. [Security](reference/framework/security.md) for protection and best practices. [Object Storage](reference/modules/swift.md) for Swift integration.
 
 ## System Requirements
 
@@ -41,7 +41,7 @@ Substation runs on macOS 13 or later and modern Linux distributions. Any termina
 
 ## Getting Help
 
-Press `?` at any time in Substation for context-aware help. Check the [FAQ](reference/faq.md) for frequently asked questions. Read the [Troubleshooting Guide](troubleshooting/index.md) for common issues and solutions. [Report bugs and request features](https://github.com/cloudnull/substation/issues) on GitHub.
+Press `?` at any time in Substation for context-aware help. Read the [Troubleshooting Guide](troubleshooting/index.md) for common issues and solutions. [Report bugs and request features](https://github.com/cloudnull/substation/issues) on GitHub.
 
 ## License
 

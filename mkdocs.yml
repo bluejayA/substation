@@ -96,71 +96,64 @@ nav:
   - Installation: installation/index.md
   - Configuration: configuration/index.md
 
-  - Concepts:
-    - Features: concepts/features.md
-    - Caching System: concepts/caching.md
-    - Search Engine: concepts/search.md
-    - Security: concepts/security.md
-    - Object Storage: concepts/object-storage.md
-
   - Architecture:
     - Overview: architecture/index.md
     - System Architecture: architecture/overview.md
-    - Components: architecture/components.md
-    - Technology Stack: architecture/technology-stack.md
-    - Navigation System: architecture/navigation.md
-    - Modular Ecosystem: architecture/modular-ecosystem.md
-    - Memory Management: architecture/memory-management.md
-    - Object Storage: architecture/object-storage.md
 
   - Performance:
     - Overview: performance/index.md
-    - Performance Details: performance/overview.md
     - Benchmarks: performance/benchmarks.md
-    - Tuning: performance/tuning.md
     - Object Storage: performance/object-storage.md
-    - Troubleshooting: performance/troubleshooting.md
-
+    - Tuning: performance/tuning.md
   - Reference:
     - API Reference:
       - Quick Reference: reference/api/index.md
-      - OSClient Library: reference/api/osclient.md
-      - SwiftNCurses Framework: reference/api/SwiftNCurses.md
+      - OSClient: reference/api/osclient.md
+      - SwiftNCurses: reference/api/SwiftNCurses.md
+      - CrossPlatformTimer: reference/api/crossplatformtimer.md
       - MemoryKit: reference/api/memorykit.md
       - Integration Guide: reference/api/integration.md
     - Framework:
+      - Cache Manager: reference/framework/cache-manager.md
+      - Module System: reference/framework/module-system.md
+      - Refresh Manager: reference/framework/refresh-manager.md
       - Registries: reference/framework/registries.md
+      - Render Coordinator: reference/framework/render-coordinator.md
+      - Security: reference/framework/security.md
+      - Search System: reference/framework/search-system.md
+      - Selection Manager: reference/framework/selection-manager.md
       - Universal Form Handler: reference/framework/universal-form-handler.md
+      - View System: reference/framework/view-system.md
     - Modules:
       - Module Catalog: reference/modules/index.md
-      - Servers: reference/modules/servers.md
-      - Volumes: reference/modules/volumes.md
-      - Networks: reference/modules/networks.md
-      - Subnets: reference/modules/subnets.md
-      - Routers: reference/modules/routers.md
-      - Ports: reference/modules/ports.md
+      - Secrets: reference/modules/barbican.md
+      - Flavors: reference/modules/flavors.md
       - Floating IPs: reference/modules/floatingips.md
+      - Hypervisors: reference/modules/hypervisors.md
+      - Images: reference/modules/images.md
+      - Key Pairs: reference/modules/keypairs.md
+      - Containers: reference/modules/magnum.md
+      - Networks: reference/modules/networks.md
+      - Ports: reference/modules/ports.md
+      - Routers: reference/modules/routers.md
       - Security Groups: reference/modules/securitygroups.md
       - Server Groups: reference/modules/servergroups.md
-      - Images: reference/modules/images.md
-      - Flavors: reference/modules/flavors.md
-      - Key Pairs: reference/modules/keypairs.md
+      - Servers: reference/modules/servers.md
+      - Subnets: reference/modules/subnets.md
       - Object Storage: reference/modules/swift.md
-      - Secrets: reference/modules/barbican.md
+      - Volumes: reference/modules/volumes.md
     - Operators:
       - Keyboard Shortcuts: reference/operators/keyboard-shortcuts.md
       - Common Workflows: reference/operators/workflows.md
     - Developers:
       - Overview: reference/developers/index.md
-      - Module Development Guide: reference/developers/module-development-guide.md
-      - FormBuilder Guide: reference/developers/formbuilder-guide.md
-      - FormTextField Guide: reference/developers/formtextfield-guide.md
-      - FormSelector Guide: reference/developers/formselector-guide.md
-      - StatusListView Guide: reference/developers/statuslistview-guide.md
       - DetailView Guide: reference/developers/detailview-guide.md
+      - FormBuilder Guide: reference/developers/formbuilder-guide.md
+      - FormSelector Guide: reference/developers/formselector-guide.md
+      - FormTextField Guide: reference/developers/formtextfield-guide.md
+      - Module Development Guide: reference/developers/module-development-guide.md
+      - StatusListView Guide: reference/developers/statuslistview-guide.md
       - Testing Guide: reference/developers/testing.md
     - OpenStack Integration:
       - Overview: reference/openstack/index.md
-      - Swift: reference/openstack/os-swift.md
-    - FAQ: reference/faq.md
     - Troubleshooting: troubleshooting/index.md

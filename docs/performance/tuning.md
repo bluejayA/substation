@@ -17,6 +17,8 @@ Your OpenStack environment has unusual characteristics - maybe you're running on
 
 ## Cache Tuning
 
+> **Note**: For complete details on cache architecture, multi-level caching (L1/L2/L3), eviction policies, and the full MemoryKit API, see the [MemoryKit API Reference](../reference/api/memorykit.md).
+
 ### Understanding Resource TTL Configuration
 
 We set default TTL values based on how often things actually change in real OpenStack deployments. Authentication tokens last an hour because Keystone says they do. Service endpoints basically never change unless someone's having a really bad day. Flavors and volume types change when admins remember they exist, which is roughly quarterly. Everything else falls somewhere on the spectrum from "moderately dynamic" to "changes every time you blink."
@@ -311,9 +313,8 @@ OpenStackConfig(
 
 **See Also**:
 
-- [Performance Overview](overview.md) - Architecture and key components
+- [Performance Overview](index.md) - Architecture and key components
 - [Performance Benchmarks](benchmarks.md) - Metrics and scoring
-- [Troubleshooting](troubleshooting.md) - Performance issue diagnosis
-- [Caching Concepts](../concepts/caching.md) - Deep dive into caching
+- [MemoryKit API Reference](../reference/api/memorykit.md) - Deep dive into caching
 
 **Note**: All tuning recommendations and targets are based on design goals and testing with 10K+ resource environments. Actual performance will vary based on your specific OpenStack deployment, network conditions, and system resources. Start with defaults and adjust based on measured metrics in your environment.

@@ -562,8 +562,3 @@ extension ServersModule {
 | **Load Order** | 10 |
 | **Typical Memory Usage** | 10-50 MB |
 | **CPU Impact** | Low to Medium |
-
----
-
-*Last Updated: January 2025*
-*Documentation Version: 1.1*

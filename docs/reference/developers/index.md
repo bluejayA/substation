@@ -56,6 +56,14 @@ You're here because you need to create a form in Substation. Maybe it's a networ
 
 **Read this** when you need detail screens with consistent formatting. It provides section-based information organization, automatic field label and value formatting, and scrolling for large content. Another 70-85% code reduction. You're welcome.
 
+### [Module Development Guide](module-development-guide.md)
+
+**What it does**: Comprehensive guide for creating new OpenStack service modules.
+
+**When to use it**: When adding support for a new OpenStack service or extending existing modules.
+
+**Read this** when building a new module from scratch. It covers module structure, protocol implementations, view registration, data providers, form handlers, and batch operations. Follow the patterns established by existing modules like ServersModule and NetworksModule.
+
 ### [Testing Guide](testing.md)
 
 **What it does**: Comprehensive guide to running tests, writing tests, and understanding the testing infrastructure.
@@ -274,7 +282,9 @@ Study these when the guides aren't enough. The code is well-commented and shows 
 
 ## Related Documentation
 
-- **[API Reference](../../reference/api/index.md)** - Complete API documentation for OSClient, SwiftNCurses, CrossPlatformTimer
+- **[API Reference](../api/index.md)** - Complete API documentation for OSClient, SwiftNCurses, MemoryKit, CrossPlatformTimer
+- **[Framework Reference](../framework/)** - Framework components: CacheManager, ViewCoordinator, ModuleOrchestrator, and more
+- **[Module Reference](../modules/)** - Documentation for all OpenStack service modules
 - **[Architecture Overview](../../architecture/index.md)** - Overall system architecture
 - **[Performance Documentation](../../performance/index.md)** - Benchmarking and optimization
 
