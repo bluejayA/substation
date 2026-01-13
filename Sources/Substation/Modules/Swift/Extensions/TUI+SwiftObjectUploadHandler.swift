@@ -18,6 +18,7 @@ extension TUI {
     /// This handler manages the object upload form which allows users to specify
     /// a file path, prefix, and options for uploading files to Swift storage.
     /// It supports both single file and directory uploads with concurrent processing.
+    /// TAB completion is supported for file/directory paths with tilde expansion.
     ///
     /// - Parameters:
     ///   - ch: The input character code from ncurses
@@ -25,6 +26,53 @@ extension TUI {
     internal func handleSwiftObjectUploadInput(_ ch: Int32, screen: OpaquePointer?) async {
         var localFormState = swiftObjectUploadFormState
         var localForm = swiftObjectUploadForm
+
+        // Custom key handler for TAB completion on file path field
+        let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout SwiftObjectUploadForm, OpaquePointer?) async -> Bool = { ch, formState, form, _ in
+            // TAB completion for filePath field
+            if ch == Int32(9) { // TAB key
+                if formState.isCurrentFieldActive(),
+                   let field = formState.getCurrentField(),
+                   case .text(let textField) = field,
+                   textField.id == "filePath" {
+                    // Perform tab completion
+                    let currentPath = form.filePath
+                    let (completedPath, hasMultiple) = FilePathCompleter.tabComplete(currentPath)
+
+                    if completedPath != currentPath {
+                        // Update the form with the completed path
+                        form.filePath = completedPath
+
+                        // Update the text field state with new value and cursor position
+                        if var textState = formState.textFieldStates["filePath"] {
+                            textState.value = completedPath
+                            textState.cursorPosition = completedPath.count
+                            formState.textFieldStates["filePath"] = textState
+                        }
+
+                        if hasMultiple {
+                            // Show hint that there are multiple matches
+                            let completions = FilePathCompleter.getCompletions(for: completedPath)
+                            let displayCount = min(completions.count, 5)
+                            let names = completions.prefix(displayCount).map { URL(fileURLWithPath: $0).lastPathComponent }
+                            let moreText = completions.count > displayCount ? " ..." : ""
+                            self.statusMessage = "Matches: \(names.joined(separator: ", "))\(moreText)"
+                        } else {
+                            self.statusMessage = ""
+                        }
+                    } else if hasMultiple {
+                        // No progress but multiple matches - show them
+                        let completions = FilePathCompleter.getCompletions(for: currentPath)
+                        let displayCount = min(completions.count, 5)
+                        let names = completions.prefix(displayCount).map { URL(fileURLWithPath: $0).lastPathComponent }
+                        let moreText = completions.count > displayCount ? " ..." : ""
+                        self.statusMessage = "Matches: \(names.joined(separator: ", "))\(moreText)"
+                    }
+                    return true // TAB handled, don't pass to universal handler
+                }
+            }
+            return false // Let universal handler process
+        }
 
         await universalFormInputHandler.handleInput(
             ch,
@@ -38,7 +86,8 @@ extension TUI {
             },
             onCancel: {
                 self.changeView(to: .swift, resetSelection: false)
-            }
+            },
+            customKeyHandler: customHandler
         )
 
         // Rebuild form state to reflect any changes
@@ -57,7 +106,8 @@ extension TUI {
     }
 
     private func submitSwiftObjectUpload(screen: OpaquePointer?) async {
-        let filePath = swiftObjectUploadForm.filePath.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        // Use expanded path (with ~ resolved to home directory)
+        let filePath = swiftObjectUploadForm.getExpandedFilePath()
         let containerName = swiftObjectUploadForm.containerName
 
         // Change view immediately to return to container list

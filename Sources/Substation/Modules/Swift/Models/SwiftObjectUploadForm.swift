@@ -2,6 +2,9 @@ import Foundation
 import OSClient
 
 /// Swift Object Upload Form
+///
+/// Form for uploading files or directories to Swift object storage.
+/// Supports TAB completion for file/directory paths with tilde expansion.
 struct SwiftObjectUploadForm {
     // Form data
     var filePath: String = ""
@@ -20,12 +23,12 @@ struct SwiftObjectUploadForm {
         let isDir = isDirectory()
         let pathType = isDir ? "Directory" : (filePath.isEmpty ? "File or Directory" : "File")
 
-        // File/Directory path field
+        // File/Directory path field with TAB completion
         fields.append(.text(FormFieldText(
             id: "filePath",
-            label: "File/Directory Path",
+            label: "File/Directory Path (TAB to complete)",
             value: filePath,
-            placeholder: "/path/to/file.txt or /path/to/directory",
+            placeholder: "~/path/to/file.txt (TAB to complete)",
             isRequired: true,
             isVisible: true,
             isSelected: selectedFieldId == "filePath",
@@ -153,23 +156,25 @@ struct SwiftObjectUploadForm {
         }
     }
 
-    // Check if path is a directory
+    // Check if path is a directory (supports ~ expansion)
     func isDirectory() -> Bool {
         let trimmedPath = filePath.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         if trimmedPath.isEmpty {
             return false
         }
 
-        let fileManager = FileManager.default
-        var isDirectory: ObjCBool = false
-        if fileManager.fileExists(atPath: trimmedPath, isDirectory: &isDirectory) {
-            return isDirectory.boolValue
-        }
-
-        return false
+        // Expand ~ to home directory
+        let expandedPath = FilePathCompleter.expandPath(trimmedPath)
+        return FilePathCompleter.isDirectory(at: expandedPath)
     }
 
-    // Validate file path
+    /// Get the expanded file path (with ~ expanded)
+    func getExpandedFilePath() -> String {
+        let trimmedPath = filePath.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        return FilePathCompleter.expandPath(trimmedPath)
+    }
+
+    // Validate file path (supports ~ expansion)
     func validateFilePath() -> String? {
         let trimmedPath = filePath.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
 
@@ -177,14 +182,17 @@ struct SwiftObjectUploadForm {
             return "File or directory path is required"
         }
 
+        // Expand ~ to home directory
+        let expandedPath = FilePathCompleter.expandPath(trimmedPath)
+
         // Check if path exists
-        let fileManager = FileManager.default
-        if !fileManager.fileExists(atPath: trimmedPath) {
+        if !FilePathCompleter.fileExists(at: expandedPath) {
             return "Path does not exist"
         }
 
         // Check if readable
-        if !fileManager.isReadableFile(atPath: trimmedPath) {
+        let fileManager = FileManager.default
+        if !fileManager.isReadableFile(atPath: expandedPath) {
             return "Path is not readable"
         }
 
