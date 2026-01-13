@@ -22,12 +22,12 @@ Because listing 50,000 servers shouldn't take 10 minutes and three cups of coffe
 
 Manage everything your OpenStack cluster throws at you (and it will throw a lot):
 
-- **Compute (Nova)**: Servers, flavors, keypairs, server groups - Battle-tested compute management
+- **Compute (Nova)**: Servers, flavors, keypairs, server groups, hypervisors - Battle-tested compute management
 - **Networking (Neutron)**: Networks, subnets, routers, security groups, floating IPs, ports - Because networking is never simple
 - **Storage (Cinder)**: Volumes, snapshots, volume types - Where your data lives (hopefully)
 - **Images (Glance)**: Operating system images and snapshots - The good, the bad, and the corrupted
 - **Secrets (Barbican)**: Secrets and certificates management - Keeping your secrets safe
-- **Load Balancing (Octavia)**: Load balancers, pools, listeners - Traffic distribution made manageable
+- **Container Infrastructure (Magnum)**: Kubernetes clusters and cluster templates - Container orchestration at scale
 - **Object Storage (Swift)**: Containers and object management - Blob storage at scale
 
 ### Performance & Architecture
@@ -86,7 +86,7 @@ sudo mv substation /usr/local/bin/
 - **[Quick Start Guide](https://substation.cloud/quick-start/)** - Get up and running in 5 minutes
 - **[Getting Started](https://substation.cloud/getting-started/)** - Comprehensive first-time setup
 
-**Full keyboard guide:** [Keyboard Shortcuts & Navigation](https://substation.cloud/guides/operators/keyboard-shortcuts/)
+**Full keyboard guide:** [Keyboard Shortcuts & Navigation](https://substation.cloud/reference/operators/keyboard-shortcuts/)
 
 ### Library Overview
 
@@ -153,22 +153,22 @@ Because fast matters when you're debugging production at 3 AM:
 
 ### Operators
 
-- **[Keyboard Shortcuts](https://substation.cloud/guides/operators/keyboard-shortcuts/)** - Complete navigation reference
-- **[Common Workflows](https://substation.cloud/guides/operators/workflows/)** - Everyday operations
-- **[Troubleshooting](https://substation.cloud/guides/troubleshooting/)** - When things go wrong
+- **[Keyboard Shortcuts](https://substation.cloud/reference/operators/keyboard-shortcuts/)** - Complete navigation reference
+- **[Common Workflows](https://substation.cloud/reference/operators/workflows/)** - Everyday operations
+- **[Troubleshooting](https://substation.cloud/troubleshooting/)** - When things go wrong
 
 ### Developers
 
-- **[Developer Guide](https://substation.cloud/guides/developers/)** - Contributing and extending
-- **[API Reference](https://substation.cloud/reference/api/)** - Using Substation libraries
-- **[FormBuilder Guide](https://substation.cloud/guides/developers/)** - Building forms
+- **[API Reference](https://substation.cloud/reference/api/)** - Using Substation libraries (OSClient, SwiftNCurses, MemoryKit)
+- **[Module Development](https://substation.cloud/reference/developers/module-development-guide/)** - Creating new modules
+- **[FormBuilder Guide](https://substation.cloud/reference/developers/formbuilder-guide/)** - Building forms
 
 ### Deep Dives
 
 - **[Architecture](https://substation.cloud/architecture/)** - System design and components
 - **[Performance](https://substation.cloud/performance/)** - Optimization and benchmarking
-- **[Concepts](https://substation.cloud/concepts/features/)** - Features, caching, search, security
-- **[FAQ](https://substation.cloud/reference/faq/)** - Frequently asked questions
+- **[Module Reference](https://substation.cloud/reference/modules/)** - All OpenStack modules documented
+- **[Security](https://substation.cloud/reference/framework/security/)** - Security implementation details
 
 Full documentation available at [https://substation.cloud](https://substation.cloud)
 
