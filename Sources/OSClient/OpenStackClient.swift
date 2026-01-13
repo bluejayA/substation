@@ -271,7 +271,11 @@ public final class OpenStackClient: @unchecked Sendable {
             if let existing = _cinder {
                 return existing
             }
-            let service = CinderService(core: core)
+            let service = CinderService(
+                core: core,
+                logger: await core.clientLogger,
+                cloudName: await core.cloudName
+            )
             _cinder = service
             return service
         }
@@ -283,7 +287,11 @@ public final class OpenStackClient: @unchecked Sendable {
             if let existing = _keystone {
                 return existing
             }
-            let service = await KeystoneService(core: core)
+            let service = await KeystoneService(
+                core: core,
+                logger: await core.clientLogger,
+                cloudName: await core.cloudName
+            )
             _keystone = service
             return service
         }
@@ -307,7 +315,11 @@ public final class OpenStackClient: @unchecked Sendable {
             if let existing = _glance {
                 return existing
             }
-            let service = GlanceService(core: core)
+            let service = GlanceService(
+                core: core,
+                logger: await core.clientLogger,
+                cloudName: await core.cloudName
+            )
             _glance = service
             return service
         }
@@ -331,7 +343,11 @@ public final class OpenStackClient: @unchecked Sendable {
             if let existing = _magnum {
                 return existing
             }
-            let service = MagnumService(core: core)
+            let service = MagnumService(
+                core: core,
+                logger: await core.clientLogger,
+                cloudName: await core.cloudName
+            )
             _magnum = service
             return service
         }

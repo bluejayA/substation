@@ -5,15 +5,55 @@ import Foundation
 public actor GlanceService: OpenStackService {
     public let core: OpenStackClientCore
     public let serviceName = "image"
+    private let cacheManager: OpenStackCacheManager
+    private let invalidationManager: IntelligentCacheInvalidation
+    private let logger: any OpenStackClientLogger
 
-    public init(core: OpenStackClientCore) {
+    /// Initialize the Glance service with the given OpenStack core and logger.
+    ///
+    /// - Parameters:
+    ///   - core: The OpenStack client core for API communication
+    ///   - logger: Logger instance for service operations
+    ///   - cloudName: Optional cloud name for consistent cache filenames across restarts
+    public init(core: OpenStackClientCore, logger: any OpenStackClientLogger, cloudName: String? = nil) {
         self.core = core
+        self.logger = logger
+        self.cacheManager = OpenStackCacheManager(
+            maxCacheSize: 2000,
+            maxMemoryUsage: 20 * 1024 * 1024, // 20MB for image metadata
+            cacheIdentifier: cloudName,
+            logger: logger
+        )
+        self.invalidationManager = IntelligentCacheInvalidation(
+            cacheManager: cacheManager,
+            logger: logger
+        )
     }
 
     // MARK: - Image Operations
 
-    /// List images with automatic pagination support
-    public func listImages(options: PaginationOptions = PaginationOptions()) async throws -> [Image] {
+    /// List images with automatic pagination support and intelligent caching
+    public func listImages(options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [Image] {
+        let cacheKey = "glance_image_list_\(options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [Image].self,
+                resourceType: .imageList
+            ) {
+                logger.logInfo("Glance service cache hit - image list", context: [
+                    "imageCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Glance service API call - listing images", context: [
+            "forceRefresh": forceRefresh
+        ])
+
         var allImages: [Image] = []
         var currentMarker: String? = nil
         var hasMore = true
@@ -53,21 +93,66 @@ public actor GlanceService: OpenStackService {
             }
         }
 
+        // Cache the image list
+        await cacheManager.store(
+            allImages,
+            forKey: cacheKey,
+            resourceType: .imageList
+        )
+
+        // Cache individual images
+        for image in allImages {
+            await cacheManager.store(
+                image,
+                forKey: "glance_image_\(image.id)",
+                resourceType: .image
+            )
+        }
+
         return allImages
     }
 
-    /// Get image details
-    public func getImage(id: String) async throws -> Image {
+    /// Get image details with intelligent caching
+    public func getImage(id: String, forceRefresh: Bool = false) async throws -> Image {
+        let cacheKey = "glance_image_\(id)"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: Image.self,
+                resourceType: .image
+            ) {
+                logger.logInfo("Glance service cache hit - image detail", context: [
+                    "imageId": id
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Glance service API call - getting image", context: [
+            "imageId": id,
+            "forceRefresh": forceRefresh
+        ])
+
         let response: Image = try await core.request(
             service: serviceName,
             method: "GET",
             path: "/v2/images/\(id)",
             expected: 200
         )
+
+        // Cache the image
+        await cacheManager.store(
+            response,
+            forKey: cacheKey,
+            resourceType: .image
+        )
+
         return response
     }
 
-    /// Create a new image
+    /// Create a new image with intelligent cache invalidation
     public func createImage(request: CreateImageRequest) async throws -> Image {
         let requestData = try SharedResources.jsonEncoder.encode(request)
         let response: Image = try await core.request(
@@ -77,6 +162,21 @@ public actor GlanceService: OpenStackService {
             body: requestData,
             expected: 201
         )
+
+        // Cache the new image
+        await cacheManager.store(
+            response,
+            forKey: "glance_image_\(response.id)",
+            resourceType: .image
+        )
+
+        // Invalidate image lists
+        await invalidationManager.invalidateForOperation(
+            .create,
+            resourceType: .image,
+            resourceId: response.id
+        )
+
         return response
     }
 
@@ -94,13 +194,20 @@ public actor GlanceService: OpenStackService {
         return response
     }
 
-    /// Delete an image
+    /// Delete an image with intelligent cache invalidation
     public func deleteImage(id: String) async throws {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
             path: "/v2/images/\(id)",
             expected: 204
+        )
+
+        // Invalidate all related caches
+        await invalidationManager.invalidateForOperation(
+            .delete,
+            resourceType: .image,
+            resourceId: id
         )
     }
 

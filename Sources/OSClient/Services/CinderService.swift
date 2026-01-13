@@ -5,15 +5,55 @@ import Foundation
 public actor CinderService: OpenStackService {
     public let core: OpenStackClientCore
     public let serviceName = "volumev3"
+    private let cacheManager: OpenStackCacheManager
+    private let invalidationManager: IntelligentCacheInvalidation
+    private let logger: any OpenStackClientLogger
 
-    public init(core: OpenStackClientCore) {
+    /// Initialize the Cinder service with the given OpenStack core and logger.
+    ///
+    /// - Parameters:
+    ///   - core: The OpenStack client core for API communication
+    ///   - logger: Logger instance for service operations
+    ///   - cloudName: Optional cloud name for consistent cache filenames across restarts
+    public init(core: OpenStackClientCore, logger: any OpenStackClientLogger, cloudName: String? = nil) {
         self.core = core
+        self.logger = logger
+        self.cacheManager = OpenStackCacheManager(
+            maxCacheSize: 3000,
+            maxMemoryUsage: 25 * 1024 * 1024, // 25MB for block storage resources
+            cacheIdentifier: cloudName,
+            logger: logger
+        )
+        self.invalidationManager = IntelligentCacheInvalidation(
+            cacheManager: cacheManager,
+            logger: logger
+        )
     }
 
     // MARK: - Volume Operations
 
-    /// List volumes with optional filtering
-    public func listVolumes(options: PaginationOptions = PaginationOptions()) async throws -> [Volume] {
+    /// List volumes with optional filtering and intelligent caching
+    public func listVolumes(options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [Volume] {
+        let cacheKey = "cinder_volume_list_\(options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [Volume].self,
+                resourceType: .volumeList
+            ) {
+                logger.logInfo("Cinder service cache hit - volume list", context: [
+                    "volumeCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Cinder service API call - listing volumes", context: [
+            "forceRefresh": forceRefresh
+        ])
+
         var path = "/volumes/detail"
 
         if !options.queryItems.isEmpty {
@@ -27,21 +67,67 @@ public actor CinderService: OpenStackService {
             path: path,
             expected: 200
         )
+
+        // Cache the volume list
+        await cacheManager.store(
+            response.volumes,
+            forKey: cacheKey,
+            resourceType: .volumeList
+        )
+
+        // Cache individual volumes
+        for volume in response.volumes {
+            await cacheManager.store(
+                volume,
+                forKey: "cinder_volume_\(volume.id)",
+                resourceType: .volume
+            )
+        }
+
         return response.volumes
     }
 
-    /// Get volume details
-    public func getVolume(id: String) async throws -> Volume {
+    /// Get volume details with intelligent caching
+    public func getVolume(id: String, forceRefresh: Bool = false) async throws -> Volume {
+        let cacheKey = "cinder_volume_\(id)"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: Volume.self,
+                resourceType: .volume
+            ) {
+                logger.logInfo("Cinder service cache hit - volume detail", context: [
+                    "volumeId": id
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Cinder service API call - getting volume", context: [
+            "volumeId": id,
+            "forceRefresh": forceRefresh
+        ])
+
         let response: VolumeDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
             path: "/volumes/\(id)",
             expected: 200
         )
+
+        // Cache the volume
+        await cacheManager.store(
+            response.volume,
+            forKey: cacheKey,
+            resourceType: .volume
+        )
+
         return response.volume
     }
 
-    /// Create a volume
+    /// Create a volume with intelligent cache invalidation
     public func createVolume(request: CreateVolumeRequest) async throws -> Volume {
         let requestData = try SharedResources.jsonEncoder.encode(["volume": request])
         let response: VolumeDetailResponse = try await core.request(
@@ -51,10 +137,25 @@ public actor CinderService: OpenStackService {
             body: requestData,
             expected: 202
         )
+
+        // Cache the new volume
+        await cacheManager.store(
+            response.volume,
+            forKey: "cinder_volume_\(response.volume.id)",
+            resourceType: .volume
+        )
+
+        // Invalidate volume lists
+        await invalidationManager.invalidateForOperation(
+            .create,
+            resourceType: .volume,
+            resourceId: response.volume.id
+        )
+
         return response.volume
     }
 
-    /// Update a volume
+    /// Update a volume with intelligent cache invalidation
     public func updateVolume(id: String, request: UpdateVolumeRequest) async throws -> Volume {
         let requestData = try SharedResources.jsonEncoder.encode(["volume": request])
         let response: VolumeDetailResponse = try await core.request(
@@ -64,16 +165,38 @@ public actor CinderService: OpenStackService {
             body: requestData,
             expected: 200
         )
+
+        // Update cache with new volume data
+        await cacheManager.store(
+            response.volume,
+            forKey: "cinder_volume_\(id)",
+            resourceType: .volume
+        )
+
+        // Invalidate volume lists
+        await invalidationManager.invalidateForOperation(
+            .update,
+            resourceType: .volume,
+            resourceId: id
+        )
+
         return response.volume
     }
 
-    /// Delete a volume
+    /// Delete a volume with intelligent cache invalidation
     public func deleteVolume(id: String) async throws {
         try await core.requestVoid(
             service: serviceName,
             method: "DELETE",
             path: "/volumes/\(id)",
             expected: 202
+        )
+
+        // Invalidate all related caches
+        await invalidationManager.invalidateForOperation(
+            .delete,
+            resourceType: .volume,
+            resourceId: id
         )
     }
 
@@ -132,14 +255,42 @@ public actor CinderService: OpenStackService {
 
     // MARK: - Volume Type Operations
 
-    /// List volume types
-    public func listVolumeTypes() async throws -> [VolumeType] {
+    /// List volume types with intelligent caching
+    public func listVolumeTypes(forceRefresh: Bool = false) async throws -> [VolumeType] {
+        let cacheKey = "cinder_volume_type_list"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [VolumeType].self,
+                resourceType: .volumeTypeList
+            ) {
+                logger.logInfo("Cinder service cache hit - volume type list", context: [
+                    "typeCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Cinder service API call - listing volume types", context: [
+            "forceRefresh": forceRefresh
+        ])
+
         let response: VolumeTypeListResponse = try await core.request(
             service: serviceName,
             method: "GET",
             path: "/types",
             expected: 200
         )
+
+        // Cache the volume type list
+        await cacheManager.store(
+            response.volumeTypes,
+            forKey: cacheKey,
+            resourceType: .volumeTypeList
+        )
+
         return response.volumeTypes
     }
 
@@ -179,12 +330,32 @@ public actor CinderService: OpenStackService {
 
     // MARK: - Snapshot Operations
 
-    /// List volume snapshots
-    public func listSnapshots(volumeId: String? = nil, options: PaginationOptions = PaginationOptions()) async throws -> [VolumeSnapshot] {
+    /// List volume snapshots with intelligent caching
+    public func listSnapshots(volumeId: String? = nil, options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [VolumeSnapshot] {
         var queryItems = options.queryItems
         if let volumeId = volumeId {
             queryItems.append(URLQueryItem(name: "volume_id", value: volumeId))
         }
+
+        let cacheKey = "cinder_snapshot_list_\(queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [VolumeSnapshot].self,
+                resourceType: .volumeSnapshotList
+            ) {
+                logger.logInfo("Cinder service cache hit - snapshot list", context: [
+                    "snapshotCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Cinder service API call - listing snapshots", context: [
+            "forceRefresh": forceRefresh
+        ])
 
         var path = "/snapshots/detail"
         if !queryItems.isEmpty {
@@ -198,6 +369,14 @@ public actor CinderService: OpenStackService {
             path: path,
             expected: 200
         )
+
+        // Cache the snapshot list
+        await cacheManager.store(
+            response.snapshots,
+            forKey: cacheKey,
+            resourceType: .volumeSnapshotList
+        )
+
         return response.snapshots
     }
 

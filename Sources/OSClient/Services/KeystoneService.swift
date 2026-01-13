@@ -5,9 +5,30 @@ import Foundation
 public actor KeystoneService: OpenStackService {
     public let core: OpenStackClientCore
     public let serviceName = "identity"
+    private let cacheManager: OpenStackCacheManager
+    private let invalidationManager: IntelligentCacheInvalidation
+    private let logger: any OpenStackClientLogger
 
-    public init(core: OpenStackClientCore) async {
+    /// Initialize the Keystone service with the given OpenStack core and logger.
+    ///
+    /// - Parameters:
+    ///   - core: The OpenStack client core for API communication
+    ///   - logger: Logger instance for service operations
+    ///   - cloudName: Optional cloud name for consistent cache filenames across restarts
+    public init(core: OpenStackClientCore, logger: any OpenStackClientLogger, cloudName: String? = nil) async {
         self.core = core
+        self.logger = logger
+        self.cacheManager = OpenStackCacheManager(
+            maxCacheSize: 2500,
+            maxMemoryUsage: 20 * 1024 * 1024, // 20MB for identity resources
+            cacheIdentifier: cloudName,
+            logger: logger
+        )
+        self.invalidationManager = IntelligentCacheInvalidation(
+            cacheManager: cacheManager,
+            logger: logger
+        )
+
         // If the endpoint URL ends with /v3 remove it. Keystone service endpoints should not
         // include the version in the base URL because all versions are provided in our API calls.
         // keeping /v3 in the URL may lead to incorrect URL construction like /v3/v3/projects.
@@ -21,8 +42,28 @@ public actor KeystoneService: OpenStackService {
 
     // MARK: - Project Operations
 
-    /// List projects
-    public func listProjects(options: PaginationOptions = PaginationOptions()) async throws -> [Project] {
+    /// List projects with intelligent caching
+    public func listProjects(options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [Project] {
+        let cacheKey = "keystone_project_list_\(options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [Project].self,
+                resourceType: .projectList
+            ) {
+                logger.logInfo("Keystone service cache hit - project list", context: [
+                    "projectCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Keystone service API call - listing projects", context: [
+            "forceRefresh": forceRefresh
+        ])
+
         var path = "/v3/projects"
 
         if !options.queryItems.isEmpty {
@@ -36,17 +77,63 @@ public actor KeystoneService: OpenStackService {
             path: path,
             expected: 200
         )
+
+        // Cache the project list
+        await cacheManager.store(
+            response.projects,
+            forKey: cacheKey,
+            resourceType: .projectList
+        )
+
+        // Cache individual projects
+        for project in response.projects {
+            await cacheManager.store(
+                project,
+                forKey: "keystone_project_\(project.id)",
+                resourceType: .project
+            )
+        }
+
         return response.projects
     }
 
-    /// Get project details
-    public func getProject(id: String) async throws -> Project {
+    /// Get project details with intelligent caching
+    public func getProject(id: String, forceRefresh: Bool = false) async throws -> Project {
+        let cacheKey = "keystone_project_\(id)"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: Project.self,
+                resourceType: .project
+            ) {
+                logger.logInfo("Keystone service cache hit - project detail", context: [
+                    "projectId": id
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Keystone service API call - getting project", context: [
+            "projectId": id,
+            "forceRefresh": forceRefresh
+        ])
+
         let response: ProjectDetailResponse = try await core.request(
             service: serviceName,
             method: "GET",
             path: "/v3/projects/\(id)",
             expected: 200
         )
+
+        // Cache the project
+        await cacheManager.store(
+            response.project,
+            forKey: cacheKey,
+            resourceType: .project
+        )
+
         return response.project
     }
 
@@ -88,12 +175,32 @@ public actor KeystoneService: OpenStackService {
 
     // MARK: - User Operations
 
-    /// List users
-    public func listUsers(domainId: String? = nil, options: PaginationOptions = PaginationOptions()) async throws -> [User] {
+    /// List users with intelligent caching
+    public func listUsers(domainId: String? = nil, options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [User] {
         var queryItems = options.queryItems
         if let domainId = domainId {
             queryItems.append(URLQueryItem(name: "domain_id", value: domainId))
         }
+
+        let cacheKey = "keystone_user_list_\(queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [User].self,
+                resourceType: .userList
+            ) {
+                logger.logInfo("Keystone service cache hit - user list", context: [
+                    "userCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Keystone service API call - listing users", context: [
+            "forceRefresh": forceRefresh
+        ])
 
         var path = "/v3/users"
         if !queryItems.isEmpty {
@@ -107,6 +214,14 @@ public actor KeystoneService: OpenStackService {
             path: path,
             expected: 200
         )
+
+        // Cache the user list
+        await cacheManager.store(
+            response.users,
+            forKey: cacheKey,
+            resourceType: .userList
+        )
+
         return response.users
     }
 
@@ -288,8 +403,28 @@ public actor KeystoneService: OpenStackService {
 
     // MARK: - Role Operations
 
-    /// List roles
-    public func listRoles(options: PaginationOptions = PaginationOptions()) async throws -> [Role] {
+    /// List roles with intelligent caching
+    public func listRoles(options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [Role] {
+        let cacheKey = "keystone_role_list_\(options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [Role].self,
+                resourceType: .roleList
+            ) {
+                logger.logInfo("Keystone service cache hit - role list", context: [
+                    "roleCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Keystone service API call - listing roles", context: [
+            "forceRefresh": forceRefresh
+        ])
+
         var path = "/v3/roles"
 
         if !options.queryItems.isEmpty {
@@ -303,6 +438,14 @@ public actor KeystoneService: OpenStackService {
             path: path,
             expected: 200
         )
+
+        // Cache the role list
+        await cacheManager.store(
+            response.roles,
+            forKey: cacheKey,
+            resourceType: .roleList
+        )
+
         return response.roles
     }
 
@@ -450,8 +593,28 @@ public actor KeystoneService: OpenStackService {
 
     // MARK: - Domain Operations
 
-    /// List domains
-    public func listDomains(options: PaginationOptions = PaginationOptions()) async throws -> [Domain] {
+    /// List domains with intelligent caching
+    public func listDomains(options: PaginationOptions = PaginationOptions(), forceRefresh: Bool = false) async throws -> [Domain] {
+        let cacheKey = "keystone_domain_list_\(options.queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))"
+
+        // Try intelligent caching first
+        if !forceRefresh {
+            if let cached = await cacheManager.retrieve(
+                forKey: cacheKey,
+                as: [Domain].self,
+                resourceType: .domainList
+            ) {
+                logger.logInfo("Keystone service cache hit - domain list", context: [
+                    "domainCount": cached.count
+                ])
+                return cached
+            }
+        }
+
+        logger.logInfo("Keystone service API call - listing domains", context: [
+            "forceRefresh": forceRefresh
+        ])
+
         var path = "/v3/domains"
 
         if !options.queryItems.isEmpty {
@@ -465,6 +628,14 @@ public actor KeystoneService: OpenStackService {
             path: path,
             expected: 200
         )
+
+        // Cache the domain list
+        await cacheManager.store(
+            response.domains,
+            forKey: cacheKey,
+            resourceType: .domainList
+        )
+
         return response.domains
     }
 

@@ -57,6 +57,18 @@ public actor OpenStackCacheManager {
         case authentication = "auth_token"
         case serviceEndpoints = "service_endpoints"
         case quotas = "quotas"
+        case project = "project"
+        case projectList = "project_list"
+        case user = "user"
+        case userList = "user_list"
+        case domain = "domain"
+        case domainList = "domain_list"
+        case role = "role"
+        case roleList = "role_list"
+        case cluster = "cluster"
+        case clusterList = "cluster_list"
+        case clusterTemplate = "cluster_template"
+        case clusterTemplateList = "cluster_template_list"
 
         /// Get the default TTL for this resource type
         public var defaultTTL: TimeInterval {
@@ -65,7 +77,7 @@ public actor OpenStackCacheManager {
                 return 3600.0 // 1 hour for auth tokens
             case .serviceEndpoints, .quotas:
                 return 1800.0 // 30 minutes for semi-static data
-            case .flavor, .flavorList, .volumeType, .volumeTypeList:
+            case .flavor, .flavorList, .volumeType, .volumeTypeList, .project, .projectList, .user, .userList, .domain, .domainList, .role, .roleList, .cluster, .clusterList, .clusterTemplate, .clusterTemplateList:
                 return 900.0 // 15 minutes for relatively static resources
             case .keypair, .keypairList, .serverGroup, .serverGroupList, .image, .imageList, .network, .networkList, .subnet, .subnetList, .router, .routerList, .securityGroup, .securityGroupList, .addressGroup, .addressGroupList:
                 return 300.0 // 5 minutes for moderately static resources
