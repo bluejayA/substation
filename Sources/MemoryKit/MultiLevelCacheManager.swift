@@ -2,6 +2,9 @@ import Foundation
 #if canImport(Compression)
 import Compression
 #endif
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 
 /// Advanced multi-level cache manager providing L1 (memory), L2 (compressed memory), and L3 (disk) caching
 /// Generic implementation for MemoryKit - works with any cache key/value types
@@ -197,11 +200,41 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
     private var totalMisses: Int = 0
     private var compressionStats: CompressionStats = CompressionStats()
 
+    // Reusable JSON encoders/decoders for performance (PERF-004)
+    private let jsonEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    private let jsonDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
+    // Sampled logging for performance (PERF-001)
+    private var operationCount: Int = 0
+    private let logSampleRate: Int = 1000
+
     // Maintenance
     private var maintenanceTask: Task<Void, Never>?
 
+    /// Determines if current operation should be logged (sampling).
+    ///
+    /// Only logs 1 in every `logSampleRate` operations to reduce overhead.
+    private func shouldLog() -> Bool {
+        operationCount += 1
+        return operationCount % logSampleRate == 0
+    }
+
     // MARK: - Initialization
 
+    /// Creates a new multi-level cache manager.
+    ///
+    /// - Parameters:
+    ///   - configuration: Cache configuration options
+    ///   - logger: Optional logger for cache operations
     public init(
         configuration: Configuration = Configuration(),
         logger: (any MemoryKitLogger)? = nil
@@ -220,18 +253,24 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
 
         // Append cloud name as subdirectory if provided for cloud-specific caching
         if let cloudName = configuration.cacheIdentifier {
-            // Sanitize cloud name for use as directory name
-            let sanitizedCloudName = cloudName
-                .replacingOccurrences(of: "/", with: "_")
-                .replacingOccurrences(of: ":", with: "_")
-                .replacingOccurrences(of: " ", with: "_")
+            // Use secure sanitization to prevent path traversal attacks
+            let sanitizedCloudName = Self.sanitizeCloudName(cloudName)
             self.l3CacheDirectory = baseDirectory.appendingPathComponent(sanitizedCloudName)
         } else {
             self.l3CacheDirectory = baseDirectory
         }
 
-        // Create cache directory if needed
-        try? FileManager.default.createDirectory(at: l3CacheDirectory, withIntermediateDirectories: true)
+        // Create cache directory with secure permissions (owner only)
+        do {
+            try Self.createSecureDirectory(at: l3CacheDirectory)
+        } catch {
+            logger?.logWarning("Failed to create cache directory with secure permissions", context: [
+                "directory": l3CacheDirectory.path,
+                "error": error.localizedDescription
+            ])
+            // Fall back to standard creation
+            try? FileManager.default.createDirectory(at: l3CacheDirectory, withIntermediateDirectories: true)
+        }
 
         logger?.logInfo("Multi-level cache manager initialized", context: [
             "l1MaxSize": configuration.l1MaxSize,
@@ -256,15 +295,66 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         return homeDir.appendingPathComponent(".config/substation/multi-level-cache")
     }
 
-    /// Sanitizes a cloud name for use as a directory name.
+    /// Sanitizes a cloud name for safe use as a directory name.
+    ///
+    /// Uses a whitelist approach to prevent path traversal attacks. Only allows
+    /// alphanumeric characters, hyphens, and underscores. All other characters
+    /// are removed. The result is also limited to 64 characters.
     ///
     /// - Parameter cloudName: The cloud name to sanitize
     /// - Returns: A sanitized string safe for use as a directory name
     private static func sanitizeCloudName(_ cloudName: String) -> String {
-        return cloudName
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: ":", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
+        // Whitelist approach: only allow safe characters
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+
+        let sanitized = cloudName.unicodeScalars
+            .filter { allowed.contains($0) }
+            .map { Character($0) }
+            .prefix(64)  // Limit length to prevent filesystem issues
+
+        let result = String(sanitized)
+
+        // Ensure result is not empty or a reserved name
+        if result.isEmpty || result == "." || result == ".." {
+            return "default_cache"
+        }
+
+        return result
+    }
+
+    /// Creates a directory with secure permissions (owner only).
+    ///
+    /// - Parameter url: The URL of the directory to create
+    /// - Throws: Any error from FileManager
+    private static func createSecureDirectory(at url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]  // rwx------ (owner only)
+        )
+    }
+
+    /// Writes data to a file with secure permissions (owner read/write only).
+    ///
+    /// - Parameters:
+    ///   - data: The data to write
+    ///   - url: The URL to write to
+    /// - Throws: Any error from writing or setting attributes
+    private func writeSecureFile(_ data: Data, to url: URL) throws {
+        // Check if target is a symlink (prevent symlink attacks)
+        if let resourceValues = try? url.resourceValues(forKeys: [.isSymbolicLinkKey]),
+           resourceValues.isSymbolicLink == true {
+            try FileManager.default.removeItem(at: url)
+        }
+
+        // Write atomically to prevent partial reads
+        try data.write(to: url, options: [.atomic])
+
+        // Set restrictive permissions (owner read/write only)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],  // rw------- (owner only)
+            ofItemAtPath: url.path
+        )
     }
 
     /// Cleans up stale cache files from the cache directory.
@@ -351,7 +441,16 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
 
     // MARK: - Public API
 
-    /// Store data with intelligent tier placement
+    /// Stores data with intelligent tier placement.
+    ///
+    /// Data is automatically placed in the appropriate cache tier based on
+    /// priority and configuration settings.
+    ///
+    /// - Parameters:
+    ///   - value: The value to cache
+    ///   - key: The cache key
+    ///   - priority: Priority level for the entry
+    ///   - customTTL: Optional custom time-to-live
     public func store(
         _ value: Value,
         forKey key: Key,
@@ -360,7 +459,8 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
     ) async {
         do {
             let keyString = String(describing: key)
-            let jsonData = try JSONEncoder().encode(value)
+            // Use reusable encoder for performance (PERF-004)
+            let jsonData = try jsonEncoder.encode(value)
             let baseTTL = customTTL ?? configuration.defaultTTL
             let adjustedTTL = baseTTL * priority.ttlMultiplier
 
@@ -386,6 +486,7 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
     ) async -> Value? {
         let keyString = String(describing: key)
         let startTime = Date()
+        let logThisOp = shouldLog()  // Sample logging for performance (PERF-001)
 
         // Try L1 cache first
         if let l1Entry = l1Cache[keyString], !l1Entry.isExpired {
@@ -393,11 +494,15 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
             l1Hits += 1
 
             do {
-                let value = try JSONDecoder().decode(type, from: l1Entry.data)
-                logger?.logDebug("L1 cache hit", context: [
-                    "key": keyString,
-                    "responseTime": Date().timeIntervalSince(startTime)
-                ])
+                // Use reusable decoder for performance (PERF-004)
+                let value = try jsonDecoder.decode(type, from: l1Entry.data)
+                if logThisOp {
+                    logger?.logDebug("L1 cache hit (sampled)", context: [
+                        "key": keyString,
+                        "responseTime": Date().timeIntervalSince(startTime),
+                        "totalL1Hits": l1Hits
+                    ])
+                }
                 return value
             } catch {
                 // Remove corrupted entry
@@ -409,7 +514,8 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         if let l2Entry = l2Cache[keyString], !l2Entry.isExpired {
             do {
                 let decompressedData = try await decompress(l2Entry.compressedData)
-                let decoded = try JSONDecoder().decode(type, from: decompressedData)
+                // Use reusable decoder for performance (PERF-004)
+                let decoded = try jsonDecoder.decode(type, from: decompressedData)
 
                 l2Cache[keyString] = l2Entry.accessed()
                 l2Hits += 1
@@ -419,10 +525,13 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
                     await promoteToL1(key: keyString, data: decompressedData, from: l2Entry)
                 }
 
-                logger?.logDebug("L2 cache hit", context: [
-                    "key": keyString,
-                    "responseTime": Date().timeIntervalSince(startTime)
-                ])
+                if logThisOp {
+                    logger?.logDebug("L2 cache hit (sampled)", context: [
+                        "key": keyString,
+                        "responseTime": Date().timeIntervalSince(startTime),
+                        "totalL2Hits": l2Hits
+                    ])
+                }
                 return decoded
 
             } catch {
@@ -435,7 +544,8 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         if let l3Meta = l3Index[keyString], !l3Meta.isExpired {
             do {
                 let data = try await loadFromL3(key: keyString, metadata: l3Meta)
-                let decoded = try JSONDecoder().decode(type, from: data)
+                // Use reusable decoder for performance (PERF-004)
+                let decoded = try jsonDecoder.decode(type, from: data)
 
                 l3Index[keyString] = l3Meta.accessed()
                 l3Hits += 1
@@ -445,10 +555,13 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
                     await promoteToL2(key: keyString, data: data, from: l3Meta)
                 }
 
-                logger?.logDebug("L3 cache hit", context: [
-                    "key": keyString,
-                    "responseTime": Date().timeIntervalSince(startTime)
-                ])
+                if logThisOp {
+                    logger?.logDebug("L3 cache hit (sampled)", context: [
+                        "key": keyString,
+                        "responseTime": Date().timeIntervalSince(startTime),
+                        "totalL3Hits": l3Hits
+                    ])
+                }
                 return decoded
 
             } catch {
@@ -628,6 +741,13 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         }
     }
 
+    /// Stores data in the L3 (disk) cache tier.
+    ///
+    /// - Parameters:
+    ///   - key: Cache key
+    ///   - data: Data to store
+    ///   - priority: Cache priority level
+    ///   - ttl: Time-to-live in seconds
     private func storeInL3(
         key: String,
         data: Data,
@@ -638,18 +758,20 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
             let filename = generateL3Filename(for: key)
             let fileURL = l3CacheDirectory.appendingPathComponent(filename)
 
-            // Try compression for disk storage
+            // Try compression for disk storage (only for files > 4KB to avoid overhead)
             var finalData = data
             var isCompressed = false
 
-            if configuration.enableCompression && data.count > 1024 { // Compress files larger than 1KB
-                if let compressed = try? await compress(data), compressed.count < data.count {
+            if configuration.enableCompression && data.count > 4096 {
+                if let compressed = try? await compress(data),
+                   compressed.count < Int(Double(data.count) * 0.85) { // Only if 15%+ savings
                     finalData = compressed
                     isCompressed = true
                 }
             }
 
-            try finalData.write(to: fileURL)
+            // Write with secure permissions (owner read/write only)
+            try writeSecureFile(finalData, to: fileURL)
 
             let metadata = L3CacheMetadata(
                 filename: filename,
@@ -715,40 +837,67 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         return compressedData
     }
 
+    /// Decompresses LZFSE-compressed data with automatic buffer sizing.
+    ///
+    /// Uses a progressive buffer sizing strategy starting at 8x the compressed size
+    /// and doubling up to 64x if needed. This handles highly compressible data
+    /// (like JSON with repeated strings) that may have compression ratios > 10x.
+    ///
+    /// - Parameter compressedData: The compressed data to decompress
+    /// - Returns: The decompressed data
+    /// - Throws: MultiLevelCacheError.decompressionFailed if decompression fails
     private func decompress(_ compressedData: Data) async throws -> Data {
         guard configuration.enableCompression else { return compressedData }
 
         let startTime = Date()
 
         #if canImport(Compression)
-        // Estimate decompressed size (typically 2-10x compressed size for JSON)
-        let estimatedSize = compressedData.count * 8
+        // Try progressively larger buffer sizes to handle highly compressible data
+        var multiplier = 8
+        let maxMultiplier = 64
 
-        let decompressedData = try compressedData.withUnsafeBytes { bytes in
-            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: estimatedSize)
-            defer { buffer.deallocate() }
+        while multiplier <= maxMultiplier {
+            let estimatedSize = compressedData.count * multiplier
 
-            let decompressedSize = compression_decode_buffer(
-                buffer, estimatedSize,
-                bytes.bindMemory(to: UInt8.self).baseAddress!, compressedData.count,
-                nil, COMPRESSION_LZFSE
-            )
+            let result: Data? = compressedData.withUnsafeBytes { bytes -> Data? in
+                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: estimatedSize)
+                defer { buffer.deallocate() }
 
-            guard decompressedSize > 0 else {
-                throw MultiLevelCacheError.decompressionFailed
+                guard let baseAddress = bytes.bindMemory(to: UInt8.self).baseAddress else {
+                    return nil
+                }
+
+                let decompressedSize = compression_decode_buffer(
+                    buffer, estimatedSize,
+                    baseAddress, compressedData.count,
+                    nil, COMPRESSION_LZFSE
+                )
+
+                guard decompressedSize > 0 else {
+                    return nil  // Buffer may be too small, retry with larger
+                }
+
+                return Data(bytes: buffer, count: decompressedSize)
             }
 
-            return Data(bytes: buffer, count: decompressedSize)
+            if let decompressedData = result {
+                let decompressionTime = Date().timeIntervalSince(startTime)
+                compressionStats.recordDecompression(decompressionTime: decompressionTime)
+                return decompressedData
+            }
+
+            // Double buffer size and retry
+            multiplier *= 2
         }
+
+        // All attempts failed
+        throw MultiLevelCacheError.decompressionFailed
         #else
         // On Linux or when compression is not available, return data as-is
-        let decompressedData = compressedData
-        #endif
-
         let decompressionTime = Date().timeIntervalSince(startTime)
         compressionStats.recordDecompression(decompressionTime: decompressionTime)
-
-        return decompressedData
+        return compressedData
+        #endif
     }
 
     // MARK: - Tier Promotion
@@ -812,9 +961,22 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
 
     // MARK: - L3 Operations
 
+    /// Loads data from L3 (disk) cache tier.
+    ///
+    /// Uses async file I/O to avoid blocking the actor during disk access (PERF-003).
+    ///
+    /// - Parameters:
+    ///   - key: The cache key
+    ///   - metadata: Metadata for the cached entry
+    /// - Returns: The cached data (decompressed if necessary)
+    /// - Throws: Any error from file I/O or decompression
     private func loadFromL3(key: String, metadata: L3CacheMetadata) async throws -> Data {
         let fileURL = l3CacheDirectory.appendingPathComponent(metadata.filename)
-        let fileData = try Data(contentsOf: fileURL)
+
+        // Perform file I/O outside actor isolation to avoid blocking (PERF-003)
+        let fileData = try await Task.detached(priority: .userInitiated) {
+            try Data(contentsOf: fileURL)
+        }.value
 
         if metadata.isCompressed {
             return try await decompress(fileData)
@@ -838,20 +1000,27 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         return "cache_\(hash).dat"
     }
 
-    /// Simple hash function for generating consistent cache filenames.
+    /// Secure hash function for generating consistent cache filenames.
     ///
-    /// Uses a djb2-style hash algorithm to produce a deterministic integer hash
-    /// from the input string. This ensures the same input always produces the same
-    /// filename across application restarts.
+    /// Uses SHA256 when available for collision resistance (SEC-006), falling
+    /// back to a djb2-style hash on platforms without CryptoKit.
     ///
     /// - Parameter input: The string to hash
     /// - Returns: A hexadecimal string representation of the hash
     private static func simpleHash(_ input: String) -> String {
+        #if canImport(CryptoKit)
+        // Use SHA256 for better collision resistance (SEC-006)
+        let hash = SHA256.hash(data: Data(input.utf8))
+        // Use first 16 bytes (32 hex chars) for reasonable filename length
+        return hash.prefix(16).map { String(format: "%02x", $0) }.joined()
+        #else
+        // Fallback to djb2 on platforms without CryptoKit
         var hash: UInt64 = 5381
         for char in input.utf8 {
             hash = ((hash << 5) &+ hash) &+ UInt64(char)
         }
         return String(format: "%016llx", hash)
+        #endif
     }
 
     // MARK: - Maintenance
@@ -926,13 +1095,23 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         }
     }
 
+    /// Evicts entries from cache tiers when they exceed configured limits.
+    ///
+    /// Entries are sorted by score (higher = more valuable) and the lowest-scoring
+    /// entries are evicted first. Valuable entries may be demoted to lower tiers.
     private func evictIfNeeded() async {
         // Evict from L1 if needed
         if l1Cache.count > configuration.l1MaxSize {
             let sortedL1 = l1Cache.sorted { $0.value.score > $1.value.score }
-            let toEvict = l1Cache.count - Int(Double(configuration.l1MaxSize) * 0.8) // Reduce to 80% of max
+            let targetCount = Int(Double(configuration.l1MaxSize) * 0.8)
+            // Clamp toEvict to valid range to prevent array index out of bounds
+            let toEvict = min(l1Cache.count - targetCount, sortedL1.count)
 
-            for i in stride(from: sortedL1.count - 1, to: sortedL1.count - toEvict - 1, by: -1) {
+            guard toEvict > 0 else { return }
+
+            // Evict lowest-scoring entries (at end of sorted array)
+            let startIndex = max(0, sortedL1.count - toEvict)
+            for i in startIndex..<sortedL1.count {
                 let (key, entry) = sortedL1[i]
                 l1Cache.removeValue(forKey: key)
 
@@ -946,9 +1125,15 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         // Evict from L2 if needed
         if l2Cache.count > configuration.l2MaxSize {
             let sortedL2 = l2Cache.sorted { $0.value.score > $1.value.score }
-            let toEvict = l2Cache.count - Int(Double(configuration.l2MaxSize) * 0.8)
+            let targetCount = Int(Double(configuration.l2MaxSize) * 0.8)
+            // Clamp toEvict to valid range to prevent array index out of bounds
+            let toEvict = min(l2Cache.count - targetCount, sortedL2.count)
 
-            for i in stride(from: sortedL2.count - 1, to: sortedL2.count - toEvict - 1, by: -1) {
+            guard toEvict > 0 else { return }
+
+            // Evict lowest-scoring entries (at end of sorted array)
+            let startIndex = max(0, sortedL2.count - toEvict)
+            for i in startIndex..<sortedL2.count {
                 let (key, entry) = sortedL2[i]
                 l2Cache.removeValue(forKey: key)
 
@@ -959,6 +1144,9 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
                         await demoteToL3(key: key, data: decompressedData, from: entry)
                     } catch {
                         // If decompression fails, just discard
+                        logger?.logWarning("Failed to decompress during L2 eviction", context: [
+                            "key": key
+                        ])
                     }
                 }
             }
@@ -967,12 +1155,22 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         // Evict from L3 if needed
         if l3Index.count > configuration.l3MaxSize {
             let sortedL3 = l3Index.sorted { $0.value.accessCount < $1.value.accessCount }
-            let toEvict = l3Index.count - Int(Double(configuration.l3MaxSize) * 0.8)
+            let targetCount = Int(Double(configuration.l3MaxSize) * 0.8)
+            let toEvict = min(l3Index.count - targetCount, sortedL3.count)
 
-            for i in 0..<min(toEvict, sortedL3.count) {
+            guard toEvict > 0 else { return }
+
+            for i in 0..<toEvict {
                 let (key, metadata) = sortedL3[i]
                 l3Index.removeValue(forKey: key)
-                try? FileManager.default.removeItem(at: l3CacheDirectory.appendingPathComponent(metadata.filename))
+                do {
+                    try FileManager.default.removeItem(at: l3CacheDirectory.appendingPathComponent(metadata.filename))
+                } catch {
+                    logger?.logWarning("Failed to remove L3 cache file", context: [
+                        "filename": metadata.filename,
+                        "error": error.localizedDescription
+                    ])
+                }
             }
         }
     }
@@ -1073,18 +1271,35 @@ public enum MultiLevelCacheError: Error, LocalizedError {
     }
 }
 
+/// Statistics tracking for compression and decompression operations.
 public struct CompressionStats: Sendable {
+    /// Total number of compression operations performed
     public var totalCompressions: Int = 0
+    /// Total number of decompression operations performed
+    public var totalDecompressions: Int = 0
+    /// Total bytes before compression
     public var totalOriginalBytes: Int = 0
+    /// Total bytes after compression
     public var totalCompressedBytes: Int = 0
+    /// Running average compression time in seconds
     public var averageCompressionTime: TimeInterval = 0.0
+    /// Running average decompression time in seconds
     public var averageDecompressionTime: TimeInterval = 0.0
 
+    /// Average compression ratio (original size / compressed size).
+    ///
+    /// Returns 1.0 if no data has been compressed yet.
     public var averageCompressionRatio: Double {
-        guard totalOriginalBytes > 0 else { return 1.0 }
+        guard totalOriginalBytes > 0 && totalCompressedBytes > 0 else { return 1.0 }
         return Double(totalOriginalBytes) / Double(totalCompressedBytes)
     }
 
+    /// Records a compression operation.
+    ///
+    /// - Parameters:
+    ///   - originalSize: Size of data before compression in bytes
+    ///   - compressedSize: Size of data after compression in bytes
+    ///   - compressionTime: Time taken to compress in seconds
     public mutating func recordCompression(originalSize: Int, compressedSize: Int, compressionTime: TimeInterval) {
         let previousTotal = Double(totalCompressions) * averageCompressionTime
         totalCompressions += 1
@@ -1093,9 +1308,14 @@ public struct CompressionStats: Sendable {
         averageCompressionTime = (previousTotal + compressionTime) / Double(totalCompressions)
     }
 
+    /// Records a decompression operation.
+    ///
+    /// - Parameter decompressionTime: Time taken to decompress in seconds
     public mutating func recordDecompression(decompressionTime: TimeInterval) {
-        let previousTotal = Double(totalCompressions) * averageDecompressionTime
-        averageDecompressionTime = (previousTotal + decompressionTime) / Double(totalCompressions)
+        let previousTotal = Double(totalDecompressions) * averageDecompressionTime
+        totalDecompressions += 1
+        // Use separate counter to avoid division by zero when decompressions > compressions
+        averageDecompressionTime = (previousTotal + decompressionTime) / Double(totalDecompressions)
     }
 }
 

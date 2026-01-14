@@ -71,3 +71,6 @@ CLAUDE.md
 .gpt/
 GPT.md
 ModelMemory/
+
+# Editor
+.vscode/

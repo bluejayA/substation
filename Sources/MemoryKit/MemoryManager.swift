@@ -377,55 +377,93 @@ public actor MemoryManager {
 // MARK: - Memory Metrics
 
 public struct MemoryMetrics: Sendable {
+    /// Total cache hits since initialization
     public private(set) var cacheHits: Int = 0
+    /// Total cache misses since initialization
     public private(set) var cacheMisses: Int = 0
+    /// Total cache evictions since initialization
     public private(set) var cacheEvictions: Int = 0
+    /// Total bytes written to cache (cumulative)
     public private(set) var bytesWritten: Int = 0
+    /// Total bytes read from cache (cumulative)
     public private(set) var bytesRead: Int = 0
+    /// Total bytes evicted from cache (cumulative)
+    public private(set) var bytesEvicted: Int = 0
+    /// Current cache size in bytes
+    public private(set) var currentCacheSize: Int = 0
+    /// Total cleanup operations performed
     public private(set) var cleanupOperations: Int = 0
+    /// Number of aggressive cleanup operations
     public private(set) var aggressiveCleanups: Int = 0
+    /// Timestamp of last cleanup operation
     public private(set) var lastCleanupTime: Date?
 
+    /// Cache hit rate as a ratio (0.0 to 1.0).
     public var hitRate: Double {
         let total = cacheHits + cacheMisses
         return total > 0 ? Double(cacheHits) / Double(total) : 0.0
     }
 
+    /// Write efficiency ratio (bytes written / bytes read).
     public var efficiency: Double {
         return bytesRead > 0 ? Double(bytesWritten) / Double(bytesRead) : 0.0
     }
 
+    /// Records a cache hit.
+    ///
+    /// - Parameter size: Size of the cached data in bytes
     mutating func recordCacheHit(size: Int) {
         cacheHits += 1
         bytesRead += size
     }
 
+    /// Records a cache miss.
     mutating func recordCacheMiss() {
         cacheMisses += 1
     }
 
+    /// Records a cache write.
+    ///
+    /// - Parameter size: Size of the data written in bytes
     mutating func recordCacheWrite(size: Int) {
         bytesWritten += size
+        currentCacheSize += size
     }
 
+    /// Records a cache eviction.
+    ///
+    /// - Parameter size: Size of the evicted data in bytes
     mutating func recordCacheEviction(size: Int) {
         cacheEvictions += 1
-        bytesWritten = max(0, bytesWritten - size)
+        bytesEvicted += size
+        currentCacheSize = max(0, currentCacheSize - size)
     }
 
+    /// Records a cache entry expiry.
     mutating func recordCacheExpiry() {
         cacheEvictions += 1
     }
 
+    /// Records a mass eviction (cache clear).
+    ///
+    /// - Parameter size: Total size of evicted data in bytes
     mutating func recordMassEviction(size: Int) {
         cacheEvictions += 1
-        bytesWritten = 0
+        bytesEvicted += size
+        currentCacheSize = 0
     }
 
+    /// Records a cleanup operation.
+    ///
+    /// - Parameters:
+    ///   - entriesRemoved: Number of entries removed
+    ///   - bytesFreed: Number of bytes freed
+    ///   - wasAggressive: Whether this was an aggressive cleanup
     mutating func recordCleanup(entriesRemoved: Int, bytesFreed: Int, wasAggressive: Bool) {
         cleanupOperations += 1
         cacheEvictions += entriesRemoved
-        bytesWritten = max(0, bytesWritten - bytesFreed)
+        bytesEvicted += bytesFreed
+        currentCacheSize = max(0, currentCacheSize - bytesFreed)
         lastCleanupTime = Date()
 
         if wasAggressive {
@@ -433,6 +471,7 @@ public struct MemoryMetrics: Sendable {
         }
     }
 
+    /// Returns a snapshot of current metrics.
     func snapshot() -> MemoryMetrics {
         return self
     }

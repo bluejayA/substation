@@ -66,9 +66,16 @@ public actor CacheManager<Key: Hashable & Sendable, Value: Sendable> {
             return Date().timeIntervalSince(timestamp)
         }
 
+        /// Calculates access frequency as accesses per second.
+        ///
+        /// Uses a minimum 1 second time span to avoid division issues with new entries,
+        /// and counts the initial storage as the first access.
         var accessFrequency: Double {
-            let timeSpan = Date().timeIntervalSince(timestamp)
-            return timeSpan > 0 ? Double(accessCount) / timeSpan : 0
+            // Use minimum 1 second to avoid near-zero division for new entries
+            let timeSpan = max(1.0, Date().timeIntervalSince(timestamp))
+            // Count initial storage as first access for fair eviction
+            let effectiveAccessCount = max(1, accessCount)
+            return Double(effectiveAccessCount) / timeSpan
         }
 
         mutating func recordAccess() {
@@ -260,7 +267,7 @@ public actor CacheManager<Key: Hashable & Sendable, Value: Sendable> {
 
     private func startCleanupTask() {
         logger.logInfo("CacheManager starting periodic cleanup task", context: [
-            "cleanupInterval": "5 minutes"
+            "cleanupInterval": "30 seconds"
         ])
 
         cleanupTask = Task { [weak self] in
@@ -406,19 +413,50 @@ public actor CacheManager<Key: Hashable & Sendable, Value: Sendable> {
         }
     }
 
+    /// Estimates the memory size of a value in bytes.
+    ///
+    /// Uses type-specific sizing for known types and Mirror-based introspection
+    /// for collections and custom types. This approach works correctly with
+    /// Sendable types unlike casting to [Any].
+    ///
+    /// - Parameter value: The value to estimate size for
+    /// - Returns: Estimated size in bytes
     private func estimateSize(of value: Value) -> Int {
-        // Basic size estimation - could be improved with specific type handling
-        switch value {
-        case let data as Data:
+        // Handle known types first (most efficient)
+        if let data = value as? Data {
             return data.count
-        case let string as String:
+        }
+        if let string = value as? String {
             return string.utf8.count
-        case let array as [Any]:
-            return array.count * 100 // Rough estimate
-        case let dict as [String: Any]:
-            return dict.count * 150 // Rough estimate
+        }
+
+        // Use Mirror for collection introspection (works with Sendable types)
+        let mirror = Mirror(reflecting: value)
+
+        switch mirror.displayStyle {
+        case .collection, .set:
+            // Estimate based on element count
+            return max(64, mirror.children.count * 100)
+        case .dictionary:
+            // Dictionary entries are larger due to key storage
+            return max(64, mirror.children.count * 150)
+        case .struct, .class:
+            // Estimate based on property count
+            return max(64, mirror.children.count * 32)
+        case .tuple:
+            return max(32, mirror.children.count * 16)
+        case .optional:
+            // Recurse into optional value if present
+            if let (_, child) = mirror.children.first {
+                let childMirror = Mirror(reflecting: child)
+                return max(8, childMirror.children.count * 32)
+            }
+            return 8
+        case .enum:
+            return 16
         default:
-            return 64 // Default estimate
+            // Fallback to MemoryLayout for basic types
+            return max(64, MemoryLayout<Value>.size)
         }
     }
 }
@@ -481,15 +519,62 @@ public struct CacheMetrics: Sendable {
 
 // MARK: - Resource Pool
 
-/// Thread-safe resource pool for expensive-to-create objects with automatic cleanup
+/// A handle representing a leased resource from a ResourcePool.
+///
+/// ResourceHandle wraps a resource along with its unique tracking identifier,
+/// enabling proper resource lifecycle management for both reference and value types.
+/// Always release the handle back to the pool when done using the resource.
+public struct ResourceHandle<Resource: Sendable>: Sendable {
+    /// Unique identifier for this resource lease
+    public let id: UUID
+    /// The actual resource being leased
+    public let resource: Resource
+
+    internal init(id: UUID, resource: Resource) {
+        self.id = id
+        self.resource = resource
+    }
+}
+
+/// Thread-safe resource pool for expensive-to-create objects with automatic cleanup.
+///
+/// This pool manages a collection of reusable resources, providing efficient
+/// acquisition and release operations. It supports both reference and value types
+/// through UUID-based tracking instead of ObjectIdentifier.
+///
+/// ## Usage
+/// ```swift
+/// let pool = ResourcePool<DatabaseConnection>(
+///     configuration: .init(maxPoolSize: 10),
+///     factory: { try await DatabaseConnection.create() },
+///     cleanup: { conn in await conn.close() }
+/// )
+/// await pool.start()
+///
+/// let handle = try await pool.acquire()
+/// defer { Task { await pool.release(handle) } }
+/// // Use handle.resource
+/// ```
 public actor ResourcePool<Resource: Sendable> {
 
+    /// Configuration options for the resource pool.
     public struct Configuration: Sendable {
+        /// Maximum number of resources to keep in the pool
         public let maxPoolSize: Int
+        /// Minimum number of resources to maintain (pre-warmed)
         public let minPoolSize: Int
+        /// Time after which idle resources are cleaned up
         public let idleTimeout: TimeInterval
+        /// Whether to collect pool metrics
         public let enableMetrics: Bool
 
+        /// Creates a new pool configuration.
+        ///
+        /// - Parameters:
+        ///   - maxPoolSize: Maximum pool size (default: 10)
+        ///   - minPoolSize: Minimum pool size (default: 2)
+        ///   - idleTimeout: Idle timeout in seconds (default: 300)
+        ///   - enableMetrics: Enable metrics collection (default: true)
         public init(
             maxPoolSize: Int = 10,
             minPoolSize: Int = 2,
@@ -505,7 +590,9 @@ public actor ResourcePool<Resource: Sendable> {
 
     // MARK: - Pool Entry
 
-    private struct PoolEntry {
+    /// Internal tracking structure for pooled resources.
+    private struct PoolEntry: Sendable {
+        let id: UUID
         let resource: Resource
         let createdAt: Date
         var lastUsed: Date
@@ -529,12 +616,19 @@ public actor ResourcePool<Resource: Sendable> {
     private let validator: @Sendable (Resource) async -> Bool
 
     private var available: [PoolEntry] = []
-    private var inUse: [ObjectIdentifier: PoolEntry] = [:]
+    private var inUse: [UUID: PoolEntry] = [:]
     private var metrics: PoolMetrics
     private var cleanupTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
+    /// Creates a new resource pool.
+    ///
+    /// - Parameters:
+    ///   - configuration: Pool configuration options
+    ///   - factory: Async closure that creates new resources
+    ///   - cleanup: Async closure called when resources are discarded
+    ///   - validator: Async closure to validate resources before reuse
     public init(
         configuration: Configuration = Configuration(),
         factory: @escaping @Sendable () async throws -> Resource,
@@ -548,7 +642,10 @@ public actor ResourcePool<Resource: Sendable> {
         self.metrics = PoolMetrics()
     }
 
-    /// Start the resource pool (call after initialization)
+    /// Starts the resource pool background tasks.
+    ///
+    /// Call this method after initialization to enable automatic cleanup
+    /// of idle resources and pool warming.
     public func start() {
         startCleanupTask()
     }
@@ -559,18 +656,24 @@ public actor ResourcePool<Resource: Sendable> {
 
     // MARK: - Public API
 
-    /// Acquire a resource from the pool
-    public func acquire() async throws -> Resource {
+    /// Acquires a resource from the pool.
+    ///
+    /// Returns a ResourceHandle containing the resource and its tracking ID.
+    /// The handle must be released back to the pool when done.
+    ///
+    /// - Returns: A handle wrapping the acquired resource
+    /// - Throws: Any error from the factory when creating new resources
+    public func acquire() async throws -> ResourceHandle<Resource> {
         // Try to get from available pool
-        if let entry = available.popLast() {
+        while let entry = available.popLast() {
             // Validate resource
             if await validator(entry.resource) {
                 var updatedEntry = entry
                 updatedEntry.recordUse()
-                inUse[ObjectIdentifier(entry.resource as AnyObject)] = updatedEntry
+                inUse[entry.id] = updatedEntry
 
                 metrics.recordAcquisition(fromPool: true)
-                return entry.resource
+                return ResourceHandle(id: entry.id, resource: entry.resource)
             } else {
                 // Resource is invalid, clean it up
                 await cleanup(entry.resource)
@@ -579,26 +682,31 @@ public actor ResourcePool<Resource: Sendable> {
         }
 
         // Create new resource
+        let id = UUID()
         let resource = try await factory()
         let entry = PoolEntry(
+            id: id,
             resource: resource,
             createdAt: Date(),
             lastUsed: Date(),
             useCount: 1
         )
 
-        inUse[ObjectIdentifier(resource as AnyObject)] = entry
+        inUse[id] = entry
         metrics.recordAcquisition(fromPool: false)
 
-        return resource
+        return ResourceHandle(id: id, resource: resource)
     }
 
-    /// Return a resource to the pool
-    public func release(_ resource: Resource) async {
-        let identifier = ObjectIdentifier(resource as AnyObject)
-
-        guard let entry = inUse.removeValue(forKey: identifier) else {
-            return // Resource not from this pool
+    /// Releases a resource handle back to the pool.
+    ///
+    /// The resource will be returned to the pool for reuse if the pool
+    /// is not full, otherwise it will be cleaned up.
+    ///
+    /// - Parameter handle: The resource handle to release
+    public func release(_ handle: ResourceHandle<Resource>) async {
+        guard let entry = inUse.removeValue(forKey: handle.id) else {
+            return // Resource not from this pool or already released
         }
 
         // Check if pool is full
@@ -607,12 +715,14 @@ public actor ResourcePool<Resource: Sendable> {
             metrics.recordRelease(toPool: true)
         } else {
             // Pool is full, cleanup resource
-            await cleanup(resource)
+            await cleanup(entry.resource)
             metrics.recordRelease(toPool: false)
         }
     }
 
-    /// Get pool statistics
+    /// Returns pool statistics.
+    ///
+    /// - Returns: Current pool statistics including utilization and hit rate
     public func getStats() async -> PoolStats {
         return PoolStats(
             availableCount: available.count,
@@ -622,7 +732,10 @@ public actor ResourcePool<Resource: Sendable> {
         )
     }
 
-    /// Force cleanup of idle resources
+    /// Forces cleanup of idle resources.
+    ///
+    /// Removes and cleans up all resources that have been idle longer
+    /// than the configured timeout.
     public func cleanupIdleResources() async {
         let idleThreshold = Date().addingTimeInterval(-configuration.idleTimeout)
 
@@ -650,8 +763,10 @@ public actor ResourcePool<Resource: Sendable> {
     private func ensureMinimumPool() async {
         while available.count < configuration.minPoolSize {
             do {
+                let id = UUID()
                 let resource = try await factory()
                 let entry = PoolEntry(
+                    id: id,
                     resource: resource,
                     createdAt: Date(),
                     lastUsed: Date(),

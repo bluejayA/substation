@@ -1,4 +1,7 @@
 import Foundation
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+@preconcurrency import Darwin
+#endif
 
 // MARK: - Performance Monitoring Integration
 
@@ -193,15 +196,14 @@ public actor PerformanceMonitor {
 
     // MARK: - Metrics Collection
 
+    /// Collects unified metrics from all registered components.
+    ///
+    /// - Returns: A snapshot of current performance metrics
     public func collectMetrics() async -> UnifiedMetrics {
         let timestamp = Date()
         let memoryMetrics = await memoryManager?.getMetrics() ?? MemoryMetrics()
         let cacheMetrics = CacheMetrics()
-        let systemMetrics = SystemMetrics(
-            memoryUsage: 0.5,
-            cpuUsage: 0.3,
-            timestamp: timestamp
-        )
+        let systemMetrics = collectSystemMetrics(timestamp: timestamp)
 
         let performanceProfile = PerformanceProfile(
             averageResponseTime: 0.5,
@@ -218,13 +220,73 @@ public actor PerformanceMonitor {
         )
     }
 
+    /// Collects actual system metrics (BUG-010 fix).
+    ///
+    /// - Parameter timestamp: The timestamp for the metrics
+    /// - Returns: System metrics with actual values where available
+    private nonisolated func collectSystemMetrics(timestamp: Date) -> SystemMetrics {
+        #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+        // Get actual memory usage on Apple platforms
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+
+        // Use nonisolated(unsafe) for mach_task_self_ which is safe to read from any thread
+        let taskPort = mach_task_self_
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(taskPort, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+
+        let memoryUsage: Double
+        if result == KERN_SUCCESS {
+            let physicalMemory = Double(ProcessInfo.processInfo.physicalMemory)
+            memoryUsage = physicalMemory > 0 ? Double(info.resident_size) / physicalMemory : 0.0
+        } else {
+            memoryUsage = 0.0
+        }
+
+        return SystemMetrics(
+            memoryUsage: memoryUsage,
+            cpuUsage: 0.0,  // CPU usage requires complex sampling, left as placeholder
+            timestamp: timestamp
+        )
+        #else
+        // On other platforms, return placeholder values
+        return SystemMetrics(
+            memoryUsage: 0.0,
+            cpuUsage: 0.0,
+            timestamp: timestamp
+        )
+        #endif
+    }
+
     // MARK: - Alert Management
 
+    /// Returns all currently active performance alerts.
+    ///
+    /// - Returns: Array of active alerts
     public func getActiveAlerts() async -> [PerformanceAlert] {
         return activeAlerts
     }
 
+    /// Clears a specific performance alert.
+    ///
+    /// - Parameter alert: The alert to clear
     public func clearAlert(_ alert: PerformanceAlert) async {
-        activeAlerts.removeAll { $0.description == alert.description }
+        // Use direct enum comparison instead of string description (BUG-011 fix)
+        activeAlerts.removeAll { existingAlert in
+            switch (existingAlert, alert) {
+            case let (.highMemoryUsage(c1, t1), .highMemoryUsage(c2, t2)):
+                return c1 == c2 && t1 == t2
+            case let (.lowCacheHitRate(c1, t1), .lowCacheHitRate(c2, t2)):
+                return c1 == c2 && t1 == t2
+            case let (.slowResponseTime(c1, t1), .slowResponseTime(c2, t2)):
+                return c1 == c2 && t1 == t2
+            default:
+                return false
+            }
+        }
     }
 }
