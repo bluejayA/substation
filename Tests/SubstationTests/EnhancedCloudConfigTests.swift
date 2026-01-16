@@ -111,6 +111,51 @@ final class EnhancedCloudConfigTests: XCTestCase {
         XCTAssertEqual(cloudConfig.interface, "public")
     }
 
+    func testTokenAuthenticationParsing() async throws {
+        let yamlContent = """
+        clouds:
+          tokencloud:
+            auth:
+              auth_url: https://identity.example.com/v3
+              token: gAAAAABhExampleTokenValue
+              project_id: abc123def456
+            auth_type: v3token
+            region_name: RegionOne
+        """
+
+        let parser = EnhancedYAMLParser()
+        let data = yamlContent.data(using: .utf8)!
+        let config = try await parser.parse(data)
+
+        XCTAssertEqual(config.clouds.count, 1)
+        let cloudConfig = config.clouds["tokencloud"]!
+        XCTAssertEqual(cloudConfig.auth.token, "gAAAAABhExampleTokenValue")
+        XCTAssertEqual(cloudConfig.auth.project_id, "abc123def456")
+        XCTAssertEqual(cloudConfig.primaryRegionName, "RegionOne")
+    }
+
+    func testTokenAuthenticationWithProjectName() async throws {
+        let yamlContent = """
+        clouds:
+          tokencloud:
+            auth:
+              auth_url: https://identity.example.com/v3
+              token: gAAAAABhExampleToken
+              project_name: myproject
+              project_domain_name: Default
+            region_name: RegionOne
+        """
+
+        let parser = EnhancedYAMLParser()
+        let data = yamlContent.data(using: .utf8)!
+        let config = try await parser.parse(data)
+
+        let cloudConfig = config.clouds["tokencloud"]!
+        XCTAssertEqual(cloudConfig.auth.token, "gAAAAABhExampleToken")
+        XCTAssertEqual(cloudConfig.auth.project_name, "myproject")
+        XCTAssertEqual(cloudConfig.auth.project_domain_name, "Default")
+    }
+
     func testEnvironmentVariableInYAML() async throws {
         // Set environment variables for test
         setenv("OS_USERNAME", "env_user", 1)
@@ -267,6 +312,48 @@ final class EnhancedCloudConfigTests: XCTestCase {
             XCTAssertEqual(projectName, "project")
         default:
             XCTFail("Expected application credential authentication method")
+        }
+    }
+
+    func testTokenAuthMethodDetermination() async {
+        let authManager = AuthenticationManager()
+        let authConfig = AuthConfig(
+            auth_url: "https://example.com/v3",
+            username: nil,
+            password: nil,
+            project_name: nil,
+            project_domain_name: nil,
+            user_domain_name: nil,
+            application_credential_id: nil,
+            application_credential_secret: nil,
+            application_credential_name: nil,
+            user_id: nil,
+            project_id: "project123",
+            project_domain_id: nil,
+            user_domain_id: nil,
+            token: "gAAAAABhExampleToken",
+            identity_provider: nil,
+            protocol: nil,
+            mapped_local_user: nil,
+            system_scope: nil,
+            passcode: nil,
+            totp: nil,
+            verify: nil,
+            cacert: nil,
+            cert: nil,
+            key: nil,
+            insecure: nil
+        )
+
+        let method = await authManager.determineAuthMethod(from: authConfig)
+
+        switch method {
+        case .token(let token, let projectName, let projectID):
+            XCTAssertEqual(token, "gAAAAABhExampleToken")
+            XCTAssertNil(projectName)
+            XCTAssertEqual(projectID, "project123")
+        default:
+            XCTFail("Expected token authentication method")
         }
     }
 

@@ -147,6 +147,33 @@ public enum RegionDetection {
                 ]
             }
             return authDict
+
+        case .token(let token, let projectName, let projectID, _, let projectDomainName):
+            var projectDict: [String: Any] = [:]
+            if let projectID = projectID {
+                projectDict["id"] = projectID
+            } else if let projectName = projectName {
+                projectDict["name"] = projectName
+                if let projectDomainName = projectDomainName {
+                    projectDict["domain"] = ["name": projectDomainName]
+                } else {
+                    projectDict["domain"] = ["name": "default"]
+                }
+            }
+
+            return [
+                "auth": [
+                    "identity": [
+                        "methods": ["token"],
+                        "token": [
+                            "id": token
+                        ]
+                    ],
+                    "scope": [
+                        "project": projectDict
+                    ]
+                ]
+            ]
         }
     }
 

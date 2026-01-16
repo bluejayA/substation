@@ -443,6 +443,8 @@ public final class OpenStackClient: @unchecked Sendable {
                 return projectName
             case .applicationCredential(_, _, let projectName, _):
                 return projectName
+            case .token(_, let projectName, _, _, _):
+                return projectName
             }
         }
     }
