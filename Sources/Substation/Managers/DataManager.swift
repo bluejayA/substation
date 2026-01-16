@@ -152,6 +152,9 @@ class DataManager {
 
         let _ = await DataProviderRegistry.shared.fetchPhase(.secondary, forceRefresh: true)
 
+        // Also refresh volume archives (snapshots and backups) in secondary phase
+        await refreshVolumeArchives()
+
         let phaseDuration = Date().timeIntervalSinceReferenceDate - phaseStart
         Logger.shared.logInfo("DataManager - Phase 2 completed in \(String(format: "%.2f", phaseDuration))s")
     }
@@ -185,12 +188,45 @@ class DataManager {
             forceRefresh: true
         )
 
+        // Also refresh volume archives if user is viewing that view
+        let currentView = tui.viewCoordinator.currentView
+        if currentView == .volumeArchives || currentView == .volumeArchiveDetail {
+            await refreshVolumeArchives()
+        }
+
         tui.resourceOperations.updateResourceCounts()
 
         let duration = Date().timeIntervalSinceReferenceDate - startTime
         Logger.shared.logDebug("DataManager - Fast refresh completed in \(String(format: "%.2f", duration))s")
 
         tui.markNeedsRedraw()
+    }
+
+    /// Refresh volume archives (snapshots and backups) for near-realtime updates
+    ///
+    /// Called during fast refresh when user is viewing volume archives view.
+    private func refreshVolumeArchives() async {
+        guard let tui = tui else { return }
+
+        Logger.shared.logDebug("DataManager - Refreshing volume archives")
+
+        do {
+            // Fetch snapshots and backups concurrently
+            async let snapshotsTask = client.cinder.listSnapshots(forceRefresh: true)
+            async let backupsTask = client.cinder.listBackups()
+
+            let (snapshots, backups) = try await (snapshotsTask, backupsTask)
+
+            tui.cacheManager.cachedVolumeSnapshots = snapshots
+            tui.cacheManager.cachedVolumeBackups = backups
+
+            Logger.shared.logDebug("DataManager - Volume archives refreshed", context: [
+                "snapshotCount": snapshots.count,
+                "backupCount": backups.count
+            ])
+        } catch {
+            Logger.shared.logError("DataManager - Failed to refresh volume archives: \(error)")
+        }
     }
 
     // MARK: - Cache Management

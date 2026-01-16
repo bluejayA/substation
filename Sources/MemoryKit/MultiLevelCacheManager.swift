@@ -54,7 +54,7 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
 
     // MARK: - Cache Priority
 
-    public enum CachePriority: Int, CaseIterable, Sendable {
+    public enum CachePriority: Int, CaseIterable, Sendable, Codable {
         case critical = 4    // Auth tokens, service endpoints
         case high = 3        // Active servers, current projects
         case normal = 2      // General resources
@@ -150,7 +150,11 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         }
     }
 
-    private struct L3CacheMetadata {
+    /// Metadata for L3 cache entries stored on disk.
+    ///
+    /// This structure is Codable to support persisting the cache index to disk,
+    /// enabling cache reuse across application restarts.
+    private struct L3CacheMetadata: Codable {
         let filename: String
         let size: Int
         let timestamp: Date
@@ -159,6 +163,7 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         let lastAccessed: Date
         let priority: CachePriority
         let isCompressed: Bool
+        let cacheKey: String  // Store the original key for index rebuilding
 
         var isExpired: Bool {
             Date().timeIntervalSince(timestamp) > ttl
@@ -173,10 +178,26 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
                 accessCount: accessCount + 1,
                 lastAccessed: Date(),
                 priority: priority,
-                isCompressed: isCompressed
+                isCompressed: isCompressed,
+                cacheKey: cacheKey
             )
         }
+
+        enum CodingKeys: String, CodingKey {
+            case filename, size, timestamp, ttl, accessCount, lastAccessed, priority, isCompressed, cacheKey
+        }
     }
+
+    /// Persisted index structure for L3 cache.
+    ///
+    /// This structure wraps the L3 index for serialization to disk.
+    private struct L3IndexFile: Codable {
+        let version: Int
+        let entries: [String: L3CacheMetadata]
+    }
+
+    /// Current version of the L3 index file format
+    private static var l3IndexCurrentVersion: Int { 1 }
 
     // MARK: - Properties
 
@@ -283,8 +304,120 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
     }
 
     /// Start the cache manager (call after initialization)
+    ///
+    /// This method loads the L3 index from disk and starts maintenance tasks.
+    /// Must be called after initialization to enable cache reuse across restarts.
     public func start() {
+        // Load existing L3 index from disk for cache reuse across restarts
+        loadL3Index()
         startMaintenanceTasks()
+
+        logger?.logInfo("Cache manager started", context: [
+            "l3EntriesLoaded": l3Index.count
+        ])
+    }
+
+    // MARK: - L3 Index Persistence
+
+    /// Name of the index file for L3 cache metadata
+    private static var l3IndexFilename: String { "cache_index.json" }
+
+    /// URL for the L3 index file
+    private var l3IndexFileURL: URL {
+        l3CacheDirectory.appendingPathComponent(Self.l3IndexFilename)
+    }
+
+    /// Load the L3 index from disk.
+    ///
+    /// This method reads the persisted cache index to enable cache reuse across
+    /// application restarts. Expired entries and entries with missing files are
+    /// automatically removed.
+    private func loadL3Index() {
+        let indexURL = l3IndexFileURL
+
+        guard FileManager.default.fileExists(atPath: indexURL.path) else {
+            logger?.logDebug("No L3 index file found, starting with empty index", context: [
+                "path": indexURL.path
+            ])
+            return
+        }
+
+        do {
+            let data = try Data(contentsOf: indexURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let indexFile = try decoder.decode(L3IndexFile.self, from: data)
+
+            // Validate version compatibility
+            guard indexFile.version == Self.l3IndexCurrentVersion else {
+                logger?.logWarning("L3 index version mismatch, starting fresh", context: [
+                    "fileVersion": indexFile.version,
+                    "currentVersion": Self.l3IndexCurrentVersion
+                ])
+                return
+            }
+
+            // Load entries, filtering out expired and missing files
+            var loadedCount = 0
+            var expiredCount = 0
+            var missingCount = 0
+
+            for (key, metadata) in indexFile.entries {
+                // Skip expired entries
+                if metadata.isExpired {
+                    expiredCount += 1
+                    continue
+                }
+
+                // Verify the cache file exists
+                let fileURL = l3CacheDirectory.appendingPathComponent(metadata.filename)
+                guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                    missingCount += 1
+                    continue
+                }
+
+                l3Index[key] = metadata
+                loadedCount += 1
+            }
+
+            logger?.logInfo("L3 index loaded from disk", context: [
+                "loadedEntries": loadedCount,
+                "expiredEntries": expiredCount,
+                "missingFiles": missingCount
+            ])
+
+        } catch {
+            logger?.logWarning("Failed to load L3 index, starting fresh", context: [
+                "error": error.localizedDescription
+            ])
+        }
+    }
+
+    /// Save the L3 index to disk.
+    ///
+    /// This method persists the cache index to enable cache reuse across
+    /// application restarts. Called after modifications to the index.
+    private func saveL3Index() {
+        let indexFile = L3IndexFile(version: Self.l3IndexCurrentVersion, entries: l3Index)
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.sortedKeys]  // Deterministic output
+            let data = try encoder.encode(indexFile)
+
+            try writeSecureFile(data, to: l3IndexFileURL)
+
+            if shouldLog() {
+                logger?.logDebug("L3 index saved to disk", context: [
+                    "entries": l3Index.count
+                ])
+            }
+        } catch {
+            logger?.logWarning("Failed to save L3 index", context: [
+                "error": error.localizedDescription
+            ])
+        }
     }
 
     // MARK: - Static Cache Cleanup
@@ -592,6 +725,7 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
         // Remove from L3
         if let l3Meta = l3Index.removeValue(forKey: keyString) {
             try? FileManager.default.removeItem(at: l3CacheDirectory.appendingPathComponent(l3Meta.filename))
+            saveL3Index()
         }
     }
 
@@ -605,6 +739,7 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
             try? FileManager.default.removeItem(at: l3CacheDirectory.appendingPathComponent(metadata.filename))
         }
         l3Index.removeAll()
+        saveL3Index()
 
         // Reset statistics
         l1Hits = 0
@@ -781,7 +916,8 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
                 accessCount: 0,
                 lastAccessed: Date(),
                 priority: priority,
-                isCompressed: isCompressed
+                isCompressed: isCompressed,
+                cacheKey: key
             )
 
             // Remove from other tiers if present
@@ -789,6 +925,9 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
             l2Cache.removeValue(forKey: key)
 
             l3Index[key] = metadata
+
+            // Persist index to disk for cache reuse across restarts
+            saveL3Index()
 
         } catch {
             logger?.logError("Failed to store data in L3 cache", context: [
@@ -803,15 +942,21 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
     private func compress(_ data: Data) async throws -> Data {
         guard configuration.enableCompression else { return data }
 
+        // Skip compression for very small data (overhead not worth it)
+        guard data.count > 64 else { return data }
+
         let startTime = Date()
 
         #if canImport(Compression)
+        // Allocate buffer larger than input to handle incompressible data
+        // LZFSE can produce output slightly larger than input for incompressible data
+        let bufferSize = data.count + max(256, data.count / 10)
         let compressedData = try data.withUnsafeBytes { bytes in
-            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
+            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
             defer { buffer.deallocate() }
 
             let compressedSize = compression_encode_buffer(
-                buffer, data.count,
+                buffer, bufferSize,
                 bytes.bindMemory(to: UInt8.self).baseAddress!, data.count,
                 nil, COMPRESSION_LZFSE
             )
@@ -952,9 +1097,9 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
             ])
 
         } catch {
-            logger?.logError("Failed to promote L3 entry to L2", context: [
-                "key": key,
-                "error": error.localizedDescription
+            // Promotion failure is non-critical - data remains in L3
+            logger?.logDebug("Skipped L3 to L2 promotion (compression unavailable)", context: [
+                "key": key
             ])
         }
     }
@@ -1172,6 +1317,7 @@ public actor MultiLevelCacheManager<Key: Hashable & Sendable, Value: Codable & S
                     ])
                 }
             }
+            saveL3Index()
         }
     }
 
