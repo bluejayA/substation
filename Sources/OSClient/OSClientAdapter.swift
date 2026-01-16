@@ -399,10 +399,15 @@ extension OpenStackClient {
     }
 
     /// Get snapshots for a specific volume
-    public func getVolumeSnapshots(volumeId: String) async throws -> [VolumeSnapshot] {
+    ///
+    /// - Parameters:
+    ///   - volumeId: The ID of the volume to get snapshots for
+    ///   - forceRefresh: Whether to bypass cache and fetch fresh data from API
+    /// - Returns: Array of volume snapshots for the specified volume
+    public func getVolumeSnapshots(volumeId: String, forceRefresh: Bool = false) async throws -> [VolumeSnapshot] {
         return try await executeWithTokenRefresh {
             let cinder = await self.cinder
-            return try await cinder.listSnapshots(volumeId: volumeId)
+            return try await cinder.listSnapshots(volumeId: volumeId, forceRefresh: forceRefresh)
         }
     }
 

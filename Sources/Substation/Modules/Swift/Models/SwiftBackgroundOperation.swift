@@ -45,6 +45,7 @@ final class SwiftBackgroundOperation: Identifiable {
         case delete
         case bulkDelete
         case bulkCreate
+        case cascadingDelete
 
         var displayName: String {
             switch self {
@@ -53,6 +54,7 @@ final class SwiftBackgroundOperation: Identifiable {
             case .delete: return "Delete"
             case .bulkDelete: return "Bulk Delete"
             case .bulkCreate: return "Bulk Create"
+            case .cascadingDelete: return "Cascading Delete"
             }
         }
     }

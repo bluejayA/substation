@@ -547,10 +547,13 @@ public final class OpenStackClient: @unchecked Sendable {
     }
 
     /// List all volumes in the project
-    public func listVolumes() async throws -> [Volume] {
+    ///
+    /// - Parameter forceRefresh: Force refresh from API, bypassing cache
+    /// - Returns: Array of volumes
+    public func listVolumes(forceRefresh: Bool = false) async throws -> [Volume] {
         return try await executeWithTokenRefresh {
             let cinder = await self.cinder
-            return try await cinder.listVolumes()
+            return try await cinder.listVolumes(forceRefresh: forceRefresh)
         }
     }
 

@@ -56,6 +56,7 @@ public enum OperationType {
     case batchResourceCleanup(resourceCount: Int)
     case batchFloatingIPCreate(ipCount: Int)
     case batchFloatingIPAssign(assignmentCount: Int)
+    case cascadingVolumeDelete(snapshotCount: Int)
 
     var stages: [OperationStage] {
         switch self {
@@ -173,6 +174,15 @@ public enum OperationType {
             let timePerAssignment: TimeInterval = 15.0 // ~15 seconds per assignment
             return [
                 OperationStage(name: "Assigning", description: "Assigning \(assignmentCount) floating IPs", estimatedDuration: Double(assignmentCount) * timePerAssignment, weight: 1.0)
+            ]
+
+        case .cascadingVolumeDelete(let snapshotCount):
+            let timePerSnapshot: TimeInterval = 30.0 // ~30 seconds per snapshot deletion
+            let volumeDeleteTime: TimeInterval = 20.0
+            return [
+                OperationStage(name: "Deleting Snapshots", description: "Deleting \(snapshotCount) snapshot(s)", estimatedDuration: Double(snapshotCount) * timePerSnapshot, weight: 0.7),
+                OperationStage(name: "Verifying", description: "Verifying snapshots removed", estimatedDuration: 10.0, weight: 0.1),
+                OperationStage(name: "Deleting Volume", description: "Deleting volume", estimatedDuration: volumeDeleteTime, weight: 0.2)
             ]
         }
     }

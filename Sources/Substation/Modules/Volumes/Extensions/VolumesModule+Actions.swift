@@ -787,6 +787,13 @@ extension VolumesModule {
     // MARK: - Volume CRUD Operations
 
     /// Delete the currently selected volume
+    ///
+    /// This method handles volume deletion with cascading delete support:
+    /// - Verifies the volume is not attached to any servers
+    /// - Checks for existing snapshots and automatically offers cascading delete
+    /// - If initial snapshot check fails, attempts delete and handles snapshot errors
+    /// - Provides clear status messages for all scenarios
+    ///
     /// - Parameter screen: The ncurses screen pointer for UI operations
     internal func deleteVolume(screen: OpaquePointer?) async {
         guard let tui = tui else { return }
@@ -803,7 +810,34 @@ extension VolumesModule {
 
         // Check if volume is attached to any servers
         if !(volume.attachments?.isEmpty ?? true) {
-            tui.statusMessage = "Cannot delete volume '\(volumeName)': Volume is attached to server(s)"
+            tui.statusMessage = "Cannot delete volume '\(volumeName)': Volume is attached to server(s). Detach first."
+            return
+        }
+
+        // Check for snapshots associated with this volume
+        tui.statusMessage = "Checking for dependent snapshots..."
+        await tui.draw(screen: screen)
+
+        var volumeSnapshots: [VolumeSnapshot] = []
+        var snapshotCheckFailed = false
+        do {
+            volumeSnapshots = try await tui.client.getVolumeSnapshots(volumeId: volume.id)
+        } catch {
+            snapshotCheckFailed = true
+            Logger.shared.logError(
+                "Failed to check volume snapshots",
+                error: error,
+                context: ["volumeId": volume.id]
+            )
+        }
+
+        // If snapshots exist, perform cascading delete
+        if !volumeSnapshots.isEmpty {
+            await handleVolumeDeleteWithSnapshots(
+                volume: volume,
+                snapshots: volumeSnapshots,
+                screen: screen
+            )
             return
         }
 
@@ -816,6 +850,7 @@ extension VolumesModule {
         // Show deletion in progress
         tui.statusMessage = "Deleting volume '\(volumeName)'..."
         tui.renderCoordinator.needsRedraw = true
+        await tui.draw(screen: screen)
 
         do {
             try await tui.client.deleteVolume(id: volume.id)
@@ -835,6 +870,12 @@ extension VolumesModule {
             tui.refreshAfterOperation()
 
         } catch let error as OpenStackError {
+            // Handle snapshot-related errors by offering cascading delete
+            if await handleSnapshotDeleteError(error: error, volume: volume, snapshotCheckFailed: snapshotCheckFailed, screen: screen) {
+                return
+            }
+
+            // Handle other errors
             let baseMsg = "Failed to delete volume '\(volumeName)'"
             switch error {
             case .authenticationFailed:
@@ -844,17 +885,13 @@ extension VolumesModule {
             case .unexpectedResponse:
                 tui.statusMessage = "\(baseMsg): Unexpected response from server"
             case .httpError(let code, let message):
-                if let message = message {
-                    tui.statusMessage = "\(baseMsg): \(message)"
-                } else {
-                    tui.statusMessage = "\(baseMsg): HTTP error \(code)"
-                }
-            case .networkError(let error):
-                tui.statusMessage = "\(baseMsg): Network error - \(error.localizedDescription)"
-            case .decodingError(let error):
-                tui.statusMessage = "\(baseMsg): Data decoding error - \(error.localizedDescription)"
-            case .encodingError(let error):
-                tui.statusMessage = "\(baseMsg): Data encoding error - \(error.localizedDescription)"
+                tui.statusMessage = "\(baseMsg): \(message ?? "HTTP error \(code)")"
+            case .networkError(let netError):
+                tui.statusMessage = "\(baseMsg): Network error - \(netError.localizedDescription)"
+            case .decodingError(let decError):
+                tui.statusMessage = "\(baseMsg): Data decoding error - \(decError.localizedDescription)"
+            case .encodingError(let encError):
+                tui.statusMessage = "\(baseMsg): Data encoding error - \(encError.localizedDescription)"
             case .configurationError(let message):
                 tui.statusMessage = "\(baseMsg): Configuration error - \(message)"
             case .performanceEnhancementsNotAvailable:
@@ -869,6 +906,445 @@ extension VolumesModule {
         } catch {
             tui.statusMessage = "Failed to delete volume '\(volumeName)': \(error.localizedDescription)"
         }
+    }
+
+    /// Handle volume deletion when snapshots are detected
+    ///
+    /// Shows a confirmation dialog and performs cascading delete if confirmed.
+    ///
+    /// - Parameters:
+    ///   - volume: The volume to delete
+    ///   - snapshots: The snapshots associated with the volume
+    ///   - screen: The ncurses screen pointer
+    private func handleVolumeDeleteWithSnapshots(
+        volume: Volume,
+        snapshots: [VolumeSnapshot],
+        screen: OpaquePointer?
+    ) async {
+        guard let tui = tui else { return }
+
+        let volumeName = volume.name ?? "Unnamed Volume"
+        let snapshotNames = snapshots.prefix(5).map { $0.name ?? $0.id }
+        var details = snapshotNames
+        if snapshots.count > 5 {
+            details.append("... and \(snapshots.count - 5) more")
+        }
+
+        let cascadeConfirmed = await ViewUtils.confirmOperation(
+            title: "Cascading Delete",
+            message: "Volume '\(volumeName)' has \(snapshots.count) snapshot(s). Delete snapshots and volume?",
+            details: details,
+            screen: screen,
+            screenRows: tui.screenRows,
+            screenCols: tui.screenCols
+        )
+
+        if cascadeConfirmed {
+            await performCascadingVolumeDelete(
+                volume: volume,
+                snapshots: snapshots,
+                screen: screen
+            )
+        } else {
+            tui.statusMessage = "Deletion cancelled. Volume has \(snapshots.count) dependent snapshot(s)."
+        }
+    }
+
+    /// Handle snapshot-related delete errors by offering cascading delete
+    ///
+    /// When a volume delete fails due to dependent snapshots, this method
+    /// fetches the snapshots and offers to perform a cascading delete.
+    ///
+    /// - Parameters:
+    ///   - error: The OpenStack error from the failed delete
+    ///   - volume: The volume that failed to delete
+    ///   - snapshotCheckFailed: Whether the initial snapshot check failed
+    ///   - screen: The ncurses screen pointer
+    /// - Returns: True if the error was handled (snapshot-related), false otherwise
+    private func handleSnapshotDeleteError(
+        error: OpenStackError,
+        volume: Volume,
+        snapshotCheckFailed: Bool,
+        screen: OpaquePointer?
+    ) async -> Bool {
+        guard let tui = tui else { return false }
+
+        let volumeName = volume.name ?? "Unnamed Volume"
+
+        // Check if this is a snapshot-related error
+        let isSnapshotError: Bool
+        switch error {
+        case .httpError(let code, let message):
+            // OpenStack returns 400 or 409 when volume has dependent snapshots
+            let errorMessage = message?.lowercased() ?? ""
+            isSnapshotError = (code == 400 || code == 409) &&
+                (errorMessage.contains("snapshot") ||
+                 errorMessage.contains("dependent") ||
+                 errorMessage.contains("has 1 dependent") ||
+                 errorMessage.contains("has dependent"))
+        default:
+            isSnapshotError = false
+        }
+
+        guard isSnapshotError else { return false }
+
+        // Fetch snapshots to show the user what needs to be deleted
+        tui.statusMessage = "Volume has dependent snapshots. Fetching snapshot list..."
+        await tui.draw(screen: screen)
+
+        var snapshots: [VolumeSnapshot] = []
+        do {
+            snapshots = try await tui.client.getVolumeSnapshots(volumeId: volume.id)
+        } catch {
+            Logger.shared.logError(
+                "Failed to fetch snapshots for cascading delete",
+                error: error,
+                context: ["volumeId": volume.id]
+            )
+        }
+
+        if snapshots.isEmpty {
+            // Could not fetch snapshots but API says they exist
+            let confirmed = await ViewUtils.confirmOperation(
+                title: "Cascading Delete",
+                message: "Volume '\(volumeName)' has dependent snapshots. Delete all snapshots and the volume?",
+                details: ["Unable to list snapshots - they will be deleted automatically"],
+                screen: screen,
+                screenRows: tui.screenRows,
+                screenCols: tui.screenCols
+            )
+
+            if confirmed {
+                // Try to get all snapshots and filter by volume
+                tui.statusMessage = "Fetching all snapshots..."
+                await tui.draw(screen: screen)
+
+                do {
+                    let allSnapshots = try await tui.client.getAllVolumeSnapshots()
+                    snapshots = allSnapshots.filter { $0.volumeId == volume.id }
+                } catch {
+                    tui.statusMessage = "Failed to fetch snapshots. Delete snapshots manually first."
+                    return true
+                }
+
+                if !snapshots.isEmpty {
+                    await performCascadingVolumeDelete(volume: volume, snapshots: snapshots, screen: screen)
+                } else {
+                    tui.statusMessage = "Could not identify dependent snapshots. Delete them manually first."
+                }
+            } else {
+                tui.statusMessage = "Deletion cancelled. Volume has dependent snapshots."
+            }
+        } else {
+            await handleVolumeDeleteWithSnapshots(volume: volume, snapshots: snapshots, screen: screen)
+        }
+
+        return true
+    }
+
+    /// Perform cascading delete of a volume and its snapshots
+    ///
+    /// Deletes all snapshots associated with a volume in parallel, waits for
+    /// all deletions to complete, waits for the volume to reach a deletable state,
+    /// then deletes the volume itself. This operation runs in the background and
+    /// is non-blocking, with progress tracked via the Operations system.
+    ///
+    /// - Parameters:
+    ///   - volume: The volume to delete
+    ///   - snapshots: The snapshots to delete before the volume
+    ///   - screen: The ncurses screen pointer for UI operations
+    private func performCascadingVolumeDelete(
+        volume: Volume,
+        snapshots: [VolumeSnapshot],
+        screen: OpaquePointer?
+    ) async {
+        guard let tui = tui else { return }
+
+        let volumeName = volume.name ?? "Unnamed Volume"
+        let snapshotCount = snapshots.count
+        // Total items: snapshots + 1 volume
+        let totalItems = snapshotCount + 1
+
+        // Create background operation for tracking
+        let operation = SwiftBackgroundOperation(
+            type: .cascadingDelete,
+            resourceType: "Volume: \(volumeName)",
+            itemsTotal: totalItems
+        )
+        tui.swiftBackgroundOps.addOperation(operation)
+        operation.status = .running
+
+        // Show initial status and return to volumes view immediately
+        tui.statusMessage = "Starting cascading delete of volume '\(volumeName)' with \(snapshotCount) snapshot(s)..."
+        tui.markNeedsRedraw()
+
+        // Run the cascading delete in a background task
+        let backgroundTask = Task { @MainActor [weak self] in
+            guard let self = self, let tui = self.tui else {
+                operation.markFailed(error: "Operation cancelled - module unavailable")
+                return
+            }
+
+            let pollIntervalNs: UInt64 = 2_000_000_000 // 2 seconds
+            let maxSnapshotWaitSeconds = 120 // 2 minutes per snapshot
+
+            var snapshotErrors: [String] = []
+            var completedSnapshots = 0
+
+            // Delete snapshots in parallel using TaskGroup
+            // Capture client reference for use in background tasks
+            let client = tui.client
+            let volumeId = volume.id
+
+            let results = await withTaskGroup(of: (String, Bool).self, returning: [(String, Bool)].self) { group in
+                for snapshot in snapshots {
+                    let snapshotId = snapshot.id
+                    let snapshotName = snapshot.name ?? snapshot.id
+
+                    group.addTask {
+                        do {
+                            // Request snapshot deletion
+                            try await client.deleteVolumeSnapshot(snapshotId: snapshotId)
+
+                            // Wait for snapshot to be fully deleted
+                            var snapshotDeleted = false
+                            var waitedSeconds = 0
+
+                            while waitedSeconds < maxSnapshotWaitSeconds {
+                                do {
+                                    // Force refresh to bypass cache and get live API data
+                                    let remainingSnapshots = try await client.getVolumeSnapshots(volumeId: volumeId, forceRefresh: true)
+                                    if !remainingSnapshots.contains(where: { $0.id == snapshotId }) {
+                                        snapshotDeleted = true
+                                        break
+                                    }
+
+                                    if let currentSnapshot = remainingSnapshots.first(where: { $0.id == snapshotId }) {
+                                        let status = currentSnapshot.status?.lowercased() ?? "unknown"
+                                        if status == "deleted" || status == "error_deleting" {
+                                            snapshotDeleted = true
+                                            break
+                                        }
+                                    }
+
+                                    try await Task.sleep(nanoseconds: pollIntervalNs)
+                                    waitedSeconds += 2
+
+                                } catch let error as OpenStackError {
+                                    if case .httpError(404, _) = error {
+                                        snapshotDeleted = true
+                                        break
+                                    }
+                                    try? await Task.sleep(nanoseconds: pollIntervalNs)
+                                    waitedSeconds += 2
+                                } catch {
+                                    try? await Task.sleep(nanoseconds: pollIntervalNs)
+                                    waitedSeconds += 2
+                                }
+                            }
+
+                            if snapshotDeleted {
+                                return (snapshotName, true)
+                            } else {
+                                return (snapshotName, false)
+                            }
+
+                        } catch {
+                            return (snapshotName, false)
+                        }
+                    }
+                }
+
+                var collected: [(String, Bool)] = []
+                for await result in group {
+                    collected.append(result)
+                }
+                return collected
+            }
+
+            // Process results on main actor
+            for (snapshotName, success) in results {
+                if success {
+                    completedSnapshots += 1
+                    operation.itemsCompleted = completedSnapshots
+                    operation.progress = Double(completedSnapshots) / Double(totalItems)
+                    Logger.shared.logInfo(
+                        "Snapshot fully deleted in cascade",
+                        context: ["snapshotName": snapshotName, "volumeId": volume.id]
+                    )
+                } else {
+                    snapshotErrors.append(snapshotName)
+                    operation.itemsFailed += 1
+                    Logger.shared.logWarning(
+                        "Snapshot deletion failed or timed out in cascade",
+                        context: ["snapshotName": snapshotName, "volumeId": volume.id]
+                    )
+                }
+                tui.markNeedsRedraw()
+            }
+
+            tui.statusMessage = "Cascading delete: \(completedSnapshots)/\(snapshotCount) snapshots removed"
+            tui.markNeedsRedraw()
+
+            // Check if all snapshots were deleted
+            if !snapshotErrors.isEmpty {
+                let errorList = snapshotErrors.prefix(3).joined(separator: ", ")
+                let suffix = snapshotErrors.count > 3 ? " and \(snapshotErrors.count - 3) more" : ""
+                let errorMsg = "Failed to delete some snapshots: \(errorList)\(suffix). Volume not deleted."
+                tui.statusMessage = errorMsg
+                operation.markFailed(error: errorMsg)
+                tui.refreshAfterOperation()
+                return
+            }
+
+            // Verify all snapshots removed
+            var snapshotsCleared = false
+            var verifyWaitSeconds = 0
+            let maxVerifyWaitSeconds = 30
+
+            while verifyWaitSeconds < maxVerifyWaitSeconds {
+                do {
+                    // Force refresh to bypass cache and get live API data
+                    let remainingSnapshots = try await tui.client.getVolumeSnapshots(volumeId: volume.id, forceRefresh: true)
+                    if remainingSnapshots.isEmpty {
+                        snapshotsCleared = true
+                        break
+                    }
+                    tui.statusMessage = "Waiting for \(remainingSnapshots.count) snapshot(s) to clear..."
+                    try await Task.sleep(nanoseconds: pollIntervalNs)
+                    verifyWaitSeconds += 2
+                } catch {
+                    snapshotsCleared = true
+                    break
+                }
+            }
+
+            if !snapshotsCleared {
+                let errorMsg = "Snapshots still present on volume '\(volumeName)'. Try again later."
+                tui.statusMessage = errorMsg
+                operation.markFailed(error: errorMsg)
+                return
+            }
+
+            // Wait for volume to be ready for deletion
+            tui.statusMessage = "Waiting for volume '\(volumeName)' to be ready for deletion..."
+
+            let deletableStatuses = ["available", "error", "error_restoring", "error_extending", "error_managing"]
+            let maxWaitSeconds = 60
+
+            var volumeReady = false
+            var currentStatus = volume.status ?? "unknown"
+            var waitedSeconds = 0
+
+            while waitedSeconds < maxWaitSeconds {
+                do {
+                    let freshVolume = try await tui.client.cinder.getVolume(id: volume.id, forceRefresh: true)
+                    currentStatus = freshVolume.status ?? "unknown"
+
+                    if deletableStatuses.contains(currentStatus.lowercased()) {
+                        volumeReady = true
+                        break
+                    }
+
+                    if currentStatus.lowercased().contains("error") && !deletableStatuses.contains(currentStatus.lowercased()) {
+                        break
+                    }
+
+                    tui.statusMessage = "Waiting for volume '\(volumeName)' (status: \(currentStatus))..."
+                    try await Task.sleep(nanoseconds: pollIntervalNs)
+                    waitedSeconds += 2
+
+                } catch {
+                    Logger.shared.logError(
+                        "Failed to poll volume status",
+                        error: error,
+                        context: ["volumeId": volume.id]
+                    )
+                    try? await Task.sleep(nanoseconds: pollIntervalNs)
+                    waitedSeconds += 2
+                }
+            }
+
+            if !volumeReady {
+                let errorMsg = "Deleted \(snapshotCount) snapshot(s) but volume '\(volumeName)' not ready (status: \(currentStatus)). Try again later."
+                tui.statusMessage = errorMsg
+                Logger.shared.logWarning(
+                    "Cascading delete: volume not ready after waiting",
+                    context: ["volumeId": volume.id, "status": currentStatus, "waitedSeconds": "\(waitedSeconds)"]
+                )
+                operation.markFailed(error: errorMsg)
+                tui.refreshAfterOperation()
+                _ = await self.loadAllVolumeSnapshots()
+                return
+            }
+
+            // Delete the volume
+            tui.statusMessage = "Deleting volume '\(volumeName)'..."
+            tui.markNeedsRedraw()
+
+            do {
+                try await tui.client.deleteVolume(id: volume.id)
+
+                // Remove from cached volumes
+                if let index = tui.cacheManager.cachedVolumes.firstIndex(where: { $0.id == volume.id }) {
+                    tui.cacheManager.cachedVolumes.remove(at: index)
+                }
+
+                // Adjust selection if needed
+                let filteredVolumes = FilterUtils.filterVolumes(tui.cacheManager.cachedVolumes, query: tui.searchQuery)
+                let newMaxIndex = max(0, filteredVolumes.count - 1)
+                tui.viewCoordinator.selectedIndex = min(tui.viewCoordinator.selectedIndex, newMaxIndex)
+
+                // Mark volume deletion as completed
+                operation.itemsCompleted = totalItems
+                operation.progress = 1.0
+                operation.markCompleted()
+
+                let successMsg = "Deleted \(snapshotCount) snapshot(s) and volume '\(volumeName)' successfully"
+                tui.statusMessage = successMsg
+                Logger.shared.logInfo(
+                    "Cascading volume delete completed",
+                    context: [
+                        "volumeId": volume.id,
+                        "volumeName": volumeName,
+                        "snapshotsDeleted": "\(snapshotCount)"
+                    ]
+                )
+
+                // Refresh data
+                tui.refreshAfterOperation()
+                _ = await self.loadAllVolumeSnapshots()
+
+            } catch let error as OpenStackError {
+                let baseMsg = "Deleted \(snapshotCount) snapshot(s) but failed to delete volume '\(volumeName)'"
+                let errorMsg: String
+                switch error {
+                case .httpError(_, let message):
+                    errorMsg = message != nil ? "\(baseMsg): \(message!)" : baseMsg
+                default:
+                    errorMsg = "\(baseMsg): \(error)"
+                }
+                tui.statusMessage = errorMsg
+                Logger.shared.logError(
+                    "Cascading delete failed at volume deletion",
+                    error: error,
+                    context: ["volumeId": volume.id, "snapshotsDeleted": "\(snapshotCount)"]
+                )
+                operation.markFailed(error: errorMsg)
+            } catch {
+                let errorMsg = "Deleted \(snapshotCount) snapshot(s) but failed to delete volume: \(error.localizedDescription)"
+                tui.statusMessage = errorMsg
+                Logger.shared.logError(
+                    "Cascading delete failed at volume deletion",
+                    error: error,
+                    context: ["volumeId": volume.id, "snapshotsDeleted": "\(snapshotCount)"]
+                )
+                operation.markFailed(error: errorMsg)
+            }
+        }
+
+        // Store the task reference for potential cancellation
+        operation.task = backgroundTask
     }
 
     /// Create a snapshot from a volume

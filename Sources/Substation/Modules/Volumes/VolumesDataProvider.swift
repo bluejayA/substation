@@ -68,14 +68,13 @@ final class VolumesDataProvider: DataProvider {
             let timeoutSeconds = timeoutForPriority(priority)
 
             // Fetch volumes with appropriate timeout
-            // Note: listVolumes does not support forceRefresh parameter
             let volumes: [Volume]
             if timeoutSeconds > 0 {
                 volumes = try await withTimeout(seconds: timeoutSeconds) {
-                    try await tui.client.listVolumes()
+                    try await tui.client.listVolumes(forceRefresh: forceRefresh)
                 }
             } else {
-                volumes = try await tui.client.listVolumes()
+                volumes = try await tui.client.listVolumes(forceRefresh: forceRefresh)
             }
 
             // Update cache
