@@ -1,3 +1,4 @@
+// Sources/Substation/Framework/BackgroundOperations/BackgroundOperationsView.swift
 import Foundation
 #if canImport(Darwin)
 import Darwin
@@ -6,8 +7,20 @@ import Glibc
 #endif
 import SwiftNCurses
 
-struct SwiftBackgroundOperationsView {
+/// View for displaying a list of background operations
+struct BackgroundOperationsView {
 
+    /// Draw the background operations list view
+    ///
+    /// - Parameters:
+    ///   - screen: The ncurses screen pointer
+    ///   - startRow: Starting row position
+    ///   - startCol: Starting column position
+    ///   - width: Available width
+    ///   - height: Available height
+    ///   - operations: Array of operations to display
+    ///   - scrollOffset: Current scroll offset
+    ///   - selectedIndex: Currently selected index
     @MainActor
     static func draw(
         screen: OpaquePointer?,
@@ -15,19 +28,19 @@ struct SwiftBackgroundOperationsView {
         startCol: Int32,
         width: Int32,
         height: Int32,
-        operations: [SwiftBackgroundOperation],
+        operations: [BackgroundOperation],
         scrollOffset: Int,
         selectedIndex: Int
     ) async {
         guard let screen = screen else { return }
 
         let columns = [
-            StatusListColumn<SwiftBackgroundOperation>(
+            StatusListColumn<BackgroundOperation>(
                 header: "Type",
-                width: 12,
+                width: 16,
                 getValue: { $0.type.displayName }
             ),
-            StatusListColumn<SwiftBackgroundOperation>(
+            StatusListColumn<BackgroundOperation>(
                 header: "Status",
                 width: 12,
                 getValue: { $0.status.displayName },
@@ -41,33 +54,35 @@ struct SwiftBackgroundOperationsView {
                     }
                 }
             ),
-            StatusListColumn<SwiftBackgroundOperation>(
-                header: "Resource/Object",
+            StatusListColumn<BackgroundOperation>(
+                header: "Resource",
                 width: 28,
                 getValue: { $0.displayName }
             ),
-            StatusListColumn<SwiftBackgroundOperation>(
-                header: "Container",
+            StatusListColumn<BackgroundOperation>(
+                header: "Context",
                 width: 18,
                 getValue: { operation in
-                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
+                    if let context = operation.resourceContext {
+                        return context
+                    } else if operation.type.tracksItems {
                         return "-"
                     } else {
-                        return operation.containerName
+                        return "-"
                     }
                 }
             ),
-            StatusListColumn<SwiftBackgroundOperation>(
+            StatusListColumn<BackgroundOperation>(
                 header: "Progress",
                 width: 18,
                 getValue: { operation in
-                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
+                    if operation.type.tracksItems {
                         if operation.status == .completed {
-                            return "\(operation.itemsCompleted)/\(operation.itemsTotal)"
+                            return operation.itemsSummary
                         } else if operation.status.isActive {
                             return "\(operation.itemsCompleted)/\(operation.itemsTotal) (\(operation.progressPercentage)%)"
                         } else {
-                            return "\(operation.itemsCompleted)/\(operation.itemsTotal)"
+                            return operation.itemsSummary
                         }
                     } else {
                         if operation.status == .completed {
@@ -80,11 +95,11 @@ struct SwiftBackgroundOperationsView {
                     }
                 }
             ),
-            StatusListColumn<SwiftBackgroundOperation>(
+            StatusListColumn<BackgroundOperation>(
                 header: "Size/Failed",
                 width: 14,
                 getValue: { operation in
-                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
+                    if operation.type.tracksItems {
                         if operation.itemsFailed > 0 {
                             return "\(operation.itemsFailed) failed"
                         } else {
@@ -97,20 +112,18 @@ struct SwiftBackgroundOperationsView {
                     }
                 }
             ),
-            StatusListColumn<SwiftBackgroundOperation>(
+            StatusListColumn<BackgroundOperation>(
                 header: "Rate",
                 width: 12,
                 getValue: { operation in
-                    if operation.type == .bulkDelete || operation.type == .bulkCreate {
-                        return "-"
-                    } else if operation.status == .running {
+                    if operation.type.tracksBytes && operation.status == .running {
                         return operation.formattedTransferRate
                     } else {
                         return "-"
                     }
                 }
             ),
-            StatusListColumn<SwiftBackgroundOperation>(
+            StatusListColumn<BackgroundOperation>(
                 header: "Time",
                 width: 8,
                 getValue: { $0.formattedElapsedTime }
@@ -136,9 +149,10 @@ struct SwiftBackgroundOperationsView {
             scrollOffset: scrollOffset,
             selectedIndex: selectedIndex,
             dataManager: nil as DataManager?,
-            virtualScrollManager: nil as VirtualScrollManager<SwiftBackgroundOperation>?,
+            virtualScrollManager: nil as VirtualScrollManager<BackgroundOperation>?,
             multiSelectMode: false,
             selectedItems: []
         )
     }
 }
+

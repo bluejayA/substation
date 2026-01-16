@@ -114,6 +114,7 @@ nav:
       - MemoryKit: reference/api/memorykit.md
       - Integration Guide: reference/api/integration.md
     - Framework:
+      - Background Operations: reference/framework/background-operations.md
       - Cache Manager: reference/framework/cache-manager.md
       - Module System: reference/framework/module-system.md
       - Refresh Manager: reference/framework/refresh-manager.md

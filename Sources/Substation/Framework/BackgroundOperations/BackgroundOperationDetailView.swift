@@ -1,8 +1,20 @@
+// Sources/Substation/Framework/BackgroundOperations/BackgroundOperationDetailView.swift
 import Foundation
 import SwiftNCurses
 
-struct SwiftBackgroundOperationDetailView {
+/// View for displaying detailed information about a background operation
+struct BackgroundOperationDetailView {
 
+    /// Draw the operation detail view
+    ///
+    /// - Parameters:
+    ///   - screen: The ncurses screen pointer
+    ///   - startRow: Starting row position
+    ///   - startCol: Starting column position
+    ///   - width: Available width
+    ///   - height: Available height
+    ///   - operation: The operation to display details for
+    ///   - scrollOffset: Current scroll offset
     @MainActor
     static func draw(
         screen: OpaquePointer?,
@@ -10,7 +22,7 @@ struct SwiftBackgroundOperationDetailView {
         startCol: Int32,
         width: Int32,
         height: Int32,
-        operation: SwiftBackgroundOperation,
+        operation: BackgroundOperation,
         scrollOffset: Int
     ) async {
         var sections: [DetailSection] = []
@@ -19,6 +31,7 @@ struct SwiftBackgroundOperationDetailView {
         var basicItems: [DetailItem] = []
         basicItems.append(.field(label: "Operation ID", value: operation.id.uuidString.prefix(8) + "...", style: .secondary))
         basicItems.append(.field(label: "Type", value: operation.type.displayName, style: .secondary))
+        basicItems.append(.field(label: "Category", value: operation.type.category.rawValue, style: .secondary))
 
         // Status with custom component for visual indicator
         let statusStyle: TextStyle
@@ -45,11 +58,13 @@ struct SwiftBackgroundOperationDetailView {
 
         // Resource Information Section
         var resourceItems: [DetailItem] = []
-        resourceItems.append(.field(label: "Container", value: operation.containerName, style: .secondary))
-        if let objectName = operation.objectName {
-            resourceItems.append(.field(label: "Object", value: objectName, style: .secondary))
+        resourceItems.append(.field(label: "Resource", value: operation.resourceName, style: .secondary))
+        if let resourceType = operation.resourceType {
+            resourceItems.append(.field(label: "Resource Type", value: resourceType, style: .secondary))
         }
-        resourceItems.append(.field(label: "Local Path", value: operation.localPath, style: .secondary))
+        if let context = operation.resourceContext {
+            resourceItems.append(.field(label: "Context", value: context, style: .secondary))
+        }
 
         sections.append(DetailSection(title: "Resource Information", items: resourceItems))
 
@@ -57,11 +72,28 @@ struct SwiftBackgroundOperationDetailView {
         if operation.status.isActive || operation.status == .completed {
             var progressItems: [DetailItem] = []
             progressItems.append(.field(label: "Progress", value: "\(operation.progressPercentage)%", style: .secondary))
-            progressItems.append(.field(label: "Bytes Transferred", value: operation.formattedBytesTransferred, style: .secondary))
-            progressItems.append(.field(label: "Total Size", value: operation.formattedTotalBytes, style: .secondary))
 
-            if operation.status == .running {
-                progressItems.append(.field(label: "Transfer Rate", value: operation.formattedTransferRate, style: .secondary))
+            // Show byte-level stats for transfer operations
+            if operation.type.tracksBytes {
+                progressItems.append(.field(label: "Bytes Transferred", value: operation.formattedBytesTransferred, style: .secondary))
+                progressItems.append(.field(label: "Total Size", value: operation.formattedTotalBytes, style: .secondary))
+
+                if operation.status == .running {
+                    progressItems.append(.field(label: "Transfer Rate", value: operation.formattedTransferRate, style: .secondary))
+                }
+            }
+
+            // Show item-level stats for bulk operations
+            if operation.type.tracksItems {
+                progressItems.append(.field(label: "Items Completed", value: "\(operation.itemsCompleted)/\(operation.itemsTotal)", style: .secondary))
+
+                if operation.itemsFailed > 0 {
+                    progressItems.append(.field(label: "Items Failed", value: "\(operation.itemsFailed)", style: .error))
+                }
+
+                if operation.itemsSkipped > 0 {
+                    progressItems.append(.field(label: "Items Skipped", value: "\(operation.itemsSkipped)", style: .info))
+                }
             }
 
             // Show file statistics if multi-file operation
@@ -82,7 +114,7 @@ struct SwiftBackgroundOperationDetailView {
         timingItems.append(.field(label: "Started At", value: operation.startTime.formatted(), style: .secondary))
         timingItems.append(.field(label: "Elapsed Time", value: operation.formattedElapsedTime, style: .secondary))
 
-        if operation.status == .completed {
+        if !operation.status.isActive {
             let duration = operation.elapsedTime
             let minutes = Int(duration) / 60
             let seconds = Int(duration) % 60
@@ -123,3 +155,4 @@ struct SwiftBackgroundOperationDetailView {
         )
     }
 }
+

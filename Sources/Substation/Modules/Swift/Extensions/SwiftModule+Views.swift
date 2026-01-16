@@ -552,7 +552,7 @@ extension SwiftModule {
                 category: .storage,
                 renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
                     guard let self = self, let tui = tui else { return }
-                    await self.renderSwiftBackgroundOperationsView(
+                    await self.renderBackgroundOperationsView(
                         tui: tui,
                         screen: screen,
                         startRow: startRow,
@@ -683,7 +683,7 @@ extension SwiftModule {
                 category: .storage,
                 renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
                     guard let self = self, let tui = tui else { return }
-                    await self.renderSwiftBackgroundOperationDetailView(
+                    await self.renderBackgroundOperationDetailView(
                         tui: tui,
                         screen: screen,
                         startRow: startRow,

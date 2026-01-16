@@ -121,7 +121,7 @@ extension SwiftModule {
             totalBytes: 0
         )
         tui.swiftBackgroundOps.addOperation(operation)
-        operation.status = SwiftBackgroundOperation.OperationStatus.queued
+        operation.status = BackgroundOperationStatus.queued
 
         // Start background deletion task
         let deleteTask = Task { @MainActor in
@@ -210,7 +210,7 @@ extension SwiftModule {
                 totalBytes: Int64(objectsInDirectory.count)
             )
             tui.swiftBackgroundOps.addOperation(operation)
-            operation.status = SwiftBackgroundOperation.OperationStatus.queued
+            operation.status = BackgroundOperationStatus.queued
 
             // Start background deletion task
             let deleteTask = Task { @MainActor in
@@ -251,7 +251,7 @@ extension SwiftModule {
                 totalBytes: 1
             )
             tui.swiftBackgroundOps.addOperation(operation)
-            operation.status = SwiftBackgroundOperation.OperationStatus.queued
+            operation.status = BackgroundOperationStatus.queued
 
             // Start background deletion task
             let deleteTask = Task { @MainActor in
@@ -282,7 +282,7 @@ extension SwiftModule {
     ///   - operation: The background operation tracking this deletion
     private func deleteContainerInBackground(containerName: String, hasObjects: Bool, objectCount: Int, operation: SwiftBackgroundOperation) async {
         guard let tui = tui else { return }
-        operation.status = SwiftBackgroundOperation.OperationStatus.running
+        operation.status = BackgroundOperationStatus.running
 
         do {
             var totalDeletedCount = 0
@@ -292,7 +292,7 @@ extension SwiftModule {
             // This handles pagination (Swift returns max ~10000 objects per list call)
             while true {
                 // Check for cancellation
-                if operation.status == SwiftBackgroundOperation.OperationStatus.cancelled {
+                if operation.status == BackgroundOperationStatus.cancelled {
                     tui.statusMessage = "Container deletion cancelled"
                     return
                 }
@@ -343,7 +343,7 @@ extension SwiftModule {
                     // Process results and start new deletes
                     while let result = await group.next() {
                         // Check for cancellation
-                        if operation.status == SwiftBackgroundOperation.OperationStatus.cancelled {
+                        if operation.status == BackgroundOperationStatus.cancelled {
                             group.cancelAll()
                             return
                         }
@@ -393,7 +393,7 @@ extension SwiftModule {
             }
 
             // Check for cancellation before deleting container
-            if operation.status == SwiftBackgroundOperation.OperationStatus.cancelled {
+            if operation.status == BackgroundOperationStatus.cancelled {
                 tui.statusMessage = "Container deletion cancelled"
                 return
             }
@@ -431,11 +431,11 @@ extension SwiftModule {
     ///   - operation: The background operation tracking this deletion
     private func deleteSingleObjectInBackground(containerName: String, objectName: String, operation: SwiftBackgroundOperation) async {
         guard let tui = tui else { return }
-        operation.status = SwiftBackgroundOperation.OperationStatus.running
+        operation.status = BackgroundOperationStatus.running
 
         do {
             // Check for cancellation
-            if operation.status == SwiftBackgroundOperation.OperationStatus.cancelled {
+            if operation.status == BackgroundOperationStatus.cancelled {
                 tui.statusMessage = "Object deletion cancelled"
                 return
             }
@@ -485,7 +485,7 @@ extension SwiftModule {
     ///   - operation: The background operation tracking this deletion
     private func deleteDirectoryInBackground(containerName: String, directoryPath: String, objects: [SwiftObject], operation: SwiftBackgroundOperation) async {
         guard let tui = tui else { return }
-        operation.status = SwiftBackgroundOperation.OperationStatus.running
+        operation.status = BackgroundOperationStatus.running
 
         let totalObjects = objects.count
         var deletedCount = 0
@@ -518,7 +518,7 @@ extension SwiftModule {
             // Process results and start new deletes
             while let result = await group.next() {
                 // Check for cancellation
-                if operation.status == SwiftBackgroundOperation.OperationStatus.cancelled {
+                if operation.status == BackgroundOperationStatus.cancelled {
                     group.cancelAll()
                     tui.statusMessage = "Directory deletion cancelled"
                     return

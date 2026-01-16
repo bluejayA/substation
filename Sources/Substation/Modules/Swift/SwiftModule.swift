@@ -957,7 +957,7 @@ final class SwiftModule: OpenStackModule {
                 title: "Background Operations",
                 renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
                     guard let self = self, let tui = tui else { return }
-                    await self.renderSwiftBackgroundOperationsView(
+                    await self.renderBackgroundOperationsView(
                         tui: tui,
                         screen: screen,
                         startRow: startRow,
@@ -1087,7 +1087,7 @@ final class SwiftModule: OpenStackModule {
                 title: "Operation Details",
                 renderHandler: { [weak self, weak tui] screen, startRow, startCol, width, height in
                     guard let self = self, let tui = tui else { return }
-                    await self.renderSwiftBackgroundOperationDetailView(
+                    await self.renderBackgroundOperationDetailView(
                         tui: tui,
                         screen: screen,
                         startRow: startRow,
@@ -1752,7 +1752,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render background operations list view
-    func renderSwiftBackgroundOperationsView(
+    func renderBackgroundOperationsView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -1763,7 +1763,7 @@ final class SwiftModule: OpenStackModule {
         // Get all background operations from the manager
         let operations = tui.swiftBackgroundOps.getAllOperations()
 
-        await SwiftBackgroundOperationsView.draw(
+        await BackgroundOperationsView.draw(
             screen: screen,
             startRow: startRow,
             startCol: startCol,
@@ -1776,7 +1776,7 @@ final class SwiftModule: OpenStackModule {
     }
 
     /// Render background operation detail view
-    func renderSwiftBackgroundOperationDetailView(
+    func renderBackgroundOperationDetailView(
         tui: TUI,
         screen: OpaquePointer?,
         startRow: Int32,
@@ -1791,7 +1791,7 @@ final class SwiftModule: OpenStackModule {
             return
         }
 
-        await SwiftBackgroundOperationDetailView.draw(
+        await BackgroundOperationDetailView.draw(
             screen: screen,
             startRow: startRow,
             startCol: startCol,

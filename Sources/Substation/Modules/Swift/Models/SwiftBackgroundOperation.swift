@@ -1,259 +1,83 @@
+// Sources/Substation/Modules/Swift/Models/SwiftBackgroundOperation.swift
+//
+// DEPRECATED: This file exists for backwards compatibility only.
+// Use BackgroundOperation from Sources/Substation/Framework/BackgroundOperations/ instead.
+
 import Foundation
 
-/// Represents a background operation (Swift storage or resource bulk operation)
-@MainActor
-final class SwiftBackgroundOperation: Identifiable {
-    let id: UUID
-    let type: OperationType
-    let containerName: String
-    let objectName: String?
-    let localPath: String
-    let startTime: Date
-    var status: OperationStatus
-    var progress: Double
-    var bytesTransferred: Int64
-    var totalBytes: Int64
-    var filesSkipped: Int
-    var filesCompleted: Int
-    var filesTotal: Int
-    var error: String?
-    /// Task for the main operation
-    var task: Task<Void, Never>?
-    /// Task for upload operations
-    var uploadTask: Task<Void, Never>?
+// MARK: - Legacy Compatibility Extensions
 
-    // Resource bulk operation fields
-    let resourceType: String?
-
-    // MARK: - Deinitialization
-
-    /// Clean up Task references when the operation is deallocated
+extension BackgroundOperation {
+    /// Legacy property for Swift storage container name
     ///
-    /// Cancels any running tasks to prevent memory leaks and ensure
-    /// proper resource cleanup when the operation is no longer needed.
-    deinit {
-        task?.cancel()
-        uploadTask?.cancel()
-    }
-    var itemsTotal: Int
-    var itemsCompleted: Int
-    var itemsFailed: Int
-
-    enum OperationType {
-        case upload
-        case download
-        case delete
-        case bulkDelete
-        case bulkCreate
-        case cascadingDelete
-
-        var displayName: String {
-            switch self {
-            case .upload: return "Upload"
-            case .download: return "Download"
-            case .delete: return "Delete"
-            case .bulkDelete: return "Bulk Delete"
-            case .bulkCreate: return "Bulk Create"
-            case .cascadingDelete: return "Cascading Delete"
-            }
-        }
+    /// Maps to resourceContext for backwards compatibility
+    var containerName: String {
+        return resourceContext ?? ""
     }
 
-    enum OperationStatus {
-        case queued
-        case running
-        case completed
-        case failed
-        case cancelled
-
-        var displayName: String {
-            switch self {
-            case .queued: return "Queued"
-            case .running: return "Running"
-            case .completed: return "Completed"
-            case .failed: return "Failed"
-            case .cancelled: return "Canceled"
-            }
+    /// Legacy property for Swift storage object name
+    ///
+    /// Maps to resourceName for backwards compatibility
+    var objectName: String? {
+        // Only return for storage operations
+        if type.category == .storage {
+            return resourceName
         }
-
-        var isActive: Bool {
-            switch self {
-            case .queued, .running: return true
-            case .completed, .failed, .cancelled: return false
-            }
-        }
+        return nil
     }
 
-    /// Initialize for Swift storage operations
-    init(
-        type: OperationType,
+    /// Legacy property for local file path
+    ///
+    /// Maps to resourceName for backwards compatibility
+    var localPath: String {
+        return resourceName
+    }
+
+    /// Legacy task property alias
+    var uploadTask: Task<Void, Never>? {
+        get { return secondaryTask }
+        set { secondaryTask = newValue }
+    }
+
+    /// Legacy convenience initializer for Swift storage operations
+    ///
+    /// - Parameters:
+    ///   - type: Operation type
+    ///   - containerName: Swift container name
+    ///   - objectName: Object name (optional)
+    ///   - localPath: Local file path
+    ///   - totalBytes: Total bytes to transfer
+    convenience init(
+        type: BackgroundOperationType,
         containerName: String,
         objectName: String?,
         localPath: String,
         totalBytes: Int64
     ) {
-        self.id = UUID()
-        self.type = type
-        self.containerName = containerName
-        self.objectName = objectName
-        self.localPath = localPath
-        self.startTime = Date()
-        self.status = .queued
-        self.progress = 0.0
-        self.bytesTransferred = 0
-        self.totalBytes = totalBytes
-        self.filesSkipped = 0
-        self.filesCompleted = 0
-        self.filesTotal = 0
-        self.resourceType = nil
-        self.itemsTotal = 0
-        self.itemsCompleted = 0
-        self.itemsFailed = 0
+        self.init(
+            type: type,
+            resourceName: objectName ?? localPath,
+            resourceContext: containerName,
+            totalBytes: totalBytes
+        )
     }
 
-    /// Initialize for resource bulk operations
-    init(
-        type: OperationType,
+    /// Legacy convenience initializer for resource bulk operations
+    ///
+    /// - Parameters:
+    ///   - type: Operation type
+    ///   - resourceType: Type of resource (e.g., "Volumes")
+    ///   - itemsTotal: Total items to process
+    convenience init(
+        type: BackgroundOperationType,
         resourceType: String,
         itemsTotal: Int
     ) {
-        self.id = UUID()
-        self.type = type
-        self.containerName = ""
-        self.objectName = nil
-        self.localPath = ""
-        self.startTime = Date()
-        self.status = .queued
-        self.progress = 0.0
-        self.bytesTransferred = 0
-        self.totalBytes = 0
-        self.filesSkipped = 0
-        self.filesCompleted = 0
-        self.filesTotal = 0
-        self.resourceType = resourceType
-        self.itemsTotal = itemsTotal
-        self.itemsCompleted = 0
-        self.itemsFailed = 0
-    }
-
-    var displayName: String {
-        if let resourceType = resourceType {
-            return resourceType
-        } else if let objName = objectName {
-            return objName
-        } else {
-            return localPath
-        }
-    }
-
-    var progressPercentage: Int {
-        return Int(progress * 100)
-    }
-
-    private(set) var endTime: Date?
-
-    var elapsedTime: TimeInterval {
-        if let endTime = endTime {
-            return endTime.timeIntervalSince(startTime)
-        }
-        return Date().timeIntervalSince(startTime)
-    }
-
-    var formattedElapsedTime: String {
-        let elapsed = Int(elapsedTime)
-        let minutes = elapsed / 60
-        let seconds = elapsed % 60
-        return String(format: "%d:%02d", minutes, seconds)
-    }
-
-    var transferRate: Double {
-        guard elapsedTime > 0 else { return 0 }
-        return Double(bytesTransferred) / elapsedTime / 1024 / 1024
-    }
-
-    var formattedTransferRate: String {
-        return String(format: "%.2f MB/s", transferRate)
-    }
-
-    var formattedBytesTransferred: String {
-        let mb = Double(bytesTransferred) / 1024 / 1024
-        return String(format: "%.2f MB", mb)
-    }
-
-    var formattedTotalBytes: String {
-        let mb = Double(totalBytes) / 1024 / 1024
-        return String(format: "%.2f MB", mb)
-    }
-
-    func cancel() {
-        task?.cancel()
-        uploadTask?.cancel()
-        status = .cancelled
-        if endTime == nil {
-            endTime = Date()
-        }
-    }
-
-    func markCompleted() {
-        status = .completed
-        if endTime == nil {
-            endTime = Date()
-        }
-    }
-
-    func markFailed(error: String) {
-        self.error = error
-        status = .failed
-        if endTime == nil {
-            endTime = Date()
-        }
-    }
-}
-
-/// Manager for tracking background operations (Swift storage and resource bulk operations)
-@MainActor
-final class SwiftBackgroundOperationsManager {
-    private var operations: [UUID: SwiftBackgroundOperation] = [:]
-
-    func addOperation(_ operation: SwiftBackgroundOperation) {
-        operations[operation.id] = operation
-    }
-
-    func removeOperation(id: UUID) {
-        operations.removeValue(forKey: id)
-    }
-
-    func getOperation(id: UUID) -> SwiftBackgroundOperation? {
-        return operations[id]
-    }
-
-    func getAllOperations() -> [SwiftBackgroundOperation] {
-        return Array(operations.values).sorted { $0.startTime > $1.startTime }
-    }
-
-    func getActiveOperations() -> [SwiftBackgroundOperation] {
-        return operations.values.filter { $0.status.isActive }.sorted { $0.startTime > $1.startTime }
-    }
-
-    func getCompletedOperations() -> [SwiftBackgroundOperation] {
-        return operations.values.filter { !$0.status.isActive }.sorted { $0.startTime > $1.startTime }
-    }
-
-    func clearCompleted() {
-        operations = operations.filter { $0.value.status.isActive }
-    }
-
-    func cancelAll() {
-        for operation in operations.values where operation.status.isActive {
-            operation.cancel()
-        }
-    }
-
-    var activeCount: Int {
-        return operations.values.filter { $0.status.isActive }.count
-    }
-
-    var completedCount: Int {
-        return operations.values.filter { !$0.status.isActive }.count
+        self.init(
+            type: type,
+            resourceType: resourceType,
+            resourceName: resourceType,
+            itemsTotal: itemsTotal
+        )
     }
 }

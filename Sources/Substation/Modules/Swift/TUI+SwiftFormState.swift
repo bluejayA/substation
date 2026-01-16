@@ -6,6 +6,7 @@ import Foundation
 /// This struct encapsulates all form state and background operation tracking
 /// for the Swift Object Storage module, reducing the number of properties
 /// stored directly in the TUI class.
+@MainActor
 struct SwiftFormState {
     // MARK: - Background Operations
 
