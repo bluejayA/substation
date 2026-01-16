@@ -5,7 +5,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:6.1 AS build
+FROM swift:6.2 AS build
 
 # Set up a build area
 WORKDIR /build
