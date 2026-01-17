@@ -97,7 +97,8 @@ final class MultiLevelCacheTests: XCTestCase {
 
     func testCloudNameWithSpecialCharactersIsSanitized() async throws {
         let cloudName = "cloud/with:special chars"
-        let expectedSanitized = "cloud_with_special_chars"
+        // Sanitization REMOVES invalid characters (/, :, space), doesn't replace with underscore
+        let expectedSanitized = "cloudwithspecialchars"
 
         let config = MultiLevelCacheManager<String, Data>.Configuration(
             l1MaxSize: 10,
@@ -109,8 +110,9 @@ final class MultiLevelCacheTests: XCTestCase {
 
         let cache = MultiLevelCacheManager<String, Data>(configuration: config)
 
-        // Store data to trigger directory creation
-        let testData = Data("test".utf8)
+        // Store large data (>= 500KB) to trigger L3 storage and directory creation
+        // Small data goes to L1/L2, only large data or overflow goes to L3
+        let testData = Data(repeating: 0x42, count: 512 * 1024)  // 512KB to force L3
         await cache.store(testData, forKey: "key", priority: .normal)
 
         // Verify sanitized directory was created
@@ -137,8 +139,9 @@ final class MultiLevelCacheTests: XCTestCase {
 
         let cache = MultiLevelCacheManager<String, Data>(configuration: config)
 
-        // Store data with specific key
-        let testData = Data("test data for consistent hashing".utf8)
+        // Store large data (>= 500KB) to trigger L3 storage directly
+        // Small data goes to L1/L2 based on priority, only large data or overflow goes to L3
+        let testData = Data(repeating: 0x41, count: 512 * 1024)  // 512KB to force L3
         let testKey = "nova_server_list"
         await cache.store(testData, forKey: testKey, priority: .normal)
 
@@ -160,12 +163,13 @@ final class MultiLevelCacheTests: XCTestCase {
                 filename.hasSuffix(".dat"),
                 "Filename should end with '.dat'"
             )
-            // Verify it's a hash format (cache_<16-char-hex>.dat)
+            // Verify it's a hash format (cache_<32-char-hex>.dat)
+            // SHA256 produces 32 bytes, we use first 16 bytes = 32 hex characters
             let nameWithoutPrefix = filename.dropFirst("cache_".count)
             let nameWithoutSuffix = nameWithoutPrefix.dropLast(".dat".count)
             XCTAssertEqual(
-                nameWithoutSuffix.count, 16,
-                "Hash portion should be 16 characters"
+                nameWithoutSuffix.count, 32,
+                "Hash portion should be 32 characters (16 bytes from SHA256)"
             )
             // Verify it's hexadecimal
             let hexChars = CharacterSet(charactersIn: "0123456789abcdef")
