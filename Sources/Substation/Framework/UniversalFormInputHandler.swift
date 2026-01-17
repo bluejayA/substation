@@ -41,6 +41,9 @@ final class UniversalFormInputHandler {
 
     weak var tui: TUI?
 
+    /// Callback to sync state before drawing - receives the current formState and form (type-erased)
+    private var syncCallback: (@MainActor (FormBuilderState, Any) -> Void)?
+
     // MARK: - Initialization
 
     init(tui: TUI) {
@@ -59,6 +62,8 @@ final class UniversalFormInputHandler {
     ///               Receives the current formState and form as parameters to avoid exclusivity violations
     ///   - onCancel: Closure to execute when form is cancelled (ESC on inactive field)
     ///   - customKeyHandler: Optional custom key handler for form-specific keys (return true if handled)
+    ///   - syncStateBeforeDraw: Optional callback to sync state before drawing. Receives current formState
+    ///                          and form as parameters to avoid stale capture issues with @Sendable closures
     func handleInput<Form: FormStateUpdatable & FormStateRebuildable & FormValidatable>(
         _ ch: Int32,
         screen: OpaquePointer?,
@@ -66,8 +71,19 @@ final class UniversalFormInputHandler {
         form: inout Form,
         onSubmit: @MainActor @escaping (FormBuilderState, Form) async -> Void,
         onCancel: @escaping () -> Void,
-        customKeyHandler: (@MainActor @Sendable (Int32, inout FormBuilderState, inout Form, OpaquePointer?) async -> Bool)? = nil
+        customKeyHandler: (@MainActor @Sendable (Int32, inout FormBuilderState, inout Form, OpaquePointer?) async -> Bool)? = nil,
+        syncStateBeforeDraw: (@MainActor (FormBuilderState, Form) -> Void)? = nil
     ) async {
+        // Store sync callback with type erasure - called with current formState and form before each draw
+        if let callback = syncStateBeforeDraw {
+            self.syncCallback = { formState, anyForm in
+                if let typedForm = anyForm as? Form {
+                    callback(formState, typedForm)
+                }
+            }
+        } else {
+            self.syncCallback = nil
+        }
         let isFieldActive = formState.isCurrentFieldActive()
 
         // Give custom handler first priority
@@ -75,7 +91,7 @@ final class UniversalFormInputHandler {
             let handled = await customHandler(ch, &formState, &form, screen)
             if handled {
                 updateFormFromState(&formState, form: &form)
-                await draw(screen: screen)
+                await draw(screen: screen, formState: formState, form: form)
                 return
             }
         }
@@ -85,14 +101,14 @@ final class UniversalFormInputHandler {
             if !isFieldActive {
                 formState.nextField()
                 updateFormFromState(&formState, form: &form)
-                await draw(screen: screen)
+                await draw(screen: screen, formState: formState, form: form)
             }
 
         case 353: // SHIFT+TAB - Navigate to previous field
             if !isFieldActive {
                 formState.previousField()
                 updateFormFromState(&formState, form: &form)
-                await draw(screen: screen)
+                await draw(screen: screen, formState: formState, form: form)
             }
 
         case Int32(32): // SPACE - Activate field, toggle, or add space character
@@ -106,7 +122,7 @@ final class UniversalFormInputHandler {
                 let handled = formState.handleSpecialKey(ch)
                 if handled {
                     updateFormFromState(&formState, form: &form)
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
                 }
             }
 
@@ -117,7 +133,7 @@ final class UniversalFormInputHandler {
             if isFieldActive {
                 formState.deactivateCurrentField()
                 updateFormFromState(&formState, form: &form)
-                await draw(screen: screen)
+                await draw(screen: screen, formState: formState, form: form)
             } else {
                 onCancel()
             }
@@ -127,7 +143,7 @@ final class UniversalFormInputHandler {
                 let handled = formState.handleSpecialKey(ch)
                 if handled {
                     updateFormFromState(&formState, form: &form)
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
                 }
             }
 
@@ -138,7 +154,7 @@ final class UniversalFormInputHandler {
                     let char = Character(scalar)
                     formState.handleCharacterInput(char)
                     updateFormFromState(&formState, form: &form)
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
                 }
             }
         }
@@ -165,13 +181,13 @@ final class UniversalFormInputHandler {
                     // should handle this via custom key handlers that have access to TUI data
                     // rebuildFormState(&formState, form: &form)
 
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
 
                 case .checkbox:
                     // Checkbox fields toggle immediately without activation
                     formState.toggleCurrentField()
                     updateFormFromState(&formState, form: &form)
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
 
                 case .select:
                     // Select fields cycle immediately without activation
@@ -182,13 +198,13 @@ final class UniversalFormInputHandler {
                     // should handle this via custom key handlers that have access to TUI data
                     // rebuildFormState(&formState, form: &form)
 
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
 
                 default:
                     // Other fields activate for editing
                     formState.activateCurrentField()
                     updateFormFromState(&formState, form: &form)
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
                 }
             }
         } else {
@@ -198,13 +214,13 @@ final class UniversalFormInputHandler {
                     // Add space character
                     formState.handleCharacterInput(" ")
                     updateFormFromState(&formState, form: &form)
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
 
                 case .selector, .multiSelect:
                     // Toggle selection
                     formState.toggleCurrentField()
                     updateFormFromState(&formState, form: &form)
-                    await draw(screen: screen)
+                    await draw(screen: screen, formState: formState, form: form)
 
                 default:
                     break
@@ -234,7 +250,7 @@ final class UniversalFormInputHandler {
             // should handle this via custom key handlers that have access to TUI data
             // rebuildFormState(&formState, form: &form)
 
-            await draw(screen: screen)
+            await draw(screen: screen, formState: formState, form: form)
         } else {
             // Sync form with state before validation/submission
             updateFormFromState(&formState, form: &form)
@@ -248,7 +264,7 @@ final class UniversalFormInputHandler {
             } else {
                 // Show validation errors
                 tui.statusMessage = "Validation errors: \(errors.joined(separator: ", "))"
-                await draw(screen: screen)
+                await draw(screen: screen, formState: formState, form: form)
             }
         }
     }
@@ -268,13 +284,13 @@ final class UniversalFormInputHandler {
                 formState.nextField()
             }
             updateFormFromState(&formState, form: &form)
-            await draw(screen: screen)
+            await draw(screen: screen, formState: formState, form: form)
         } else {
             // Handle up/down within active field (selectors, etc.)
             let handled = formState.handleSpecialKey(ch)
             if handled {
                 updateFormFromState(&formState, form: &form)
-                await draw(screen: screen)
+                await draw(screen: screen, formState: formState, form: form)
             }
         }
     }
@@ -306,8 +322,11 @@ final class UniversalFormInputHandler {
 
     // MARK: - Drawing Helper
 
-    private func draw(screen: OpaquePointer?) async {
+    private func draw<Form: FormStateUpdatable>(screen: OpaquePointer?, formState: FormBuilderState, form: Form) async {
         guard let tui = tui else { return }
+        // Sync state before drawing (if callback provided)
+        // formState and form are passed as parameters so the callback gets CURRENT values, not stale captured copies
+        syncCallback?(formState, form)
         await tui.draw(screen: screen)
     }
 }

@@ -916,11 +916,33 @@ extension VolumesModule: ActionProvider {
             let volumeTypes = await loadVolumeTypes()
 
             // Initialize form with loaded data
-            // Sort images and snapshots by name for consistent display and selection
+            // Sort images, snapshots, and volume types by name with ID as tiebreaker
+            // for deterministic ordering that remains stable across rebuilds
             tui.volumeCreateForm = VolumeCreateForm()
-            tui.volumeCreateForm.images = tui.cacheManager.cachedImages.sorted { ($0.name ?? "") < ($1.name ?? "") }
-            tui.volumeCreateForm.snapshots = snapshots.sorted { ($0.name ?? "") < ($1.name ?? "") }
-            tui.volumeCreateForm.volumeTypes = volumeTypes.sorted { ($0.name ?? "") < ($1.name ?? "") }
+            tui.volumeCreateForm.images = tui.cacheManager.cachedImages.sorted {
+                let name0 = $0.name ?? ""
+                let name1 = $1.name ?? ""
+                if name0 != name1 {
+                    return name0 < name1
+                }
+                return $0.id < $1.id
+            }
+            tui.volumeCreateForm.snapshots = snapshots.sorted {
+                let name0 = $0.name ?? ""
+                let name1 = $1.name ?? ""
+                if name0 != name1 {
+                    return name0 < name1
+                }
+                return $0.id < $1.id
+            }
+            tui.volumeCreateForm.volumeTypes = volumeTypes.sorted {
+                let name0 = $0.name ?? ""
+                let name1 = $1.name ?? ""
+                if name0 != name1 {
+                    return name0 < name1
+                }
+                return $0.id < $1.id
+            }
 
             // Initialize form state
             tui.volumeCreateFormState = FormBuilderState(fields: tui.volumeCreateForm.buildFields(

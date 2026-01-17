@@ -121,14 +121,18 @@ struct ServerCreateView {
         switch field.id {
         case ServerCreateFieldId.source.rawValue:
             // Use SourceSelectionView for boot source selection
+            // IMPORTANT: Use field.items (sorted) instead of form.images (unsorted)
+            // to ensure highlightedIndex matches the displayed item order
+            let sortedImages = field.items.compactMap { $0 as? Image }
+            let sortedVolumes = field.items.compactMap { $0 as? Volume }
             await SourceSelectionView.draw(
                 screen: screen,
                 startRow: startRow,
                 startCol: startCol,
                 width: width,
                 height: height,
-                images: form.images,
-                volumes: form.volumes,
+                images: form.bootSource == .image ? sortedImages : form.images,
+                volumes: form.bootSource == .volume ? sortedVolumes : form.volumes,
                 bootSource: form.bootSource,
                 selectedImageId: form.selectedImageID,
                 selectedVolumeId: form.selectedVolumeID,

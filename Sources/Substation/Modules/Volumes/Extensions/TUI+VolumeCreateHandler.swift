@@ -21,6 +21,7 @@ extension TUI {
         var localForm = volumeCreateForm
 
         // Custom key handler for source type selector and source field selection
+        // Note: We must sync state to TUI before drawing since tui.draw() uses tui.volumeCreateFormState
         let customHandler: @MainActor @Sendable (Int32, inout FormBuilderState, inout VolumeCreateForm, OpaquePointer?) async -> Bool = { ch, formState, form, screen in
             // Handle SPACE on selector fields
             if ch == Int32(32) && formState.isCurrentFieldActive() {
@@ -42,6 +43,9 @@ extension TUI {
                                 preservingStateFrom: formState
                             )
 
+                            // Sync state to TUI before drawing
+                            self.volumeCreateFormState = formState
+                            self.volumeCreateForm = form
                             await self.draw(screen: screen)
                             return true // Handled
                         }
@@ -51,6 +55,9 @@ extension TUI {
                             // Toggle the selection
                             formState.toggleCurrentField()
                             form.updateFromFormState(formState)
+                            // Sync state to TUI before drawing
+                            self.volumeCreateFormState = formState
+                            self.volumeCreateForm = form
                             await self.draw(screen: screen)
                             return true // Handled
                         }
@@ -78,6 +85,9 @@ extension TUI {
                                 preservingStateFrom: formState
                             )
 
+                            // Sync state to TUI before drawing
+                            self.volumeCreateFormState = formState
+                            self.volumeCreateForm = form
                             await self.draw(screen: screen)
                             return true // Handled
                         }
@@ -86,6 +96,9 @@ extension TUI {
                         if selector.id == VolumeCreateFieldId.source.rawValue {
                             formState.deactivateCurrentField()
                             form.updateFromFormState(formState)
+                            // Sync state to TUI before drawing
+                            self.volumeCreateFormState = formState
+                            self.volumeCreateForm = form
                             await self.draw(screen: screen)
                             return true // Handled
                         }
@@ -112,7 +125,13 @@ extension TUI {
             onCancel: {
                 self.changeView(to: .volumes, resetSelection: false)
             },
-            customKeyHandler: customHandler
+            customKeyHandler: customHandler,
+            syncStateBeforeDraw: { formState, form in
+                // Sync current state to TUI before every draw
+                // Both formState and form are passed as parameters to avoid stale capture issues
+                self.volumeCreateFormState = formState
+                self.volumeCreateForm = form
+            }
         )
 
         // Always rebuild after universal handler to ensure form reflects current state

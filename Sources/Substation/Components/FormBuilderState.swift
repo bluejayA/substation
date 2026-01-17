@@ -73,11 +73,31 @@ struct FormBuilderState {
                 if let existingState = existingSelectorStates[selectorField.id] {
                     // Update items but preserve search and selection state
                     var updatedState = existingState
+
+                    // Get the ID of the currently highlighted item BEFORE updating items
+                    let oldFilteredItems = existingState.getFilteredItems()
+                    let highlightedItemId: String? = {
+                        guard existingState.highlightedIndex >= 0,
+                              existingState.highlightedIndex < oldFilteredItems.count else {
+                            return nil
+                        }
+                        return oldFilteredItems[existingState.highlightedIndex].id
+                    }()
+
+                    // Update items to new array
                     updatedState.items = selectorField.items
-                    // Validate highlightedIndex against new items count
-                    let filteredItems = updatedState.getFilteredItems()
-                    if updatedState.highlightedIndex >= filteredItems.count {
-                        updatedState.highlightedIndex = max(0, filteredItems.count - 1)
+
+                    // Recalculate highlightedIndex to point to the SAME item by ID in the new array
+                    let newFilteredItems = updatedState.getFilteredItems()
+                    if let itemId = highlightedItemId,
+                       let newIndex = newFilteredItems.firstIndex(where: { $0.id == itemId }) {
+                        // Found the same item in new array - update index to match
+                        updatedState.highlightedIndex = newIndex
+                        // Adjust scroll offset to keep item visible
+                        updatedState.adjustScrollOffsetForIndex(newIndex)
+                    } else if updatedState.highlightedIndex >= newFilteredItems.count {
+                        // Item not found or index out of bounds - clamp to valid range
+                        updatedState.highlightedIndex = max(0, newFilteredItems.count - 1)
                         updatedState.scrollOffset = 0
                     }
                     selectorStates[selectorField.id] = updatedState
@@ -101,11 +121,31 @@ struct FormBuilderState {
                 if let existingState = existingSelectorStates[multiSelectField.id] {
                     // Update items but preserve search and selection state
                     var updatedState = existingState
+
+                    // Get the ID of the currently highlighted item BEFORE updating items
+                    let oldFilteredItems = existingState.getFilteredItems()
+                    let highlightedItemId: String? = {
+                        guard existingState.highlightedIndex >= 0,
+                              existingState.highlightedIndex < oldFilteredItems.count else {
+                            return nil
+                        }
+                        return oldFilteredItems[existingState.highlightedIndex].id
+                    }()
+
+                    // Update items to new array
                     updatedState.items = multiSelectField.items
-                    // Validate highlightedIndex against new items count
-                    let filteredItems = updatedState.getFilteredItems()
-                    if updatedState.highlightedIndex >= filteredItems.count {
-                        updatedState.highlightedIndex = max(0, filteredItems.count - 1)
+
+                    // Recalculate highlightedIndex to point to the SAME item by ID in the new array
+                    let newFilteredItems = updatedState.getFilteredItems()
+                    if let itemId = highlightedItemId,
+                       let newIndex = newFilteredItems.firstIndex(where: { $0.id == itemId }) {
+                        // Found the same item in new array - update index to match
+                        updatedState.highlightedIndex = newIndex
+                        // Adjust scroll offset to keep item visible
+                        updatedState.adjustScrollOffsetForIndex(newIndex)
+                    } else if updatedState.highlightedIndex >= newFilteredItems.count {
+                        // Item not found or index out of bounds - clamp to valid range
+                        updatedState.highlightedIndex = max(0, newFilteredItems.count - 1)
                         updatedState.scrollOffset = 0
                     }
                     selectorStates[multiSelectField.id] = updatedState
@@ -779,15 +819,34 @@ struct FormSelectorFieldState {
         }
     }
 
+    /// Move highlight up with bounds validation against filtered items
     mutating func moveUp() {
+        let filteredItems = getFilteredItems()
+        // Clamp highlightedIndex to valid range first (handles stale state after rebuild)
+        if filteredItems.isEmpty {
+            highlightedIndex = 0
+            return
+        }
+        if highlightedIndex >= filteredItems.count {
+            highlightedIndex = filteredItems.count - 1
+        }
         if highlightedIndex > 0 {
             highlightedIndex -= 1
             adjustScrollOffset()
         }
     }
 
+    /// Move highlight down with bounds validation against filtered items
     mutating func moveDown() {
         let filteredItems = getFilteredItems()
+        if filteredItems.isEmpty {
+            highlightedIndex = 0
+            return
+        }
+        // Clamp highlightedIndex to valid range first (handles stale state after rebuild)
+        if highlightedIndex >= filteredItems.count {
+            highlightedIndex = filteredItems.count - 1
+        }
         if highlightedIndex < filteredItems.count - 1 {
             highlightedIndex += 1
             adjustScrollOffset()
@@ -815,6 +874,22 @@ struct FormSelectorFieldState {
             scrollOffset = highlightedIndex
         } else if highlightedIndex >= scrollOffset + maxVisibleItems {
             scrollOffset = highlightedIndex - maxVisibleItems + 1
+        }
+
+        if scrollOffset < 0 {
+            scrollOffset = 0
+        }
+    }
+
+    /// Adjust scroll offset to ensure a specific index is visible
+    /// Used when recalculating highlightedIndex after items are reordered
+    mutating func adjustScrollOffsetForIndex(_ index: Int) {
+        let maxVisibleItems = 10
+
+        if index < scrollOffset {
+            scrollOffset = index
+        } else if index >= scrollOffset + maxVisibleItems {
+            scrollOffset = index - maxVisibleItems + 1
         }
 
         if scrollOffset < 0 {

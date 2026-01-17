@@ -369,16 +369,34 @@ struct FormSelectorState<Item: FormSelectableItem> {
 
     // MARK: - Navigation
 
+    /// Move highlight up with bounds validation against filtered items
     mutating func moveUp() {
         let displayItems = getFilteredAndSortedItems()
+        // Clamp highlightedIndex to valid range first (handles stale state after rebuild)
+        if displayItems.isEmpty {
+            highlightedIndex = 0
+            return
+        }
+        if highlightedIndex >= displayItems.count {
+            highlightedIndex = displayItems.count - 1
+        }
         if highlightedIndex > 0 {
             highlightedIndex -= 1
             adjustScrollOffset(itemCount: displayItems.count)
         }
     }
 
+    /// Move highlight down with bounds validation against filtered items
     mutating func moveDown() {
         let displayItems = getFilteredAndSortedItems()
+        if displayItems.isEmpty {
+            highlightedIndex = 0
+            return
+        }
+        // Clamp highlightedIndex to valid range first (handles stale state after rebuild)
+        if highlightedIndex >= displayItems.count {
+            highlightedIndex = displayItems.count - 1
+        }
         if highlightedIndex < displayItems.count - 1 {
             highlightedIndex += 1
             adjustScrollOffset(itemCount: displayItems.count)

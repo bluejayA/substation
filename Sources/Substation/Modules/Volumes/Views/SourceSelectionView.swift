@@ -5,9 +5,8 @@ import OSClient
 struct SourceSelectionView {
 
     static func draw(screen: OpaquePointer?, startRow: Int32, startCol: Int32, width: Int32, height: Int32, images: [Image], volumes: [Volume], bootSource: BootSource, selectedImageId: String?, selectedVolumeId: String?, selectedIndex: Int, scrollOffset: Int, searchQuery: String?) async {
-        // Sort volumes alphabetically by name
-        let sortedVolumes = volumes.sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
-
+        // Use items as provided - sorting should be done at the data source level
+        // to ensure consistency between state.highlightedIndex and displayed items
         if bootSource == .image {
             // Use unified ImageSelectionView
             await ImageSelectionView.drawImageSelection(
@@ -31,7 +30,7 @@ struct SourceSelectionView {
                 startCol: startCol,
                 width: width,
                 height: height,
-                volumes: sortedVolumes,
+                volumes: volumes,
                 selectedVolumeId: selectedVolumeId,
                 selectedIndex: selectedIndex,
                 scrollOffset: scrollOffset,
