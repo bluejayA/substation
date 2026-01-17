@@ -396,17 +396,14 @@ struct Substation {
             )
 
         case .applicationCredentialByName(let name, let secret, _, _, _, let projectName):
-            // Application credential by name requires special handling
             Logger.shared.logInfo("Using application credential by name authentication")
             Logger.shared.logDebug("Application credential name: '\(name)'")
 
-            // Check if project_id is available in cloud config
             let projectID = cloudConfig.auth.project_id
             if let projectID = projectID {
                 Logger.shared.logInfo("Using project_id: \(projectID)")
             }
 
-            // For now, use the ID-based approach with the name as ID (this may need OpenStackCredentials enhancement)
             credentials = .applicationCredential(
                 id: name,
                 secret: secret,
@@ -414,11 +411,22 @@ struct Substation {
                 projectID: projectID
             )
 
-        case .token(_, _, _):
-            // Token-based authentication would require extending OpenStackCredentials
-            Logger.shared.logError("Token-based authentication is not yet supported")
-            printError("Token-based authentication is not yet supported by the OpenStack client. Please use password or application credential authentication.")
-            exit(1)
+        case .token(let token, let projectName, let projectID):
+            if let projectName = projectName {
+                Logger.shared.logInfo("Using token authentication for project: \(projectName)")
+            } else if let projectID = projectID {
+                Logger.shared.logInfo("Using token authentication for project ID: \(projectID)")
+            } else {
+                Logger.shared.logInfo("Using unscoped token authentication")
+            }
+
+            credentials = .token(
+                token: token,
+                projectName: projectName,
+                projectID: projectID,
+                userDomainName: userDomain,
+                projectDomainName: projectDomain
+            )
         }
 
         // Clean up stale cache files before starting (older than 8 hours)

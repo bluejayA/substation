@@ -178,6 +178,7 @@ public struct OpenStackConfig: Sendable {
 public enum OpenStackCredentials: Sendable {
     case password(username: String, password: String, projectName: String?, projectID: String? = nil, userDomainName: String? = nil, userDomainID: String? = nil, projectDomainName: String? = nil, projectDomainID: String? = nil)
     case applicationCredential(id: String, secret: String, projectName: String?, projectID: String? = nil)
+    case token(token: String, projectName: String?, projectID: String? = nil, userDomainName: String? = nil, projectDomainName: String? = nil)
 }
 
 // MARK: - Retry Policy
@@ -692,7 +693,8 @@ public actor OpenStackClientCore {
                         password: password
                     )
                 ),
-                applicationCredential: nil
+                applicationCredential: nil,
+                token: nil
             )
 
             // Build project scope - prefer ID over name
@@ -723,7 +725,8 @@ public actor OpenStackClientCore {
                 applicationCredential: AuthApplicationCredential(
                     id: id,
                     secret: secret
-                )
+                ),
+                token: nil
             )
             // For application credentials, create scope if project info is provided
             let scope: AuthScope?
@@ -733,6 +736,33 @@ public actor OpenStackClientCore {
                 scope = AuthScope(project: AuthProject(name: projectName, domain: nil))
             } else {
                 scope = nil
+            }
+            return (identity, scope)
+
+        case .token(let token, let projectName, let projectID, _, let projectDomainName):
+            let identity = Identity(
+                methods: ["token"],
+                password: nil,
+                applicationCredential: nil,
+                token: AuthToken(id: token)
+            )
+
+            // Build project scope - prefer ID over name
+            let scope: AuthScope
+            if let projectID = projectID {
+                scope = AuthScope(project: AuthProject(id: projectID, name: nil, domain: nil))
+            } else if let projectName = projectName {
+                // Build project domain for token auth
+                let projectDomain: AuthDomain?
+                if let projectDomainName = projectDomainName {
+                    projectDomain = AuthDomain(name: projectDomainName)
+                } else {
+                    projectDomain = AuthDomain(name: "default")
+                }
+                scope = AuthScope(project: AuthProject(name: projectName, domain: projectDomain))
+            } else {
+                // No project scoping - unscoped token
+                scope = AuthScope(project: nil)
             }
             return (identity, scope)
         }
@@ -1398,16 +1428,22 @@ private struct Identity: Codable {
     let methods: [String]
     let password: AuthPassword?
     let applicationCredential: AuthApplicationCredential?
+    let token: AuthToken?
 
     enum CodingKeys: String, CodingKey {
         case methods
         case password
         case applicationCredential = "application_credential"
+        case token
     }
 }
 
 private struct AuthPassword: Codable {
     let user: AuthUser
+}
+
+private struct AuthToken: Codable {
+    let id: String
 }
 
 private struct AuthApplicationCredential: Codable {
