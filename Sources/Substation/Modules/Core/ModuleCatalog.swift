@@ -150,9 +150,24 @@ enum ModuleCatalog {
     /// All available module identifiers
     ///
     /// Returns the set of all module identifiers from the catalog.
-    /// Used by FeatureFlags as the default set of enabled modules.
     static var allModuleIdentifiers: Set<String> {
         return Set(availableModules.map { $0.identifier })
+    }
+
+    /// Modules disabled by default in the TUI
+    ///
+    /// These modules remain in the catalog and can be re-enabled via
+    /// the ENABLED_MODULES environment variable or UserDefaults.
+    static let disabledByDefault: Set<String> = [
+        "swift"
+    ]
+
+    /// Module identifiers enabled by default
+    ///
+    /// Returns all modules except those in `disabledByDefault`.
+    /// Used by FeatureFlags as the default set of enabled modules.
+    static var defaultEnabledModuleIdentifiers: Set<String> {
+        return allModuleIdentifiers.subtracting(disabledByDefault)
     }
 
     /// Get module definition by identifier

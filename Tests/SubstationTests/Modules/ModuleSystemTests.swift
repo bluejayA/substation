@@ -383,15 +383,23 @@ final class ModuleSystemTests: XCTestCase {
         )
     }
 
-    /// Test enabledModules defaults to all modules from catalog
+    /// Test enabledModules defaults to catalog modules minus disabledByDefault
     @MainActor func testFeatureFlagsEnabledModulesDefault() {
         let enabledModules = FeatureFlags.enabledModules
-        let catalogModules = ModuleCatalog.allModuleIdentifiers
+        let expectedModules = ModuleCatalog.defaultEnabledModuleIdentifiers
 
         XCTAssertEqual(
             enabledModules,
-            catalogModules,
-            "enabledModules should default to all catalog modules"
+            expectedModules,
+            "enabledModules should default to defaultEnabledModuleIdentifiers"
+        )
+    }
+
+    /// Test that swift is excluded from default enabled modules
+    @MainActor func testFeatureFlagsExcludesSwiftByDefault() {
+        XCTAssertFalse(
+            FeatureFlags.enabledModules.contains("swift"),
+            "Swift module should not be in default enabled modules"
         )
     }
 

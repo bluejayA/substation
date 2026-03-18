@@ -34,8 +34,8 @@ struct FeatureFlags {
             return Set(stored)
         }
         #endif
-        // All available modules enabled by default (dynamic from catalog)
-        return ModuleCatalog.allModuleIdentifiers
+        // Modules enabled by default (excludes disabledByDefault modules)
+        return ModuleCatalog.defaultEnabledModuleIdentifiers
     }
 
     /// Clear all modules (for testing)

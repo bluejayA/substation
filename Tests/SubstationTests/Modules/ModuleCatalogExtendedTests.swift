@@ -354,6 +354,49 @@ final class ModuleCatalogExtendedTests: XCTestCase {
     }
 }
 
+// MARK: - Default Disabled Module Tests
+
+/// Tests for modules disabled by default
+final class ModuleDefaultDisabledTests: XCTestCase {
+
+    /// Test that swift is in the disabledByDefault set
+    @MainActor
+    func testSwiftDisabledByDefault() {
+        XCTAssertTrue(
+            ModuleCatalog.disabledByDefault.contains("swift"),
+            "Swift module should be disabled by default"
+        )
+    }
+
+    /// Test that swift is still in the full catalog
+    @MainActor
+    func testSwiftStillInCatalog() {
+        XCTAssertTrue(
+            ModuleCatalog.allModuleIdentifiers.contains("swift"),
+            "Swift module should still exist in the catalog"
+        )
+    }
+
+    /// Test that defaultEnabledModuleIdentifiers excludes swift
+    @MainActor
+    func testDefaultEnabledExcludesSwift() {
+        XCTAssertFalse(
+            ModuleCatalog.defaultEnabledModuleIdentifiers.contains("swift"),
+            "Swift module should not be in default enabled modules"
+        )
+    }
+
+    /// Test that defaultEnabledModuleIdentifiers contains all non-disabled modules
+    @MainActor
+    func testDefaultEnabledContainsOtherModules() {
+        let enabled = ModuleCatalog.defaultEnabledModuleIdentifiers
+        let all = ModuleCatalog.allModuleIdentifiers
+        let disabled = ModuleCatalog.disabledByDefault
+
+        XCTAssertEqual(enabled, all.subtracting(disabled))
+    }
+}
+
 // MARK: - Load Phase Tests
 
 /// Tests for LoadPhase enum behavior
